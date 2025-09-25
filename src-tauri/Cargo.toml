@@ -1,0 +1,20 @@
+[package]
+name = "lexi-ai-client"
+version = "0.1.0"
+description = "Speech-to-text overlay app for macOS"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = [ "shell-open", "macos-private-api", "global-shortcut"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+cpal = "0.15"
