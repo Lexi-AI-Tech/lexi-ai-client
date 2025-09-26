@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 
 interface AppState {
@@ -31,7 +31,7 @@ function App() {
 
   // Recording duration timer
   useEffect(() => {
-    let interval: NodeJS.Timeout
+    let interval: number
     if (state.isRecording) {
       interval = setInterval(() => {
         setState(prev => ({ ...prev, recordingDuration: prev.recordingDuration + 1 }))
@@ -139,7 +139,7 @@ function App() {
       try {
         const isRecording = await invoke('is_recording')
         if (isRecording !== state.isRecording) {
-          setState(prev => ({ ...prev, isRecording }))
+          setState(prev => ({ ...prev, isRecording: Boolean(isRecording) }))
         }
       } catch (error) {
         console.error('Failed to check recording state:', error)
