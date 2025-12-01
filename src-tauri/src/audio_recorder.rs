@@ -1,6 +1,7 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
 use std::sync::{Arc, Mutex};
+use std::io::Cursor;
 
 pub struct AudioRecorder {
     device: Device,
@@ -29,14 +30,20 @@ impl AudioRecorder {
         }
     }
 
-    pub async fn start_recording(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn start_recording(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let audio_data = Arc::clone(&self.audio_data);
+        // Clear previous data
+        audio_data.lock().unwrap().clear();
+
         let config = self.config.clone();
+        let _channels = config.channels;
 
         let stream = self.device.build_input_stream(
             &config,
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
                 let mut audio_buffer = audio_data.lock().unwrap();
+                // If stereo, we might want to mix down or just keep it. 
+                // For simplicity, we just append all samples.
                 audio_buffer.extend_from_slice(data);
             },
             move |err| {
@@ -50,7 +57,7 @@ impl AudioRecorder {
         Ok(())
     }
 
-    pub async fn stop_recording(&mut self) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn stop_recording(&mut self) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
         if let Some(stream) = self.stream.take() {
             drop(stream);
         }
@@ -59,22 +66,24 @@ impl AudioRecorder {
         let audio_data = audio_buffer.clone();
         drop(audio_buffer);
 
-        // Convert f32 samples to 16-bit PCM
-        let pcm_data: Vec<i16> = audio_data
-            .iter()
-            .map(|&sample| (sample * i16::MAX as f32) as i16)
-            .collect();
+        // Create a WAV writer
+        let spec = hound::WavSpec {
+            channels: self.config.channels,
+            sample_rate: self.config.sample_rate.0,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
 
-        // Convert to bytes
-        let mut bytes = Vec::new();
-        for sample in pcm_data {
-            bytes.extend_from_slice(&sample.to_le_bytes());
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut writer = hound::WavWriter::new(&mut cursor, spec)?;
+            for sample in audio_data {
+                let amplitude = i16::MAX as f32;
+                writer.write_sample((sample * amplitude) as i16)?;
+            }
+            writer.finalize()?;
         }
 
-        // Clear the buffer for next recording
-        let mut audio_buffer = self.audio_data.lock().unwrap();
-        audio_buffer.clear();
-
-        Ok(bytes)
+        Ok(cursor.into_inner())
     }
 }
