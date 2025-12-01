@@ -1,109 +1,191 @@
 # Lexi AI Client
 
-A macOS overlay app built with Tauri that provides speech-to-text functionality with configurable hotkeys. The app can transcribe speech and inject the text into any input field on your Mac.
+A macOS desktop app for speech-to-text transcription with global hotkey support. Record your voice anywhere on your Mac and have it transcribed and inserted into any text field.
 
 ## Features
 
-- 🎤 **Speech-to-Text**: Record audio and convert it to text using a backend API
-- ⌨️ **Global Hotkey**: Configurable hotkey for triggering speech recording
-- 🖥️ **Overlay Window**: Small, always-on-top overlay that doesn't interfere with other apps
-- 📝 **Text Injection**: Automatically injects transcribed text into focused input fields
-- ⚙️ **Configurable**: Set custom API endpoints and hotkeys
+- 🎤 **Voice Recording**: Hold a hotkey to record audio
+- 🤖 **AI Transcription**: Powered by Groq's Whisper API
+- ⌨️ **Auto Text Injection**: Automatically types the transcription into your active text field
+- 🌍 **Global Hotkey**: Works system-wide - press Option (⌥) key to record
+- 🎯 **Lightweight**: Minimal UI, runs in the background
 
 ## Prerequisites
 
-- macOS 10.15 or later
-- Rust (latest stable version)
-- Node.js 16 or later
-- Xcode Command Line Tools
+Before you begin, make sure you have:
 
-## Installation
+- **macOS 10.15+** (Catalina or later)
+- **Node.js 16+** - [Download here](https://nodejs.org/)
+- **Rust** - Install with: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- **Xcode Command Line Tools** - Install with: `xcode-select --install`
 
-### 1. Install Tauri CLI
+## Quick Start
 
-```bash
-npm install -g @tauri-apps/cli
-```
-
-### 2. Build the Tauri App
+### 1. Clone the Repository
 
 ```bash
-# Install Rust dependencies
-cd src-tauri
-cargo build
-
-# Build the app
-cd ..
-npm run build
+git clone <your-repo-url>
+cd lexi-ai-client
 ```
 
-## Usage
+### 2. Install Dependencies
 
-### Run the App
+```bash
+npm install
+```
+
+### 3. Set Up API Key
+
+1. Get a free API key from [Groq](https://console.groq.com/)
+2. Copy the example environment file:
+   ```bash
+   cp src-tauri/.env.example src-tauri/.env
+   ```
+3. Edit `src-tauri/.env` and add your API key:
+   ```
+   GROQ_API_KEY=your_api_key_here
+   ```
+
+### 4. Grant Permissions
+
+The app needs two macOS permissions:
+
+1. **Microphone Access** - To record audio
+2. **Accessibility Access** - To detect hotkeys and inject text
+
+**To grant Accessibility permission:**
+1. Open **System Settings** → **Privacy & Security** → **Accessibility**
+2. Click the **lock icon** and enter your password
+3. Add your **Terminal** app (or the built Lexi AI Client app)
+4. Enable the checkbox
+
+### 5. Run the App
 
 ```bash
 npm run dev
 ```
 
-### Using the App
+The app will open and run in the background.
 
-1. **Start Recording**: Click "Start Recording" or use the default hotkey (Cmd+Shift+V)
-2. **Speak**: Hold the hotkey and speak clearly
-3. **Release**: Release the hotkey to stop recording and transcribe
-4. **Text Injection**: The transcribed text ("hello world") will be automatically injected into the currently focused input field
+## How to Use
 
-## How It Works
+### Method 1: Global Hotkey (Recommended)
 
-The app now uses a simplified approach:
-- Records audio for 2 seconds when the hotkey is pressed
-- Returns "hello world" as the transcription (no external API needed)
-- Injects the text into the currently focused input field
+1. **Press and hold** the **Option (⌥)** key (either left or right)
+2. **Speak** your message
+3. **Release** the Option key
+4. The transcription will automatically be typed into your active text field
 
-## Development
+### Method 2: UI Buttons
 
-### Project Structure
+1. Click **"Start Recording"** in the app window
+2. Speak your message
+3. Click **"Stop Recording"**
+4. The transcription will appear in the app
 
-```
-lexi-ai-client/
-├── src-tauri/          # Rust backend
-│   ├── src/
-│   │   ├── main.rs     # Main application logic
-│   │   ├── audio_recorder.rs
-│   │   ├── speech_api.rs
-│   │   └── text_injector.rs
-│   ├── Cargo.toml
-│   └── tauri.conf.json
-├── dist/               # Frontend
-│   └── index.html
-└── package.json
-```
+## Building for Production
 
-### Building for Production
+To create a standalone macOS app:
 
 ```bash
 npm run build
 ```
 
-This will create a macOS app bundle in `src-tauri/target/release/bundle/macos/`.
+The app will be created at:
+- **App Bundle**: `src-tauri/target/release/bundle/macos/Lexi AI Client.app`
+- **DMG Installer**: `src-tauri/target/release/bundle/dmg/Lexi AI Client_0.1.0_aarch64.dmg`
 
-## Permissions
+You can then move the `.app` to your Applications folder or distribute the `.dmg`.
 
-The app requires the following macOS permissions:
-- **Microphone Access**: To record audio for transcription
-- **Accessibility**: To inject text into other applications
+## Project Structure
 
-Grant these permissions when prompted or in System Preferences > Security & Privacy.
+```
+lexi-ai-client/
+├── src/                    # Frontend (React + TypeScript)
+│   ├── App.tsx            # Main UI component
+│   └── index.css          # Styles
+├── src-tauri/             # Backend (Rust)
+│   ├── src/
+│   │   ├── main.rs        # Main app logic & hotkey listener
+│   │   ├── audio_recorder.rs  # Audio recording
+│   │   ├── speech_api.rs      # Groq API integration
+│   │   └── text_injector.rs   # Text injection
+│   ├── Cargo.toml         # Rust dependencies
+│   └── .env               # API keys (not tracked in git)
+└── package.json           # Node.js dependencies
+```
 
 ## Troubleshooting
 
-### Audio Recording Issues
-- Ensure microphone permissions are granted
-- Check that no other app is using the microphone exclusively
+### "This app does not have Accessibility Permissions"
 
-### Text Injection Not Working
-- Grant accessibility permissions in System Preferences
-- Ensure the target application allows text input
+**Solution**: Grant Accessibility permissions (see step 4 above)
+
+### Hotkey Not Working
+
+**Possible causes:**
+- Accessibility permissions not granted
+- Another app is using the same hotkey
+- Try restarting the app after granting permissions
+
+### Microphone Not Recording
+
+**Solution**: 
+1. Check System Settings → Privacy & Security → Microphone
+2. Ensure the app (or Terminal) has microphone access
+3. Make sure no other app is using the microphone
+
+### "GROQ_API_KEY not set" Error
+
+**Solution**: 
+1. Make sure you created `src-tauri/.env` (not just `.env.example`)
+2. Add your API key: `GROQ_API_KEY=your_key_here`
+3. Restart the app
+
+### Same Transcription Every Time
+
+**Possible causes:**
+- API key not set correctly
+- Audio not being recorded (check microphone permissions)
+- Check terminal output for debug messages (🔍 DEBUG)
+
+## Development
+
+### Run in Development Mode
+
+```bash
+npm run dev
+```
+
+### View Logs
+
+All debug output appears in the terminal where you ran `npm run dev`. Look for:
+- `Starting recording...` - When recording starts
+- `Stopping recording...` - When recording stops
+- `🔍 DEBUG: Audio data size: XXX bytes` - Audio capture info
+- `🔍 DEBUG: Full API response: {...}` - API response
+
+### Modify the Hotkey
+
+Edit `src-tauri/src/main.rs` and change:
+```rust
+let is_pressed = keys.contains(&Keycode::LOption) || keys.contains(&Keycode::ROption);
+```
+
+Available keycodes: `LControl`, `RControl`, `LShift`, `RShift`, `Command`, etc.
+
+## Tech Stack
+
+- **Frontend**: React + TypeScript + Vite
+- **Backend**: Rust + Tauri
+- **Audio**: cpal (cross-platform audio library)
+- **Hotkeys**: device_query
+- **API**: Groq Whisper (speech-to-text)
 
 ## License
 
 MIT License - see LICENSE file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
