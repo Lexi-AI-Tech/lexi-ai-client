@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { listen } from '@tauri-apps/api/event'
 
 interface AppState {
   isRecording: boolean
@@ -24,9 +25,79 @@ function App() {
     transcriptHistory: []
   })
 
-  // Initialize
+  // Initialize and listen for events
   useEffect(() => {
     console.log('Lexi AI Client initialized')
+    
+    const setupListeners = async () => {
+      const unlistenStarted = await listen('recording_started', () => {
+        setState(prev => ({
+          ...prev,
+          isRecording: true,
+          showTranscript: false,
+          recordingDuration: 0,
+          status: 'Recording...',
+          statusType: 'recording'
+        }))
+      })
+
+      const unlistenStopped = await listen('recording_stopped', () => {
+        setState(prev => ({
+          ...prev,
+          isRecording: false,
+          isProcessing: true,
+          status: 'Processing...',
+          statusType: 'processing'
+        }))
+      })
+
+      const unlistenProcessingStart = await listen('processing_start', () => {
+        setState(prev => ({
+          ...prev,
+          isProcessing: true,
+          status: 'Transcribing...',
+          statusType: 'processing'
+        }))
+      })
+
+      const unlistenSuccess = await listen('transcription_success', (event: any) => {
+        const text = event.payload as string
+        setState(prev => ({
+          ...prev,
+          isProcessing: false,
+          status: 'Ready',
+          statusType: 'success',
+          currentTranscript: text,
+          showTranscript: true,
+          transcriptHistory: [...prev.transcriptHistory, text]
+        }))
+        
+        // Auto-hide status after 3 seconds
+        setTimeout(() => {
+          setState(prev => ({ ...prev, status: 'Ready', statusType: '' }))
+        }, 3000)
+      })
+
+      const unlistenError = await listen('transcription_error', (event: any) => {
+        console.error('Transcription error:', event.payload)
+        setState(prev => ({
+          ...prev,
+          isProcessing: false,
+          status: 'Error',
+          statusType: 'error'
+        }))
+      })
+      
+      return () => {
+        unlistenStarted()
+        unlistenStopped()
+        unlistenProcessingStart()
+        unlistenSuccess()
+        unlistenError()
+      }
+    }
+    
+    setupListeners()
   }, [])
 
   // Recording duration timer
@@ -76,29 +147,15 @@ function App() {
     if (!state.isRecording) return
     
     try {
-      updateStatus('Processing...', 'processing')
-      setState(prev => ({ ...prev, isProcessing: true }))
+      // The backend handles the actual stopping and event emission
+      // We just trigger the command if needed, but mostly we rely on the hotkey
+      // or the backend event. If this button is clicked, we should invoke the command.
       await invoke('stop_recording')
-      setState(prev => ({ ...prev, isRecording: false }))
       
-      // Simulate processing time
-      setTimeout(() => {
-        updateStatus('Ready')
-        setState(prev => ({ ...prev, isProcessing: false }))
-        
-        // Show sample transcript (replace with actual transcript)
-        const sampleTranscript = 'Sample transcription: "Hello, this is a test of the speech-to-text functionality. This is a longer sample to demonstrate the transcript display capabilities."'
-        setState(prev => ({
-          ...prev,
-          currentTranscript: sampleTranscript,
-          showTranscript: true,
-          transcriptHistory: [...prev.transcriptHistory, sampleTranscript]
-        }))
-      }, 1500)
+      // We don't manually set state here because we wait for 'recording_stopped' event
+      // But for UI responsiveness we can set a temporary state if needed
     } catch (error) {
       console.error('Failed to stop recording:', error)
-      updateStatus('Error stopping recording', 'error')
-      setState(prev => ({ ...prev, isProcessing: false }))
     }
   }
 

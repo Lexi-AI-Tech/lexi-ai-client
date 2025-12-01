@@ -4,9 +4,9 @@
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use std::sync::OnceLock;
 
-use tauri::{AppHandle, GlobalShortcutManager, Manager, State};
+use tauri::{AppHandle, Manager};
+use device_query::{DeviceQuery, DeviceState, Keycode};
 
 mod audio_recorder;
 mod speech_api;
@@ -16,153 +16,123 @@ use audio_recorder::AudioRecorder;
 use speech_api::SpeechAPI;
 use text_injector::TextInjector;
 
-#[derive(Default)]
-struct AppState {
-    recording: Arc<Mutex<bool>>,
-}
 
-// Global state for hotkey handler
-static GLOBAL_STATE: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
 
 #[tauri::command]
-async fn start_recording(
-    state: State<'_, AppState>,
-    _app_handle: AppHandle,
-) -> Result<(), String> {
-    let mut recording = state.recording.lock().unwrap();
-    if *recording {
-        return Ok(());
-    }
-    *recording = true;
-    drop(recording);
+async fn start_recording(_app_handle: AppHandle) -> Result<(), String> {
+    // This command might be unused now that we use device_query, but keeping it for UI triggers if needed
+    Ok(())
+}
 
-    let recording_state = state.recording.clone();
-    
+#[tauri::command]
+async fn stop_recording() -> Result<(), String> {
+    Ok(())
+}
+
+fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
     thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let mut recorder = AudioRecorder::new();
-            if let Err(e) = recorder.start_recording().await {
-                eprintln!("Failed to start recording: {}", e);
-                return;
-            }
-
-            // Record for a short duration
-            thread::sleep(Duration::from_millis(2000));
+            println!("Processing audio, size: {} bytes", audio_data.len());
             
-            if let Ok(_audio_data) = recorder.stop_recording().await {
-                let api = SpeechAPI::new("".to_string());
-                match api.transcribe_audio(vec![]).await {
-                    Ok(transcription) => {
-                        if !transcription.trim().is_empty() {
-                            let injector = TextInjector::new();
-                            if let Err(e) = injector.inject_text(&transcription) {
-                                eprintln!("Failed to inject text: {}", e);
-                            }
+            // Emit processing start event
+            app_handle.emit_all("processing_start", ()).unwrap_or_default();
+            
+            let api = SpeechAPI::new();
+            match api.transcribe_audio(audio_data).await {
+                Ok(transcription) => {
+                    println!("Transcription: {}", transcription);
+                    
+                    // Emit success event with transcription
+                    app_handle.emit_all("transcription_success", &transcription).unwrap_or_default();
+                    
+                    if !transcription.trim().is_empty() {
+                        let injector = TextInjector::new();
+                        if let Err(e) = injector.inject_text(&transcription) {
+                            eprintln!("Failed to inject text: {}", e);
+                            app_handle.emit_all("injection_error", e.to_string()).unwrap_or_default();
+                        } else {
+                            app_handle.emit_all("injection_success", ()).unwrap_or_default();
                         }
                     }
-                    Err(e) => eprintln!("Transcription failed: {}", e),
+                }
+                Err(e) => {
+                    eprintln!("Transcription failed: {}", e);
+                    app_handle.emit_all("transcription_error", e.to_string()).unwrap_or_default();
                 }
             }
-
-            let mut recording = recording_state.lock().unwrap();
-            *recording = false;
         });
     });
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn stop_recording(state: State<'_, AppState>) -> Result<(), String> {
-    let mut recording = state.recording.lock().unwrap();
-    *recording = false;
-    Ok(())
-}
-
-
-#[tauri::command]
-async fn is_recording(state: State<'_, AppState>) -> Result<bool, String> {
-    let recording = state.recording.lock().unwrap();
-    Ok(*recording)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
+    let recording = Arc::new(Mutex::new(false));
+    
     tauri::Builder::default()
-        .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![
-            start_recording,
-            stop_recording,
-            is_recording
-        ])
-        .setup(|app| {
-            let state = app.state::<AppState>();
-            let recording_state = state.recording.clone();
+        .setup(move |app| {
+            let app_handle = app.handle();
+            let recording_state = recording.clone();
             
-            // Store global state for hotkey handler
-            GLOBAL_STATE.set(recording_state.clone()).unwrap();
-            
-            // Register global hotkey (Cmd+Shift+V)
-            if let Err(e) = app.global_shortcut_manager().register("CmdOrCtrl+Shift+V", || {
-                if let Some(global_state) = GLOBAL_STATE.get() {
-                    let recording = global_state.lock().unwrap();
-                    if !*recording {
-                        // Start recording in a separate thread
-                        let state = global_state.clone();
-                        thread::spawn(move || {
-                            let rt = tokio::runtime::Runtime::new().unwrap();
-                            rt.block_on(async {
-                                let mut recording = state.lock().unwrap();
-                                if *recording {
-                                    return;
+            // Spawn the hotkey listener thread
+            thread::spawn(move || {
+                let mut recorder: Option<AudioRecorder> = None;
+                
+                let device_state = DeviceState::new();
+                let mut was_pressed = false;
+
+                loop {
+                    let keys: Vec<Keycode> = device_state.get_keys();
+                    
+                    // Check for either Left Option or Right Option (macOS uses Option, not Alt)
+                    let is_pressed = keys.contains(&Keycode::LOption) || keys.contains(&Keycode::ROption);
+
+                    if is_pressed && !was_pressed {
+                        // Key Pressed
+                        let mut is_recording = recording_state.lock().unwrap();
+                        if !*is_recording {
+                            println!("Starting recording...");
+                            *is_recording = true;
+                            
+                            // Notify frontend
+                            app_handle.emit_all("recording_started", ()).unwrap_or_default();
+                            
+                            // Start recording
+                            let mut new_recorder = AudioRecorder::new();
+                            if let Err(e) = new_recorder.start_recording() {
+                                eprintln!("Failed to start recording: {}", e);
+                                *is_recording = false;
+                                app_handle.emit_all("recording_error", e.to_string()).unwrap_or_default();
+                            } else {
+                                recorder = Some(new_recorder);
+                            }
+                        }
+                    } else if !is_pressed && was_pressed {
+                        // Key Released
+                        let mut is_recording = recording_state.lock().unwrap();
+                        if *is_recording {
+                            println!("Stopping recording...");
+                            *is_recording = false;
+                            
+                            // Notify frontend
+                            app_handle.emit_all("recording_stopped", ()).unwrap_or_default();
+
+                            if let Some(mut rec) = recorder.take() {
+                                if let Ok(audio_data) = rec.stop_recording() {
+                                    process_audio(audio_data, app_handle.clone());
                                 }
-                                *recording = true;
-                                drop(recording);
-
-                                let recording_state = state.clone();
-                                
-                                thread::spawn(move || {
-                                    let rt = tokio::runtime::Runtime::new().unwrap();
-                                    rt.block_on(async {
-                                        let mut recorder = AudioRecorder::new();
-                                        if let Err(e) = recorder.start_recording().await {
-                                            eprintln!("Failed to start recording: {}", e);
-                                            return;
-                                        }
-
-                                        // Record for a short duration
-                                        thread::sleep(Duration::from_millis(2000));
-                                        
-                                        if let Ok(_audio_data) = recorder.stop_recording().await {
-                                            let api = SpeechAPI::new("".to_string());
-                                            match api.transcribe_audio(vec![]).await {
-                                                Ok(transcription) => {
-                                                    if !transcription.trim().is_empty() {
-                                                        let injector = TextInjector::new();
-                                                        if let Err(e) = injector.inject_text(&transcription) {
-                                                            eprintln!("Failed to inject text: {}", e);
-                                                        }
-                                                    }
-                                                }
-                                                Err(e) => eprintln!("Transcription failed: {}", e),
-                                            }
-                                        }
-
-                                        let mut recording = recording_state.lock().unwrap();
-                                        *recording = false;
-                                    });
-                                });
-                            });
-                        });
+                            }
+                        }
                     }
+
+                    was_pressed = is_pressed;
+                    thread::sleep(Duration::from_millis(50));
                 }
-            }) {
-                eprintln!("Failed to register global shortcut: {}", e);
-            }
+            });
             
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![start_recording, stop_recording])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
