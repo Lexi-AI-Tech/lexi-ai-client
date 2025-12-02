@@ -59,4 +59,44 @@ impl SpeechAPI {
 
         Ok(text)
     }
+
+    pub async fn summarize_text(&self, text: &str) -> Result<String, Box<dyn Error + Send + Sync>> {
+        if self.api_key.is_empty() {
+            return Err("GROQ_API_KEY not set".into());
+        }
+
+        let prompt = format!(
+            "Please provide a concise summary of the following meeting transcript. \
+            Focus on key decisions, action items, and important points.\n\n\
+            Transcript:\n{}", 
+            text
+        );
+
+        let body = serde_json::json!({
+            "model": "llama3-8b-8192",
+            "messages": [
+                {"role": "user", "content": prompt}
+            ]
+        });
+
+        let res = self.client
+            .post("https://api.groq.com/openai/v1/chat/completions")
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&body)
+            .send()
+            .await?;
+
+        if !res.status().is_success() {
+            let error_text = res.text().await?;
+            return Err(format!("API Error: {}", error_text).into());
+        }
+
+        let json: serde_json::Value = res.json().await?;
+        let summary = json["choices"][0]["message"]["content"]
+            .as_str()
+            .unwrap_or("No summary generated")
+            .to_string();
+
+        Ok(summary)
+    }
 }

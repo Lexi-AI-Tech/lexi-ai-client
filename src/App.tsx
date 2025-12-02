@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
+import { MeetingRecorder } from './components/MeetingRecorder'
+import { MeetingList } from './components/MeetingList'
+import { MeetingDetail } from './components/MeetingDetail'
 
 interface AppState {
   isRecording: boolean
@@ -13,7 +16,21 @@ interface AppState {
   transcriptHistory: string[]
 }
 
+interface Meeting {
+  id: string;
+  title: string;
+  date: string;
+  duration_seconds: number;
+  transcript: string;
+  summary: string;
+}
+
 function App() {
+  const [activeTab, setActiveTab] = useState<'dictation' | 'meetings'>('dictation')
+  const [meetings, setMeetings] = useState<Meeting[]>([])
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null)
+
+  // Existing Dictation State
   const [state, setState] = useState<AppState>({
     isRecording: false,
     status: 'Ready',
@@ -25,10 +42,24 @@ function App() {
     transcriptHistory: []
   })
 
-  // Initialize and listen for events
+  // Load meetings on mount
+  useEffect(() => {
+    loadMeetings()
+  }, [])
+
+  const loadMeetings = async () => {
+    try {
+      const loadedMeetings = await invoke<Meeting[]>('get_all_meetings')
+      setMeetings(loadedMeetings.reverse()) // Show newest first
+    } catch (e) {
+      console.error('Failed to load meetings:', e)
+    }
+  }
+
+  // Initialize and listen for events (Dictation)
   useEffect(() => {
     console.log('Lexi AI Client initialized')
-    
+
     const setupListeners = async () => {
       const unlistenStarted = await listen('recording_started', () => {
         setState(prev => ({
@@ -71,8 +102,7 @@ function App() {
           showTranscript: true,
           transcriptHistory: [...prev.transcriptHistory, text]
         }))
-        
-        // Auto-hide status after 3 seconds
+
         setTimeout(() => {
           setState(prev => ({ ...prev, status: 'Ready', statusType: '' }))
         }, 3000)
@@ -87,7 +117,7 @@ function App() {
           statusType: 'error'
         }))
       })
-      
+
       return () => {
         unlistenStarted()
         unlistenStopped()
@@ -96,13 +126,13 @@ function App() {
         unlistenError()
       }
     }
-    
+
     setupListeners()
   }, [])
 
-  // Recording duration timer
+  // Recording duration timer (Dictation)
   useEffect(() => {
-    let interval: number
+    let interval: any
     if (state.isRecording) {
       interval = setInterval(() => {
         setState(prev => ({ ...prev, recordingDuration: prev.recordingDuration + 1 }))
@@ -111,22 +141,19 @@ function App() {
     return () => clearInterval(interval)
   }, [state.isRecording])
 
-  // Update status with animation
+  // Dictation Functions
   const updateStatus = (text: string, type: string = '') => {
     setState(prev => ({ ...prev, status: text, statusType: type }))
   }
 
-  // Format duration
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Start recording
   const startRecording = async () => {
     if (state.isRecording) return
-    
     try {
       await invoke('start_recording')
       setState(prev => ({
@@ -142,24 +169,15 @@ function App() {
     }
   }
 
-  // Stop recording
   const stopRecording = async () => {
     if (!state.isRecording) return
-    
     try {
-      // The backend handles the actual stopping and event emission
-      // We just trigger the command if needed, but mostly we rely on the hotkey
-      // or the backend event. If this button is clicked, we should invoke the command.
       await invoke('stop_recording')
-      
-      // We don't manually set state here because we wait for 'recording_stopped' event
-      // But for UI responsiveness we can set a temporary state if needed
     } catch (error) {
       console.error('Failed to stop recording:', error)
     }
   }
 
-  // Copy transcript to clipboard
   const copyTranscript = async () => {
     try {
       await navigator.clipboard.writeText(state.currentTranscript)
@@ -171,7 +189,6 @@ function App() {
     }
   }
 
-  // Clear transcript
   const clearTranscript = () => {
     setState(prev => ({
       ...prev,
@@ -180,7 +197,6 @@ function App() {
     }))
   }
 
-  // Clear history
   const clearHistory = () => {
     setState(prev => ({
       ...prev,
@@ -190,130 +206,141 @@ function App() {
     }))
   }
 
-  // Listen for recording state changes from the backend
-  useEffect(() => {
-    const checkRecordingState = async () => {
-      try {
-        const isRecording = await invoke('is_recording')
-        if (isRecording !== state.isRecording) {
-          setState(prev => ({ ...prev, isRecording: Boolean(isRecording) }))
-        }
-      } catch (error) {
-        console.error('Failed to check recording state:', error)
-      }
-    }
-
-    const interval = setInterval(checkRecordingState, 1000)
-    return () => clearInterval(interval)
-  }, [state.isRecording])
+  // Meeting Functions
+  const handleMeetingProcessed = (meeting: Meeting) => {
+    setMeetings(prev => [meeting, ...prev])
+    setSelectedMeeting(meeting)
+  }
 
   return (
-    <div className="app">
-      <div className="container">
-        <div className="header">
-          <div className="app-title">
-            <div className="logo">🎤</div>
-            <div className="title-text">
-              <h1>Lexi AI</h1>
-              <p>Speech-to-Text Overlay</p>
-            </div>
+    <div className="min-h-screen bg-gray-900 text-white font-sans">
+      {/* Navigation */}
+      <nav className="bg-gray-800 border-b border-gray-700 p-4">
+        <div className="container mx-auto flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <span className="text-2xl">🎤</span>
+            <h1 className="text-xl font-bold">Lexi AI</h1>
+          </div>
+          <div className="flex space-x-4">
+            <button
+              onClick={() => setActiveTab('dictation')}
+              className={`px-4 py-2 rounded-lg transition-colors ${activeTab === 'dictation' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+            >
+              Dictation
+            </button>
+            <button
+              onClick={() => setActiveTab('meetings')}
+              className={`px-4 py-2 rounded-lg transition-colors ${activeTab === 'meetings' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+            >
+              Meetings
+            </button>
           </div>
         </div>
+      </nav>
 
-        <div className="status-container">
-          <div className={`status ${state.statusType}`}>
-            <div className="status-icon"></div>
-            <span>{state.status}</span>
-            {state.isRecording && (
-              <span className="duration">{formatDuration(state.recordingDuration)}</span>
-            )}
-          </div>
-        </div>
-        
-        <div className="controls">
-          <button 
-            className={`button primary ${state.isRecording ? 'recording' : ''}`}
-            onClick={startRecording}
-            disabled={state.isRecording || state.isProcessing}
-          >
-            {state.isRecording ? (
-              <>
-                <div className="recording-indicator"></div>
-                Recording...
-              </>
-            ) : (
-              <>
-                <span className="icon">🎤</span>
-                Start Recording
-              </>
-            )}
-          </button>
-          <button 
-            className="button secondary"
-            onClick={stopRecording}
-            disabled={!state.isRecording}
-          >
-            <span className="icon">⏹️</span>
-            Stop Recording
-          </button>
-        </div>
+      {/* Content */}
+      <main className="container mx-auto p-4">
+        {activeTab === 'dictation' ? (
+          // Existing Dictation UI (Styled with Tailwind)
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div className="bg-gray-800 rounded-lg p-6 text-center shadow-lg">
+              <div className={`text-lg font-semibold mb-2 ${state.statusType === 'recording' ? 'text-red-400 animate-pulse' :
+                  state.statusType === 'processing' ? 'text-yellow-400' :
+                    state.statusType === 'success' ? 'text-green-400' : 'text-gray-400'
+                }`}>
+                {state.status}
+                {state.isRecording && <span className="ml-2">({formatDuration(state.recordingDuration)})</span>}
+              </div>
 
-        <div className="settings">
-          <h3>Quick Start</h3>
-          
-          <div className="hotkey-display">
-            <span>Global hotkey:</span>
-            <div className="hotkey-combo">⌘⇧V</div>
-          </div>
-          
-          <div className="instructions">
-            Press the hotkey anywhere on your system to start recording. The app will automatically transcribe and inject the text.
-          </div>
-        </div>
+              <div className="flex justify-center space-x-4 mb-6">
+                {!state.isRecording ? (
+                  <button
+                    onClick={startRecording}
+                    disabled={state.isProcessing}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-full transition-all transform hover:scale-105"
+                  >
+                    Start Dictation
+                  </button>
+                ) : (
+                  <button
+                    onClick={stopRecording}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full transition-all transform hover:scale-105 animate-pulse"
+                  >
+                    Stop Dictation
+                  </button>
+                )}
+              </div>
 
-        {state.showTranscript && (
-          <div className="transcript-display show">
-            <div className="transcript-header">
-              <h4>Transcript</h4>
-              <div className="transcript-actions">
-                <button className="transcript-btn" onClick={copyTranscript}>
-                  <span className="icon">📋</span>
-                  Copy
-                </button>
-                <button className="transcript-btn" onClick={clearTranscript}>
-                  <span className="icon">🗑️</span>
-                  Clear
-                </button>
+              <div className="text-sm text-gray-500">
+                Global Hotkey: <span className="font-mono bg-gray-700 px-2 py-1 rounded">Option (Left/Right)</span>
               </div>
             </div>
-            <div className="transcript-text">{state.currentTranscript}</div>
-          </div>
-        )}
 
-        {state.transcriptHistory.length > 0 && (
-          <div className="history-section">
-            <div className="history-header">
-              <h4>History ({state.transcriptHistory.length})</h4>
-              <button className="clear-history-btn" onClick={clearHistory}>
-                Clear All
-              </button>
-            </div>
-            <div className="history-list">
-              {state.transcriptHistory.slice(-3).reverse().map((transcript, index) => (
-                <div key={index} className="history-item">
-                  <div className="history-text">{transcript}</div>
-                  <button 
-                    className="history-copy-btn"
-                    onClick={() => navigator.clipboard.writeText(transcript)}
-                  >
-                    📋
-                  </button>
+            {state.showTranscript && (
+              <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Transcript</h3>
+                  <div className="space-x-2">
+                    <button onClick={copyTranscript} className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded transition-colors">Copy</button>
+                    <button onClick={clearTranscript} className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded transition-colors">Clear</button>
+                  </div>
                 </div>
-              ))}
-            </div>
+                <div className="bg-gray-900 p-4 rounded text-gray-300 min-h-[100px] whitespace-pre-wrap">
+                  {state.currentTranscript}
+                </div>
+              </div>
+            )}
+
+            {state.transcriptHistory.length > 0 && (
+              <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">History</h3>
+                  <button onClick={clearHistory} className="text-sm text-red-400 hover:text-red-300">Clear All</button>
+                </div>
+                <div className="space-y-3">
+                  {state.transcriptHistory.slice(-3).reverse().map((text, i) => (
+                    <div key={i} className="bg-gray-900 p-3 rounded text-sm text-gray-400 flex justify-between items-start group">
+                      <div className="line-clamp-2">{text}</div>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(text)}
+                        className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        📋
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          // Meetings UI
+          <div className="h-[calc(100vh-100px)] flex gap-6">
+            {selectedMeeting ? (
+              <div className="w-full">
+                <MeetingDetail
+                  meeting={selectedMeeting}
+                  onBack={() => setSelectedMeeting(null)}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="w-1/3">
+                  <MeetingList
+                    meetings={meetings}
+                    onSelectMeeting={setSelectedMeeting}
+                  />
+                </div>
+                <div className="w-2/3 flex items-center justify-center">
+                  <MeetingRecorder onMeetingProcessed={handleMeetingProcessed} />
+                </div>
+              </>
+            )}
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }
