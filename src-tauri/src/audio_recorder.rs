@@ -1,58 +1,89 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Stream, StreamConfig};
-use std::sync::{Arc, Mutex, mpsc};
-use std::thread;
-use crate::system_audio::SystemAudioRecorder;
+use cpal::{Device, Stream, StreamConfig, Host};
+use std::sync::{Arc, Mutex};
 
 pub struct AudioRecorder {
-    device: Device,
-    config: StreamConfig,
+    host: Host,
+    mic_device: Device,
+    mic_config: StreamConfig,
+    system_device: Option<Device>,
+    system_config: Option<StreamConfig>,
     mic_stream: Option<Stream>,
-    system_recorder: Option<SystemAudioRecorder>,
+    system_stream: Option<Stream>,
     audio_data: Arc<Mutex<Vec<f32>>>,
 }
 
 impl AudioRecorder {
     pub fn new() -> Self {
         let host = cpal::default_host();
-        let device = host
+        let mic_device = host
             .default_input_device()
             .expect("Failed to get default input device");
         
-        let config = device
+        let mic_config = mic_device
             .default_input_config()
             .expect("Failed to get default input config")
             .into();
 
+        // Try to find BlackHole device for system audio
+        let system_device = host.input_devices()
+            .ok()
+            .and_then(|mut devices| {
+                devices.find(|d| {
+                    d.name()
+                        .map(|name| name.contains("BlackHole"))
+                        .unwrap_or(false)
+                })
+            });
+
+        let system_config = system_device.as_ref().and_then(|device| {
+            device.default_input_config().ok().map(|c| c.into())
+        });
+
         Self {
-            device,
-            config,
+            host,
+            mic_device,
+            mic_config,
+            system_device,
+            system_config,
             mic_stream: None,
-            system_recorder: None,
+            system_stream: None,
             audio_data: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
+    pub fn list_input_devices() -> Vec<String> {
+        let host = cpal::default_host();
+        host.input_devices()
+            .ok()
+            .map(|devices| {
+                devices
+                    .filter_map(|d| d.name().ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn has_system_audio(&self) -> bool {
+        self.system_device.is_some()
+    }
+
     pub fn start_recording(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let audio_data = Arc::clone(&self.audio_data);
-        // Clear previous data
         audio_data.lock().unwrap().clear();
 
-        let config = self.config.clone();
-        
-        // Channel for mixing
-        let (tx, rx) = mpsc::channel::<Vec<f32>>();
-        let tx_mic = tx.clone();
-        let tx_sys = tx.clone();
+        let mic_config = self.mic_config.clone();
+        let mic_audio_data = audio_data.clone();
 
-        // Start Mic Stream
-        let mic_stream = self.device.build_input_stream(
-            &config,
+        // Start microphone stream
+        let mic_stream = self.mic_device.build_input_stream(
+            &mic_config,
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                let _ = tx_mic.send(data.to_vec());
+                let mut audio_buffer = mic_audio_data.lock().unwrap();
+                audio_buffer.extend_from_slice(data);
             },
             move |err| {
-                eprintln!("Error in audio stream: {}", err);
+                eprintln!("Error in mic audio stream: {}", err);
             },
             None,
         )?;
@@ -60,48 +91,30 @@ impl AudioRecorder {
         mic_stream.play()?;
         self.mic_stream = Some(mic_stream);
 
-        // Start System Recorder
-        let mut sys_recorder = SystemAudioRecorder::new(tx_sys);
-        
-        // We need to start it in a way that keeps it alive in the struct
-        // But start() is async.
-        // We can spawn a task that runs start(), but start() holds the stream.
-        // If we await start(), it returns when capture starts.
-        // We need to keep the `sys_recorder` instance which holds the `stream`.
-        
-        // To do this, we need to run the async start method but keep ownership of sys_recorder.
-        // This is hard because start(&mut self) borrows self.
-        
-        // Let's modify SystemAudioRecorder to have a `start_capture` that consumes self and returns a RunningSystemRecorder?
-        // Or just use a channel to send the started recorder back?
-        
-        let (recorder_tx, recorder_rx) = mpsc::channel();
-        
-        thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async {
-                if let Err(e) = sys_recorder.start().await {
-                    eprintln!("Failed to start system audio: {}", e);
-                }
-                let _ = recorder_tx.send(sys_recorder);
-            });
-        });
-        
-        // Wait for the recorder to be returned (started)
-        if let Ok(started_recorder) = recorder_rx.recv() {
-            self.system_recorder = Some(started_recorder);
+        // Start system audio stream if available
+        if let (Some(system_device), Some(system_config)) = (&self.system_device, &self.system_config) {
+            let system_config = system_config.clone();
+            let system_audio_data = audio_data.clone();
+
+            let system_stream = system_device.build_input_stream(
+                &system_config,
+                move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                    let mut audio_buffer = system_audio_data.lock().unwrap();
+                    audio_buffer.extend_from_slice(data);
+                },
+                move |err| {
+                    eprintln!("Error in system audio stream: {}", err);
+                },
+                None,
+            )?;
+
+            system_stream.play()?;
+            self.system_stream = Some(system_stream);
+            
+            println!("✅ Recording with both microphone and system audio (BlackHole)");
         } else {
-            eprintln!("Failed to receive started system recorder");
+            println!("⚠️  Recording with microphone only (BlackHole not found)");
         }
-        
-        // Mixer thread
-        let mixer_audio_data = audio_data.clone();
-        thread::spawn(move || {
-            while let Ok(samples) = rx.recv() {
-                let mut buffer = mixer_audio_data.lock().unwrap();
-                buffer.extend_from_slice(&samples);
-            }
-        });
 
         Ok(())
     }
@@ -110,10 +123,9 @@ impl AudioRecorder {
         if let Some(stream) = self.mic_stream.take() {
             drop(stream);
         }
-        
-        // Stop system recorder
-        if let Some(mut recorder) = self.system_recorder.take() {
-            recorder.stop();
+
+        if let Some(stream) = self.system_stream.take() {
+            drop(stream);
         }
 
         let audio_buffer = self.audio_data.lock().unwrap();
@@ -122,8 +134,8 @@ impl AudioRecorder {
 
         // Create a WAV writer
         let spec = hound::WavSpec {
-            channels: self.config.channels,
-            sample_rate: self.config.sample_rate.0,
+            channels: self.mic_config.channels,
+            sample_rate: self.mic_config.sample_rate.0,
             bits_per_sample: 16,
             sample_format: hound::SampleFormat::Int,
         };
