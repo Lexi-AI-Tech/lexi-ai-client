@@ -73,6 +73,23 @@ pub fn main() {
         .setup(move |app| {
             let app_handle = app.handle();
             let recording_state = recording.clone();
+
+            let window = app.get_window("main").unwrap();
+            #[cfg(target_os = "macos")]
+            {
+                use cocoa::appkit::{NSWindow, NSWindowCollectionBehavior};
+                use cocoa::base::id;
+                use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+
+                if let RawWindowHandle::AppKit(handle) = window.raw_window_handle() {
+                    let ns_window = handle.ns_window as id;
+                    unsafe {
+                        let mut behavior = ns_window.collectionBehavior();
+                        behavior |= NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces;
+                        ns_window.setCollectionBehavior_(behavior);
+                    }
+                }
+            }
             
             // Spawn the hotkey listener thread
             thread::spawn(move || {
