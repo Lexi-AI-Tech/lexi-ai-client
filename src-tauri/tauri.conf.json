@@ -43,12 +43,12 @@
     "windows": [
       {
         "fullscreen": false,
-        "resizable": true,
+        "resizable": false,
         "title": "Lexi AI Client",
-        "width": 400,
-        "height": 600,
-        "minWidth": 300,
-        "minHeight": 400,
+        "width": 200,
+        "height": 60,
+        "minWidth": 200,
+        "minHeight": 60,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "decorations": false,
