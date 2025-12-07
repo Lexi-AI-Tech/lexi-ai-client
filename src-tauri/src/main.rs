@@ -73,6 +73,36 @@ pub fn main() {
         .setup(move |app| {
             let app_handle = app.handle();
             let recording_state = recording.clone();
+
+            let window = app.get_window("main").unwrap();
+            
+            // Position window at bottom center of screen, just above taskbar
+            // if let Ok(monitor) = window.primary_monitor() {
+            //     if let Some(monitor) = monitor {
+            //         let screen_size = monitor.size();
+            //         let window_size = window.inner_size().unwrap();
+            //         let taskbar_height = 60.0; // Approximate taskbar/dock height
+            //         let x = (screen_size.width as f64 / 2.0) - (window_size.width as f64 / 2.0);
+            //         let y = screen_size.height as f64 - window_size.height as f64 - taskbar_height;
+            //         window.set_position(tauri::LogicalPosition::new(x, y)).unwrap_or_default();
+            //     }
+            // }
+            
+            #[cfg(target_os = "macos")]
+            {
+                use cocoa::appkit::{NSWindow, NSWindowCollectionBehavior};
+                use cocoa::base::id;
+                use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+
+                if let RawWindowHandle::AppKit(handle) = window.raw_window_handle() {
+                    let ns_window = handle.ns_window as id;
+                    unsafe {
+                        let mut behavior = ns_window.collectionBehavior();
+                        behavior |= NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces;
+                        ns_window.setCollectionBehavior_(behavior);
+                    }
+                }
+            }
             
             // Spawn the hotkey listener thread
             thread::spawn(move || {
