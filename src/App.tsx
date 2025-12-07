@@ -1,62 +1,103 @@
+/**
+ * Main App Component
+ * 
+ * This is the root React component for the Lexi AI Client frontend.
+ * It manages the application state and listens to events from the Tauri backend
+ * to update the UI based on recording and transcription status.
+ * 
+ * The app displays a Pill component that shows the current state:
+ * - idle: Ready to record
+ * - recording: Currently capturing audio
+ * - processing: Transcribing audio and injecting text
+ */
+
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
 import { Pill } from './components/Pill'
 
+/**
+ * Application state interface
+ * 
+ * Tracks whether we're currently recording and the overall status
+ * of the voice-to-text pipeline.
+ */
 interface AppState {
-  isRecording: boolean
-  status: 'idle' | 'recording' | 'processing'
+  isRecording: boolean  // True when audio is being captured
+  status: 'idle' | 'recording' | 'processing'  // Current pipeline status
 }
 
 function App() {
+  // Initialize application state
+  // The state is updated based on events from the Tauri backend
   const [state, setState] = useState<AppState>({
     isRecording: false,
-    status: 'idle'
+    status: 'idle'  // Start in idle state
   })
 
-  // Initialize and listen for events
+  /**
+   * Set up event listeners for backend events
+   * 
+   * This effect runs once on component mount and sets up listeners for
+   * all events emitted by the Tauri backend. These events notify the
+   * frontend about the state of the recording and transcription pipeline.
+   * 
+   * Events listened to:
+   * - recording_started: Backend detected Option key press, started recording
+   * - recording_stopped: Backend detected Option key release, stopped recording
+   * - processing_start: Backend started transcribing the audio
+   * - transcription_success: Transcription completed successfully
+   * - transcription_error: Transcription failed (API error, etc.)
+   */
   useEffect(() => {
     console.log('Lexi AI Client initialized')
 
     const setupListeners = async () => {
+      // Listen for when recording starts (Option key pressed)
       const unlistenStarted = await listen('recording_started', () => {
         setState(prev => ({
           ...prev,
           isRecording: true,
-          status: 'recording'
+          status: 'recording'  // Update UI to show recording state
         }))
       })
 
+      // Listen for when recording stops (Option key released)
       const unlistenStopped = await listen('recording_stopped', () => {
         setState(prev => ({
           ...prev,
           isRecording: false,
-          status: 'processing'
+          status: 'processing'  // Transition to processing state
         }))
       })
 
+      // Listen for when transcription processing begins
       const unlistenProcessingStart = await listen('processing_start', () => {
         setState(prev => ({
           ...prev,
-          status: 'processing'
+          status: 'processing'  // Ensure we're in processing state
         }))
       })
 
+      // Listen for successful transcription completion
       const unlistenSuccess = await listen('transcription_success', () => {
         setState(prev => ({
           ...prev,
-          status: 'idle'
+          status: 'idle'  // Return to idle, ready for next recording
         }))
       })
 
+      // Listen for transcription errors
       const unlistenError = await listen('transcription_error', (event: any) => {
         console.error('Transcription error:', event.payload)
         setState(prev => ({
           ...prev,
-          status: 'idle'
+          status: 'idle'  // Return to idle even on error
         }))
       })
 
+      // Return cleanup function to unregister all listeners
+      // This prevents memory leaks when the component unmounts
       return () => {
         unlistenStarted()
         unlistenStopped()
@@ -67,13 +108,26 @@ function App() {
     }
 
     setupListeners()
-  }, [])
+  }, [])  // Empty dependency array means this runs only once on mount
 
-  // Check recording state periodically
+  /**
+   * Periodically check recording state from backend
+   * 
+   * This effect polls the backend every second to check if recording is active.
+   * This serves as a fallback mechanism in case event listeners fail or
+   * the state gets out of sync. It helps ensure the UI accurately reflects
+   * the backend state.
+   * 
+   * Note: The `is_recording` command may not be implemented in the backend
+   * (it's not in the current main.rs), so this may throw an error.
+   * This is kept for potential future use or manual recording triggers.
+   */
   useEffect(() => {
     const checkRecordingState = async () => {
       try {
+        // Attempt to query the backend for current recording state
         const isRecording = await invoke('is_recording')
+        // Only update state if it differs from current state
         if (isRecording !== state.isRecording) {
           setState(prev => ({
             ...prev,
@@ -82,14 +136,24 @@ function App() {
           }))
         }
       } catch (error) {
+        // Silently handle errors (command may not be implemented)
         console.error('Failed to check recording state:', error)
       }
     }
 
+    // Check every second
     const interval = setInterval(checkRecordingState, 1000)
+    // Cleanup: clear interval when component unmounts or state changes
     return () => clearInterval(interval)
   }, [state.isRecording])
 
+  /**
+   * Toggle recording state (currently unused - recording is controlled by hotkey)
+   * 
+   * This function could be used for manual recording control via UI,
+   * but currently recording is automatically controlled by the Option key
+   * detection in the backend. This is kept for potential future UI controls.
+   */
   const toggleRecording = async () => {
     if (state.isRecording) {
       await invoke('stop_recording')
@@ -98,10 +162,17 @@ function App() {
     }
   }
 
+  /**
+   * Render the application UI
+   * 
+   * The app displays a single Pill component that shows the current status
+   * and allows manual recording control (though recording is primarily
+   * controlled by the Option key hotkey in the backend).
+   */
   return (
     <Pill
-      status={state.status}
-      onClick={toggleRecording}
+      status={state.status}      // Pass current status to display
+      onClick={toggleRecording}  // Allow manual recording toggle
     />
   )
 }
