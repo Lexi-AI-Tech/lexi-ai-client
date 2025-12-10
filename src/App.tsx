@@ -5,16 +5,15 @@
  * It manages the application state and listens to events from the Tauri backend
  * to update the UI based on recording and transcription status.
  * 
- * The app displays a Pill component that shows the current state:
- * - idle: Ready to record
- * - recording: Currently capturing audio
- * - processing: Transcribing audio and injecting text
+ * The app displays its own interface showing:
+ * - Current status (idle, recording, processing)
+ * - Manual recording controls
+ * - Settings and instructions
  */
 
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
-import { Pill } from './components/Pill'
 
 /**
  * Application state interface
@@ -25,6 +24,7 @@ import { Pill } from './components/Pill'
 interface AppState {
   isRecording: boolean  // True when audio is being captured
   status: 'idle' | 'recording' | 'processing'  // Current pipeline status
+  recordingDuration: number  // Duration of current recording in seconds
 }
 
 function App() {
@@ -32,7 +32,8 @@ function App() {
   // The state is updated based on events from the Tauri backend
   const [state, setState] = useState<AppState>({
     isRecording: false,
-    status: 'idle'  // Start in idle state
+    status: 'idle',  // Start in idle state
+    recordingDuration: 0
   })
 
   /**
@@ -58,7 +59,8 @@ function App() {
         setState(prev => ({
           ...prev,
           isRecording: true,
-          status: 'recording'  // Update UI to show recording state
+          status: 'recording',  // Update UI to show recording state
+          recordingDuration: 0
         }))
       })
 
@@ -111,6 +113,24 @@ function App() {
   }, [])  // Empty dependency array means this runs only once on mount
 
   /**
+   * Track recording duration
+   */
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+    if (state.isRecording) {
+      interval = setInterval(() => {
+        setState(prev => ({
+          ...prev,
+          recordingDuration: prev.recordingDuration + 1
+        }))
+      }, 1000)
+    }
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [state.isRecording])
+
+  /**
    * Periodically check recording state from backend
    * 
    * This effect polls the backend every second to check if recording is active.
@@ -148,11 +168,10 @@ function App() {
   }, [state.isRecording])
 
   /**
-   * Toggle recording state (currently unused - recording is controlled by hotkey)
+   * Toggle recording state
    * 
-   * This function could be used for manual recording control via UI,
-   * but currently recording is automatically controlled by the Option key
-   * detection in the backend. This is kept for potential future UI controls.
+   * This function allows manual recording control via UI,
+   * in addition to the automatic Option key detection in the backend.
    */
   const toggleRecording = async () => {
     if (state.isRecording) {
@@ -163,17 +182,93 @@ function App() {
   }
 
   /**
+   * Format duration in MM:SS format
+   */
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  /**
+   * Get status text based on current state
+   */
+  const getStatusText = (): string => {
+    switch (state.status) {
+      case 'recording':
+        return 'Recording'
+      case 'processing':
+        return 'Processing'
+      default:
+        return 'Ready'
+    }
+  }
+
+  /**
    * Render the application UI
    * 
-   * The app displays a single Pill component that shows the current status
-   * and allows manual recording control (though recording is primarily
-   * controlled by the Option key hotkey in the backend).
+   * The app displays its own interface with status, controls, and settings.
    */
   return (
-    <Pill
-      status={state.status}      // Pass current status to display
-      onClick={toggleRecording}  // Allow manual recording toggle
-    />
+    <div className="app">
+      <div className="container">
+        {/* Header */}
+        <div className="header">
+          <div className="app-title">
+            <div className="logo">🎤</div>
+            <div className="title-text">
+              <h1>Lexi AI Client</h1>
+              <p>Voice-to-Text Assistant</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Container */}
+        <div className="status-container">
+          <div className={`status ${state.status}`}>
+            <span className="status-icon"></span>
+            {getStatusText()}
+            {state.isRecording && (
+              <span className="duration">{formatDuration(state.recordingDuration)}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="controls">
+          <button
+            className={`button ${state.isRecording ? 'recording' : 'primary'}`}
+            onClick={toggleRecording}
+            disabled={state.status === 'processing'}
+          >
+            {state.isRecording ? (
+              <>
+                <span className="recording-indicator"></span>
+                <span>Stop Recording</span>
+              </>
+            ) : (
+              <>
+                <span className="icon">🎤</span>
+                <span>Start Recording</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Settings */}
+        <div className="settings">
+          <h3>How to Use</h3>
+          <div className="hotkey-display">
+            <span>Press and hold</span>
+            <span className="hotkey-combo">Option</span>
+            <span>to record</span>
+          </div>
+          <div className="instructions">
+            Hold the Option key to start recording. Release it to stop and automatically transcribe your speech.
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
