@@ -5,7 +5,7 @@
 // The application provides a voice-to-text overlay that:
 // 1. Listens for Option key press/release to start/stop audio recording
 // 2. Captures audio from the default microphone
-// 3. Transcribes the audio using Groq's Whisper API
+// 3. Transcribes the audio using Lexi AI Server (which uses Groq's Whisper API)
 // 4. Injects the transcribed text into the currently active application
 
 use std::sync::{Arc, Mutex};
