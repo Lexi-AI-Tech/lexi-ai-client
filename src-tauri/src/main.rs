@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Emitter};
 use device_query::{DeviceQuery, DeviceState, Keycode};
 
 // Module declarations for core functionality
@@ -56,7 +56,7 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             println!("Processing audio, size: {} bytes", audio_data.len());
             
             // Notify frontend that transcription has started
-            app_handle.emit_all("processing_start", ()).unwrap_or_default();
+            app_handle.emit("processing_start", ()).unwrap_or_default();
             
             // Initialize the speech API client and transcribe the audio
             let api = SpeechAPI::new();
@@ -65,7 +65,7 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     println!("Transcription: {}", transcription);
                     
                     // Notify frontend of successful transcription
-                    app_handle.emit_all("transcription_success", &transcription).unwrap_or_default();
+                    app_handle.emit("transcription_success", &transcription).unwrap_or_default();
                     
                     // Only inject text if transcription is not empty
                     if !transcription.trim().is_empty() {
@@ -73,12 +73,12 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                         match injector.inject_text(&transcription) {
                             Ok(_) => {
                                 // Successfully injected text into active application
-                                app_handle.emit_all("injection_success", ()).unwrap_or_default();
+                                app_handle.emit("injection_success", ()).unwrap_or_default();
                             }
                             Err(e) => {
                                 eprintln!("Failed to inject text: {}", e);
                                 // Notify frontend of injection failure
-                                app_handle.emit_all("injection_error", e.to_string()).unwrap_or_default();
+                                app_handle.emit("injection_error", e.to_string()).unwrap_or_default();
                             }
                         }
                     }
@@ -86,7 +86,7 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 Err(e) => {
                     eprintln!("Transcription failed: {}", e);
                     // Notify frontend of transcription failure
-                    app_handle.emit_all("transcription_error", e.to_string()).unwrap_or_default();
+                    app_handle.emit("transcription_error", e.to_string()).unwrap_or_default();
                 }
             }
         });
@@ -109,7 +109,7 @@ pub fn main() {
             let app_handle = app.handle();
             let recording_state = recording.clone();
 
-            let window = app.get_window("main").unwrap();
+            let window = app.get_webview_window("main").unwrap();
             
             // Prevent the app from closing when window is closed
             // This keeps the background hotkey monitoring thread running
@@ -148,10 +148,9 @@ pub fn main() {
             {
                 use cocoa::appkit::{NSWindow, NSWindowCollectionBehavior};
                 use cocoa::base::id;
-                use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 
-                if let RawWindowHandle::AppKit(handle) = window.raw_window_handle() {
-                    let ns_window = handle.ns_window as id;
+                if let Ok(ns_window_ptr) = window.ns_window() {
+                    let ns_window = ns_window_ptr as id;
                     unsafe {
                         // Set window behavior to allow it to join all Spaces
                         let mut behavior = ns_window.collectionBehavior();
@@ -163,6 +162,7 @@ pub fn main() {
             
             // Spawn a background thread to continuously monitor for Option key presses
             // This thread runs independently of the main UI thread
+            let app_handle_clone = app_handle.clone();
             thread::spawn(move || {
                 // AudioRecorder instance - created when recording starts, consumed when stopped
                 let mut recorder: Option<AudioRecorder> = None;
@@ -191,7 +191,7 @@ pub fn main() {
                             *is_recording = true;
                             
                             // Notify frontend that recording has started
-                            app_handle.emit_all("recording_started", ()).unwrap_or_default();
+                            app_handle_clone.emit("recording_started", ()).unwrap_or_default();
                             
                             // Initialize and start the audio recorder
                             let mut new_recorder = AudioRecorder::new();
@@ -204,7 +204,7 @@ pub fn main() {
                                     eprintln!("Failed to start recording: {}", e);
                                     // Reset state and notify frontend of error
                                     *is_recording = false;
-                                    app_handle.emit_all("recording_error", e.to_string()).unwrap_or_default();
+                                    app_handle_clone.emit("recording_error", e.to_string()).unwrap_or_default();
                                 }
                             }
                         }
@@ -218,7 +218,7 @@ pub fn main() {
                             *is_recording = false;
                             
                             // Notify frontend that recording has stopped
-                            app_handle.emit_all("recording_stopped", ()).unwrap_or_default();
+                            app_handle_clone.emit("recording_stopped", ()).unwrap_or_default();
 
                             // Stop the recorder and get the audio data
                             if let Some(mut rec) = recorder.take() {
@@ -226,11 +226,11 @@ pub fn main() {
                                     Ok(audio_data) => {
                                         // Process the audio in a separate thread
                                         // This will transcribe and inject the text
-                                        process_audio(audio_data, app_handle.clone());
+                                        process_audio(audio_data, app_handle_clone.clone());
                                     }
                                     Err(e) => {
                                         eprintln!("Failed to stop recording: {}", e);
-                                        app_handle.emit_all("recording_error", e.to_string()).unwrap_or_default();
+                                        app_handle_clone.emit("recording_error", e.to_string()).unwrap_or_default();
                                     }
                                 }
                             }
