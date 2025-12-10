@@ -5,7 +5,7 @@
 // The application provides a voice-to-text overlay that:
 // 1. Listens for Option key press/release to start/stop audio recording
 // 2. Captures audio from the default microphone
-// 3. Transcribes the audio using Groq's Whisper API
+// 3. Transcribes the audio using Lexi AI Server (which uses Groq's Whisper API)
 // 4. Injects the transcribed text into the currently active application
 
 use std::sync::{Arc, Mutex};
@@ -110,6 +110,22 @@ pub fn main() {
             let recording_state = recording.clone();
 
             let window = app.get_window("main").unwrap();
+            
+            // Prevent the app from closing when window is closed
+            // This keeps the background hotkey monitoring thread running
+            let window_clone = window.clone();
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    // Hide the window instead of closing it
+                    // This keeps the app running in the background so hotkeys continue to work
+                    api.prevent_close();
+                    if let Err(e) = window_clone.hide() {
+                        eprintln!("Failed to hide window: {}", e);
+                    } else {
+                        println!("Window hidden - app continues running in background. Hotkeys will still work.");
+                    }
+                }
+            });
             
             // Window positioning code (currently commented out)
             // This would position the window at the bottom center of the screen,
