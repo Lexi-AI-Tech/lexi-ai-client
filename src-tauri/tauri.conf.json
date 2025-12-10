@@ -30,7 +30,7 @@
         "icons/icon.ico"
       ],
       "macOS": {
-        "entitlements": null,
+        "entitlements": "entitlements.plist",
         "exceptionDomain": "",
         "frameworks": [],
         "providerShortName": null,
@@ -43,16 +43,16 @@
     "windows": [
       {
         "fullscreen": false,
-        "resizable": false,
+        "resizable": true,
         "title": "Lexi AI Client",
-        "width": 200,
-        "height": 60,
-        "minWidth": 200,
-        "minHeight": 60,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "decorations": false,
-        "transparent": true
+        "width": 400,
+        "height": 500,
+        "minWidth": 350,
+        "minHeight": 400,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "decorations": true,
+        "transparent": false
       }
     ],
     "macOSPrivateApi": true
