@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
 /**
@@ -116,7 +116,7 @@ function App() {
    * Track recording duration
    */
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
+    let interval: ReturnType<typeof setInterval> | null = null
     if (state.isRecording) {
       interval = setInterval(() => {
         setState(prev => ({
