@@ -167,19 +167,6 @@ function App() {
     return () => clearInterval(interval)
   }, [state.isRecording])
 
-  /**
-   * Toggle recording state
-   * 
-   * This function allows manual recording control via UI,
-   * in addition to the automatic Option key detection in the backend.
-   */
-  const toggleRecording = async () => {
-    if (state.isRecording) {
-      await invoke('stop_recording')
-    } else {
-      await invoke('start_recording')
-    }
-  }
 
   /**
    * Format duration in MM:SS format
@@ -238,7 +225,7 @@ function App() {
         <div className="controls">
           <button
             className={`button ${state.isRecording ? 'recording' : 'primary'}`}
-            onClick={toggleRecording}
+            onClick={() => {}}
             disabled={state.status === 'processing'}
           >
             {state.isRecording ? (
