@@ -12,7 +12,6 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
 use tauri::{AppHandle, Manager, Emitter};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 // Module declarations for core functionality
 mod audio_recorder;  // Handles audio capture from microphone
@@ -129,22 +128,14 @@ pub fn main() {
                 }
             }
             
-            // Register global shortcuts for Option key
-            // Note: Global shortcuts don't support modifier-only keys (like just Option/Alt),
-            // so we use Alt+Space (Option+Space on macOS) as the trigger
             #[cfg(desktop)]
             {
                 let recording_state_clone = recording_state.clone();
                 let app_handle_clone = app_handle.clone();
                 
-                // Store the registered shortcut for comparison in the handler
-                let option_space_shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
-                let registered_shortcut = option_space_shortcut.clone();
-                
                 // Channel to communicate with the recording thread
                 // Sender is used to signal start/stop, receiver is used in the recording thread
-                let (tx, rx) = mpsc::channel::<bool>(); // true = start, false = stop
-                let tx_clone = tx.clone();
+                let (_tx, rx) = mpsc::channel::<bool>(); // true = start, false = stop
                 
                 // Spawn a dedicated thread to manage the audio recorder
                 // This thread will handle creating, starting, and stopping the recorder
@@ -196,67 +187,6 @@ pub fn main() {
                         }
                     }
                 });
-                
-                // Initialize the global shortcut plugin with a handler
-                app.handle().plugin(
-                    tauri_plugin_global_shortcut::Builder::new()
-                        .with_handler(move |_app, shortcut, event| {
-                            // Only handle our registered Option+Space shortcut
-                            if shortcut != &registered_shortcut {
-                                return;
-                            }
-                            
-                            match event.state() {
-                                ShortcutState::Pressed => {
-                                    let mut is_recording = recording_state_clone.lock().unwrap();
-                                    // Only start recording if we're not already recording
-                                    if !*is_recording {
-                                        println!("Option+Space pressed - starting recording");
-                                        *is_recording = true;
-                                        
-                                        // Notify frontend that recording has started
-                                        app_handle_clone.emit("recording_started", ()).unwrap_or_default();
-                                        
-                                        // Signal the recording thread to start
-                                        if let Err(e) = tx_clone.send(true) {
-                                            eprintln!("Failed to signal recording start: {}", e);
-                                            let mut is_rec = recording_state_clone.lock().unwrap();
-                                            *is_rec = false;
-                                        }
-                                    }
-                                }
-                                ShortcutState::Released => {
-                                    let mut is_recording = recording_state_clone.lock().unwrap();
-                                    // Only stop recording if we were actually recording
-                                    if *is_recording {
-                                        println!("Option+Space released - stopping recording");
-                                        *is_recording = false;
-                                        
-                                        // Notify frontend that recording has stopped
-                                        app_handle_clone.emit("recording_stopped", ()).unwrap_or_default();
-
-                                        // Signal the recording thread to stop
-                                        if let Err(e) = tx_clone.send(false) {
-                                            eprintln!("Failed to signal recording stop: {}", e);
-                                        }
-                                    }
-                                }
-                            }
-                        })
-                        .build(),
-                )?;
-                
-                // Register Option+Space shortcut
-                // Note: We use Alt+Space because global shortcuts don't support modifier-only keys
-                match app.global_shortcut().register(option_space_shortcut) {
-                    Ok(_) => {
-                        println!("Registered Option+Space global shortcut (hold Option+Space to record)");
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to register Option+Space shortcut: {}", e);
-                        return Err(format!("Failed to register global shortcut: {}", e).into());
-                    }
-                }
             }
             
             Ok(())
