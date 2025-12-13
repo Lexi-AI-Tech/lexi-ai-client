@@ -3,7 +3,7 @@
 
 // This is the main entry point for the Lexi AI Client Tauri application.
 // The application provides a voice-to-text overlay that:
-// 1. Listens for Option key press/release to start/stop audio recording
+// 1. Listens for Function key (fn) press/release to start/stop audio recording
 // 2. Captures audio from the default microphone
 // 3. Transcribes the audio using Lexi AI Server (which uses Groq's Whisper API)
 // 4. Injects the transcribed text into the currently active application
@@ -78,7 +78,7 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 /// Main entry point for the Tauri application
 /// 
 /// Sets up the application window, configures macOS-specific window behavior,
-/// and registers global shortcuts for Option key presses/releases
+/// and registers global shortcuts for Function key (fn) presses/releases
 /// to control audio recording.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
@@ -91,8 +91,13 @@ pub fn main() {
             let app_handle = app.handle();
             let recording_state = recording.clone();
             
+            // Channel to communicate with the recording thread
+            // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
+            let (recording_tx, recording_rx) = mpsc::channel::<bool>(); // true = start, false = stop
+            
             // Start the global input listener (rdev) in a background thread
-            global_key_listener::start_listener(app_handle.clone());
+            // Pass the channel sender so it can trigger recording on F1 key press/release
+            global_key_listener::start_listener(app_handle.clone(), recording_tx);
 
             let window = app.get_webview_window("main").unwrap();
             
@@ -137,43 +142,51 @@ pub fn main() {
                 let recording_state_clone = recording_state.clone();
                 let app_handle_clone = app_handle.clone();
                 
-                // Channel to communicate with the recording thread
-                // Sender is used to signal start/stop, receiver is used in the recording thread
-                let (_tx, rx) = mpsc::channel::<bool>(); // true = start, false = stop
-                
                 // Spawn a dedicated thread to manage the audio recorder
                 // This thread will handle creating, starting, and stopping the recorder
+                // It receives signals from the global key listener via the channel
                 let app_handle_for_recording = app_handle_clone.clone();
                 let recording_state_for_recording = recording_state_clone.clone();
                 thread::spawn(move || {
                     let mut recorder: Option<AudioRecorder> = None;
                     
                     loop {
-                        match rx.recv() {
+                        match recording_rx.recv() {
                             Ok(true) => {
-                                // Start recording
+                                // Start recording (Function key pressed)
                                 if recorder.is_none() {
-                                    println!("Starting recording in dedicated thread...");
+                                    println!("Function key (fn) pressed - Starting recording in dedicated thread...");
+                                    let mut is_rec = recording_state_for_recording.lock().unwrap();
+                                    *is_rec = true;
+                                    drop(is_rec);
+                                    
                                     let mut new_recorder = AudioRecorder::new();
                                     match new_recorder.start_recording() {
                                         Ok(_) => {
                                             recorder = Some(new_recorder);
+                                            app_handle_for_recording.emit("recording_started", ()).unwrap_or_default();
                                         }
                                         Err(e) => {
                                             eprintln!("Failed to start recording: {}", e);
                                             let mut is_rec = recording_state_for_recording.lock().unwrap();
                                             *is_rec = false;
+                                            drop(is_rec);
                                             app_handle_for_recording.emit("recording_error", e.to_string()).unwrap_or_default();
                                         }
                                     }
                                 }
                             }
                             Ok(false) => {
-                                // Stop recording
+                                // Stop recording (Function key released)
                                 if let Some(mut rec) = recorder.take() {
-                                    println!("Stopping recording in dedicated thread...");
+                                    println!("Function key (fn) released - Stopping recording in dedicated thread...");
+                                    let mut is_rec = recording_state_for_recording.lock().unwrap();
+                                    *is_rec = false;
+                                    drop(is_rec);
+                                    
                                     match rec.stop_recording() {
                                         Ok(audio_data) => {
+                                            app_handle_for_recording.emit("recording_stopped", ()).unwrap_or_default();
                                             // Process the audio in a separate thread
                                             process_audio(audio_data, app_handle_for_recording.clone());
                                         }
