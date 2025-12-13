@@ -38,6 +38,7 @@ function App() {
 
   const [isRequestingPermission, setIsRequestingPermission] = useState(false)
   const [isRequestingInputMonitoring, setIsRequestingInputMonitoring] = useState(false)
+  const [isRequestingAccessibility, setIsRequestingAccessibility] = useState(false)
   const [permissionMessage, setPermissionMessage] = useState<string | null>(null)
 
   /**
@@ -250,6 +251,29 @@ function App() {
   }
 
   /**
+   * Request Accessibility permission from macOS (required for pasting text)
+   */
+  const handleRequestAccessibilityPermission = async () => {
+    setIsRequestingAccessibility(true)
+    setPermissionMessage(null)
+    
+    try {
+      const result = await invoke<boolean>('request_accessibility_permission')
+      if (result) {
+        setPermissionMessage('Permission dialog should appear. Please grant Accessibility access in the dialog, then restart the app.')
+        // Clear message after 8 seconds
+        setTimeout(() => setPermissionMessage(null), 8000)
+      }
+    } catch (error) {
+      console.error('Failed to request Accessibility permission:', error)
+      setPermissionMessage('Failed to request permission. Please manually grant Accessibility permission in System Settings → Privacy & Security → Accessibility.')
+      setTimeout(() => setPermissionMessage(null), 8000)
+    } finally {
+      setIsRequestingAccessibility(false)
+    }
+  }
+
+  /**
    * Render the application UI
    * 
    * The app displays its own interface with status, controls, and settings.
@@ -305,8 +329,13 @@ function App() {
           <h3>Permissions</h3>
           <div className="permission-section">
             <p className="permission-text">
-              This app needs microphone and Input Monitoring permissions to work properly.
+              This app needs three permissions:
             </p>
+            <ul style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', textAlign: 'left', marginBottom: '12px', paddingLeft: '20px' }}>
+              <li>Microphone - to record audio</li>
+              <li>Input Monitoring - to detect fn/Option key presses</li>
+              <li>Accessibility - to paste transcribed text into applications</li>
+            </ul>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
                 className="button secondary"
@@ -321,6 +350,13 @@ function App() {
                 disabled={isRequestingInputMonitoring}
               >
                 {isRequestingInputMonitoring ? 'Requesting...' : 'Request Input Monitoring Permission'}
+              </button>
+              <button
+                className="button secondary"
+                onClick={handleRequestAccessibilityPermission}
+                disabled={isRequestingAccessibility}
+              >
+                {isRequestingAccessibility ? 'Requesting...' : 'Request Accessibility Permission'}
               </button>
             </div>
             {permissionMessage && (

@@ -89,6 +89,49 @@ fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> 
     Ok(true)
 }
 
+/// Request Accessibility permission on macOS
+/// This is required for pasting text via AppleScript/System Events
+#[tauri::command]
+#[cfg(target_os = "macos")]
+fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
+    use std::process::Command;
+    use std::thread;
+    use std::time::Duration;
+    
+    // Spawn a thread to attempt using System Events, which triggers the permission dialog
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(100));
+        
+        // Try to run a simple AppleScript that uses System Events
+        // This will trigger the Accessibility permission dialog
+        // We use a harmless command that just checks if we can access System Events
+        let script = r#"
+            tell application "System Events"
+                -- Just check if we can access System Events (triggers permission dialog)
+                get name of every process
+            end tell
+        "#;
+        
+        let _ = std::panic::catch_unwind(|| {
+            let _ = Command::new("osascript")
+                .arg("-e")
+                .arg(script)
+                .output();
+            println!("Accessibility permission dialog should have appeared");
+        });
+    });
+    
+    // Return immediately - the permission dialog will appear asynchronously
+    Ok(true)
+}
+
+/// Request Accessibility permission (non-macOS platforms)
+#[tauri::command]
+#[cfg(not(target_os = "macos"))]
+fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
+    Ok(true)
+}
+
 /// Processes recorded audio data by:
 /// 1. Sending it to the speech-to-text API for transcription
 /// 2. Injecting the transcribed text into the active application
@@ -149,7 +192,7 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![request_microphone_permission, request_input_monitoring_permission])
+        .invoke_handler(tauri::generate_handler![request_microphone_permission, request_input_monitoring_permission, request_accessibility_permission])
         .setup(move |app| {
             let app_handle = app.handle();
             
