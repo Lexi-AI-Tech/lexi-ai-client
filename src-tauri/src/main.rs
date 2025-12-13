@@ -132,6 +132,27 @@ fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Inject text into the currently active application
+/// 
+/// This command allows the frontend to directly inject text into any active application.
+/// It uses the cross-platform TextInjector implementation which:
+/// 1. Copies text to the clipboard
+/// 2. Simulates a paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere)
+/// 
+/// # Arguments
+/// * `text` - The text to inject
+/// 
+/// # Returns
+/// * `Ok(())` - Successfully injected the text
+/// * `Err(String)` - An error message if injection failed
+#[tauri::command]
+fn inject_text(text: String) -> Result<(), String> {
+    let injector = TextInjector::new();
+    injector
+        .inject_text(&text)
+        .map_err(|e| format!("Injection failed: {}", e))
+}
+
 /// Processes recorded audio data by:
 /// 1. Sending it to the speech-to-text API for transcription
 /// 2. Injecting the transcribed text into the active application
@@ -192,7 +213,7 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![request_microphone_permission, request_input_monitoring_permission, request_accessibility_permission])
+        .invoke_handler(tauri::generate_handler![request_microphone_permission, request_input_monitoring_permission, request_accessibility_permission, inject_text])
         .setup(move |app| {
             let app_handle = app.handle();
             
