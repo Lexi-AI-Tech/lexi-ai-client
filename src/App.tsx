@@ -1,7 +1,7 @@
 /**
  * Main App Component
  * 
- * This is the root React component for the Lexi AI Client frontend.
+ * This is the root React component for the Lexi AI frontend.
  * It manages the application state and listens to events from the Tauri backend
  * to update the UI based on recording and transcription status.
  * 
@@ -36,6 +36,11 @@ function App() {
     recordingDuration: 0
   })
 
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false)
+  const [isRequestingInputMonitoring, setIsRequestingInputMonitoring] = useState(false)
+  const [isRequestingAccessibility, setIsRequestingAccessibility] = useState(false)
+  const [permissionMessage, setPermissionMessage] = useState<string | null>(null)
+
   /**
    * Set up event listeners for backend events
    * 
@@ -51,7 +56,7 @@ function App() {
    * - transcription_error: Transcription failed (API error, etc.)
    */
   useEffect(() => {
-    console.log('Lexi AI Client initialized')
+    console.log('Lexi AI initialized')
 
     const setupListeners = async () => {
       // Listen for when recording starts (Option key pressed)
@@ -200,6 +205,75 @@ function App() {
   }
 
   /**
+   * Request microphone permission from macOS
+   */
+  const handleRequestMicrophonePermission = async () => {
+    setIsRequestingPermission(true)
+    setPermissionMessage(null)
+    
+    try {
+      const result = await invoke<boolean>('request_microphone_permission')
+      if (result) {
+        setPermissionMessage('Permission dialog should appear. Please grant microphone access in the dialog.')
+        // Clear message after 5 seconds
+        setTimeout(() => setPermissionMessage(null), 5000)
+      }
+    } catch (error) {
+      console.error('Failed to request microphone permission:', error)
+      setPermissionMessage('Failed to request permission. Please try again or grant permission manually in System Settings.')
+      setTimeout(() => setPermissionMessage(null), 5000)
+    } finally {
+      setIsRequestingPermission(false)
+    }
+  }
+
+  /**
+   * Request Input Monitoring permission from macOS
+   */
+  const handleRequestInputMonitoringPermission = async () => {
+    setIsRequestingInputMonitoring(true)
+    setPermissionMessage(null)
+    
+    try {
+      const result = await invoke<boolean>('request_input_monitoring_permission')
+      if (result) {
+        setPermissionMessage('Permission dialog should appear. Please grant Input Monitoring access in the dialog, then restart the app.')
+        // Clear message after 8 seconds
+        setTimeout(() => setPermissionMessage(null), 8000)
+      }
+    } catch (error) {
+      console.error('Failed to request Input Monitoring permission:', error)
+      setPermissionMessage('Failed to request permission. Please manually grant Input Monitoring permission in System Settings → Privacy & Security → Input Monitoring.')
+      setTimeout(() => setPermissionMessage(null), 8000)
+    } finally {
+      setIsRequestingInputMonitoring(false)
+    }
+  }
+
+  /**
+   * Request Accessibility permission from macOS (required for pasting text)
+   */
+  const handleRequestAccessibilityPermission = async () => {
+    setIsRequestingAccessibility(true)
+    setPermissionMessage(null)
+    
+    try {
+      const result = await invoke<boolean>('request_accessibility_permission')
+      if (result) {
+        setPermissionMessage('Permission dialog should appear. Please grant Accessibility access in the dialog, then restart the app.')
+        // Clear message after 8 seconds
+        setTimeout(() => setPermissionMessage(null), 8000)
+      }
+    } catch (error) {
+      console.error('Failed to request Accessibility permission:', error)
+      setPermissionMessage('Failed to request permission. Please manually grant Accessibility permission in System Settings → Privacy & Security → Accessibility.')
+      setTimeout(() => setPermissionMessage(null), 8000)
+    } finally {
+      setIsRequestingAccessibility(false)
+    }
+  }
+
+  /**
    * Render the application UI
    * 
    * The app displays its own interface with status, controls, and settings.
@@ -212,7 +286,7 @@ function App() {
           <div className="app-title">
             <div className="logo">🎤</div>
             <div className="title-text">
-              <h1>Lexi AI Client</h1>
+              <h1>Lexi AI</h1>
               <p>Voice-to-Text Assistant</p>
             </div>
           </div>
@@ -250,16 +324,61 @@ function App() {
           </button>
         </div>
 
+        {/* Permission Request Section */}
+        <div className="settings">
+          <h3>Permissions</h3>
+          <div className="permission-section">
+            <p className="permission-text">
+              This app needs three permissions:
+            </p>
+            <ul style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', textAlign: 'left', marginBottom: '12px', paddingLeft: '20px' }}>
+              <li>Microphone - to record audio</li>
+              <li>Input Monitoring - to detect fn/Option key presses</li>
+              <li>Accessibility - to paste transcribed text into applications</li>
+            </ul>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                className="button secondary"
+                onClick={handleRequestMicrophonePermission}
+                disabled={isRequestingPermission}
+              >
+                {isRequestingPermission ? 'Requesting...' : 'Request Microphone Permission'}
+              </button>
+              <button
+                className="button secondary"
+                onClick={handleRequestInputMonitoringPermission}
+                disabled={isRequestingInputMonitoring}
+              >
+                {isRequestingInputMonitoring ? 'Requesting...' : 'Request Input Monitoring Permission'}
+              </button>
+              <button
+                className="button secondary"
+                onClick={handleRequestAccessibilityPermission}
+                disabled={isRequestingAccessibility}
+              >
+                {isRequestingAccessibility ? 'Requesting...' : 'Request Accessibility Permission'}
+              </button>
+            </div>
+            {permissionMessage && (
+              <div className="permission-message">
+                {permissionMessage}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Settings */}
         <div className="settings">
           <h3>How to Use</h3>
           <div className="hotkey-display">
             <span>Press and hold</span>
             <span className="hotkey-combo">fn</span>
+            <span>or</span>
+            <span className="hotkey-combo">Option</span>
             <span>to record</span>
           </div>
           <div className="instructions">
-            Hold the Function key (fn) to start recording. Release it to stop and automatically transcribe your speech.
+            Hold the Function key (fn) or Option key to start recording. Release it to stop and automatically transcribe your speech.
           </div>
         </div>
       </div>

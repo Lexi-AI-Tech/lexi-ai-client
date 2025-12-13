@@ -1,4 +1,4 @@
-# Lexi AI Client
+# Lexi AI
 
 A macOS desktop app for speech-to-text transcription with global hotkey support. Record your voice anywhere on your Mac and have it transcribed and inserted into any text field.
 
@@ -56,7 +56,7 @@ The app needs two macOS permissions:
 **To grant Accessibility permission:**
 1. Open **System Settings** → **Privacy & Security** → **Accessibility**
 2. Click the **lock icon** and enter your password
-3. Add your **Terminal** app (or the built Lexi AI Client app)
+3. Add your **Terminal** app (or the built Lexi AI app)
 4. Enable the checkbox
 
 ### 5. Run the App
@@ -92,8 +92,8 @@ npm run build
 ```
 
 The app will be created at:
-- **App Bundle**: `src-tauri/target/release/bundle/macos/Lexi AI Client.app`
-- **DMG Installer**: `src-tauri/target/release/bundle/dmg/Lexi AI Client_0.1.0_aarch64.dmg`
+- **App Bundle**: `src-tauri/target/release/bundle/macos/Lexi AI.app`
+- **DMG Installer**: `src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg`
 
 You can then move the `.app` to your Applications folder or distribute the `.dmg`.
 
