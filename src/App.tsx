@@ -36,6 +36,9 @@ function App() {
     recordingDuration: 0
   })
 
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false)
+  const [permissionMessage, setPermissionMessage] = useState<string | null>(null)
+
   /**
    * Set up event listeners for backend events
    * 
@@ -200,6 +203,29 @@ function App() {
   }
 
   /**
+   * Request microphone permission from macOS
+   */
+  const handleRequestMicrophonePermission = async () => {
+    setIsRequestingPermission(true)
+    setPermissionMessage(null)
+    
+    try {
+      const result = await invoke<boolean>('request_microphone_permission')
+      if (result) {
+        setPermissionMessage('Permission dialog should appear. Please grant microphone access in the dialog.')
+        // Clear message after 5 seconds
+        setTimeout(() => setPermissionMessage(null), 5000)
+      }
+    } catch (error) {
+      console.error('Failed to request microphone permission:', error)
+      setPermissionMessage('Failed to request permission. Please try again or grant permission manually in System Settings.')
+      setTimeout(() => setPermissionMessage(null), 5000)
+    } finally {
+      setIsRequestingPermission(false)
+    }
+  }
+
+  /**
    * Render the application UI
    * 
    * The app displays its own interface with status, controls, and settings.
@@ -248,6 +274,28 @@ function App() {
               </>
             )}
           </button>
+        </div>
+
+        {/* Permission Request Section */}
+        <div className="settings">
+          <h3>Permissions</h3>
+          <div className="permission-section">
+            <p className="permission-text">
+              This app needs microphone access to record audio for speech-to-text transcription.
+            </p>
+            <button
+              className="button secondary"
+              onClick={handleRequestMicrophonePermission}
+              disabled={isRequestingPermission}
+            >
+              {isRequestingPermission ? 'Requesting...' : 'Request Microphone Permission'}
+            </button>
+            {permissionMessage && (
+              <div className="permission-message">
+                {permissionMessage}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Settings */}

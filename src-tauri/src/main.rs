@@ -23,6 +23,38 @@ use audio_recorder::AudioRecorder;
 use speech_api::SpeechAPI;
 use text_injector::TextInjector;
 
+/// Request microphone permission on macOS
+/// This will trigger the system permission dialog by attempting to access the microphone
+#[tauri::command]
+#[cfg(target_os = "macos")]
+fn request_microphone_permission() -> Result<bool, String> {
+    use std::thread;
+    use std::time::Duration;
+    
+    // Spawn a thread to attempt microphone access, which triggers the permission dialog
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(100));
+        
+        // Try to create an audio recorder, which will trigger the permission dialog
+        // We do this in a separate thread to avoid blocking
+        // If permission is denied, this will fail, but that's okay - we just want to trigger the dialog
+        let _ = std::panic::catch_unwind(|| {
+            let _recorder = AudioRecorder::new();
+            println!("Microphone permission dialog should have appeared");
+        });
+    });
+    
+    // Return immediately - the permission dialog will appear asynchronously
+    Ok(true)
+}
+
+/// Request microphone permission (non-macOS platforms)
+#[tauri::command]
+#[cfg(not(target_os = "macos"))]
+fn request_microphone_permission() -> Result<bool, String> {
+    Ok(true)
+}
+
 /// Processes recorded audio data by:
 /// 1. Sending it to the speech-to-text API for transcription
 /// 2. Injecting the transcribed text into the active application
@@ -83,6 +115,7 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![request_microphone_permission])
         .setup(move |app| {
             let app_handle = app.handle();
             
