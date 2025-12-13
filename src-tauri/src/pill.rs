@@ -6,10 +6,11 @@
 
 use tauri::{AppHandle, Manager, LogicalPosition, WebviewUrl, WebviewWindowBuilder};
 
-/// Calculate the center position of the primary monitor
+/// Calculate the bottom position of the primary monitor, just above the taskbar/dock
 /// 
-/// Returns the (x, y) coordinates for centering the pill window
-fn calculate_center_position(app: &AppHandle) -> Result<(f64, f64), String> {
+/// Returns the (x, y) coordinates for positioning the pill window at the bottom center
+/// The window is positioned responsively based on screen size with an offset above the taskbar
+fn calculate_bottom_position(app: &AppHandle) -> Result<(f64, f64), String> {
     let monitor = app
         .primary_monitor()
         .map_err(|e| format!("Failed to get primary monitor: {}", e))?
@@ -26,9 +27,15 @@ fn calculate_center_position(app: &AppHandle) -> Result<(f64, f64), String> {
     let pill_width = 200.0;
     let pill_height = 50.0;
     
-    // Calculate center position
-    let x = (monitor_width - pill_width) / 2.0;
-    let y = (monitor_height - pill_height) / 2.0;
+    // Calculate bottom position: horizontally centered, positioned above taskbar/dock
+    // Use a responsive offset that scales with screen height but has a minimum
+    // This accounts for different taskbar/dock sizes across platforms
+    let base_offset: f64 = 60.0; // Base offset in logical pixels
+    let responsive_offset: f64 = monitor_height * 0.02; // 2% of screen height for larger screens
+    let bottom_offset = base_offset.max(responsive_offset);
+    
+    let x = (monitor_width - pill_width) / 2.0; // Horizontally centered
+    let y = monitor_height - pill_height - bottom_offset; // Just above taskbar/dock
     
     Ok((x, y))
 }
@@ -45,8 +52,8 @@ fn calculate_center_position(app: &AppHandle) -> Result<(f64, f64), String> {
 /// * `Ok(())` - Successfully created and positioned the window
 /// * `Err(String)` - An error message if the operation failed
 fn create_pill_window(app: &AppHandle) -> Result<(), String> {
-    // Calculate center position
-    let (position_x, position_y) = calculate_center_position(app)?;
+    // Calculate bottom position
+    let (position_x, position_y) = calculate_bottom_position(app)?;
     
     // Pill window dimensions
     let pill_width = 200.0;
@@ -119,10 +126,10 @@ fn ensure_pill_window_exists(app: &AppHandle) -> Result<(), String> {
     create_pill_window(app)
 }
 
-/// Initialize and position the pill overlay window at the center of the primary monitor
+/// Initialize and position the pill overlay window at the bottom of the primary monitor
 /// 
-/// This function ensures the pill window exists and positions it at the center of the screen.
-/// The window is created dynamically if it doesn't exist.
+/// This function ensures the pill window exists and positions it at the bottom center of the screen,
+/// just above the taskbar/dock. The window is created dynamically if it doesn't exist.
 /// Permanent window properties (visible_on_all_workspaces, always_on_top) are set
 /// during window creation in create_pill_window, so we only need to handle positioning and visibility here.
 /// 
@@ -137,8 +144,8 @@ pub fn init_pill_window(app: AppHandle) -> Result<(), String> {
     ensure_pill_window_exists(&app)?;
     
     if let Some(pill_window) = app.get_webview_window("pill") {
-        // 2. Position at center
-        let (x, y) = calculate_center_position(&app)?;
+        // 2. Position at bottom center
+        let (x, y) = calculate_bottom_position(&app)?;
         pill_window
             .set_position(LogicalPosition::new(x, y))
             .map_err(|e| format!("Failed to position pill window: {}", e))?;
@@ -217,8 +224,8 @@ pub fn toggle_pill_window(app: AppHandle) -> Result<(), String> {
                 .hide()
                 .map_err(|e| format!("Failed to hide pill window: {}", e))?;
         } else {
-            // Show the window at center position
-            let (x, y) = calculate_center_position(&app)?;
+            // Show the window at bottom center position
+            let (x, y) = calculate_bottom_position(&app)?;
             pill_window
                 .set_position(LogicalPosition::new(x, y))
                 .map_err(|e| format!("Failed to position pill window: {}", e))?;
