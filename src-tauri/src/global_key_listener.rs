@@ -12,13 +12,15 @@ fn event_type_to_string(event_type: &EventType) -> Option<String> {
     }
 }
 
-/// Checks if the event is a function key press/release
-/// Uses the macOS Function key (fn) as the trigger key for recording
-fn is_function_key_event(event_type: &EventType) -> Option<bool> {
+/// Checks if the event is a trigger key press/release
+/// Supports both Function key (fn) and Option key (Alt) for recording
+/// On some macOS systems, fn key is reported as Unknown(179) instead of Key::Function
+fn is_trigger_key_event(event_type: &EventType) -> Option<bool> {
     match event_type {
-        EventType::KeyPress(Key::Function) => Some(true),  // Start recording
-        EventType::KeyRelease(Key::Function) => Some(false), // Stop recording
-        _ => None, // Not a function key we care about
+        // Function key (fn) - primary trigger
+        EventType::KeyPress(Key::Function) => Some(true),
+        EventType::KeyRelease(Key::Function) => Some(false),
+        _ => None, // Not a trigger key we care about
     }
 }
 
@@ -38,9 +40,9 @@ fn is_function_key_event(event_type: &EventType) -> Option<bool> {
 pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
     std::thread::spawn(move || {
         let callback = move |event: Event| {
-            // Check if this is a function key event that should trigger recording
-            if let Some(should_start) = is_function_key_event(&event.event_type) {
-                println!("Function key (fn) {} - {} recording", 
+            // Check if this is a trigger key event that should trigger recording
+            if let Some(should_start) = is_trigger_key_event(&event.event_type) {
+                println!("Trigger key {} - {} recording", 
                     if should_start { "pressed" } else { "released" },
                     if should_start { "Starting" } else { "Stopping" });
                 

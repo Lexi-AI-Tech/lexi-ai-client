@@ -1,5 +1,5 @@
 [package]
-name = "lexi-ai-client"
+name = "lexi-ai"
 version = "0.1.0"
 description = "Speech-to-text overlay app for macOS"
 authors = ["you"]
@@ -29,3 +29,5 @@ chrono = "0.4"
 cocoa = "0.24"
 objc = "0.2"
 rdev = { git = "https://github.com/fufesou/rdev" }  # Fork fixes macOS issues
+arboard = "3.4"  # Cross-platform clipboard
+enigo = "0.6"    # Cross-platform input simulation

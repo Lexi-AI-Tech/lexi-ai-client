@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Lexi AI Client",
+  "productName": "Lexi AI",
   "version": "0.1.0",
-  "identifier": "com.lexi.ai.client",
+  "identifier": "com.lexi.ai",
   "build": {
     "beforeDevCommand": "npm run dev:frontend",
     "beforeBuildCommand": "npm run build:frontend",
@@ -35,7 +35,7 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "Lexi AI Client",
+        "title": "Lexi AI",
         "width": 400,
         "height": 500,
         "minWidth": 350,
