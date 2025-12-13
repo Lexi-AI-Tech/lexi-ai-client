@@ -33,6 +33,7 @@
     },
     "windows": [
       {
+        "label": "main",
         "fullscreen": false,
         "resizable": true,
         "title": "Lexi AI",
@@ -43,7 +44,8 @@
         "alwaysOnTop": false,
         "skipTaskbar": false,
         "decorations": true,
-        "transparent": false
+        "transparent": false,
+        "url": "screens/main.html"
       }
     ],
     "macOSPrivateApi": true

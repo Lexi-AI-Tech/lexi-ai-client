@@ -15,13 +15,14 @@ use tauri::{AppHandle, Manager, Emitter};
 
 // Module declarations for core functionality
 mod audio_recorder;  // Handles audio capture from microphone
-mod speech_api;      // Communicates with Groq API for speech-to-text transcription
+mod stt_service;     // Communicates with Groq API for speech-to-text transcription
 mod text_injector;   // Injects transcribed text into active application
 mod global_key_listener;  // Handles global keyboard event listening via rdev
 mod permissions;     // Handles permission requests for microphone, input monitoring, and accessibility
+mod pill;           // Handles pill overlay window management
 
 use audio_recorder::AudioRecorder;
-use speech_api::SpeechAPI;
+use stt_service::SttService;
 use text_injector::TextInjector;
 
 use permissions::{
@@ -51,6 +52,17 @@ fn inject_text(text: String) -> Result<(), String> {
         .map_err(|e| format!("Injection failed: {}", e))
 }
 
+// Re-export pill functions as Tauri commands
+#[tauri::command]
+fn show_pill_window(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
+    pill::show_pill_window(app, x, y)
+}
+
+#[tauri::command]
+fn toggle_pill_window(app: AppHandle) -> Result<(), String> {
+    pill::toggle_pill_window(app)
+}
+
 /// Processes recorded audio data by:
 /// 1. Sending it to the speech-to-text API for transcription
 /// 2. Injecting the transcribed text into the active application
@@ -68,9 +80,9 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             // Notify frontend that transcription has started
             app_handle.emit("processing_start", ()).unwrap_or_default();
             
-            // Initialize the speech API client and transcribe the audio
-            let api = SpeechAPI::new();
-            match api.transcribe_audio(audio_data).await {
+            // Initialize the STT service client and transcribe the audio
+            let stt_service = SttService::new();
+            match stt_service.transcribe_audio(audio_data).await {
                 Ok(transcription) => {
                     println!("Transcription: {}", transcription);
                     
@@ -115,10 +127,28 @@ pub fn main() {
             request_microphone_permission,
             request_input_monitoring_permission,
             request_accessibility_permission,
-            inject_text
+            inject_text,
+            show_pill_window,
+            toggle_pill_window
         ])
         .setup(move |app| {
+            // CRITICAL FIX FOR MACOS FLOATING WINDOWS
+            // This policy allows the app to have accessory windows (like the pill)
+            // that float above all spaces and do not clutter the Dock/App Switcher.
+            // Must be set before getting the app handle to avoid borrow checker issues.
+            #[cfg(target_os = "macos")]
+            {
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                println!("🍎 Set macOS activation policy to Accessory (app will not appear in Dock)");
+            }
+            
             let app_handle = app.handle();
+            
+            // Initialize and position the pill window at the center of the screen
+            // The window is created dynamically in Rust but shown at app startup
+            if let Err(e) = pill::init_pill_window(app_handle.clone()) {
+                eprintln!("Failed to initialize pill window: {}", e);
+            }
             
             // Channel to communicate with the recording thread
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
@@ -161,6 +191,13 @@ pub fn main() {
                                 // Start recording (Function key pressed)
                                 if recorder.is_none() {
                                     println!("Function key (fn) pressed - Starting recording in dedicated thread...");
+                                    
+                                    // Show the pill window when recording starts (it's already created at startup)
+                                    if let Some(pill_window) = app_handle_for_recording.get_webview_window("pill") {
+                                        if let Err(e) = pill_window.show() {
+                                            eprintln!("Failed to show pill window: {}", e);
+                                        }
+                                    }
                                     
                                     let mut new_recorder = AudioRecorder::new();
                                     match new_recorder.start_recording() {
