@@ -3,43 +3,25 @@
 
 // This is the main entry point for the Lexi AI Client Tauri application.
 // The application provides a voice-to-text overlay that:
-// 1. Listens for Option key press/release to start/stop audio recording
+// 1. Listens for Function key (fn) press/release to start/stop audio recording
 // 2. Captures audio from the default microphone
 // 3. Transcribes the audio using Lexi AI Server (which uses Groq's Whisper API)
 // 4. Injects the transcribed text into the currently active application
 
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
 
 use tauri::{AppHandle, Manager, Emitter};
-use device_query::{DeviceQuery, DeviceState, Keycode};
 
 // Module declarations for core functionality
 mod audio_recorder;  // Handles audio capture from microphone
 mod speech_api;      // Communicates with Groq API for speech-to-text transcription
 mod text_injector;   // Injects transcribed text into active application
+mod global_key_listener;  // Handles global keyboard event listening via rdev
 
 use audio_recorder::AudioRecorder;
 use speech_api::SpeechAPI;
 use text_injector::TextInjector;
-
-
-
-/// Tauri command to start recording (currently unused as we use hotkey detection)
-/// This is kept for potential future UI-triggered recording functionality
-#[tauri::command]
-async fn start_recording(_app_handle: AppHandle) -> Result<(), String> {
-    // This command might be unused now that we use device_query, but keeping it for UI triggers if needed
-    Ok(())
-}
-
-/// Tauri command to stop recording (currently unused as we use hotkey detection)
-/// This is kept for potential future UI-triggered recording functionality
-#[tauri::command]
-async fn stop_recording() -> Result<(), String> {
-    Ok(())
-}
 
 /// Processes recorded audio data by:
 /// 1. Sending it to the speech-to-text API for transcription
@@ -96,23 +78,26 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 /// Main entry point for the Tauri application
 /// 
 /// Sets up the application window, configures macOS-specific window behavior,
-/// and spawns a background thread to monitor for Option key presses/releases
+/// and registers global shortcuts for Function key (fn) presses/releases
 /// to control audio recording.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
-    // Shared state to track whether we're currently recording
-    // Arc<Mutex<>> allows safe sharing between threads
-    let recording = Arc::new(Mutex::new(false));
-    
     tauri::Builder::default()
         .setup(move |app| {
             let app_handle = app.handle();
-            let recording_state = recording.clone();
+            
+            // Channel to communicate with the recording thread
+            // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
+            let (recording_tx, recording_rx) = mpsc::channel::<bool>(); // true = start, false = stop
+            
+            // Start the global input listener (rdev) in a background thread
+            // Pass the channel sender so it can trigger recording on Function key press/release
+            global_key_listener::start_listener(app_handle.clone(), recording_tx);
 
             let window = app.get_webview_window("main").unwrap();
             
             // Prevent the app from closing when window is closed
-            // This keeps the background hotkey monitoring thread running
+            // This keeps the global shortcut monitoring active
             let window_clone = window.clone();
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -127,128 +112,64 @@ pub fn main() {
                 }
             });
             
-            // Window positioning code (currently commented out)
-            // This would position the window at the bottom center of the screen,
-            // just above the taskbar/dock. Uncomment if you want this behavior.
-            // if let Ok(monitor) = window.primary_monitor() {
-            //     if let Some(monitor) = monitor {
-            //         let screen_size = monitor.size();
-            //         let window_size = window.inner_size().unwrap();
-            //         let taskbar_height = 60.0; // Approximate taskbar/dock height
-            //         let x = (screen_size.width as f64 / 2.0) - (window_size.width as f64 / 2.0);
-            //         let y = screen_size.height as f64 - window_size.height as f64 - taskbar_height;
-            //         window.set_position(tauri::LogicalPosition::new(x, y)).unwrap_or_default();
-            //     }
-            // }
-            
-            // macOS-specific window configuration
-            // Makes the window appear on all Spaces (virtual desktops)
-            // This ensures the overlay is always accessible regardless of which Space the user is on
-            #[cfg(target_os = "macos")]
+            #[cfg(desktop)]
             {
-                use cocoa::appkit::{NSWindow, NSWindowCollectionBehavior};
-                use cocoa::base::id;
-
-                if let Ok(ns_window_ptr) = window.ns_window() {
-                    let ns_window = ns_window_ptr as id;
-                    unsafe {
-                        // Set window behavior to allow it to join all Spaces
-                        let mut behavior = ns_window.collectionBehavior();
-                        behavior |= NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces;
-                        ns_window.setCollectionBehavior_(behavior);
-                    }
-                }
-            }
-            
-            // Spawn a background thread to continuously monitor for Option key presses
-            // This thread runs independently of the main UI thread
-            let app_handle_clone = app_handle.clone();
-            thread::spawn(move || {
-                // AudioRecorder instance - created when recording starts, consumed when stopped
-                let mut recorder: Option<AudioRecorder> = None;
-                
-                // DeviceState allows us to query the current state of keyboard keys
-                let device_state = DeviceState::new();
-                // Track previous key state to detect press/release events
-                let mut was_pressed = false;
-
-                // Main hotkey detection loop
-                // Runs continuously, checking key state every 50ms
-                loop {
-                    // Get all currently pressed keys
-                    let keys: Vec<Keycode> = device_state.get_keys();
+                // Spawn a dedicated thread to manage the audio recorder
+                // This thread will handle creating, starting, and stopping the recorder
+                // It receives signals from the global key listener via the channel
+                let app_handle_for_recording = app_handle.clone();
+                thread::spawn(move || {
+                    let mut recorder: Option<AudioRecorder> = None;
                     
-                    // Check if either Left Option or Right Option key is currently pressed
-                    // macOS uses "Option" key (not "Alt"), which maps to LOption/ROption
-                    let is_pressed = keys.contains(&Keycode::LOption) || keys.contains(&Keycode::ROption);
-
-                    // Detect key press event (transition from not pressed to pressed)
-                    if is_pressed && !was_pressed {
-                        let mut is_recording = recording_state.lock().unwrap();
-                        // Only start recording if we're not already recording
-                        if !*is_recording {
-                            println!("Starting recording...");
-                            *is_recording = true;
-                            
-                            // Notify frontend that recording has started
-                            app_handle_clone.emit("recording_started", ()).unwrap_or_default();
-                            
-                            // Initialize and start the audio recorder
-                            let mut new_recorder = AudioRecorder::new();
-                            match new_recorder.start_recording() {
-                                Ok(_) => {
-                                    // Successfully started recording - store the recorder
-                                    recorder = Some(new_recorder);
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to start recording: {}", e);
-                                    // Reset state and notify frontend of error
-                                    *is_recording = false;
-                                    app_handle_clone.emit("recording_error", e.to_string()).unwrap_or_default();
+                    loop {
+                        match recording_rx.recv() {
+                            Ok(true) => {
+                                // Start recording (Function key pressed)
+                                if recorder.is_none() {
+                                    println!("Function key (fn) pressed - Starting recording in dedicated thread...");
+                                    
+                                    let mut new_recorder = AudioRecorder::new();
+                                    match new_recorder.start_recording() {
+                                        Ok(_) => {
+                                            recorder = Some(new_recorder);
+                                            app_handle_for_recording.emit("recording_started", ()).unwrap_or_default();
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to start recording: {}", e);
+                                            app_handle_for_recording.emit("recording_error", e.to_string()).unwrap_or_default();
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    } 
-                    // Detect key release event (transition from pressed to not pressed)
-                    else if !is_pressed && was_pressed {
-                        let mut is_recording = recording_state.lock().unwrap();
-                        // Only stop recording if we were actually recording
-                        if *is_recording {
-                            println!("Stopping recording...");
-                            *is_recording = false;
-                            
-                            // Notify frontend that recording has stopped
-                            app_handle_clone.emit("recording_stopped", ()).unwrap_or_default();
-
-                            // Stop the recorder and get the audio data
-                            if let Some(mut rec) = recorder.take() {
-                                match rec.stop_recording() {
-                                    Ok(audio_data) => {
-                                        // Process the audio in a separate thread
-                                        // This will transcribe and inject the text
-                                        process_audio(audio_data, app_handle_clone.clone());
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Failed to stop recording: {}", e);
-                                        app_handle_clone.emit("recording_error", e.to_string()).unwrap_or_default();
+                            Ok(false) => {
+                                // Stop recording (Function key released)
+                                if let Some(mut rec) = recorder.take() {
+                                    println!("Function key (fn) released - Stopping recording in dedicated thread...");
+                                    
+                                    match rec.stop_recording() {
+                                        Ok(audio_data) => {
+                                            app_handle_for_recording.emit("recording_stopped", ()).unwrap_or_default();
+                                            // Process the audio in a separate thread
+                                            process_audio(audio_data, app_handle_for_recording.clone());
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to stop recording: {}", e);
+                                            app_handle_for_recording.emit("recording_error", e.to_string()).unwrap_or_default();
+                                        }
                                     }
                                 }
+                            }
+                            Err(_) => {
+                                // Channel closed, exit thread
+                                break;
                             }
                         }
                     }
-
-                    // Update previous state for next iteration
-                    was_pressed = is_pressed;
-                    // Sleep for 50ms before checking again
-                    // This balances responsiveness with CPU usage
-                    thread::sleep(Duration::from_millis(50));
-                }
-            });
+                });
+            }
             
             Ok(())
         })
-        // Register Tauri commands that can be called from the frontend
-        .invoke_handler(tauri::generate_handler![start_recording, stop_recording])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
