@@ -37,6 +37,7 @@ function App() {
   })
 
   const [isRequestingPermission, setIsRequestingPermission] = useState(false)
+  const [isRequestingInputMonitoring, setIsRequestingInputMonitoring] = useState(false)
   const [permissionMessage, setPermissionMessage] = useState<string | null>(null)
 
   /**
@@ -226,6 +227,29 @@ function App() {
   }
 
   /**
+   * Request Input Monitoring permission from macOS
+   */
+  const handleRequestInputMonitoringPermission = async () => {
+    setIsRequestingInputMonitoring(true)
+    setPermissionMessage(null)
+    
+    try {
+      const result = await invoke<boolean>('request_input_monitoring_permission')
+      if (result) {
+        setPermissionMessage('Permission dialog should appear. Please grant Input Monitoring access in the dialog, then restart the app.')
+        // Clear message after 8 seconds
+        setTimeout(() => setPermissionMessage(null), 8000)
+      }
+    } catch (error) {
+      console.error('Failed to request Input Monitoring permission:', error)
+      setPermissionMessage('Failed to request permission. Please manually grant Input Monitoring permission in System Settings → Privacy & Security → Input Monitoring.')
+      setTimeout(() => setPermissionMessage(null), 8000)
+    } finally {
+      setIsRequestingInputMonitoring(false)
+    }
+  }
+
+  /**
    * Render the application UI
    * 
    * The app displays its own interface with status, controls, and settings.
@@ -281,15 +305,24 @@ function App() {
           <h3>Permissions</h3>
           <div className="permission-section">
             <p className="permission-text">
-              This app needs microphone access to record audio for speech-to-text transcription.
+              This app needs microphone and Input Monitoring permissions to work properly.
             </p>
-            <button
-              className="button secondary"
-              onClick={handleRequestMicrophonePermission}
-              disabled={isRequestingPermission}
-            >
-              {isRequestingPermission ? 'Requesting...' : 'Request Microphone Permission'}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                className="button secondary"
+                onClick={handleRequestMicrophonePermission}
+                disabled={isRequestingPermission}
+              >
+                {isRequestingPermission ? 'Requesting...' : 'Request Microphone Permission'}
+              </button>
+              <button
+                className="button secondary"
+                onClick={handleRequestInputMonitoringPermission}
+                disabled={isRequestingInputMonitoring}
+              >
+                {isRequestingInputMonitoring ? 'Requesting...' : 'Request Input Monitoring Permission'}
+              </button>
+            </div>
             {permissionMessage && (
               <div className="permission-message">
                 {permissionMessage}
@@ -304,10 +337,12 @@ function App() {
           <div className="hotkey-display">
             <span>Press and hold</span>
             <span className="hotkey-combo">fn</span>
+            <span>or</span>
+            <span className="hotkey-combo">Option</span>
             <span>to record</span>
           </div>
           <div className="instructions">
-            Hold the Function key (fn) to start recording. Release it to stop and automatically transcribe your speech.
+            Hold the Function key (fn) or Option key to start recording. Release it to stop and automatically transcribe your speech.
           </div>
         </div>
       </div>
