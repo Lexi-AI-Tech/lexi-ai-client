@@ -33,6 +33,7 @@
     },
     "windows": [
       {
+        "label": "main",
         "fullscreen": false,
         "resizable": true,
         "title": "Lexi AI",
@@ -43,7 +44,21 @@
         "alwaysOnTop": false,
         "skipTaskbar": false,
         "decorations": true,
-        "transparent": false
+        "transparent": false,
+        "url": "screens/main.html"
+      },
+      {
+        "label": "pill",
+        "width": 200,
+        "height": 50,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": true,
+        "url": "screens/pill.html"
       }
     ],
     "macOSPrivateApi": true

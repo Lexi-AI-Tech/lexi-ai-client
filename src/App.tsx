@@ -42,6 +42,61 @@ function App() {
   const [permissionMessage, setPermissionMessage] = useState<string | null>(null)
 
   /**
+   * Create and position the pill overlay window
+   * 
+   * This effect runs once on component mount and creates a small overlay window
+   * that stays at the bottom of the screen, always on top, and visible across
+   * all workspaces. The window is positioned dynamically based on the primary
+   * monitor's dimensions.
+   */
+  useEffect(() => {
+    const setupPillWindow = async () => {
+      try {
+        // Get screen dimensions
+        const screenWidth = window.screen.width
+        const screenHeight = window.screen.height
+
+        // Calculate center position (both horizontally and vertically)
+        const pillHeight = 50
+        const pillWidth = 200
+        const x = Math.round((screenWidth - pillWidth) / 2)
+        const y = Math.round((screenHeight - pillHeight) / 2)
+
+        console.log('Setting up pill window at position:', x, y, 'on screen:', screenWidth, 'x', screenHeight)
+
+        // The pill window is pre-configured in tauri.conf.json
+        // Use invoke to show and position it via Rust backend
+        try {
+          await invoke('show_pill_window', { x, y })
+          console.log('Pill window shown and positioned successfully at:', x, y)
+        } catch (invokeError) {
+          console.error('Failed to show pill window:', invokeError)
+          // Try again after a short delay in case the window wasn't created yet
+          setTimeout(async () => {
+            try {
+              await invoke('show_pill_window', { x, y })
+              console.log('Pill window shown on retry')
+            } catch (retryError) {
+              console.error('Failed to show pill window on retry:', retryError)
+            }
+          }, 500)
+        }
+      } catch (error) {
+        console.error('Failed to setup pill window:', error)
+      }
+    }
+
+    // Wait for Tauri to initialize - give it more time for window creation
+    const timer = setTimeout(() => {
+      setupPillWindow()
+    }, 1500)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [])
+
+  /**
    * Set up event listeners for backend events
    * 
    * This effect runs once on component mount and sets up listeners for
