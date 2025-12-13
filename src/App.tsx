@@ -255,11 +255,11 @@ function App() {
           <h3>How to Use</h3>
           <div className="hotkey-display">
             <span>Press and hold</span>
-            <span className="hotkey-combo">Option</span>
+            <span className="hotkey-combo">fn</span>
             <span>to record</span>
           </div>
           <div className="instructions">
-            Hold the Option key to start recording. Release it to stop and automatically transcribe your speech.
+            Hold the Function key (fn) to start recording. Release it to stop and automatically transcribe your speech.
           </div>
         </div>
       </div>

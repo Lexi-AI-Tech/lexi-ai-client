@@ -1,4 +1,5 @@
-use rdev::{listen, Event, EventType};
+use rdev::{listen, Event, EventType, Key};
+use std::sync::mpsc;
 use tauri::{AppHandle, Emitter};
 
 /// Helper to convert keyboard EventType to a string for frontend emission
@@ -11,19 +12,51 @@ fn event_type_to_string(event_type: &EventType) -> Option<String> {
     }
 }
 
+/// Checks if the event is a function key press/release
+/// Uses the macOS Function key (fn) as the trigger key for recording
+fn is_function_key_event(event_type: &EventType) -> Option<bool> {
+    match event_type {
+        EventType::KeyPress(Key::Function) => Some(true),  // Start recording
+        EventType::KeyRelease(Key::Function) => Some(false), // Stop recording
+        _ => None, // Not a function key we care about
+    }
+}
+
 /// Starts the global keyboard listener in a background thread.
 /// 
 /// This function spawns a separate thread to run `rdev::listen`, which is blocking by design.
 /// Only keyboard events (KeyPress and KeyRelease) are captured and emitted to the Tauri frontend
 /// via the "global-input" event. Mouse events are ignored.
 /// 
+/// When the Function key (fn) is pressed, it sends `true` through the recording channel to start recording.
+/// When the Function key (fn) is released, it sends `false` through the recording channel to stop recording.
+/// 
 /// # Arguments
 /// 
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
-pub fn start_listener(app: AppHandle) {
+/// * `recording_tx` - Channel sender to signal start/stop recording (true = start, false = stop)
+pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
     std::thread::spawn(move || {
         let callback = move |event: Event| {
-            // Only process keyboard events
+            // Check if this is a function key event that should trigger recording
+            if let Some(should_start) = is_function_key_event(&event.event_type) {
+                println!("Function key (fn) {} - {} recording", 
+                    if should_start { "pressed" } else { "released" },
+                    if should_start { "Starting" } else { "Stopping" });
+                
+                // Send signal to recording thread
+                if let Err(e) = recording_tx.send(should_start) {
+                    eprintln!("Failed to send recording signal: {:?}", e);
+                }
+                
+                // Emit event to frontend
+                let event_name = if should_start { "recording_started" } else { "recording_stopped" };
+                if let Err(e) = app.emit(event_name, ()) {
+                    eprintln!("Failed to emit {} event: {:?}", event_name, e);
+                }
+            }
+            
+            // Also emit all keyboard events to frontend for debugging
             if let Some(event_string) = event_type_to_string(&event.event_type) {
                 // Log the keyboard event for debugging
                 println!("Keyboard event: {:?}", event);
