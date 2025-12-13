@@ -18,6 +18,12 @@ import './index.css'
  * voice-to-text pipeline. It shows different colors and text based on
  * whether the app is idle, recording, or processing audio.
  */
+
+/**
+ * Note: Pill window positioning is handled in the Rust setup hook
+ * (main.rs setup function) to ensure it's positioned before becoming visible.
+ * This prevents the visible repositioning issue.
+ */
 const Pill: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'recording' | 'processing'>('idle')
 
