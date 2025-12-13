@@ -217,7 +217,7 @@ body::before {
 }
 
 .button.secondary {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.9) 0%, rgba(0, 122, 255, 0.7) 100%);
 }
 
 .icon {
@@ -253,6 +253,12 @@ body::before {
   box-shadow: 0 8px 25px rgba(0, 122, 255, 0.3);
 }
 
+.button.secondary:hover {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 1) 0%, rgba(0, 122, 255, 0.8) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 122, 255, 0.3);
+}
+
 .button:active {
   transform: translateY(0);
 }
@@ -262,6 +268,11 @@ body::before {
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.button.secondary:disabled {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.6) 0%, rgba(0, 122, 255, 0.4) 100%);
+  opacity: 0.7;
 }
 
 .button:disabled::before {
