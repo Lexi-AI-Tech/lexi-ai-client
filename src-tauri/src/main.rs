@@ -52,10 +52,15 @@ fn inject_text(text: String) -> Result<(), String> {
         .map_err(|e| format!("Injection failed: {}", e))
 }
 
-// Re-export pill function as a Tauri command
+// Re-export pill functions as Tauri commands
 #[tauri::command]
 fn show_pill_window(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
     pill::show_pill_window(app, x, y)
+}
+
+#[tauri::command]
+fn toggle_pill_window(app: AppHandle) -> Result<(), String> {
+    pill::toggle_pill_window(app)
 }
 
 /// Processes recorded audio data by:
@@ -123,13 +128,24 @@ pub fn main() {
             request_input_monitoring_permission,
             request_accessibility_permission,
             inject_text,
-            show_pill_window
+            show_pill_window,
+            toggle_pill_window
         ])
         .setup(move |app| {
+            // CRITICAL FIX FOR MACOS FLOATING WINDOWS
+            // This policy allows the app to have accessory windows (like the pill)
+            // that float above all spaces and do not clutter the Dock/App Switcher.
+            // Must be set before getting the app handle to avoid borrow checker issues.
+            #[cfg(target_os = "macos")]
+            {
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                println!("🍎 Set macOS activation policy to Accessory (app will not appear in Dock)");
+            }
+            
             let app_handle = app.handle();
             
             // Initialize and position the pill window at the center of the screen
-            // This is done in setup so the window is positioned before it becomes visible
+            // The window is created dynamically in Rust but shown at app startup
             if let Err(e) = pill::init_pill_window(app_handle.clone()) {
                 eprintln!("Failed to initialize pill window: {}", e);
             }
@@ -175,6 +191,13 @@ pub fn main() {
                                 // Start recording (Function key pressed)
                                 if recorder.is_none() {
                                     println!("Function key (fn) pressed - Starting recording in dedicated thread...");
+                                    
+                                    // Show the pill window when recording starts (it's already created at startup)
+                                    if let Some(pill_window) = app_handle_for_recording.get_webview_window("pill") {
+                                        if let Err(e) = pill_window.show() {
+                                            eprintln!("Failed to show pill window: {}", e);
+                                        }
+                                    }
                                     
                                     let mut new_recorder = AudioRecorder::new();
                                     match new_recorder.start_recording() {
