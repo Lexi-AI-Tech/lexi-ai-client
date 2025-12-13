@@ -1,20 +1,20 @@
-// SpeechAPI module handles communication with Lexi AI Server for speech-to-text transcription
+// STT (Speech-to-Text) Service module handles communication with Lexi AI Server for speech-to-text transcription
 // It sends audio data (WAV format) to the server API and receives transcribed text in response
 // The server handles the Groq API integration, so no API key is needed in the client
 
 use std::error::Error;
 use reqwest::multipart;
 
-/// SpeechAPI client for transcribing audio using Lexi AI Server
+/// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
 /// 
 /// This struct manages HTTP requests to the Lexi AI Server endpoint for speech-to-text conversion.
 /// The server handles the Groq API integration internally.
-pub struct SpeechAPI {
+pub struct SttService {
     client: reqwest::Client,  // HTTP client for making API requests
 }
 
-impl SpeechAPI {
-    /// Creates a new SpeechAPI instance
+impl SttService {
+    /// Creates a new SttService instance
     /// 
     /// Initializes the HTTP client. No API key is needed as the server handles authentication.
     pub fn new() -> Self {

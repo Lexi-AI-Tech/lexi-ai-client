@@ -15,14 +15,14 @@ use tauri::{AppHandle, Manager, Emitter};
 
 // Module declarations for core functionality
 mod audio_recorder;  // Handles audio capture from microphone
-mod speech_api;      // Communicates with Groq API for speech-to-text transcription
+mod stt_service;     // Communicates with Groq API for speech-to-text transcription
 mod text_injector;   // Injects transcribed text into active application
 mod global_key_listener;  // Handles global keyboard event listening via rdev
 mod permissions;     // Handles permission requests for microphone, input monitoring, and accessibility
 mod pill;           // Handles pill overlay window management
 
 use audio_recorder::AudioRecorder;
-use speech_api::SpeechAPI;
+use stt_service::SttService;
 use text_injector::TextInjector;
 
 use permissions::{
@@ -75,9 +75,9 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             // Notify frontend that transcription has started
             app_handle.emit("processing_start", ()).unwrap_or_default();
             
-            // Initialize the speech API client and transcribe the audio
-            let api = SpeechAPI::new();
-            match api.transcribe_audio(audio_data).await {
+            // Initialize the STT service client and transcribe the audio
+            let stt_service = SttService::new();
+            match stt_service.transcribe_audio(audio_data).await {
                 Ok(transcription) => {
                     println!("Transcription: {}", transcription);
                     
