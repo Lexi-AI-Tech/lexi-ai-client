@@ -98,6 +98,13 @@ function App() {
         }))
       })
 
+      // Listen for global input events from rdev listener
+      const unlistenGlobalInput = await listen('global-input', (event: any) => {
+        console.log('Received global input event:', event.payload)
+        // Update UI, e.g., display keystrokes or trigger actions
+        // You can add custom logic here based on the event type
+      })
+
       // Return cleanup function to unregister all listeners
       // This prevents memory leaks when the component unmounts
       return () => {
@@ -106,6 +113,7 @@ function App() {
         unlistenProcessingStart()
         unlistenSuccess()
         unlistenError()
+        unlistenGlobalInput()
       }
     }
 
@@ -167,19 +175,6 @@ function App() {
     return () => clearInterval(interval)
   }, [state.isRecording])
 
-  /**
-   * Toggle recording state
-   * 
-   * This function allows manual recording control via UI,
-   * in addition to the automatic Option key detection in the backend.
-   */
-  const toggleRecording = async () => {
-    if (state.isRecording) {
-      await invoke('stop_recording')
-    } else {
-      await invoke('start_recording')
-    }
-  }
 
   /**
    * Format duration in MM:SS format
@@ -238,7 +233,7 @@ function App() {
         <div className="controls">
           <button
             className={`button ${state.isRecording ? 'recording' : 'primary'}`}
-            onClick={toggleRecording}
+            onClick={() => {}}
             disabled={state.status === 'processing'}
           >
             {state.isRecording ? (
@@ -260,11 +255,11 @@ function App() {
           <h3>How to Use</h3>
           <div className="hotkey-display">
             <span>Press and hold</span>
-            <span className="hotkey-combo">Option</span>
+            <span className="hotkey-combo">fn</span>
             <span>to record</span>
           </div>
           <div className="instructions">
-            Hold the Option key to start recording. Release it to stop and automatically transcribe your speech.
+            Hold the Function key (fn) to start recording. Release it to stop and automatically transcribe your speech.
           </div>
         </div>
       </div>
