@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import './index.css'
 
 /**
@@ -111,8 +112,19 @@ const Pill: React.FC = () => {
     }
   }
 
+  const handleMouseDown = async () => {
+    // Start dragging the window when clicking on the pill
+    try {
+      const window = getCurrentWindow()
+      await window.startDragging()
+    } catch (error) {
+      console.error('Failed to start dragging:', error)
+    }
+  }
+
   return (
     <div
+      onMouseDown={handleMouseDown}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -120,7 +132,7 @@ const Pill: React.FC = () => {
         width: '180px',
         height: '50px',
         borderRadius: '9999px',
-        cursor: 'pointer',
+        cursor: 'move',
         transition: 'background-color 0.3s ease',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
         userSelect: 'none',
