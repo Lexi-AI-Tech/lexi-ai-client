@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Lexi AI Client needs access to your microphone to record audio for speech-to-text transcription.</string>
+    <string>Lexi AI needs access to your microphone to record audio for speech-to-text transcription.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Lexi AI Client needs accessibility permissions to inject transcribed text at your cursor position.</string>
+    <string>Lexi AI needs accessibility permissions to inject transcribed text at your cursor position.</string>
 </dict>
 </plist>
 

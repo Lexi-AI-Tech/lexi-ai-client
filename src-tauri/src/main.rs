@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-// This is the main entry point for the Lexi AI Client Tauri application.
+// This is the main entry point for the Lexi AI Tauri application.
 // The application provides a voice-to-text overlay that:
 // 1. Listens for Function key (fn) press/release to start/stop audio recording
 // 2. Captures audio from the default microphone

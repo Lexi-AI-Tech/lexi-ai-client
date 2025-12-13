@@ -1,7 +1,7 @@
 /**
  * Main App Component
  * 
- * This is the root React component for the Lexi AI Client frontend.
+ * This is the root React component for the Lexi AI frontend.
  * It manages the application state and listens to events from the Tauri backend
  * to update the UI based on recording and transcription status.
  * 
@@ -56,7 +56,7 @@ function App() {
    * - transcription_error: Transcription failed (API error, etc.)
    */
   useEffect(() => {
-    console.log('Lexi AI Client initialized')
+    console.log('Lexi AI initialized')
 
     const setupListeners = async () => {
       // Listen for when recording starts (Option key pressed)
@@ -286,7 +286,7 @@ function App() {
           <div className="app-title">
             <div className="logo">🎤</div>
             <div className="title-text">
-              <h1>Lexi AI Client</h1>
+              <h1>Lexi AI</h1>
               <p>Voice-to-Text Assistant</p>
             </div>
           </div>

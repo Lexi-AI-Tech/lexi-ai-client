@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Building Lexi AI Client..."
+echo "🚀 Building Lexi AI..."
 
 # Check if we're in the right directory
 if [ ! -f "package.json" ]; then
