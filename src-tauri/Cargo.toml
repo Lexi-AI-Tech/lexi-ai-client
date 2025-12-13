@@ -28,4 +28,4 @@ hound = "3.5" # For WAV encoding
 chrono = "0.4"
 cocoa = "0.24"
 objc = "0.2"
-rdev = "0.5"
+rdev = { git = "https://github.com/fufesou/rdev" }  # Fork fixes macOS issues
