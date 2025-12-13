@@ -17,6 +17,7 @@ use tauri::{AppHandle, Manager, Emitter};
 mod audio_recorder;  // Handles audio capture from microphone
 mod speech_api;      // Communicates with Groq API for speech-to-text transcription
 mod text_injector;   // Injects transcribed text into active application
+mod global_key_listener;  // Handles global keyboard event listening via rdev
 
 use audio_recorder::AudioRecorder;
 use speech_api::SpeechAPI;
@@ -89,6 +90,9 @@ pub fn main() {
         .setup(move |app| {
             let app_handle = app.handle();
             let recording_state = recording.clone();
+            
+            // Start the global input listener (rdev) in a background thread
+            global_key_listener::start_listener(app_handle.clone());
 
             let window = app.get_webview_window("main").unwrap();
             
@@ -112,21 +116,21 @@ pub fn main() {
             // macOS-specific window configuration
             // Makes the window appear on all Spaces (virtual desktops)
             // This ensures the overlay is always accessible regardless of which Space the user is on
-            #[cfg(target_os = "macos")]
-            {
-                use cocoa::appkit::{NSWindow, NSWindowCollectionBehavior};
-                use cocoa::base::id;
+            // #[cfg(target_os = "macos")]
+            // {
+            //     use cocoa::appkit::{NSWindow, NSWindowCollectionBehavior};
+            //     use cocoa::base::id;
 
-                if let Ok(ns_window_ptr) = window.ns_window() {
-                    let ns_window = ns_window_ptr as id;
-                    unsafe {
-                        // Set window behavior to allow it to join all Spaces
-                        let mut behavior = ns_window.collectionBehavior();
-                        behavior |= NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces;
-                        ns_window.setCollectionBehavior_(behavior);
-                    }
-                }
-            }
+            //     if let Ok(ns_window_ptr) = window.ns_window() {
+            //         let ns_window = ns_window_ptr as id;
+            //         unsafe {
+            //             // Set window behavior to allow it to join all Spaces
+            //             let mut behavior = ns_window.collectionBehavior();
+            //             behavior |= NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces;
+            //             ns_window.setCollectionBehavior_(behavior);
+            //         }
+            //     }
+            // }
             
             #[cfg(desktop)]
             {

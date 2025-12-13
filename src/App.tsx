@@ -98,6 +98,13 @@ function App() {
         }))
       })
 
+      // Listen for global input events from rdev listener
+      const unlistenGlobalInput = await listen('global-input', (event: any) => {
+        console.log('Received global input event:', event.payload)
+        // Update UI, e.g., display keystrokes or trigger actions
+        // You can add custom logic here based on the event type
+      })
+
       // Return cleanup function to unregister all listeners
       // This prevents memory leaks when the component unmounts
       return () => {
@@ -106,6 +113,7 @@ function App() {
         unlistenProcessingStart()
         unlistenSuccess()
         unlistenError()
+        unlistenGlobalInput()
       }
     }
 
