@@ -57,7 +57,7 @@
         "visibleOnAllWorkspaces": true,
         "skipTaskbar": true,
         "resizable": false,
-        "visible": true,
+        "visible": false,
         "url": "screens/pill.html"
       }
     ],

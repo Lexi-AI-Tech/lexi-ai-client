@@ -128,6 +128,12 @@ pub fn main() {
         .setup(move |app| {
             let app_handle = app.handle();
             
+            // Initialize and position the pill window at the center of the screen
+            // This is done in setup so the window is positioned before it becomes visible
+            if let Err(e) = pill::init_pill_window(app_handle.clone()) {
+                eprintln!("Failed to initialize pill window: {}", e);
+            }
+            
             // Channel to communicate with the recording thread
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
             let (recording_tx, recording_rx) = mpsc::channel::<bool>(); // true = start, false = stop
