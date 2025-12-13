@@ -11,7 +11,7 @@
 use std::sync::mpsc;
 use std::thread;
 
-use tauri::{AppHandle, Manager, Emitter, LogicalPosition};
+use tauri::{AppHandle, Manager, Emitter};
 
 // Module declarations for core functionality
 mod audio_recorder;  // Handles audio capture from microphone
@@ -19,6 +19,7 @@ mod speech_api;      // Communicates with Groq API for speech-to-text transcript
 mod text_injector;   // Injects transcribed text into active application
 mod global_key_listener;  // Handles global keyboard event listening via rdev
 mod permissions;     // Handles permission requests for microphone, input monitoring, and accessibility
+mod pill;           // Handles pill overlay window management
 
 use audio_recorder::AudioRecorder;
 use speech_api::SpeechAPI;
@@ -51,35 +52,10 @@ fn inject_text(text: String) -> Result<(), String> {
         .map_err(|e| format!("Injection failed: {}", e))
 }
 
-/// Show and position the pill overlay window
-/// 
-/// This command shows the pill window (if it exists) and positions it at the specified coordinates.
-/// The pill window is pre-configured in tauri.conf.json.
-/// 
-/// # Arguments
-/// * `x` - The x coordinate for the window position
-/// * `y` - The y coordinate for the window position
-/// 
-/// # Returns
-/// * `Ok(())` - Successfully showed and positioned the window
-/// * `Err(String)` - An error message if the operation failed
+// Re-export pill function as a Tauri command
 #[tauri::command]
 fn show_pill_window(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
-    if let Some(pill_window) = app.get_webview_window("pill") {
-        pill_window
-            .show()
-            .map_err(|e| format!("Failed to show pill window: {}", e))?;
-        
-        pill_window
-            .set_position(LogicalPosition::new(x, y))
-            .map_err(|e| format!("Failed to position pill window: {}", e))?;
-        
-        // Note: In Tauri v2, we can't prevent focus directly, but the window
-        // is configured with focus: false in the config, so it shouldn't steal focus
-        Ok(())
-    } else {
-        Err("Pill window not found".to_string())
-    }
+    pill::show_pill_window(app, x, y)
 }
 
 /// Processes recorded audio data by:
