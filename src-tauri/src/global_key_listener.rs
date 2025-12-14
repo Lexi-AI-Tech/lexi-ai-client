@@ -33,6 +33,8 @@ fn is_trigger_key_event(event_type: &EventType) -> Option<bool> {
 /// When the Function key (fn) is pressed, it sends `true` through the recording channel to start recording.
 /// When the Function key (fn) is released, it sends `false` through the recording channel to stop recording.
 /// 
+/// Additionally, on every Fn key press/release, it queries cursor context and logs it.
+/// 
 /// # Arguments
 /// 
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
@@ -42,6 +44,13 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
         let callback = move |event: Event| {
             // Check if this is a trigger key event that should trigger recording
             if let Some(should_start) = is_trigger_key_event(&event.event_type) {
+                // Log the Fn key trigger
+                let trigger_type = if should_start { "PRESSED" } else { "RELEASED" };
+                println!("=== FN KEY TRIGGER: {} ===", trigger_type);
+                
+                // Query and log cursor context on every Fn key event
+                query_and_log_cursor_context();
+                
                 println!("Trigger key {} - {} recording", 
                     if should_start { "pressed" } else { "released" },
                     if should_start { "Starting" } else { "Stopping" });
@@ -75,5 +84,39 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
             eprintln!("rdev listen error: {:?}", error);
         }
     });
+}
+
+/// Query cursor context and log it
+fn query_and_log_cursor_context() {
+    #[cfg(target_os = "macos")]
+    {
+        use crate::cursor_context::get_cursor_context;
+        
+        match get_cursor_context() {
+            Some(context) => {
+                println!("=== CURSOR CONTEXT ===");
+                println!("App: {:?}", context.app_name);
+                println!("PID: {:?}", context.pid);
+                if let Some(selected_text) = &context.selected_text {
+                    println!("Selected/Context Text: {}", selected_text);
+                } else {
+                    println!("Selected/Context Text: (none)");
+                }
+                println!("======================");
+            }
+            None => {
+                println!("=== CURSOR CONTEXT ===");
+                println!("Failed to retrieve cursor context");
+                println!("======================");
+            }
+        }
+    }
+    
+    #[cfg(not(target_os = "macos"))]
+    {
+        println!("=== CURSOR CONTEXT ===");
+        println!("Cursor context is only available on macOS");
+        println!("======================");
+    }
 }
 
