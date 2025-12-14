@@ -30,6 +30,9 @@ use permissions::{
     request_accessibility_permission,
     request_input_monitoring_permission,
     request_microphone_permission,
+    check_accessibility_permission,
+    check_input_monitoring_permission,
+    check_microphone_permission,
 };
 
 /// Inject text into the currently active application
@@ -128,6 +131,9 @@ pub fn main() {
             request_microphone_permission,
             request_input_monitoring_permission,
             request_accessibility_permission,
+            check_microphone_permission,
+            check_input_monitoring_permission,
+            check_accessibility_permission,
             inject_text,
             show_pill_window,
             toggle_pill_window
