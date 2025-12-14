@@ -20,6 +20,7 @@ mod text_injector;   // Injects transcribed text into active application
 mod global_key_listener;  // Handles global keyboard event listening via rdev
 mod permissions;     // Handles permission requests for microphone, input monitoring, and accessibility
 mod pill;           // Handles pill overlay window management
+mod cursor_context;  // Handles cursor context retrieval using macOS Accessibility API
 
 use audio_recorder::AudioRecorder;
 use stt_service::SttService;
