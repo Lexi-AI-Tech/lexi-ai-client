@@ -3,6 +3,9 @@
 //! This module provides functionality to get text context at the cursor position
 //! in the currently focused application using the macOS Accessibility API (AXUIElement).
 
+// Suppress warnings from objc crate's msg_send! macro about unexpected cfg conditions
+#![allow(unexpected_cfgs)]
+
 #[cfg(target_os = "macos")]
 use objc::{msg_send, sel, sel_impl};
 use std::ffi::c_void;
@@ -90,23 +93,10 @@ pub fn get_cursor_context() -> Option<CursorContext> {
                     attribute: CFStringRef,
                     value: *mut CFTypeRef,
                 ) -> AXError;
-                fn CFStringCreateWithCString(
-                    alloc: *const c_void,
-                    c_str: *const i8,
-                    encoding: u32,
-                ) -> CFStringRef;
                 fn CFRelease(cf: CFTypeRef);
-                fn CFStringGetCString(
-                    the_string: CFStringRef,
-                    buffer: *mut i8,
-                    buffer_size: isize,
-                    encoding: u32,
-                ) -> bool;
-                fn CFStringGetLength(the_string: CFStringRef) -> isize;
             }
             
             // Constants
-            const K_CF_STRING_ENCODING_UTF8: u32 = 0x08000100;
             const K_AX_ERROR_SUCCESS: AXError = 0;
             
             // Create AXUIElement for the application
