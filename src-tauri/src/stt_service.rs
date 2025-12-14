@@ -16,7 +16,7 @@ pub struct SttService {
 impl SttService {
     /// Creates a new SttService instance
     /// 
-    /// Initializes the HTTP client. No API key is needed as the server handles authentication.
+    /// Initializes the HTTP client.
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(), // Create a new HTTP client
