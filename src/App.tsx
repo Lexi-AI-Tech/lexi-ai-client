@@ -14,6 +14,8 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow'
+import { useOnboardingStore } from './store/onboardingStore'
 
 /**
  * Application state interface
@@ -28,6 +30,14 @@ interface AppState {
 }
 
 function App() {
+  // Check if onboarding is completed
+  const { isCompleted } = useOnboardingStore();
+  
+  // If onboarding is not completed, show onboarding flow
+  if (!isCompleted) {
+    return <OnboardingFlow />;
+  }
+
   // Initialize application state
   // The state is updated based on events from the Tauri backend
   const [state, setState] = useState<AppState>({
