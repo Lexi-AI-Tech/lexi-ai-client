@@ -33,6 +33,8 @@ fn is_trigger_key_event(event_type: &EventType) -> Option<bool> {
 /// When the Function key (fn) is pressed, it sends `true` through the recording channel to start recording.
 /// When the Function key (fn) is released, it sends `false` through the recording channel to stop recording.
 /// 
+/// Additionally, on every Fn key press/release, it queries cursor context and logs it.
+/// 
 /// # Arguments
 /// 
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
@@ -42,6 +44,13 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
         let callback = move |event: Event| {
             // Check if this is a trigger key event that should trigger recording
             if let Some(should_start) = is_trigger_key_event(&event.event_type) {
+                // Log the Fn key trigger
+                let trigger_type = if should_start { "PRESSED" } else { "RELEASED" };
+                println!("=== FN KEY TRIGGER: {} ===", trigger_type);
+                
+                // Query and log cursor context on every Fn key event
+                crate::cursor_context::log_cursor_context();
+                
                 println!("Trigger key {} - {} recording", 
                     if should_start { "pressed" } else { "released" },
                     if should_start { "Starting" } else { "Stopping" });
