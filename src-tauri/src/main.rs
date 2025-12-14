@@ -127,6 +127,7 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_google_auth::init())
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
             request_input_monitoring_permission,
