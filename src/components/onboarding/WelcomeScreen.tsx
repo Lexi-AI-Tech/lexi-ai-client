@@ -1,9 +1,12 @@
 import React from 'react';
 import { useOnboardingStore } from '../../store/onboardingStore';
+import { GoogleLoginButton } from '../auth/GoogleLoginButton';
+import { useAuthStore } from '../../store/authStore';
 import './onboarding.css';
 
 export const WelcomeScreen: React.FC = () => {
   const { nextStep } = useOnboardingStore();
+  const { isAuthenticated, error } = useAuthStore();
 
   return (
     <div className="flex flex-row h-full w-full bg-background">
@@ -31,12 +34,37 @@ export const WelcomeScreen: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-start mb-8">
+          <div className="flex flex-col items-start mb-8 gap-4 w-full">
+            {!isAuthenticated && (
+              <div className="flex flex-col gap-3 w-full">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Sign in to sync your preferences (optional)
+                </p>
+                <GoogleLoginButton 
+                  onSuccess={() => {
+                    console.log('Login successful');
+                  }}
+                  onError={(err) => {
+                    console.error('Login error:', err);
+                  }}
+                />
+                {error && (
+                  <div className="auth-error">
+                    {error}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 my-2 w-full">
+                  <div className="flex-1 h-px bg-border"></div>
+                  <span className="text-xs text-muted-foreground px-2">or</span>
+                  <div className="flex-1 h-px bg-border"></div>
+                </div>
+              </div>
+            )}
             <button 
               className="onboarding-button primary"
               onClick={nextStep}
             >
-              Get Started
+              {isAuthenticated ? 'Continue' : 'Get Started'}
             </button>
           </div>
         </div>
