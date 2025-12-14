@@ -49,7 +49,7 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
                 println!("=== FN KEY TRIGGER: {} ===", trigger_type);
                 
                 // Query and log cursor context on every Fn key event
-                query_and_log_cursor_context();
+                crate::cursor_context::log_cursor_context();
                 
                 println!("Trigger key {} - {} recording", 
                     if should_start { "pressed" } else { "released" },
@@ -84,39 +84,5 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
             eprintln!("rdev listen error: {:?}", error);
         }
     });
-}
-
-/// Query cursor context and log it
-fn query_and_log_cursor_context() {
-    #[cfg(target_os = "macos")]
-    {
-        use crate::cursor_context::get_cursor_context;
-        
-        match get_cursor_context() {
-            Some(context) => {
-                println!("=== CURSOR CONTEXT ===");
-                println!("App: {:?}", context.app_name);
-                println!("PID: {:?}", context.pid);
-                if let Some(selected_text) = &context.selected_text {
-                    println!("Selected/Context Text: {}", selected_text);
-                } else {
-                    println!("Selected/Context Text: (none)");
-                }
-                println!("======================");
-            }
-            None => {
-                println!("=== CURSOR CONTEXT ===");
-                println!("Failed to retrieve cursor context");
-                println!("======================");
-            }
-        }
-    }
-    
-    #[cfg(not(target_os = "macos"))]
-    {
-        println!("=== CURSOR CONTEXT ===");
-        println!("Cursor context is only available on macOS");
-        println!("======================");
-    }
 }
 

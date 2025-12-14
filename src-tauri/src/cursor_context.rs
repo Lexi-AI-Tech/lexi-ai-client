@@ -7,6 +7,10 @@
 use objc::{msg_send, sel, sel_impl};
 use std::ffi::c_void;
 
+// ============================================================================
+// Public Types
+// ============================================================================
+
 /// Result of cursor context query
 #[derive(Debug, Clone)]
 pub struct CursorContext {
@@ -15,9 +19,14 @@ pub struct CursorContext {
     pub pid: Option<i32>,
 }
 
-/// Get the process ID of the frontmost application
+// ============================================================================
+// Application Information Helpers
+// ============================================================================
+
+/// Helper to get the frontmost application
+/// Returns (pid, app_name) or None if unavailable
 #[cfg(target_os = "macos")]
-fn get_frontmost_app_pid() -> Option<i32> {
+fn get_frontmost_app() -> Option<(i32, Option<String>)> {
     unsafe {
         objc::rc::autoreleasepool(|| {
             use cocoa::base::id;
@@ -34,39 +43,23 @@ fn get_frontmost_app_pid() -> Option<i32> {
             }
             
             let pid: i32 = msg_send![front_app, processIdentifier];
-            Some(pid)
+            
+            // Try to get app name (optional, don't fail if unavailable)
+            let app_name: id = msg_send![front_app, localizedName];
+            let app_name_str = if !app_name.is_null() {
+                Some(cf_string_to_string(app_name as *const c_void))
+            } else {
+                None
+            };
+            
+            Some((pid, app_name_str))
         })
     }
 }
 
-/// Get the name of the frontmost application
-#[cfg(target_os = "macos")]
-fn get_frontmost_app_name() -> Option<String> {
-    unsafe {
-        objc::rc::autoreleasepool(|| {
-            use cocoa::base::id;
-            
-            let workspace_class = objc::runtime::Class::get("NSWorkspace").unwrap();
-            let workspace: id = msg_send![workspace_class, sharedWorkspace];
-            if workspace.is_null() {
-                return None;
-            }
-            
-            let front_app: id = msg_send![workspace, frontmostApplication];
-            if front_app.is_null() {
-                return None;
-            }
-            
-            let app_name: id = msg_send![front_app, localizedName];
-            if app_name.is_null() {
-                return None;
-            }
-            
-            // Convert NSString to Rust String using CFString
-            Some(cf_string_to_string(app_name as *const c_void))
-        })
-    }
-}
+// ============================================================================
+// Public API
+// ============================================================================
 
 /// Get cursor context using macOS Accessibility API
 /// 
@@ -77,8 +70,7 @@ fn get_frontmost_app_name() -> Option<String> {
 /// 4. Fallback to getting text at cursor position
 #[cfg(target_os = "macos")]
 pub fn get_cursor_context() -> Option<CursorContext> {
-    let pid = get_frontmost_app_pid()?;
-    let app_name = get_frontmost_app_name();
+    let (pid, app_name) = get_frontmost_app()?;
     
     unsafe {
         objc::rc::autoreleasepool(|| {
@@ -222,6 +214,10 @@ pub fn get_cursor_context() -> Option<CursorContext> {
     }
 }
 
+// ============================================================================
+// Helper Functions for CoreFoundation/NSString Conversion
+// ============================================================================
+
 /// Helper function to create a CFString from a Rust string
 #[cfg(target_os = "macos")]
 unsafe fn create_cf_string(s: &str) -> *const c_void {
@@ -271,6 +267,38 @@ unsafe fn cf_string_to_string(cf_string: *const c_void) -> String {
         String::from_utf8_lossy(&buffer[..buffer.len() - 1]).trim_end_matches('\0').to_string()
     } else {
         String::new()
+    }
+}
+
+/// Log cursor context to console
+pub fn log_cursor_context() {
+    #[cfg(target_os = "macos")]
+    {
+        match get_cursor_context() {
+            Some(context) => {
+                println!("=== CURSOR CONTEXT ===");
+                println!("App: {:?}", context.app_name);
+                println!("PID: {:?}", context.pid);
+                if let Some(selected_text) = &context.selected_text {
+                    println!("Selected/Context Text: {}", selected_text);
+                } else {
+                    println!("Selected/Context Text: (none)");
+                }
+                println!("======================");
+            }
+            None => {
+                println!("=== CURSOR CONTEXT ===");
+                println!("Failed to retrieve cursor context");
+                println!("======================");
+            }
+        }
+    }
+    
+    #[cfg(not(target_os = "macos"))]
+    {
+        println!("=== CURSOR CONTEXT ===");
+        println!("Cursor context is only available on macOS");
+        println!("======================");
     }
 }
 
