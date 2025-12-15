@@ -1,12 +1,43 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { GoogleLoginButton } from '../auth/GoogleLoginButton';
 import { useAuthStore } from '../../store/authStore';
+import { clearAllStorage, clearAuthStorage, clearOnboardingStorage } from '../../lib/storageUtils';
 import './onboarding.css';
 
 export const WelcomeScreen: React.FC = () => {
-  const { nextStep } = useOnboardingStore();
-  const { isAuthenticated, error } = useAuthStore();
+  const { nextStep, resetOnboarding } = useOnboardingStore();
+  const { isAuthenticated, error, clearAuth } = useAuthStore();
+  const [showDebugMenu, setShowDebugMenu] = useState(false);
+
+  const handleClearAll = () => {
+    if (confirm('Clear all app data? This will log you out and reset onboarding.')) {
+      clearAllStorage();
+      clearAuth();
+      resetOnboarding();
+      setShowDebugMenu(false);
+      alert('All data cleared! Page will refresh.');
+      window.location.reload();
+    }
+  };
+
+  const handleClearAuth = () => {
+    if (confirm('Clear authentication data? You will be logged out.')) {
+      clearAuthStorage();
+      clearAuth();
+      setShowDebugMenu(false);
+      alert('Auth data cleared!');
+    }
+  };
+
+  const handleClearOnboarding = () => {
+    if (confirm('Reset onboarding? You will need to go through setup again.')) {
+      clearOnboardingStorage();
+      resetOnboarding();
+      setShowDebugMenu(false);
+      alert('Onboarding reset!');
+    }
+  };
 
   return (
     <div className="flex flex-row h-full w-full bg-background">
@@ -66,6 +97,44 @@ export const WelcomeScreen: React.FC = () => {
             >
               {isAuthenticated ? 'Continue' : 'Get Started'}
             </button>
+            
+            {/* Debug Menu - Hold Shift and click to show */}
+            <div className="mt-4">
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+                onClick={() => setShowDebugMenu(!showDebugMenu)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setShowDebugMenu(!showDebugMenu);
+                }}
+              >
+                {showDebugMenu ? '▼' : '▶'} Debug Menu
+              </button>
+              
+              {showDebugMenu && (
+                <div className="mt-2 p-3 bg-muted rounded border border-border text-xs space-y-2">
+                  <p className="font-semibold mb-2">Clear Storage:</p>
+                  <button
+                    className="block w-full text-left px-2 py-1 hover:bg-background rounded"
+                    onClick={handleClearAuth}
+                  >
+                    Clear Auth Data
+                  </button>
+                  <button
+                    className="block w-full text-left px-2 py-1 hover:bg-background rounded"
+                    onClick={handleClearOnboarding}
+                  >
+                    Clear Onboarding Data
+                  </button>
+                  <button
+                    className="block w-full text-left px-2 py-1 hover:bg-background rounded text-red-500"
+                    onClick={handleClearAll}
+                  >
+                    Clear All Data
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
