@@ -195,17 +195,41 @@ export async function exchangeGoogleAuthCode(
   codeVerifier?: string,
   redirectUri?: string
 ): Promise<AuthResponse> {
+  // Ensure code_verifier is always sent if provided (required for PKCE)
+  const requestBody: any = {
+    code,
+    state,
+  };
+  
+  // Always include code_verifier if it's provided (check for undefined/null, not falsy)
+  if (codeVerifier !== undefined && codeVerifier !== null) {
+    requestBody.code_verifier = codeVerifier;
+  }
+  if (redirectUri) {
+    requestBody.redirect_uri = redirectUri;
+  }
+  
+  console.log('Sending token exchange request:', { 
+    hasCode: !!code,
+    codeLength: code?.length,
+    hasVerifier: codeVerifier !== undefined && codeVerifier !== null,
+    verifierLength: codeVerifier?.length,
+    verifierPreview: codeVerifier ? `${codeVerifier.substring(0, 20)}...` : 'undefined',
+    requestBodyKeys: Object.keys(requestBody)
+  });
+  
+  // Log the actual request body (without sensitive data)
+  console.log('Request body (sanitized):', {
+    ...requestBody,
+    code_verifier: requestBody.code_verifier ? `${requestBody.code_verifier.substring(0, 20)}... (length: ${requestBody.code_verifier.length})` : 'missing'
+  });
+  
   const response = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      code,
-      state,
-      code_verifier: codeVerifier, // PKCE verifier
-      redirect_uri: redirectUri,   // Redirect URI used in auth request
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {

@@ -49,11 +49,13 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       isWaitingForCallback.current = true;
       
       // Listen for OAuth callback from Rust backend
+      console.log('Setting up listener for google-oauth-callback event...');
       const unlisten = await listen<{
         code: string;
         state: string;
         verifier: string;
       }>('google-oauth-callback', async (event) => {
+        console.log('Event listener triggered!', event);
         isWaitingForCallback.current = false;
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
@@ -63,7 +65,15 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
         try {
           const { code, state, verifier } = event.payload;
-          console.log('Received OAuth callback:', { code, state, verifier });
+          console.log('Received OAuth callback:', { code, state, verifier, hasVerifier: !!verifier });
+
+          // Validate that we have the required data
+          if (!code) {
+            throw new Error('Authorization code is missing');
+          }
+          if (!verifier) {
+            throw new Error('PKCE verifier is missing - cannot complete authentication');
+          }
 
           // Exchange authorization code + verifier for backend JWT tokens
           const redirectUri = 'http://127.0.0.1:8000'; // Match the redirect URI used in Rust
