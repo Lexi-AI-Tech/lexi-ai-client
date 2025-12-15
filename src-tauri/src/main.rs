@@ -243,22 +243,33 @@ async fn start_google_login(
                                     .collect();
                                 
                                 if let (Some(code), Some(callback_state)) = (query_pairs.get("code"), query_pairs.get("state")) {
+                                    println!("OAuth callback received - code: {}..., state: {}", 
+                                        &code.chars().take(10).collect::<String>(), callback_state);
+                                    
                                     // Get verifier from app state
                                     if let Some(oauth_state) = app.try_state::<OAuthState>() {
                                         let verifier = {
                                             let verifiers = oauth_state.verifiers.lock().unwrap();
+                                            println!("Looking for verifier with state: {}, available states: {:?}", 
+                                                callback_state, verifiers.keys().collect::<Vec<_>>());
                                             verifiers.get(callback_state).cloned()
                                         };
                                         
                                         if let Some(verifier) = verifier {
+                                            println!("Verifier found, length: {}", verifier.len());
                                             // Emit callback event to frontend
                                             let response = GoogleCallbackResponse {
                                                 code: code.clone(),
                                                 state: callback_state.clone(),
-                                                verifier,
+                                                verifier: verifier.clone(),
                                             };
-                                            if let Err(e) = app.emit("google-oauth-callback", &response) {
-                                                eprintln!("Failed to emit callback event: {}", e);
+                                            println!("Emitting google-oauth-callback event with code: {}..., state: {}, verifier length: {}", 
+                                                &code.chars().take(10).collect::<String>(), 
+                                                &response.state, 
+                                                response.verifier.len());
+                                            match app.emit("google-oauth-callback", &response) {
+                                                Ok(_) => println!("Successfully emitted google-oauth-callback event"),
+                                                Err(e) => eprintln!("Failed to emit callback event: {}", e),
                                             }
                                             
                                             // Return success page
