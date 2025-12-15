@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { signIn, signOut } from '@choochmeque/tauri-plugin-google-auth-api';
+import React, { useState, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useAuthStore } from '../../store/authStore';
-import { exchangeGoogleTokens, refreshJWTToken, logout as backendLogout } from '../../lib/apiClient';
+import { exchangeGoogleAuthCode, refreshJWTToken, logout as backendLogout } from '../../lib/apiClient';
 import './auth.css';
 
 interface GoogleLoginButtonProps {
@@ -15,6 +16,8 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 }) => {
   const { setAuthData, clearAuth, setLoading, setError, user, isAuthenticated, tokens } = useAuthStore();
   const [loading, setLocalLoading] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isWaitingForCallback = useRef(false);
 
   const handleGoogleLogin = async () => {
     setLocalLoading(true);
@@ -22,68 +25,105 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     setError(null);
 
     try {
-      // Get credentials from environment or use defaults
-      // In production, these should come from environment variables
+      // Get client ID from environment
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-      const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '';
-      const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'http://localhost:8080';
 
-      if (!clientId || !clientSecret) {
-        throw new Error('Google OAuth credentials not configured. Please set VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_CLIENT_SECRET in your .env file.');
+      if (!clientId) {
+        throw new Error(
+          'Google OAuth credentials not configured. ' +
+          'Please set VITE_GOOGLE_CLIENT_ID in your .env file.'
+        );
       }
 
-      const response = await signIn({
-        clientId,
-        clientSecret,
-        scopes: ['openid', 'email', 'profile'],
-        redirectUri,
+      // Start OAuth flow with PKCE via Rust backend
+      // This generates PKCE challenge/verifier, builds auth URL, and opens browser
+      const pkceData = await invoke<{
+        challenge: string;
+        verifier: string;
+        state: string;
+        auth_url: string;
+      }>('start_google_login', { clientId });
+
+      console.log('PKCE challenge generated, browser opened:', pkceData);
+
+      isWaitingForCallback.current = true;
+      
+      // Listen for OAuth callback from Rust backend
+      const unlisten = await listen<{
+        code: string;
+        state: string;
+        verifier: string;
+      }>('google-oauth-callback', async (event) => {
+        isWaitingForCallback.current = false;
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+        unlisten(); // One-time listener
+
+        try {
+          const { code, state, verifier } = event.payload;
+          console.log('Received OAuth callback:', { code, state, verifier });
+
+          // Exchange authorization code + verifier for backend JWT tokens
+          const redirectUri = 'http://127.0.0.1:8000'; // Match the redirect URI used in Rust
+          const backendAuth = await exchangeGoogleAuthCode(
+            code,
+            state,
+            verifier, // PKCE verifier
+            redirectUri
+          );
+
+          console.log('Backend authentication successful:', backendAuth);
+
+          // Store backend JWT tokens
+          const authTokens = {
+            access_token: backendAuth.access_token,
+            refresh_token: backendAuth.refresh_token,
+            expires_in: backendAuth.expires_in,
+            expires_at: backendAuth.expires_in 
+              ? Date.now() + backendAuth.expires_in * 1000 
+              : undefined
+          };
+
+          const authUser = {
+            email: backendAuth.user.email || '',
+            name: backendAuth.user.name || '',
+            picture: backendAuth.user.picture
+          };
+
+          setAuthData(authTokens, authUser);
+          
+          if (onSuccess) {
+            onSuccess(backendAuth.user);
+          }
+        } catch (error: any) {
+          const errorMessage = error?.message || 'Failed to exchange authorization code';
+          console.error('Token exchange failed:', error);
+          setError(errorMessage);
+          
+          if (onError) {
+            onError(errorMessage);
+          }
+        } finally {
+          setLocalLoading(false);
+          setLoading(false);
+        }
       });
 
-      // Response uses camelCase: idToken, accessToken, refreshToken, expiresAt
-      console.log('Google Login Success:', response);
-
-      if (response.accessToken && response.idToken) {
-        // Exchange Google tokens for backend JWT tokens
-        console.log('Exchanging Google tokens for backend JWT tokens...');
-        
-        // Calculate expires_in from expiresAt if available
-        const expiresIn = response.expiresAt 
-          ? Math.floor((response.expiresAt - Date.now()) / 1000)
-          : undefined;
-        
-        const backendAuth = await exchangeGoogleTokens({
-          id_token: response.idToken,
-          access_token: response.accessToken,
-          refresh_token: response.refreshToken,
-          expires_in: expiresIn,
-        });
-
-        console.log('Backend authentication successful:', backendAuth);
-
-        // Store backend JWT tokens (not Google tokens)
-        const authTokens = {
-          access_token: backendAuth.access_token,
-          refresh_token: backendAuth.refresh_token,
-          expires_in: backendAuth.expires_in,
-          expires_at: backendAuth.expires_in 
-            ? Date.now() + backendAuth.expires_in * 1000 
-            : undefined
-        };
-
-        const authUser = {
-          email: backendAuth.user.email || '',
-          name: backendAuth.user.name || '',
-          picture: backendAuth.user.picture
-        };
-
-        setAuthData(authTokens, authUser);
-        
-        if (onSuccess) {
-          onSuccess(backendAuth.user);
+      // Set a timeout to handle cases where user doesn't complete auth
+      timeoutRef.current = setTimeout(() => {
+        // If still waiting for callback after 5 minutes, assume user cancelled
+        if (isWaitingForCallback.current) {
+          isWaitingForCallback.current = false;
+          setLocalLoading(false);
+          setLoading(false);
+          setError('Authentication timed out. Please try again.');
+          if (onError) {
+            onError('Authentication timed out');
+          }
         }
-      } else {
-        throw new Error('Invalid response from Google OAuth');
-      }
+      }, 5 * 60 * 1000); // 5 minutes
 
     } catch (error: any) {
       const errorMessage = error?.message || 'Google login failed';
@@ -103,8 +143,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     try {
       // Logout from backend first
       await backendLogout();
-      // Then logout from Google
-      await signOut();
+      // Clear local auth
       clearAuth();
     } catch (error) {
       console.error('Logout Failed:', error);

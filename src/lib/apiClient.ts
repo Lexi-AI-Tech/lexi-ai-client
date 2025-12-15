@@ -156,7 +156,80 @@ export async function authenticatedFetch(
 }
 
 /**
+ * Get Google OAuth URL from backend
+ * The backend should handle OAuth flow securely with client secret
+ */
+export async function getGoogleOAuthUrl(): Promise<{ url: string; state?: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/google/url`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || `Failed to get OAuth URL: ${response.status}`);
+  }
+
+  const data: ApiResponse<{ url: string; state?: string }> = await response.json();
+  
+  if (!data.url) {
+    throw new Error('Invalid response from authentication server');
+  }
+
+  return {
+    url: data.url,
+    state: data.state,
+  };
+}
+
+/**
+ * Exchange Google OAuth authorization code for backend JWT tokens
+ * This is called after user authenticates and backend receives the callback
+ * Supports both PKCE and traditional OAuth flows
+ */
+export async function exchangeGoogleAuthCode(
+  code: string, 
+  state?: string,
+  codeVerifier?: string,
+  redirectUri?: string
+): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      code,
+      state,
+      code_verifier: codeVerifier, // PKCE verifier
+      redirect_uri: redirectUri,   // Redirect URI used in auth request
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || `Authentication failed: ${response.status}`);
+  }
+
+  const data: ApiResponse<AuthResponse> = await response.json();
+  
+  if (!data.access_token || !data.user) {
+    throw new Error('Invalid response from authentication server');
+  }
+
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token || '',
+    user: data.user,
+    expires_in: data.expires_in,
+  };
+}
+
+/**
  * Exchange Google OAuth tokens for backend JWT tokens
+ * @deprecated Use exchangeGoogleAuthCode instead for secure OAuth flow
  */
 export async function exchangeGoogleTokens(googleTokens: {
   id_token: string;
