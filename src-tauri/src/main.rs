@@ -21,6 +21,7 @@ mod global_key_listener;  // Handles global keyboard event listening via rdev
 mod permissions;     // Handles permission requests for microphone, input monitoring, and accessibility
 mod pill;           // Handles pill overlay window management
 mod cursor_context;  // Handles cursor context retrieval using macOS Accessibility API
+mod oauth;          // Handles Google OAuth authentication with PKCE
 
 use audio_recorder::AudioRecorder;
 use stt_service::SttService;
@@ -34,6 +35,8 @@ use permissions::{
     check_input_monitoring_permission,
     check_microphone_permission,
 };
+
+use oauth::{OAuthState, start_google_login, get_pkce_verifier};
 
 /// Inject text into the currently active application
 /// 
@@ -127,6 +130,8 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .manage(OAuthState::default())
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
             request_input_monitoring_permission,
@@ -136,7 +141,9 @@ pub fn main() {
             check_accessibility_permission,
             inject_text,
             show_pill_window,
-            toggle_pill_window
+            toggle_pill_window,
+            start_google_login,
+            get_pkce_verifier
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
