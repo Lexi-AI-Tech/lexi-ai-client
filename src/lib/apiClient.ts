@@ -355,3 +355,102 @@ export async function logout(): Promise<void> {
     console.warn('Backend logout failed, clearing local auth anyway');
   }
 }
+
+/**
+ * Transcript types
+ */
+export interface Transcript {
+  id: number;
+  user_id: number;
+  text: string | null;
+  audio_file_url: string | null;
+  audio_file_size: number | null;
+  provider: string | null;
+  asr_model: string | null;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedTranscriptsResponse {
+  transcripts: Transcript[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/**
+ * Get paginated list of transcripts
+ */
+export async function getTranscripts(
+  page: number = 1,
+  pageSize: number = 20,
+  status?: string,
+  orderBy: string = 'created_at',
+  orderDirection: 'asc' | 'desc' = 'desc'
+): Promise<PaginatedTranscriptsResponse> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: pageSize.toString(),
+    order_by: orderBy,
+    order_direction: orderDirection,
+  });
+
+  if (status) {
+    params.append('status', status);
+  }
+
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/transcription/transcripts?${params.toString()}`,
+    {
+      method: 'GET',
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || errorData.detail || `Failed to get transcripts: ${response.status}`);
+  }
+
+  const data: ApiResponse<PaginatedTranscriptsResponse> = await response.json();
+  return (data.data || data) as PaginatedTranscriptsResponse;
+}
+
+/**
+ * Get a specific transcript by ID
+ */
+export async function getTranscript(transcriptId: number): Promise<Transcript> {
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/transcription/transcripts/${transcriptId}`,
+    {
+      method: 'GET',
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || errorData.detail || `Failed to get transcript: ${response.status}`);
+  }
+
+  const data: ApiResponse<Transcript> = await response.json();
+  return (data.data || data) as Transcript;
+}
+
+/**
+ * Delete a transcript by ID
+ */
+export async function deleteTranscript(transcriptId: number): Promise<void> {
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/transcription/transcripts/${transcriptId}`,
+    {
+      method: 'DELETE',
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || errorData.detail || `Failed to delete transcript: ${response.status}`);
+  }
+}
