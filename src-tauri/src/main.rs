@@ -37,6 +37,40 @@ use permissions::{
 };
 
 use oauth::{OAuthState, start_google_login, get_pkce_verifier};
+use std::sync::Mutex;
+
+/// Auth token state for storing the current access token
+#[derive(Default)]
+struct AuthTokenState {
+    token: Mutex<Option<String>>,
+}
+
+/// Set the authentication token from frontend
+/// 
+/// This command allows the frontend to update the access token stored in Rust state.
+/// The frontend should call this whenever the auth token changes.
+/// 
+/// # Arguments
+/// * `token` - Optional access token from frontend
+#[tauri::command]
+fn set_auth_token(state: tauri::State<AuthTokenState>, token: Option<String>) {
+    if let Ok(mut token_guard) = state.token.lock() {
+        *token_guard = token;
+        println!("🔐 Auth token updated");
+    }
+}
+
+/// Get the current authentication token
+/// 
+/// # Returns
+/// * `Option<String>` - The current access token if available, None otherwise
+fn get_auth_token(state: &tauri::State<AuthTokenState>) -> Option<String> {
+    if let Ok(token_guard) = state.token.lock() {
+        token_guard.clone()
+    } else {
+        None
+    }
+}
 
 /// Inject text into the currently active application
 /// 
@@ -71,9 +105,10 @@ fn toggle_pill_window(app: AppHandle) -> Result<(), String> {
 }
 
 /// Processes recorded audio data by:
-/// 1. Sending it to the speech-to-text API for transcription
-/// 2. Injecting the transcribed text into the active application
-/// 3. Emitting events to the frontend to update UI state
+/// 1. Getting the authentication token from state
+/// 2. Sending it to the speech-to-text API for transcription
+/// 3. Injecting the transcribed text into the active application
+/// 4. Emitting events to the frontend to update UI state
 /// 
 /// This function runs in a separate thread to avoid blocking the main thread.
 /// It creates a new Tokio runtime since it's called from a non-async context.
@@ -87,9 +122,23 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             // Notify frontend that transcription has started
             app_handle.emit("processing_start", ()).unwrap_or_default();
             
+            // Get authentication token from state
+            let auth_token = if let Some(state) = app_handle.try_state::<AuthTokenState>() {
+                get_auth_token(&state)
+            } else {
+                None
+            };
+            
+            if auth_token.is_none() {
+                eprintln!("⚠️  Warning: No authentication token available. Transcription will fail with 401.");
+                eprintln!("💡 Tip: Make sure you're logged in and the frontend has synced the token using set_auth_token");
+            } else {
+                println!("✅ Auth token available (length: {})", auth_token.as_ref().unwrap().len());
+            }
+            
             // Initialize the STT service client and transcribe the audio
             let stt_service = SttService::new();
-            match stt_service.transcribe_audio(audio_data).await {
+            match stt_service.transcribe_audio(audio_data, auth_token).await {
                 Ok(transcription) => {
                     println!("Transcription: {}", transcription);
                     
@@ -132,6 +181,7 @@ pub fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(OAuthState::default())
+        .manage(AuthTokenState::default())
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
             request_input_monitoring_permission,
@@ -143,7 +193,8 @@ pub fn main() {
             show_pill_window,
             toggle_pill_window,
             start_google_login,
-            get_pkce_verifier
+            get_pkce_verifier,
+            set_auth_token
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
