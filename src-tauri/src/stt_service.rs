@@ -4,6 +4,7 @@
 
 use std::error::Error;
 use reqwest::multipart;
+use crate::config;
 
 /// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
 /// 
@@ -32,11 +33,12 @@ impl SttService {
     /// 
     /// # Arguments
     /// * `audio_data` - WAV file data as bytes (typically from AudioRecorder)
+    /// * `auth_token` - Optional authentication token (Bearer token) for authenticated requests
     /// 
     /// # Returns
     /// * `Ok(String)` - The transcribed text on success
     /// * `Err(Box<dyn Error>)` - An error if the API call fails
-    pub async fn transcribe_audio(&self, audio_data: Vec<u8>) -> Result<String, Box<dyn Error + Send + Sync>> {
+    pub async fn transcribe_audio(&self, audio_data: Vec<u8>, auth_token: Option<String>) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
 
@@ -52,13 +54,23 @@ impl SttService {
 
         println!("🔍 DEBUG: Sending request to Lexi AI Server...");
 
-        // Send POST request to Lexi AI Server transcription endpoint
-        // The use_groq=true query parameter tells the server to use Groq API
-        let res = self.client
-            .post("https://lexi-ai-server.onrender.com/api/transcription/speech-to-text?use_groq=true")
-            .multipart(form)  // Attach the multipart form with audio file
-            .send()
-            .await?;  // Wait for the response
+        // Build the request
+        // Get API base URL from configuration
+        let api_base_url = config::get_config().api_base_url();
+        let mut request = self.client
+            .post(format!("{}/api/transcription/speech-to-text", api_base_url))
+            .multipart(form);  // Attach the multipart form with audio file
+
+        // Add authorization header if token is provided
+        if let Some(token) = &auth_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+            println!("🔍 DEBUG: Added Authorization header (token length: {})", token.len());
+        } else {
+            println!("🔍 DEBUG: No auth token provided - request will likely fail with 401");
+        }
+
+        // Send the request and wait for the response
+        let res = request.send().await?;
 
         let status = res.status();
         println!("🔍 DEBUG: Response status: {}", status);

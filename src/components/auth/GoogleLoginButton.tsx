@@ -76,7 +76,14 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           }
 
           // Exchange authorization code + verifier for backend JWT tokens
-          const redirectUri = 'http://127.0.0.1:8000'; // Match the redirect URI used in Rust
+          // Use redirect URI from environment variable to match what was used in OAuth request
+          const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
+          if (!redirectUri) {
+            throw new Error(
+              'Redirect URI not configured. ' +
+              'Please set VITE_GOOGLE_REDIRECT_URI in your .env file.'
+            );
+          }
           const backendAuth = await exchangeGoogleAuthCode(
             code,
             state,
