@@ -168,8 +168,9 @@ export async function getGoogleOAuthUrl(): Promise<{ url: string; state?: string
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || `Failed to get OAuth URL: ${response.status}`);
+    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    // FastAPI returns errors in 'detail' field, but some APIs use 'error'
+    throw new Error(errorData.detail || errorData.error || `Failed to get OAuth URL: ${response.status}`);
   }
 
   const data: ApiResponse<{ url: string; state?: string }> = await response.json();
@@ -233,8 +234,11 @@ export async function exchangeGoogleAuthCode(
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || `Authentication failed: ${response.status}`);
+    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    // FastAPI returns errors in 'detail' field, but some APIs use 'error'
+    const errorMessage = errorData.detail || errorData.error || `Authentication failed: ${response.status}`;
+    console.error('Token exchange failed:', errorMessage, errorData);
+    throw new Error(errorMessage);
   }
 
   const data: ApiResponse<AuthResponse> = await response.json();
