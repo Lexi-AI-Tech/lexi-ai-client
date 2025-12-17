@@ -21,7 +21,7 @@ mod global_key_listener;  // Handles global keyboard event listening via rdev
 mod permissions;     // Handles permission requests for microphone, input monitoring, and accessibility
 mod pill;           // Handles pill overlay window management
 mod cursor_context;  // Handles cursor context retrieval using macOS Accessibility API
-mod oauth;          // Handles Google OAuth authentication with PKCE
+mod google_oauth;   // Handles Google OAuth authentication with PKCE
 mod config;         // Handles environment variable configuration
 
 use audio_recorder::AudioRecorder;
@@ -37,7 +37,7 @@ use permissions::{
     check_microphone_permission,
 };
 
-use oauth::{OAuthState, start_google_login, get_pkce_verifier};
+use google_oauth::{OAuthState, start_google_login, get_pkce_verifier};
 use std::sync::Mutex;
 
 /// Auth token state for storing the current access token
