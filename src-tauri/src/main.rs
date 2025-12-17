@@ -22,6 +22,7 @@ mod permissions;     // Handles permission requests for microphone, input monito
 mod pill;           // Handles pill overlay window management
 mod cursor_context;  // Handles cursor context retrieval using macOS Accessibility API
 mod oauth;          // Handles Google OAuth authentication with PKCE
+mod config;         // Handles environment variable configuration
 
 use audio_recorder::AudioRecorder;
 use stt_service::SttService;
@@ -178,6 +179,10 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 /// to control audio recording.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
+    // Initialize configuration (loads environment variables)
+    let _config = config::get_config();
+    println!("🔧 Configuration loaded - API Base URL: {}", _config.api_base_url());
+    
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(OAuthState::default())
