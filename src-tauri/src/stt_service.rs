@@ -4,6 +4,7 @@
 
 use std::error::Error;
 use reqwest::multipart;
+use crate::config;
 
 /// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
 /// 
@@ -54,9 +55,8 @@ impl SttService {
         println!("🔍 DEBUG: Sending request to Lexi AI Server...");
 
         // Build the request
-        // Get API base URL from environment variable
-        // let api_base_url = "https://lexi-ai-server.onrender.com";
-        let api_base_url = "http://localhost:1230";
+        // Get API base URL from configuration
+        let api_base_url = config::get_config().api_base_url();
         let mut request = self.client
             .post(format!("{}/api/transcription/speech-to-text", api_base_url))
             .multipart(form);  // Attach the multipart form with audio file

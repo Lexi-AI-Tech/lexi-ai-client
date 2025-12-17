@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
+use crate::config;
 
 /// OAuth state management for storing PKCE verifiers
 /// Maps OAuth state strings to their corresponding PKCE verifiers
@@ -131,8 +132,9 @@ fn start_oauth_callback_server(app: AppHandle) {
         use hyper::body::Bytes;
         use hyper::{Request, Response, StatusCode};
         
-        // Try ports in order: 8000, 8001, 8002
-        let ports = vec![8000u16, 8001, 8002];
+        // Try ports starting from configured port, then try next two ports
+        let start_port = config::get_config().oauth_callback_port();
+        let ports = vec![start_port, start_port + 1, start_port + 2];
         let mut listener: Option<TcpListener> = None;
         
         // Find an available port
@@ -296,8 +298,15 @@ pub async fn start_google_login(
         verifiers.insert(oauth_state.clone(), verifier.clone());
     }
     
-    // Build Google OAuth URL with localhost redirect
-    let redirect_uri = "http://127.0.0.1:8000";
+    // Build Google OAuth URL with configured redirect URI
+    // Use provided client_id or config value
+    let client_id = if !client_id.is_empty() {
+        client_id
+    } else {
+        config::get_config().google_client_id().to_string()
+    };
+    
+    let redirect_uri = config::get_config().oauth_redirect_uri();
     let auth_url = build_google_oauth_url(&client_id, redirect_uri, &oauth_state, &challenge);
     
     // Open browser
