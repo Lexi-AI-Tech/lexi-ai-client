@@ -15,9 +15,6 @@ pub struct Config {
     /// Base URL for the Lexi AI Server API
     pub api_base_url: String,
     
-    /// Google OAuth Client ID
-    pub google_client_id: String,
-    
     /// OAuth redirect URI for the callback server
     pub oauth_redirect_uri: String,
     
@@ -32,7 +29,6 @@ impl Config {
     /// 
     /// Required environment variables:
     /// - `VITE_API_BASE_URL`: Base URL for the API server
-    /// - `VITE_GOOGLE_CLIENT_ID`: Google OAuth client ID
     /// - `VITE_GOOGLE_REDIRECT_URI`: OAuth redirect URI
     /// 
     /// Note: OAuth callback port is hardcoded to 8000 (and will try 8001, 8002 if unavailable)
@@ -64,9 +60,6 @@ impl Config {
             api_base_url: env::var("VITE_API_BASE_URL")
                 .expect("VITE_API_BASE_URL environment variable is required"),
             
-            google_client_id: env::var("VITE_GOOGLE_CLIENT_ID")
-                .expect("VITE_GOOGLE_CLIENT_ID environment variable is required"),
-            
             oauth_redirect_uri: env::var("VITE_GOOGLE_REDIRECT_URI")
                 .expect("VITE_GOOGLE_REDIRECT_URI environment variable is required"),
             
@@ -77,11 +70,6 @@ impl Config {
     /// Get the API base URL
     pub fn api_base_url(&self) -> &str {
         &self.api_base_url
-    }
-    
-    /// Get the Google OAuth Client ID
-    pub fn google_client_id(&self) -> &str {
-        &self.google_client_id
     }
     
     /// Get the OAuth redirect URI

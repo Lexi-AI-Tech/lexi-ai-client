@@ -299,13 +299,6 @@ pub async fn start_google_login(
     }
     
     // Build Google OAuth URL with configured redirect URI
-    // Use provided client_id or config value
-    let client_id = if !client_id.is_empty() {
-        client_id
-    } else {
-        config::get_config().google_client_id().to_string()
-    };
-    
     let redirect_uri = config::get_config().oauth_redirect_uri();
     let auth_url = build_google_oauth_url(&client_id, redirect_uri, &oauth_state, &challenge);
     
