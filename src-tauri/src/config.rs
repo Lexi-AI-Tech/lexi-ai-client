@@ -7,7 +7,8 @@ pub fn api_base_url() -> &'static str {
 }
 
 /// Get the OAuth redirect URI for the callback server
+/// This points to the backend callback endpoint
 pub fn oauth_redirect_uri() -> &'static str {
-    "http://localhost:5173/auth/google/callback"
+    "http://localhost:1230/api/auth/google/callback"
 }
 

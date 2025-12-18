@@ -5,10 +5,8 @@
  */
 
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow'
-import { OAuthCallback } from './components/auth/OAuthCallback'
 import { useOnboardingStore } from './store/onboardingStore'
 import { useAuthStore } from './store/authStore'
 import { TranscriptsList } from './components/TranscriptsList'
@@ -33,27 +31,18 @@ function App() {
     syncAuthToken();
   }, [tokens?.access_token]);
   
-  // OAuth callback route - handle separately from main app flow
+  // If onboarding is not completed, show onboarding flow
+  if (!isCompleted) {
+    return <OnboardingFlow />;
+  }
+
+  // Render only the transcripts list
   return (
-    <Routes>
-      <Route path="/auth/google/callback" element={<OAuthCallback />} />
-      <Route
-        path="*"
-        element={
-          // If onboarding is not completed, show onboarding flow
-          !isCompleted ? (
-            <OnboardingFlow />
-          ) : (
-            // Render only the transcripts list
-            <div className="app">
-              <div className="container">
-                <TranscriptsList />
-              </div>
-            </div>
-          )
-        }
-      />
-    </Routes>
+    <div className="app">
+      <div className="container">
+        <TranscriptsList />
+      </div>
+    </div>
   )
 }
 
