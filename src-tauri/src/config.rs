@@ -11,8 +11,3 @@ pub fn oauth_redirect_uri() -> &'static str {
     "http://localhost:5173/auth/google/callback"
 }
 
-/// Get the OAuth callback server port (first port to try)
-pub fn oauth_callback_port() -> u16 {
-    5173
-}
-
