@@ -1,8 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { useAuthStore } from '../../store/authStore';
-import { exchangeGoogleAuthCode, refreshJWTToken, logout as backendLogout } from '../../lib/apiClient';
+import { refreshJWTToken, logout as backendLogout, checkOAuthStatus } from '../../lib/apiClient';
 import './auth.css';
 
 interface GoogleLoginButtonProps {
@@ -14,10 +13,160 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onSuccess, 
   onError 
 }) => {
-  const { setAuthData, clearAuth, setLoading, setError, user, isAuthenticated, tokens } = useAuthStore();
+  const { clearAuth, setLoading, setError, setAuthData, user, isAuthenticated, tokens } = useAuthStore();
   const [loading, setLocalLoading] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isWaitingForCallback = useRef(false);
+  const oauthPollingRef = useRef<{ isPolling: boolean; interval: NodeJS.Timeout | null }>({ isPolling: false, interval: null });
+
+  // Check localStorage for tokens (in case callback page stored them)
+  const checkStoredAuth = React.useCallback(() => {
+    try {
+      const stored = localStorage.getItem('lexi-auth');
+      console.log('Checking localStorage for auth:', stored ? 'found' : 'not found');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        console.log('Parsed auth data:', { 
+          hasTokens: !!parsed.tokens, 
+          hasUser: !!parsed.user,
+          tokenKeys: parsed.tokens ? Object.keys(parsed.tokens) : [],
+          userKeys: parsed.user ? Object.keys(parsed.user) : []
+        });
+        
+        // Handle both formats: { tokens, user } and { isAuthenticated, tokens, user }
+        const tokens = parsed.tokens || parsed;
+        const user = parsed.user;
+        
+        if (tokens?.access_token && user) {
+          console.log('✅ Found stored auth in localStorage, using it');
+          // Found stored auth, use it
+          setAuthData(tokens, user);
+          setLoading(false);
+          setLocalLoading(false);
+          
+          // Clear timeout if it exists
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          
+          // Clear the stored auth so we don't keep checking
+          localStorage.removeItem('lexi-auth');
+          
+          if (onSuccess) {
+            onSuccess(user);
+          }
+          return true;
+        } else {
+          console.log('❌ Stored auth missing required fields:', {
+            hasAccessToken: !!tokens?.access_token,
+            hasUser: !!user
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Error checking stored auth:', e);
+    }
+    return false;
+  }, [setAuthData, setLoading, onSuccess]);
+
+  // Listen for OAuth callback messages from the callback page
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      console.log('Received postMessage:', event.data);
+      // Only accept messages from our backend
+      if (event.data?.type === 'oauth-success') {
+        const { access_token, refresh_token, user: authUser, expires_in } = event.data;
+        
+        const authTokens = {
+          access_token,
+          refresh_token,
+          expires_in,
+          expires_at: expires_in ? Date.now() + expires_in * 1000 : undefined
+        };
+
+        setAuthData(authTokens, authUser);
+        setLoading(false);
+        setLocalLoading(false);
+        
+        if (onSuccess) {
+          onSuccess(authUser);
+        }
+      } else if (event.data?.type === 'oauth-error') {
+        const errorMsg = event.data.error || 'Authentication failed';
+        setError(errorMsg);
+        setLoading(false);
+        setLocalLoading(false);
+        
+        if (onError) {
+          onError(errorMsg);
+        }
+      }
+    };
+
+    // Listen for postMessage (when opened from web)
+    window.addEventListener('message', handleMessage);
+    
+    // Listen for storage events (when callback page stores in localStorage)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'lexi-auth' && e.newValue) {
+        console.log('Storage event detected for lexi-auth');
+        checkStoredAuth();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [setAuthData, setError, setLoading, onSuccess, onError, checkStoredAuth]);
+
+  // Poll localStorage when loading (for when opened externally)
+  useEffect(() => {
+    if (!loading) {
+      // Stop polling when not loading
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      return;
+    }
+
+    console.log('Starting to poll localStorage, loading:', loading);
+
+    // Check immediately
+    if (checkStoredAuth()) {
+      console.log('Auth found immediately, stopping');
+      return; // Already found, no need to poll
+    }
+
+    // Clear any existing interval
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
+    
+    // Poll every 200ms (more frequent) until we find tokens
+    console.log('Starting polling interval');
+    pollIntervalRef.current = setInterval(() => {
+      console.log('Polling localStorage...');
+      if (checkStoredAuth()) {
+        console.log('Auth found via polling, stopping');
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+      }
+    }, 200); // Check every 200ms for faster detection
+
+    return () => {
+      console.log('Cleaning up polling');
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [loading, checkStoredAuth]);
 
   const handleGoogleLogin = async () => {
     setLocalLoading(true);
@@ -37,6 +186,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       // Start OAuth flow with PKCE via Rust backend
       // This generates PKCE challenge/verifier, builds auth URL, and opens browser
+      // The browser will redirect to the callback page
       const pkceData = await invoke<{
         challenge: string;
         verifier: string;
@@ -44,101 +194,129 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         auth_url: string;
       }>('start_google_login', { clientId });
 
-      console.log('PKCE challenge generated, browser opened:', pkceData);
-
-      isWaitingForCallback.current = true;
-      
-      // Listen for OAuth callback from Rust backend
-      console.log('Setting up listener for google-oauth-callback event...');
-      const unlisten = await listen<{
-        code: string;
-        state: string;
-        verifier: string;
-      }>('google-oauth-callback', async (event) => {
-        console.log('Event listener triggered!', event);
-        isWaitingForCallback.current = false;
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        unlisten(); // One-time listener
-
-        try {
-          const { code, state, verifier } = event.payload;
-          console.log('Received OAuth callback:', { code, state, verifier, hasVerifier: !!verifier });
-
-          // Validate that we have the required data
-          if (!code) {
-            throw new Error('Authorization code is missing');
-          }
-          if (!verifier) {
-            throw new Error('PKCE verifier is missing - cannot complete authentication');
-          }
-
-          // Exchange authorization code + verifier for backend JWT tokens
-          // Use redirect URI from environment variable to match what was used in OAuth request
-          const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
-          if (!redirectUri) {
-            throw new Error(
-              'Redirect URI not configured. ' +
-              'Please set VITE_GOOGLE_REDIRECT_URI in your .env file.'
-            );
-          }
-          const backendAuth = await exchangeGoogleAuthCode(
-            code,
-            state,
-            verifier, // PKCE verifier
-            redirectUri
-          );
-
-          console.log('Backend authentication successful:', backendAuth);
-
-          // Store backend JWT tokens
-          const authTokens = {
-            access_token: backendAuth.access_token,
-            refresh_token: backendAuth.refresh_token,
-            expires_in: backendAuth.expires_in,
-            expires_at: backendAuth.expires_in 
-              ? Date.now() + backendAuth.expires_in * 1000 
-              : undefined
-          };
-
-          const authUser = {
-            email: backendAuth.user.email || '',
-            name: backendAuth.user.name || '',
-            picture: backendAuth.user.picture
-          };
-
-          setAuthData(authTokens, authUser);
-          
-          if (onSuccess) {
-            onSuccess(backendAuth.user);
-          }
-        } catch (error: any) {
-          const errorMessage = error?.message || 'Failed to exchange authorization code';
-          console.error('Token exchange failed:', error);
-          setError(errorMessage);
-          
-          if (onError) {
-            onError(errorMessage);
-          }
-        } finally {
-          setLocalLoading(false);
-          setLoading(false);
-        }
+      console.log('PKCE challenge generated, browser opened:', {
+        state: pkceData.state,
+        stateLength: pkceData.state.length,
+        verifierLength: pkceData.verifier.length,
+        authUrl: pkceData.auth_url
       });
+      
+      // Store verifier on backend (Redis) so callback page can retrieve it
+      // This works even when callback opens in external browser
+      try {
+        const { storePkceVerifier } = await import('../../lib/apiClient');
+        await storePkceVerifier(pkceData.state, pkceData.verifier);
+        console.log('Stored PKCE verifier on backend (Redis):', {
+          state: pkceData.state,
+          stateLength: pkceData.state.length,
+          verifierLength: pkceData.verifier.length
+        });
+      } catch (error) {
+        console.error('Failed to store verifier on backend:', error);
+        throw new Error('Failed to store OAuth verifier. Please try again.');
+      }
+      
+      console.log('Waiting for OAuth callback...');
+      
+      // Poll backend for OAuth completion (instead of localStorage)
+      // This works across different browser contexts
+      // Use ref to track polling state across async operations
+      oauthPollingRef.current.isPolling = true;
+      oauthPollingRef.current.interval = null;
+      
+      const pollOAuthStatus = async (): Promise<boolean> => {
+        if (!oauthPollingRef.current.isPolling) {
+          console.log('Polling already stopped, skipping');
+          return true; // Already stopped
+        }
+        
+        try {
+          const status = await checkOAuthStatus(pkceData.state);
+          console.log('OAuth status check:', {
+            status: status.status,
+            hasAccessToken: !!status.access_token,
+            hasUser: !!status.user,
+            fullResponse: status
+          });
+          
+          if (status.status === 'completed' && status.access_token && status.user) {
+            console.log('✅ OAuth completed, tokens received from backend');
+            
+            // Stop polling immediately BEFORE processing to prevent race conditions
+            oauthPollingRef.current.isPolling = false;
+            if (oauthPollingRef.current.interval) {
+              clearInterval(oauthPollingRef.current.interval);
+              oauthPollingRef.current.interval = null;
+            }
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
+            
+            // Process tokens
+            const authTokens = {
+              access_token: status.access_token,
+              refresh_token: status.refresh_token || '',
+              expires_in: status.expires_in,
+              expires_at: status.expires_in ? Date.now() + status.expires_in * 1000 : undefined
+            };
 
-      // Set a timeout to handle cases where user doesn't complete auth
-      timeoutRef.current = setTimeout(() => {
-        // If still waiting for callback after 5 minutes, assume user cancelled
-        if (isWaitingForCallback.current) {
-          isWaitingForCallback.current = false;
-          setLocalLoading(false);
-          setLoading(false);
-          setError('Authentication timed out. Please try again.');
-          if (onError) {
-            onError('Authentication timed out');
+            console.log('Setting auth data:', {
+              hasAccessToken: !!authTokens.access_token,
+              hasRefreshToken: !!authTokens.refresh_token,
+              userEmail: status.user?.email
+            });
+
+            setAuthData(authTokens, status.user);
+            setLoading(false);
+            setLocalLoading(false);
+            
+            if (onSuccess) {
+              onSuccess(status.user);
+            }
+            return true; // Stop polling
+          } else if (status.status === 'pending') {
+            // Still pending, continue polling
+            return false;
+          } else {
+            // Unexpected status
+            console.warn('Unexpected OAuth status:', status);
+            return false;
           }
+        } catch (error) {
+          console.error('Error checking OAuth status:', error);
+          // Don't stop polling on error - might be temporary network issue
+          return false;
+        }
+      };
+      
+      // Poll immediately, then every 500ms
+      if (await pollOAuthStatus()) {
+        return; // Already completed
+      }
+      
+      oauthPollingRef.current.interval = setInterval(async () => {
+        if (await pollOAuthStatus()) {
+          // Polling stopped, interval already cleared in pollOAuthStatus
+        }
+      }, 500);
+      
+      // Set a timeout to stop polling after 5 minutes
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        oauthPollingRef.current.isPolling = false;
+        if (oauthPollingRef.current.interval) {
+          clearInterval(oauthPollingRef.current.interval);
+          oauthPollingRef.current.interval = null;
+        }
+        console.log('OAuth timeout - no tokens detected');
+        setLocalLoading(false);
+        setLoading(false);
+        setError('Authentication timed out. Please try again.');
+        if (onError) {
+          onError('Authentication timed out');
         }
       }, 5 * 60 * 1000); // 5 minutes
 
@@ -146,13 +324,17 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       const errorMessage = error?.message || 'Google login failed';
       console.error('Google Login Failed:', error);
       setError(errorMessage);
+      setLocalLoading(false);
+      setLoading(false);
+      
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       
       if (onError) {
         onError(errorMessage);
       }
-    } finally {
-      setLocalLoading(false);
-      setLoading(false);
     }
   };
 
