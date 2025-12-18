@@ -17,6 +17,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   const [loading, setLocalLoading] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const oauthPollingRef = useRef<{ isPolling: boolean; interval: NodeJS.Timeout | null }>({ isPolling: false, interval: null });
 
   // Check localStorage for tokens (in case callback page stored them)
   const checkStoredAuth = React.useCallback(() => {
@@ -219,14 +220,40 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       
       // Poll backend for OAuth completion (instead of localStorage)
       // This works across different browser contexts
-      const pollOAuthStatus = async () => {
+      // Use ref to track polling state across async operations
+      oauthPollingRef.current.isPolling = true;
+      oauthPollingRef.current.interval = null;
+      
+      const pollOAuthStatus = async (): Promise<boolean> => {
+        if (!oauthPollingRef.current.isPolling) {
+          console.log('Polling already stopped, skipping');
+          return true; // Already stopped
+        }
+        
         try {
           const status = await checkOAuthStatus(pkceData.state);
-          console.log('OAuth status check:', status.status);
+          console.log('OAuth status check:', {
+            status: status.status,
+            hasAccessToken: !!status.access_token,
+            hasUser: !!status.user,
+            fullResponse: status
+          });
           
           if (status.status === 'completed' && status.access_token && status.user) {
             console.log('✅ OAuth completed, tokens received from backend');
             
+            // Stop polling immediately BEFORE processing to prevent race conditions
+            oauthPollingRef.current.isPolling = false;
+            if (oauthPollingRef.current.interval) {
+              clearInterval(oauthPollingRef.current.interval);
+              oauthPollingRef.current.interval = null;
+            }
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
+            
+            // Process tokens
             const authTokens = {
               access_token: status.access_token,
               refresh_token: status.refresh_token || '',
@@ -234,24 +261,32 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
               expires_at: status.expires_in ? Date.now() + status.expires_in * 1000 : undefined
             };
 
+            console.log('Setting auth data:', {
+              hasAccessToken: !!authTokens.access_token,
+              hasRefreshToken: !!authTokens.refresh_token,
+              userEmail: status.user?.email
+            });
+
             setAuthData(authTokens, status.user);
             setLoading(false);
             setLocalLoading(false);
-            
-            if (timeoutRef.current) {
-              clearTimeout(timeoutRef.current);
-              timeoutRef.current = null;
-            }
             
             if (onSuccess) {
               onSuccess(status.user);
             }
             return true; // Stop polling
+          } else if (status.status === 'pending') {
+            // Still pending, continue polling
+            return false;
+          } else {
+            // Unexpected status
+            console.warn('Unexpected OAuth status:', status);
+            return false;
           }
-          return false; // Continue polling
         } catch (error) {
           console.error('Error checking OAuth status:', error);
-          return false; // Continue polling on error
+          // Don't stop polling on error - might be temporary network issue
+          return false;
         }
       };
       
@@ -260,9 +295,9 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         return; // Already completed
       }
       
-      const pollInterval = setInterval(async () => {
+      oauthPollingRef.current.interval = setInterval(async () => {
         if (await pollOAuthStatus()) {
-          clearInterval(pollInterval);
+          // Polling stopped, interval already cleared in pollOAuthStatus
         }
       }, 500);
       
@@ -271,7 +306,11 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         clearTimeout(timeoutRef.current);
       }
       timeoutRef.current = setTimeout(() => {
-        clearInterval(pollInterval);
+        oauthPollingRef.current.isPolling = false;
+        if (oauthPollingRef.current.interval) {
+          clearInterval(oauthPollingRef.current.interval);
+          oauthPollingRef.current.interval = null;
+        }
         console.log('OAuth timeout - no tokens detected');
         setLocalLoading(false);
         setLoading(false);
