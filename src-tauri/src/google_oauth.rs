@@ -23,14 +23,6 @@ pub struct PkceChallenge {
     pub auth_url: String,
 }
 
-/// Response structure for OAuth callback containing authorization code and state
-#[derive(Serialize, Deserialize)]
-pub struct GoogleCallbackResponse {
-    pub code: String,
-    pub state: String,
-    pub verifier: String,
-}
-
 /// Generates a cryptographically secure random string for PKCE verifier
 /// Returns a base64url-encoded string (43-128 characters)
 fn generate_pkce_verifier() -> String {
@@ -120,157 +112,6 @@ fn open_browser(url: &str, app: AppHandle) {
     });
 }
 
-/// Starts an HTTP server to listen for OAuth callback
-/// Tries multiple ports (8000, 8001, 8002) and handles the callback request
-fn start_oauth_callback_server(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        use hyper::server::conn::http1;
-        use hyper::service::service_fn;
-        use hyper_util::rt::TokioIo;
-        use tokio::net::TcpListener;
-        use http_body_util::Full;
-        use hyper::body::Bytes;
-        use hyper::{Request, Response, StatusCode};
-        
-        // Try ports starting from configured port, then try next two ports
-        let start_port = config::oauth_callback_port();
-        let ports = vec![start_port, start_port + 1, start_port + 2];
-        let mut listener: Option<TcpListener> = None;
-        
-        // Find an available port
-        for port in &ports {
-            match TcpListener::bind(format!("127.0.0.1:{}", port)).await {
-                Ok(l) => {
-                    listener = Some(l);
-                    println!("OAuth callback server listening on port {}", port);
-                    break;
-                }
-                Err(e) => {
-                    eprintln!("Port {} unavailable: {}, trying next...", port, e);
-                }
-            }
-        }
-        
-        if let Some(listener) = listener {
-            // Accept one connection (OAuth callback)
-            match listener.accept().await {
-                Ok((stream, _)) => {
-                    let io = TokioIo::new(stream);
-                    
-                    // Create service function to handle the request
-                    let app_for_service = app.clone();
-                    
-                    let service = service_fn(move |req: Request<hyper::body::Incoming>| {
-                        let app = app_for_service.clone();
-                        
-                        async move {
-                            let path = req.uri().path();
-                            let query = req.uri().query().unwrap_or("");
-                            
-                            if path == "/" || path.starts_with("/?") {
-                                // Parse query parameters
-                                let query_pairs: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
-                                    .into_owned()
-                                    .collect();
-                                
-                                if let (Some(code), Some(callback_state)) = (query_pairs.get("code"), query_pairs.get("state")) {
-                                    println!("OAuth callback received - code: {}..., state: {}", 
-                                        &code.chars().take(10).collect::<String>(), callback_state);
-                                    
-                                    // Get verifier from app state
-                                    if let Some(oauth_state) = app.try_state::<OAuthState>() {
-                                        let verifier = {
-                                            let verifiers = oauth_state.verifiers.lock().unwrap();
-                                            println!("Looking for verifier with state: {}, available states: {:?}", 
-                                                callback_state, verifiers.keys().collect::<Vec<_>>());
-                                            verifiers.get(callback_state).cloned()
-                                        };
-                                        
-                                        if let Some(verifier) = verifier {
-                                            println!("Verifier found, length: {}", verifier.len());
-                                            // Emit callback event to frontend
-                                            let response = GoogleCallbackResponse {
-                                                code: code.clone(),
-                                                state: callback_state.clone(),
-                                                verifier: verifier.clone(),
-                                            };
-                                            println!("Emitting google-oauth-callback event with code: {}..., state: {}, verifier length: {}", 
-                                                &code.chars().take(10).collect::<String>(), 
-                                                &response.state, 
-                                                response.verifier.len());
-                                            match app.emit("google-oauth-callback", &response) {
-                                                Ok(_) => println!("Successfully emitted google-oauth-callback event"),
-                                                Err(e) => eprintln!("Failed to emit callback event: {}", e),
-                                            }
-                                            
-                                            // Return success page
-                                            let html = r#"
-                                                <!DOCTYPE html>
-                                                <html>
-                                                <head><title>Authentication Successful</title></head>
-                                                <body>
-                                                    <h1>Authentication Successful!</h1>
-                                                    <p>You can close this window and return to the application.</p>
-                                                    <script>setTimeout(() => window.close(), 2000);</script>
-                                                </body>
-                                                </html>
-                                            "#;
-                                            Ok::<_, hyper::Error>(Response::builder()
-                                                .status(StatusCode::OK)
-                                                .header("Content-Type", "text/html")
-                                                .body(Full::new(Bytes::from(html)))
-                                                .unwrap())
-                                        } else {
-                                            eprintln!("Verifier not found for state: {}", callback_state);
-                                            Ok::<_, hyper::Error>(Response::builder()
-                                                .status(StatusCode::BAD_REQUEST)
-                                                .body(Full::new(Bytes::from("Invalid state parameter")))
-                                                .unwrap())
-                                        }
-                                    } else {
-                                        eprintln!("Failed to access OAuth state");
-                                        Ok::<_, hyper::Error>(Response::builder()
-                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                            .body(Full::new(Bytes::from("Internal server error")))
-                                            .unwrap())
-                                    }
-                                } else {
-                                    // No code or state in query
-                                    Ok::<_, hyper::Error>(Response::builder()
-                                        .status(StatusCode::BAD_REQUEST)
-                                        .body(Full::new(Bytes::from("Missing code or state parameter")))
-                                        .unwrap())
-                                }
-                            } else {
-                                // 404 for other paths
-                                Ok::<_, hyper::Error>(Response::builder()
-                                    .status(StatusCode::NOT_FOUND)
-                                    .body(Full::new(Bytes::from("Not found")))
-                                    .unwrap())
-                            }
-                        }
-                    });
-                    
-                    // Handle the connection
-                    if let Err(err) = http1::Builder::new()
-                        .serve_connection(io, service)
-                        .await
-                    {
-                        eprintln!("Error serving OAuth callback: {:?}", err);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Failed to accept OAuth callback connection: {}", e);
-                    let _ = app.emit("oauth-error", format!("Failed to accept connection: {}", e));
-                }
-            }
-        } else {
-            eprintln!("Failed to bind to any OAuth callback port");
-            let _ = app.emit("oauth-error", "Failed to start OAuth callback server");
-        }
-    });
-}
-
 /// Start Google OAuth login flow with PKCE
 /// 
 /// This command:
@@ -305,8 +146,9 @@ pub async fn start_google_login(
     // Open browser
     open_browser(&auth_url, app.clone());
     
-    // Start listening for OAuth callback
-    start_oauth_callback_server(app);
+    // Note: OAuth callback is now handled by the UI route (/auth/google/callback)
+    // The verifier is stored in state and can be retrieved via get_pkce_verifier command
+    // No need to start a separate callback server
     
     Ok(PkceChallenge {
         challenge,

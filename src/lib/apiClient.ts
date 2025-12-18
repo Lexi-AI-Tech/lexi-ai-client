@@ -68,6 +68,10 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   try {
+    // Import device info utility
+    const { getDeviceInfo } = await import('./deviceInfo');
+    const device = getDeviceInfo();
+    
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
@@ -75,6 +79,8 @@ async function refreshAccessToken(): Promise<string | null> {
       },
       body: JSON.stringify({
         refresh_token: refreshToken,
+        device_name: device.device_name,
+        device_type: device.device_type,
       }),
     });
 
@@ -194,12 +200,19 @@ export async function exchangeGoogleAuthCode(
   code: string, 
   state?: string,
   codeVerifier?: string,
-  redirectUri?: string
+  redirectUri?: string,
+  deviceInfo?: { device_name?: string; device_type?: string }
 ): Promise<AuthResponse> {
+  // Import device info utility
+  const { getDeviceInfo } = await import('./deviceInfo');
+  const device = deviceInfo || getDeviceInfo();
+  
   // Ensure code_verifier is always sent if provided (required for PKCE)
   const requestBody: any = {
     code,
     state,
+    device_name: device.device_name,
+    device_type: device.device_type,
   };
   
   // Always include code_verifier if it's provided (check for undefined/null, not falsy)
@@ -300,7 +313,14 @@ export async function exchangeGoogleTokens(googleTokens: {
 /**
  * Refresh JWT tokens using the backend endpoint
  */
-export async function refreshJWTToken(refreshToken: string): Promise<AuthResponse> {
+export async function refreshJWTToken(
+  refreshToken: string,
+  deviceInfo?: { device_name?: string; device_type?: string }
+): Promise<AuthResponse> {
+  // Import device info utility
+  const { getDeviceInfo } = await import('./deviceInfo');
+  const device = deviceInfo || getDeviceInfo();
+  
   const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
     method: 'POST',
     headers: {
@@ -308,6 +328,8 @@ export async function refreshJWTToken(refreshToken: string): Promise<AuthRespons
     },
     body: JSON.stringify({
       refresh_token: refreshToken,
+      device_name: device.device_name,
+      device_type: device.device_type,
     }),
   });
 
@@ -358,6 +380,85 @@ export async function logout(): Promise<void> {
     // Even if logout fails on backend, we'll clear local auth
     console.warn('Backend logout failed, clearing local auth anyway');
   }
+}
+
+/**
+ * Store PKCE verifier temporarily on backend (Redis)
+ */
+export async function storePkceVerifier(state: string, verifier: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/oauth/verifier`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      state,
+      verifier,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(errorData.detail || errorData.error || `Failed to store verifier: ${response.status}`);
+  }
+}
+
+/**
+ * Retrieve PKCE verifier from backend (Redis) using state
+ */
+export async function getPkceVerifier(state: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/oauth/verifier/${encodeURIComponent(state)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(errorData.detail || errorData.error || `Failed to retrieve verifier: ${response.status}`);
+  }
+
+  const data = await response.json();
+  // Handle both direct response and wrapped response
+  if (data.verifier) {
+    return data.verifier;
+  } else if (data.data && data.data.verifier) {
+    return data.data.verifier;
+  } else {
+    throw new Error('Invalid response format from verifier endpoint');
+  }
+}
+
+/**
+ * Check OAuth authentication status for a given state.
+ * Polls the backend to see if authentication completed.
+ */
+export async function checkOAuthStatus(state: string): Promise<{
+  status: 'pending' | 'completed';
+  access_token?: string;
+  refresh_token?: string;
+  user?: {
+    email: string;
+    name: string;
+    picture?: string;
+  };
+  expires_in?: number;
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/oauth/status/${encodeURIComponent(state)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(errorData.detail || errorData.error || `Failed to check OAuth status: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data;
 }
 
 /**
