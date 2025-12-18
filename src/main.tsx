@@ -10,6 +10,7 @@
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 
@@ -17,6 +18,8 @@ import './index.css'
 // The ! operator asserts that the element exists (it should, as it's in index.html)
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </React.StrictMode>,
 )
