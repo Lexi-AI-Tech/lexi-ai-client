@@ -43,6 +43,20 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       }>('start_google_login', { clientId });
 
       console.log('PKCE challenge generated, browser opened:', pkceData);
+      
+      // Store verifier in localStorage as fallback (in case callback opens in external browser)
+      // This allows the callback handler to retrieve it even if Tauri invoke isn't available
+      try {
+        const storedVerifiers = localStorage.getItem('oauth_verifiers');
+        const verifiers = storedVerifiers ? JSON.parse(storedVerifiers) : {};
+        verifiers[pkceData.state] = pkceData.verifier;
+        localStorage.setItem('oauth_verifiers', JSON.stringify(verifiers));
+        console.log('Stored PKCE verifier in localStorage as fallback');
+      } catch (error) {
+        console.warn('Failed to store verifier in localStorage:', error);
+        // Continue anyway - Tauri invoke should work if callback is in app
+      }
+      
       console.log('Waiting for OAuth callback at /auth/google/callback...');
 
       // The callback will be handled by the OAuthCallback component

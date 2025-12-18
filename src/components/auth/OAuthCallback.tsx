@@ -45,14 +45,42 @@ export const OAuthCallback: React.FC = () => {
 
         console.log('OAuth callback received:', { code: code.substring(0, 10) + '...', state });
 
-        // Get PKCE verifier from Rust backend using the state
-        const verifier = await invoke<string>('get_pkce_verifier', { oauthState: state });
+        // Get PKCE verifier - try Tauri invoke first, then fallback to localStorage
+        let verifier: string | null = null;
+        
+        // Check if we're in a Tauri context
+        const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+        if (isTauri) {
+          try {
+            verifier = await invoke<string>('get_pkce_verifier', { oauthState: state });
+            console.log('Retrieved PKCE verifier from Tauri backend');
+          } catch (error) {
+            console.warn('Failed to get verifier from Tauri, trying localStorage:', error);
+          }
+        }
+        
+        // Fallback to localStorage if Tauri invoke failed or not available
+        if (!verifier) {
+          try {
+            const storedVerifiers = localStorage.getItem('oauth_verifiers');
+            if (storedVerifiers) {
+              const verifiers = JSON.parse(storedVerifiers);
+              verifier = verifiers[state] || null;
+              if (verifier) {
+                console.log('Retrieved PKCE verifier from localStorage');
+                // Clean up the used verifier
+                delete verifiers[state];
+                localStorage.setItem('oauth_verifiers', JSON.stringify(verifiers));
+              }
+            }
+          } catch (error) {
+            console.error('Failed to get verifier from localStorage:', error);
+          }
+        }
         
         if (!verifier) {
           throw new Error('PKCE verifier not found. The OAuth flow may have expired. Please try again.');
         }
-
-        console.log('Retrieved PKCE verifier from backend');
 
         // Get redirect URI (should match what was used in the OAuth request)
         const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'http://localhost:5173/auth/google/callback';
