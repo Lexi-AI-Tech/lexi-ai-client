@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useAuthStore } from '../../store/authStore';
 import { exchangeGoogleAuthCode, refreshJWTToken, logout as backendLogout } from '../../lib/apiClient';
+import { getDeviceInfo } from '../../lib/deviceInfo';
 import './auth.css';
 
 interface GoogleLoginButtonProps {
@@ -84,11 +85,15 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
               'Please set VITE_GOOGLE_REDIRECT_URI in your .env file.'
             );
           }
+          // Get device info for session tracking
+          const deviceInfo = getDeviceInfo();
+          
           const backendAuth = await exchangeGoogleAuthCode(
             code,
             state,
             verifier, // PKCE verifier
-            redirectUri
+            redirectUri,
+            deviceInfo
           );
 
           console.log('Backend authentication successful:', backendAuth);
