@@ -179,9 +179,7 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 /// to control audio recording.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
-    // Initialize configuration (loads environment variables)
-    let _config = config::get_config();
-    println!("🔧 Configuration loaded - API Base URL: {}", _config.api_base_url());
+    println!("🔧 Configuration loaded - API Base URL: {}", config::api_base_url());
     
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

@@ -133,7 +133,7 @@ fn start_oauth_callback_server(app: AppHandle) {
         use hyper::{Request, Response, StatusCode};
         
         // Try ports starting from configured port, then try next two ports
-        let start_port = config::get_config().oauth_callback_port();
+        let start_port = config::oauth_callback_port();
         let ports = vec![start_port, start_port + 1, start_port + 2];
         let mut listener: Option<TcpListener> = None;
         
@@ -299,7 +299,7 @@ pub async fn start_google_login(
     }
     
     // Build Google OAuth URL with configured redirect URI
-    let redirect_uri = config::get_config().oauth_redirect_uri();
+    let redirect_uri = config::oauth_redirect_uri();
     let auth_url = build_google_oauth_url(&client_id, redirect_uri, &oauth_state, &challenge);
     
     // Open browser
