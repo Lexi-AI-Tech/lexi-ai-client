@@ -23,14 +23,6 @@ pub struct PkceChallenge {
     pub auth_url: String,
 }
 
-/// Response structure for OAuth callback containing authorization code and state
-#[derive(Serialize, Deserialize)]
-pub struct GoogleCallbackResponse {
-    pub code: String,
-    pub state: String,
-    pub verifier: String,
-}
-
 /// Generates a cryptographically secure random string for PKCE verifier
 /// Returns a base64url-encoded string (43-128 characters)
 fn generate_pkce_verifier() -> String {
@@ -305,8 +297,9 @@ pub async fn start_google_login(
     // Open browser
     open_browser(&auth_url, app.clone());
     
-    // Start listening for OAuth callback
-    start_oauth_callback_server(app);
+    // Note: OAuth callback is now handled by the UI route (/auth/google/callback)
+    // The verifier is stored in state and can be retrieved via get_pkce_verifier command
+    // No need to start a separate callback server
     
     Ok(PkceChallenge {
         challenge,

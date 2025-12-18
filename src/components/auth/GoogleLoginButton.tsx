@@ -1,9 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { useAuthStore } from '../../store/authStore';
-import { exchangeGoogleAuthCode, refreshJWTToken, logout as backendLogout } from '../../lib/apiClient';
-import { getDeviceInfo } from '../../lib/deviceInfo';
+import { refreshJWTToken, logout as backendLogout } from '../../lib/apiClient';
 import './auth.css';
 
 interface GoogleLoginButtonProps {
@@ -15,10 +13,8 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onSuccess, 
   onError 
 }) => {
-  const { setAuthData, clearAuth, setLoading, setError, user, isAuthenticated, tokens } = useAuthStore();
+  const { clearAuth, setLoading, setError, user, isAuthenticated, tokens } = useAuthStore();
   const [loading, setLocalLoading] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isWaitingForCallback = useRef(false);
 
   const handleGoogleLogin = async () => {
     setLocalLoading(true);
@@ -38,6 +34,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       // Start OAuth flow with PKCE via Rust backend
       // This generates PKCE challenge/verifier, builds auth URL, and opens browser
+      // The browser will redirect to the UI route /auth/google/callback
       const pkceData = await invoke<{
         challenge: string;
         verifier: string;
@@ -46,106 +43,10 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       }>('start_google_login', { clientId });
 
       console.log('PKCE challenge generated, browser opened:', pkceData);
+      console.log('Waiting for OAuth callback at /auth/google/callback...');
 
-      isWaitingForCallback.current = true;
-      
-      // Listen for OAuth callback from Rust backend
-      console.log('Setting up listener for google-oauth-callback event...');
-      const unlisten = await listen<{
-        code: string;
-        state: string;
-        verifier: string;
-      }>('google-oauth-callback', async (event) => {
-        console.log('Event listener triggered!', event);
-        isWaitingForCallback.current = false;
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        unlisten(); // One-time listener
-
-        try {
-          const { code, state, verifier } = event.payload;
-          console.log('Received OAuth callback:', { code, state, verifier, hasVerifier: !!verifier });
-
-          // Validate that we have the required data
-          if (!code) {
-            throw new Error('Authorization code is missing');
-          }
-          if (!verifier) {
-            throw new Error('PKCE verifier is missing - cannot complete authentication');
-          }
-
-          // Exchange authorization code + verifier for backend JWT tokens
-          // Use redirect URI from environment variable to match what was used in OAuth request
-          const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
-          if (!redirectUri) {
-            throw new Error(
-              'Redirect URI not configured. ' +
-              'Please set VITE_GOOGLE_REDIRECT_URI in your .env file.'
-            );
-          }
-          // Get device info for session tracking
-          const deviceInfo = getDeviceInfo();
-          
-          const backendAuth = await exchangeGoogleAuthCode(
-            code,
-            state,
-            verifier, // PKCE verifier
-            redirectUri,
-            deviceInfo
-          );
-
-          console.log('Backend authentication successful:', backendAuth);
-
-          // Store backend JWT tokens
-          const authTokens = {
-            access_token: backendAuth.access_token,
-            refresh_token: backendAuth.refresh_token,
-            expires_in: backendAuth.expires_in,
-            expires_at: backendAuth.expires_in 
-              ? Date.now() + backendAuth.expires_in * 1000 
-              : undefined
-          };
-
-          const authUser = {
-            email: backendAuth.user.email || '',
-            name: backendAuth.user.name || '',
-            picture: backendAuth.user.picture
-          };
-
-          setAuthData(authTokens, authUser);
-          
-          if (onSuccess) {
-            onSuccess(backendAuth.user);
-          }
-        } catch (error: any) {
-          const errorMessage = error?.message || 'Failed to exchange authorization code';
-          console.error('Token exchange failed:', error);
-          setError(errorMessage);
-          
-          if (onError) {
-            onError(errorMessage);
-          }
-        } finally {
-          setLocalLoading(false);
-          setLoading(false);
-        }
-      });
-
-      // Set a timeout to handle cases where user doesn't complete auth
-      timeoutRef.current = setTimeout(() => {
-        // If still waiting for callback after 5 minutes, assume user cancelled
-        if (isWaitingForCallback.current) {
-          isWaitingForCallback.current = false;
-          setLocalLoading(false);
-          setLoading(false);
-          setError('Authentication timed out. Please try again.');
-          if (onError) {
-            onError('Authentication timed out');
-          }
-        }
-      }, 5 * 60 * 1000); // 5 minutes
+      // The callback will be handled by the OAuthCallback component
+      // No need to listen for events or set timeouts - the browser redirect handles it
 
     } catch (error: any) {
       const errorMessage = error?.message || 'Google login failed';
