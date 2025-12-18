@@ -68,6 +68,10 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   try {
+    // Import device info utility
+    const { getDeviceInfo } = await import('./deviceInfo');
+    const device = getDeviceInfo();
+    
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
@@ -75,6 +79,8 @@ async function refreshAccessToken(): Promise<string | null> {
       },
       body: JSON.stringify({
         refresh_token: refreshToken,
+        device_name: device.device_name,
+        device_type: device.device_type,
       }),
     });
 
@@ -194,12 +200,19 @@ export async function exchangeGoogleAuthCode(
   code: string, 
   state?: string,
   codeVerifier?: string,
-  redirectUri?: string
+  redirectUri?: string,
+  deviceInfo?: { device_name?: string; device_type?: string }
 ): Promise<AuthResponse> {
+  // Import device info utility
+  const { getDeviceInfo } = await import('./deviceInfo');
+  const device = deviceInfo || getDeviceInfo();
+  
   // Ensure code_verifier is always sent if provided (required for PKCE)
   const requestBody: any = {
     code,
     state,
+    device_name: device.device_name,
+    device_type: device.device_type,
   };
   
   // Always include code_verifier if it's provided (check for undefined/null, not falsy)
@@ -300,7 +313,14 @@ export async function exchangeGoogleTokens(googleTokens: {
 /**
  * Refresh JWT tokens using the backend endpoint
  */
-export async function refreshJWTToken(refreshToken: string): Promise<AuthResponse> {
+export async function refreshJWTToken(
+  refreshToken: string,
+  deviceInfo?: { device_name?: string; device_type?: string }
+): Promise<AuthResponse> {
+  // Import device info utility
+  const { getDeviceInfo } = await import('./deviceInfo');
+  const device = deviceInfo || getDeviceInfo();
+  
   const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
     method: 'POST',
     headers: {
@@ -308,6 +328,8 @@ export async function refreshJWTToken(refreshToken: string): Promise<AuthRespons
     },
     body: JSON.stringify({
       refresh_token: refreshToken,
+      device_name: device.device_name,
+      device_type: device.device_type,
     }),
   });
 
