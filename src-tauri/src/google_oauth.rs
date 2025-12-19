@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 use crate::config;
 
 /// OAuth state management for storing PKCE verifiers
