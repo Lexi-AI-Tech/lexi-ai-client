@@ -10,7 +10,7 @@
 // 5. Manages a pill overlay window that displays recording status
 // 6. Handles Google OAuth authentication with PKCE for user authentication
 
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
 use tauri::{AppHandle, Manager, Emitter};
@@ -20,6 +20,7 @@ mod audio_recorder;  // Handles audio capture from default microphone using cpal
 mod stt_service;     // Communicates with Lexi AI Server API for speech-to-text transcription (server uses Groq)
 mod text_injector;   // Injects transcribed text into active application via clipboard + paste keystroke (rdev/enigo)
 mod global_key_listener;  // Handles global keyboard event listening via rdev, triggers recording on Function key
+mod hotkey_selector; // Handles hotkey selection/recording for the settings UI
 mod permissions;     // Handles permission requests and checks for microphone, input monitoring, and accessibility (macOS)
 mod pill;           // Handles pill overlay window creation, positioning, and visibility management
 mod cursor_context;  // Handles cursor context retrieval using macOS Accessibility API (AXUIElement)
@@ -42,7 +43,6 @@ use permissions::{
 };
 
 use google_oauth::{OAuthState, start_google_login, get_pkce_verifier};
-use std::sync::Mutex;
 
 /// Command to control recording state
 #[derive(Debug, Clone, Copy)]
@@ -62,6 +62,12 @@ struct AuthTokenState {
 struct TranscriptionTaskState {
     task_handle: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
     cancel_tx: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+}
+
+/// Hotkey recording state - tracks if we're in recording mode for hotkey selection
+struct HotkeyRecordingState {
+    is_recording: Arc<Mutex<bool>>,
+    listener_handle: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
 /// Set the authentication token from frontend
@@ -122,6 +128,37 @@ fn get_hotkey_config(state: tauri::State<ConfigStore>) -> HotkeyConfig {
 #[tauri::command]
 fn set_hotkey_config(state: tauri::State<ConfigStore>, config: HotkeyConfig) -> Result<(), String> {
     state.set_hotkey(config)
+}
+
+/// Start hotkey recording mode - enables key event emission for hotkey selection
+#[tauri::command]
+fn start_hotkey_recording(
+    app: AppHandle,
+    state: tauri::State<HotkeyRecordingState>
+) {
+    // Set recording state to true
+    if let Ok(mut recording) = state.is_recording.lock() {
+        *recording = true;
+        println!("🎹 Started hotkey recording mode");
+    }
+    
+    // Spawn listener thread if it doesn't exist yet (lazy initialization)
+    let mut handle_guard = state.listener_handle.lock().unwrap();
+    if handle_guard.is_none() || handle_guard.as_ref().unwrap().is_finished() {
+        let recording_state_arc = state.is_recording.clone();
+        let handle = hotkey_selector::start_selector_listener(app, recording_state_arc);
+        *handle_guard = Some(handle);
+        println!("🎹 Spawned hotkey selector listener thread");
+    }
+}
+
+/// Stop hotkey recording mode
+#[tauri::command]
+fn stop_hotkey_recording(state: tauri::State<HotkeyRecordingState>) {
+    if let Ok(mut recording) = state.is_recording.lock() {
+        *recording = false;
+        println!("🎹 Stopped hotkey recording mode");
+    }
 }
 
 // Re-export pill functions as Tauri commands
@@ -268,6 +305,10 @@ pub fn main() {
             task_handle: Mutex::new(None),
             cancel_tx: Mutex::new(None),
         })
+        .manage(HotkeyRecordingState {
+            is_recording: Arc::new(Mutex::new(false)),
+            listener_handle: Mutex::new(None),
+        })
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
             request_input_monitoring_permission,
@@ -282,7 +323,9 @@ pub fn main() {
             get_pkce_verifier,
             set_auth_token,
             get_hotkey_config,
-            set_hotkey_config
+            set_hotkey_config,
+            start_hotkey_recording,
+            stop_hotkey_recording
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
@@ -300,7 +343,6 @@ pub fn main() {
             // Initialize ConfigStore
             let config_store = ConfigStore::new(app_handle);
             app.manage(config_store);
-            
 
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup
@@ -315,6 +357,9 @@ pub fn main() {
             // Start the global input listener (rdev) in a background thread
             // Pass the channel sender so it can trigger recording on Function key press/release
             global_key_listener::start_listener(app_handle.clone(), recording_tx);
+            
+            // Note: Hotkey selector listener is spawned lazily when user starts recording
+            // (see start_hotkey_recording command) to avoid unnecessary resource usage
 
             let window = app.get_webview_window("main").unwrap();
             

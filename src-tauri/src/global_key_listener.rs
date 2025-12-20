@@ -151,7 +151,10 @@ fn is_trigger(
 /// 
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
 /// * `recording_tx` - Channel sender to signal start/stop recording
-pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<RecordingCommand>) {
+pub fn start_listener(
+    app: AppHandle, 
+    recording_tx: mpsc::Sender<RecordingCommand>
+) {
     let app_handle = app.clone();
     
     std::thread::spawn(move || {
@@ -164,7 +167,7 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<RecordingComman
         let mut modifier_state = ModifierState::default();
 
         let callback = move |event: Event| {
-            // Update modifier state first
+            // Update modifier state
             if let EventType::KeyPress(key) = event.event_type {
                 modifier_state.update(key, true);
             } else if let EventType::KeyRelease(key) = event.event_type {
