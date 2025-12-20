@@ -7,6 +7,7 @@
 
 use std::error::Error;
 use reqwest::multipart;
+use tokio::sync::oneshot;
 use crate::config;
 
 /// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
@@ -34,14 +35,23 @@ impl SttService {
     /// 2. Sends the request to Lexi AI Server transcription endpoint
     /// 3. Parses the JSON response to extract the transcribed text
     /// 
+    /// The request can be cancelled by aborting the tokio task, which will cause
+    /// the HTTP request to be dropped and cancelled.
+    /// 
     /// # Arguments
     /// * `audio_data` - WAV file data as bytes (typically from AudioRecorder)
     /// * `auth_token` - Optional authentication token (Bearer token) for authenticated requests
+    /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
     /// 
     /// # Returns
     /// * `Ok(String)` - The transcribed text on success
-    /// * `Err(Box<dyn Error>)` - An error if the API call fails
-    pub async fn transcribe_audio(&self, audio_data: Vec<u8>, auth_token: Option<String>) -> Result<String, Box<dyn Error + Send + Sync>> {
+    /// * `Err(Box<dyn Error>)` - An error if the API call fails or if the request was cancelled
+    pub async fn transcribe_audio(
+        &self,
+        audio_data: Vec<u8>,
+        auth_token: Option<String>,
+        cancel_rx: Option<oneshot::Receiver<()>>,
+    ) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
 
@@ -72,8 +82,25 @@ impl SttService {
             println!("🔍 DEBUG: No auth token provided - request will likely fail with 401");
         }
 
-        // Send the request and wait for the response
-        let res = request.send().await?;
+        // Send the request with cancellation support
+        // Use tokio::select! to race between the request and cancellation signal
+        let res = if let Some(cancel_rx) = cancel_rx {
+            tokio::select! {
+                result = request.send() => {
+                    match result {
+                        Ok(res) => res,
+                        Err(e) => return Err(Box::new(e)),
+                    }
+                }
+                _ = cancel_rx => {
+                    println!("🛑 HTTP request cancelled via cancellation signal");
+                    return Err("Request cancelled".into());
+                }
+            }
+        } else {
+            // No cancellation support, just send normally
+            request.send().await?
+        };
 
         let status = res.status();
         println!("🔍 DEBUG: Response status: {}", status);

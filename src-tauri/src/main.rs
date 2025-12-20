@@ -55,6 +55,13 @@ struct AuthTokenState {
     token: Mutex<Option<String>>,
 }
 
+/// Transcription task state for managing abort handles
+/// This allows canceling ongoing transcriptions when a new one starts
+struct TranscriptionTaskState {
+    task_handle: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    cancel_tx: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+}
+
 /// Set the authentication token from frontend
 /// 
 /// This command allows the frontend to update the access token stored in Rust state.
@@ -115,65 +122,115 @@ fn toggle_pill_window(app: AppHandle) -> Result<(), String> {
 }
 
 /// Processes recorded audio data by:
-/// 1. Getting the authentication token from AuthTokenState
-/// 2. Sending the WAV audio data to Lexi AI Server API for transcription
-/// 3. Injecting the transcribed text into the active application using TextInjector
-/// 4. Emitting events to the frontend to update UI state (processing_start, transcription_success, etc.)
+/// 1. Aborting any ongoing transcription task
+/// 2. Getting the authentication token from AuthTokenState
+/// 3. Sending the WAV audio data to Lexi AI Server API for transcription
+/// 4. Injecting the transcribed text into the active application using TextInjector
+/// 5. Emitting events to the frontend to update UI state (processing_start, transcription_success, etc.)
 /// 
-/// This function uses the shared Tokio runtime handle to avoid creating a new runtime per call.
-fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle, rt_handle: tokio::runtime::Handle) {
-    rt_handle.spawn(async move {
-            println!("Processing audio, size: {} bytes", audio_data.len());
-            
-            // Notify frontend that transcription has started
-            app_handle.emit("processing_start", ()).unwrap_or_default();
-            
-            // Get authentication token from state
-            let auth_token = if let Some(state) = app_handle.try_state::<AuthTokenState>() {
-                get_auth_token(&state)
-            } else {
-                None
-            };
-            
-            if auth_token.is_none() {
-                eprintln!("⚠️  Warning: No authentication token available. Transcription will fail with 401.");
-                eprintln!("💡 Tip: Make sure you're logged in and the frontend has synced the token using set_auth_token");
-            } else {
-                println!("✅ Auth token available (length: {})", auth_token.as_ref().unwrap().len());
+/// This function uses tokio to spawn async tasks with abort handles for cancellation support.
+fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
+    // Clone app_handle for use in the task and for storing abort handle
+    let app_handle_for_task = app_handle.clone();
+    
+    // Create cancellation channel for this request
+    let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel();
+    
+    // Abort any ongoing transcription task and send cancellation signal
+    if let Some(state) = app_handle.try_state::<TranscriptionTaskState>() {
+        if let Ok(mut handle_guard) = state.task_handle.lock() {
+            if let Some(handle) = handle_guard.take() {
+                println!("🛑 Aborting previous transcription task");
+                handle.abort();
             }
-            
-            // Initialize the STT service client and transcribe the audio
-            let stt_service = SttService::new();
-            match stt_service.transcribe_audio(audio_data, auth_token).await {
-                Ok(transcription) => {
-                    println!("Transcription: {}", transcription);
-                    
-                    // Notify frontend of successful transcription
-                    app_handle.emit("transcription_success", &transcription).unwrap_or_default();
-                    
-                    // Only inject text if transcription is not empty
-                    if !transcription.trim().is_empty() {
-                        let injector = TextInjector::new();
-                        match injector.inject_text(&transcription) {
-                            Ok(_) => {
-                                // Successfully injected text into active application
-                                app_handle.emit("injection_success", ()).unwrap_or_default();
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to inject text: {}", e);
-                                // Notify frontend of injection failure
-                                app_handle.emit("injection_error", e.to_string()).unwrap_or_default();
-                            }
+        }
+        // Send cancellation signal to cancel the HTTP request
+        if let Ok(mut cancel_guard) = state.cancel_tx.lock() {
+            if let Some(old_cancel_tx) = cancel_guard.take() {
+                let _ = old_cancel_tx.send(());
+                println!("🛑 Sent cancellation signal to previous HTTP request");
+            }
+        }
+        // Store the new cancellation sender
+        if let Ok(mut cancel_guard) = state.cancel_tx.lock() {
+            *cancel_guard = Some(cancel_tx);
+        }
+    }
+    
+    // Spawn a new transcription task using Tauri's async runtime
+    // This returns a JoinHandle that we can use to abort the task
+    let task = tauri::async_runtime::spawn(async move {
+        println!("Processing audio, size: {} bytes", audio_data.len());
+        
+        // Notify frontend that transcription has started
+        app_handle_for_task.emit("processing_start", ()).unwrap_or_default();
+        
+        // Get authentication token from state
+        let auth_token = if let Some(state) = app_handle_for_task.try_state::<AuthTokenState>() {
+            get_auth_token(&state)
+        } else {
+            None
+        };
+        
+        if auth_token.is_none() {
+            eprintln!("⚠️  Warning: No authentication token available. Transcription will fail with 401.");
+            eprintln!("💡 Tip: Make sure you're logged in and the frontend has synced the token using set_auth_token");
+        } else {
+            println!("✅ Auth token available (length: {})", auth_token.as_ref().unwrap().len());
+        }
+        
+        // Initialize the STT service client and transcribe the audio
+        // The cancellation receiver is passed to the service to allow cancelling the HTTP request
+        let stt_service = SttService::new();
+        let transcription_result = stt_service.transcribe_audio(audio_data, auth_token, Some(cancel_rx)).await;
+        
+        // Check if the task was aborted (the JoinHandle will be cancelled)
+        // If aborted, the result will be an error, but we should check for cancellation
+        match transcription_result {
+            Ok(transcription) => {
+                println!("Transcription: {}", transcription);
+                
+                // Notify frontend of successful transcription
+                app_handle_for_task.emit("transcription_success", &transcription).unwrap_or_default();
+                
+                // Only inject text if transcription is not empty
+                if !transcription.trim().is_empty() {
+                    let injector = TextInjector::new();
+                    match injector.inject_text(&transcription) {
+                        Ok(_) => {
+                            // Successfully injected text into active application
+                            app_handle_for_task.emit("injection_success", ()).unwrap_or_default();
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to inject text: {}", e);
+                            // Notify frontend of injection failure
+                            app_handle_for_task.emit("injection_error", e.to_string()).unwrap_or_default();
                         }
                     }
                 }
-                Err(e) => {
-                    eprintln!("Transcription failed: {}", e);
-                    // Notify frontend of transcription failure
-                    app_handle.emit("transcription_error", e.to_string()).unwrap_or_default();
-                }
             }
+            Err(e) => {
+                // Check if this is a cancellation error
+                let error_msg = e.to_string();
+                if error_msg.contains("cancelled") || error_msg.contains("aborted") {
+                    println!("🛑 Transcription was cancelled");
+                    // Don't emit error event for cancellation - it's expected
+                    return;
+                }
+                
+                eprintln!("Transcription failed: {}", e);
+                // Notify frontend of transcription failure
+                app_handle_for_task.emit("transcription_error", error_msg).unwrap_or_default();
+            }
+        }
     });
+    
+    // Store the task handle in state for future cancellation
+    if let Some(state) = app_handle.try_state::<TranscriptionTaskState>() {
+        if let Ok(mut handle_guard) = state.task_handle.lock() {
+            *handle_guard = Some(task);
+        }
+    }
 }
 
 /// Main entry point for the Tauri application
@@ -193,6 +250,10 @@ pub fn main() {
         .plugin(tauri_plugin_shell::init())
         .manage(OAuthState::default())
         .manage(AuthTokenState::default())
+        .manage(TranscriptionTaskState {
+            task_handle: Mutex::new(None),
+            cancel_tx: Mutex::new(None),
+        })
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
             request_input_monitoring_permission,
@@ -220,19 +281,7 @@ pub fn main() {
             
             let app_handle = app.handle();
             
-            // Create a shared Tokio runtime for async operations
-            // This avoids the overhead of creating a new runtime for each audio processing task
-            let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
-            let rt_handle = rt.handle().clone();
-            
-            // Spawn the runtime in a background thread so it can process async tasks
-            thread::spawn(move || {
-                rt.block_on(async {
-                    // Keep the runtime alive
-                    std::future::pending::<()>().await;
-                });
-            });
-            
+
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup
             if let Err(e) = pill::init_pill_window(app_handle.clone()) {
@@ -271,7 +320,6 @@ pub fn main() {
                 // This thread will handle creating, starting, and stopping the recorder
                 // It receives signals from the global key listener via the channel
                 let app_handle_for_recording = app_handle.clone();
-                let rt_handle_for_recording = rt_handle.clone();
                 thread::spawn(move || {
                     let mut recorder: Option<AudioRecorder> = None;
                     
@@ -310,8 +358,8 @@ pub fn main() {
                                     match rec.stop_recording() {
                                         Ok(audio_data) => {
                                             app_handle_for_recording.emit("recording_stopped", ()).unwrap_or_default();
-                                            // Process the audio using the shared Tokio runtime
-                                            process_audio(audio_data, app_handle_for_recording.clone(), rt_handle_for_recording.clone());
+                                            // Process the audio using Tauri's async runtime
+                                            process_audio(audio_data, app_handle_for_recording.clone());
                                         }
                                         Err(e) => {
                                             eprintln!("Failed to stop recording: {}", e);
