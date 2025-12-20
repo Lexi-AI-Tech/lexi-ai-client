@@ -74,7 +74,7 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
                 }
             }
             
-            // Also emit all keyboard events to frontend for debugging
+            // Emit all keyboard events to react frontend
             if let Some(event_string) = event_type_to_string(&event.event_type) {
                 // Log the keyboard event for debugging
                 println!("Keyboard event: {:?}", event);
@@ -84,7 +84,6 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
                     eprintln!("Failed to emit event: {:?}", e);
                 }
             }
-            // Mouse events are silently ignored
         };
 
         if let Err(error) = listen(callback) {
