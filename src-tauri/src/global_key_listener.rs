@@ -8,6 +8,7 @@
 use rdev::{listen, Event, EventType, Key};
 use std::sync::mpsc;
 use tauri::{AppHandle, Emitter};
+use crate::RecordingCommand;
 
 /// Helper to convert keyboard EventType to a string for frontend emission
 /// Only handles keyboard events (KeyPress and KeyRelease)
@@ -22,14 +23,14 @@ fn event_type_to_string(event_type: &EventType) -> Option<String> {
 /// Checks if the event is a trigger key press/release
 /// Supports Function key (fn) for recording
 /// On some macOS systems, fn key is reported as Unknown(179) instead of Key::Function
-fn is_trigger_key_event(event_type: &EventType) -> Option<bool> {
+fn is_trigger_key_event(event_type: &EventType) -> Option<RecordingCommand> {
     match event_type {
         // Function key (fn) - primary trigger (standard variant)
-        EventType::KeyPress(Key::Function) => Some(true),
-        EventType::KeyRelease(Key::Function) => Some(false),
+        EventType::KeyPress(Key::Function) => Some(RecordingCommand::Start),
+        EventType::KeyRelease(Key::Function) => Some(RecordingCommand::Stop),
         // Function key (fn) - alternative variant for some macOS systems
-        EventType::KeyPress(Key::Unknown(179)) => Some(true),
-        EventType::KeyRelease(Key::Unknown(179)) => Some(false),
+        EventType::KeyPress(Key::Unknown(179)) => Some(RecordingCommand::Start),
+        EventType::KeyRelease(Key::Unknown(179)) => Some(RecordingCommand::Stop),
         _ => None, // Not a trigger key we care about
     }
 }
@@ -40,38 +41,50 @@ fn is_trigger_key_event(event_type: &EventType) -> Option<bool> {
 /// Only keyboard events (KeyPress and KeyRelease) are captured and emitted to the Tauri frontend
 /// via the "global-input" event. Mouse events are ignored.
 /// 
-/// When the Function key (fn) is pressed, it sends `true` through the recording channel to start recording.
-/// When the Function key (fn) is released, it sends `false` through the recording channel to stop recording.
+/// When the Function key (fn) is pressed, it sends `RecordingCommand::Start` through the recording channel to start recording.
+/// When the Function key (fn) is released, it sends `RecordingCommand::Stop` through the recording channel to stop recording.
 /// 
 /// Additionally, on every Fn key press/release, it queries cursor context and logs it.
 /// 
 /// # Arguments
 /// 
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
-/// * `recording_tx` - Channel sender to signal start/stop recording (true = start, false = stop)
-pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<bool>) {
+/// * `recording_tx` - Channel sender to signal start/stop recording
+pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<RecordingCommand>) {
     std::thread::spawn(move || {
         let callback = move |event: Event| {
             // Check if this is a trigger key event that should trigger recording
-            if let Some(should_start) = is_trigger_key_event(&event.event_type) {
+            if let Some(command) = is_trigger_key_event(&event.event_type) {
                 // Log the Fn key trigger
-                let trigger_type = if should_start { "PRESSED" } else { "RELEASED" };
+                let trigger_type = match command {
+                    RecordingCommand::Start => "PRESSED",
+                    RecordingCommand::Stop => "RELEASED",
+                };
                 println!("=== FN KEY TRIGGER: {} ===", trigger_type);
                 
                 // Query and log cursor context on every Fn key event
                 crate::cursor_context::log_cursor_context();
                 
                 println!("Trigger key {} - {} recording", 
-                    if should_start { "pressed" } else { "released" },
-                    if should_start { "Starting" } else { "Stopping" });
+                    match command {
+                        RecordingCommand::Start => "pressed",
+                        RecordingCommand::Stop => "released",
+                    },
+                    match command {
+                        RecordingCommand::Start => "Starting",
+                        RecordingCommand::Stop => "Stopping",
+                    });
                 
                 // Send signal to recording thread
-                if let Err(e) = recording_tx.send(should_start) {
+                if let Err(e) = recording_tx.send(command) {
                     eprintln!("Failed to send recording signal: {:?}", e);
                 }
                 
                 // Emit event to frontend
-                let event_name = if should_start { "recording_started" } else { "recording_stopped" };
+                let event_name = match command {
+                    RecordingCommand::Start => "recording_started",
+                    RecordingCommand::Stop => "recording_stopped",
+                };
                 if let Err(e) = app.emit(event_name, ()) {
                     eprintln!("Failed to emit {} event: {:?}", event_name, e);
                 }

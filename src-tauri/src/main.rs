@@ -42,6 +42,13 @@ use permissions::{
 use google_oauth::{OAuthState, start_google_login, get_pkce_verifier};
 use std::sync::Mutex;
 
+/// Command to control recording state
+#[derive(Debug, Clone, Copy)]
+pub enum RecordingCommand {
+    Start,
+    Stop,
+}
+
 /// Auth token state for storing the current access token
 #[derive(Default)]
 struct AuthTokenState {
@@ -226,7 +233,7 @@ pub fn main() {
             
             // Channel to communicate with the recording thread
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
-            let (recording_tx, recording_rx) = mpsc::channel::<bool>(); // true = start, false = stop
+            let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
             
             // Start the global input listener (rdev) in a background thread
             // Pass the channel sender so it can trigger recording on Function key press/release
@@ -261,7 +268,7 @@ pub fn main() {
                     
                     loop {
                         match recording_rx.recv() {
-                            Ok(true) => {
+                            Ok(RecordingCommand::Start) => {
                                 // Start recording (Function key pressed)
                                 if recorder.is_none() {
                                     println!("Function key (fn) pressed - Starting recording in dedicated thread...");
@@ -286,7 +293,7 @@ pub fn main() {
                                     }
                                 }
                             }
-                            Ok(false) => {
+                            Ok(RecordingCommand::Stop) => {
                                 // Stop recording (Function key released)
                                 if let Some(mut rec) = recorder.take() {
                                     println!("Function key (fn) released - Stopping recording in dedicated thread...");
