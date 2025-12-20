@@ -1,6 +1,12 @@
 // TextInjector module handles injecting transcribed text into the currently active application
-// It uses cross-platform Rust crates (arboard for clipboard, rdev/enigo for input simulation)
-// to insert text at the current cursor position via clipboard + paste keystroke
+// 
+// This module uses cross-platform Rust crates to insert text at the current cursor position:
+// - arboard: Cross-platform clipboard management (macOS, Windows, Linux/X11)
+// - rdev: Keyboard event simulation on macOS (more reliable than enigo)
+// - enigo: Keyboard event simulation on Windows/Linux
+// 
+// The injection method uses clipboard + paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere),
+// which works across all applications. This requires Accessibility permission on macOS.
 
 use std::error::Error;
 use std::thread;

@@ -3,10 +3,12 @@
 
 // This is the main entry point for the Lexi AI Tauri application.
 // The application provides a voice-to-text overlay that:
-// 1. Listens for Function key (fn) press/release to start/stop audio recording
-// 2. Captures audio from the default microphone
-// 3. Transcribes the audio using Lexi AI Server (which uses Groq's Whisper API)
-// 4. Injects the transcribed text into the currently active application
+// 1. Listens for Function key (fn) press/release via global keyboard listener to start/stop audio recording
+// 2. Captures audio from the default microphone using cpal (Cross-Platform Audio Library)
+// 3. Transcribes the audio using Lexi AI Server API endpoint (server handles Groq's Whisper API integration)
+// 4. Injects the transcribed text into the currently active application using clipboard + paste keystroke
+// 5. Manages a pill overlay window that displays recording status
+// 6. Handles Google OAuth authentication with PKCE for user authentication
 
 use std::sync::mpsc;
 use std::thread;
@@ -14,15 +16,15 @@ use std::thread;
 use tauri::{AppHandle, Manager, Emitter};
 
 // Module declarations for core functionality
-mod audio_recorder;  // Handles audio capture from microphone
-mod stt_service;     // Communicates with Groq API for speech-to-text transcription
-mod text_injector;   // Injects transcribed text into active application
-mod global_key_listener;  // Handles global keyboard event listening via rdev
-mod permissions;     // Handles permission requests for microphone, input monitoring, and accessibility
-mod pill;           // Handles pill overlay window management
-mod cursor_context;  // Handles cursor context retrieval using macOS Accessibility API
-mod google_oauth;   // Handles Google OAuth authentication with PKCE
-mod config;         // Handles environment variable configuration
+mod audio_recorder;  // Handles audio capture from default microphone using cpal, converts to WAV format
+mod stt_service;     // Communicates with Lexi AI Server API for speech-to-text transcription (server uses Groq)
+mod text_injector;   // Injects transcribed text into active application via clipboard + paste keystroke (rdev/enigo)
+mod global_key_listener;  // Handles global keyboard event listening via rdev, triggers recording on Function key
+mod permissions;     // Handles permission requests and checks for microphone, input monitoring, and accessibility (macOS)
+mod pill;           // Handles pill overlay window creation, positioning, and visibility management
+mod cursor_context;  // Handles cursor context retrieval using macOS Accessibility API (AXUIElement)
+mod google_oauth;   // Handles Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
+mod config;         // Handles application configuration (API base URL, OAuth redirect URI)
 
 use audio_recorder::AudioRecorder;
 use stt_service::SttService;
@@ -106,10 +108,10 @@ fn toggle_pill_window(app: AppHandle) -> Result<(), String> {
 }
 
 /// Processes recorded audio data by:
-/// 1. Getting the authentication token from state
-/// 2. Sending it to the speech-to-text API for transcription
-/// 3. Injecting the transcribed text into the active application
-/// 4. Emitting events to the frontend to update UI state
+/// 1. Getting the authentication token from AuthTokenState
+/// 2. Sending the WAV audio data to Lexi AI Server API for transcription
+/// 3. Injecting the transcribed text into the active application using TextInjector
+/// 4. Emitting events to the frontend to update UI state (processing_start, transcription_success, etc.)
 /// 
 /// This function runs in a separate thread to avoid blocking the main thread.
 /// It creates a new Tokio runtime since it's called from a non-async context.
@@ -174,9 +176,13 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
 /// Main entry point for the Tauri application
 /// 
-/// Sets up the application window, configures macOS-specific window behavior,
-/// and registers global shortcuts for Function key (fn) presses/releases
-/// to control audio recording.
+/// Sets up the application with the following:
+/// 1. Configures macOS activation policy to Accessory (app doesn't appear in Dock)
+/// 2. Initializes and positions the pill overlay window at startup
+/// 3. Starts global keyboard listener in background thread (rdev) to monitor Function key
+/// 4. Spawns dedicated recording thread that responds to Function key press/release signals
+/// 5. Configures window close behavior to hide instead of close (keeps app running for hotkeys)
+/// 6. Registers Tauri commands for permissions, OAuth, text injection, and pill window control
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
     println!("🔧 Configuration loaded - API Base URL: {}", config::api_base_url());

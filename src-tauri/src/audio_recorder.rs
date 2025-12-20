@@ -1,7 +1,9 @@
 // AudioRecorder module handles capturing audio from the system's default microphone
-// It uses the cpal (Cross-Platform Audio Library) to interface with the audio system
-// and records audio data as 32-bit floating point samples, which are then
-// converted to WAV format for transmission to the speech-to-text API
+// 
+// This module uses the cpal (Cross-Platform Audio Library) to interface with the audio system.
+// It records audio data as 32-bit floating point samples in real-time, storing them in a
+// shared buffer. When recording stops, the samples are converted to 16-bit PCM WAV format
+// for compatibility with the Lexi AI Server transcription API.
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
