@@ -236,11 +236,11 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 /// Main entry point for the Tauri application
 /// 
 /// Sets up the application with the following:
-/// 1. Configures macOS activation policy to Accessory (app doesn't appear in Dock)
+/// 1. Configures macOS activation policy to Regular (app appears in Dock)
 /// 2. Initializes and positions the pill overlay window at startup
 /// 3. Starts global keyboard listener in background thread (rdev) to monitor Function key
 /// 4. Spawns dedicated recording thread that responds to Function key press/release signals
-/// 5. Configures window close behavior to hide instead of close (keeps app running for hotkeys)
+/// 5. Configures window close behavior for standard app termination
 /// 6. Registers Tauri commands for permissions, OAuth, text injection, and pill window control
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
@@ -269,14 +269,12 @@ pub fn main() {
             set_auth_token
         ])
         .setup(move |app| {
-            // CRITICAL FIX FOR MACOS FLOATING WINDOWS
-            // This policy allows the app to have accessory windows (like the pill)
-            // that float above all spaces and do not clutter the Dock/App Switcher.
+            // Set activation policy to Regular so the app appears in Dock
             // Must be set before getting the app handle to avoid borrow checker issues.
             #[cfg(target_os = "macos")]
             {
-                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-                println!("🍎 Set macOS activation policy to Accessory (app will not appear in Dock)");
+                app.set_activation_policy(tauri::ActivationPolicy::Regular);
+                println!("🍎 Set macOS activation policy to Regular (app will appear in Dock)");
             }
             
             let app_handle = app.handle();
@@ -298,19 +296,11 @@ pub fn main() {
 
             let window = app.get_webview_window("main").unwrap();
             
-            // Prevent the app from closing when window is closed
-            // This keeps the global shortcut monitoring active
-            let window_clone = window.clone();
+            // Allow the app to close normally when window is closed
+            // For a regular app, we want standard window close behavior
             window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    // Hide the window instead of closing it
-                    // This keeps the app running in the background so hotkeys continue to work
-                    api.prevent_close();
-                    if let Err(e) = window_clone.hide() {
-                        eprintln!("Failed to hide window: {}", e);
-                    } else {
-                        println!("Window hidden - app continues running in background. Hotkeys will still work.");
-                    }
+                if let tauri::WindowEvent::CloseRequested { .. } = event {
+                    println!("Window closing - app will terminate");
                 }
             });
             
