@@ -2,22 +2,18 @@
 // 
 // This module uses cross-platform Rust crates to insert text at the current cursor position:
 // - arboard: Cross-platform clipboard management (macOS, Windows, Linux/X11)
-// - rdev: Keyboard event simulation on macOS (more reliable than enigo)
-// - enigo: Keyboard event simulation on Windows/Linux
+// - AppleScript: Keyboard event simulation on macOS (via osascript)
+// - enigo: Cross-platform keyboard event simulation (Windows, Linux)
 // 
 // The injection method uses clipboard + paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere),
 // which works across all applications. This requires Accessibility permission on macOS.
 
 use std::error::Error;
+use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use arboard::Clipboard;
 
-// Use rdev for macOS (more reliable, already in dependencies)
-#[cfg(target_os = "macos")]
-use rdev::{simulate, EventType, Key as RdevKey};
-
-// Use enigo only for non-macOS platforms
 #[cfg(not(target_os = "macos"))]
 use enigo::{Enigo, Key, Keyboard, Direction, Settings};
 
@@ -25,14 +21,14 @@ use enigo::{Enigo, Key, Keyboard, Direction, Settings};
 ///
 /// This implementation uses:
 /// 1. `arboard` to set the system clipboard (cross-platform: macOS, Windows, Linux/X11)
-/// 2. `rdev` on macOS to simulate the paste keystroke (Cmd+V) - more reliable than enigo
+/// 2. AppleScript on macOS to simulate the paste keystroke (Cmd+V)
 /// 3. `enigo` on Windows/Linux to simulate the paste keystroke (Ctrl+V)
 ///
 /// This approach works across all applications and inserts text at the
 /// current cursor position, making it ideal for voice-to-text workflows.
 ///
 /// # Permissions
-/// - **macOS**: Requires **Accessibility** access (same as previous AppleScript approach)
+/// - **macOS**: Requires **Accessibility** access for AppleScript keyboard simulation
 /// - **Windows**: Usually works without extra permissions
 /// - **Linux**: Needs X11 (enigo's Wayland support is experimental)
 pub struct TextInjector;
@@ -68,10 +64,6 @@ impl TextInjector {
     pub fn inject_text(&self, text: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut clipboard = Clipboard::new()?;
 
-        // Optional: Save current clipboard content for restoration
-        // Uncomment the following lines if you want to preserve the clipboard:
-        // let original_clipboard = clipboard.get_text().ok();
-
         // Step 1: Set clipboard to the text we want to inject
         // arboard handles UTF-8 encoding and special characters automatically
         clipboard.set_text(text)?;
@@ -80,10 +72,10 @@ impl TextInjector {
         thread::sleep(Duration::from_millis(50));
 
         // Step 2: Simulate paste keystroke
-        // Use rdev on macOS (more reliable), enigo on other platforms
+        // AppleScript on macOS, enigo on Windows/Linux
         #[cfg(target_os = "macos")]
         {
-            self.paste_with_rdev()?;
+            self.paste_with_applescript()?;
         }
         #[cfg(not(target_os = "macos"))]
         {
@@ -93,47 +85,42 @@ impl TextInjector {
         // Brief delay to ensure paste processes (some apps need a moment)
         thread::sleep(Duration::from_millis(50));
 
-        // Optional: Restore original clipboard content
-        // Uncomment if you enabled clipboard preservation above:
-        // if let Some(original) = original_clipboard {
-        //     clipboard.set_text(original)?;
-        // }
-
         Ok(())
     }
 
-    /// Paste using rdev on macOS (more reliable than enigo)
+    /// Paste using AppleScript on macOS
+    /// Simulates Cmd+V keystroke
     #[cfg(target_os = "macos")]
-    fn paste_with_rdev(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        // Press Cmd (Meta) key first and hold it
-        simulate(&EventType::KeyPress(RdevKey::MetaLeft))
-            .map_err(|e| format!("Failed to press Meta key: {:?}", e))?;
-        thread::sleep(Duration::from_millis(50)); // Give OS time to register modifier
+    fn paste_with_applescript(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let applescript = r#"
+            tell application "System Events"
+                keystroke "v" using {command down}
+            end tell
+        "#;
 
-        // While Cmd is held, press V
-        simulate(&EventType::KeyPress(RdevKey::KeyV))
-            .map_err(|e| format!("Failed to press V key: {:?}", e))?;
-        thread::sleep(Duration::from_millis(50));
+        let output = Command::new("osascript")
+            .arg("-e")
+            .arg(applescript)
+            .output()
+            .map_err(|e| format!("Failed to run AppleScript: {}", e))?;
 
-        // Release V first
-        simulate(&EventType::KeyRelease(RdevKey::KeyV))
-            .map_err(|e| format!("Failed to release V key: {:?}", e))?;
-        thread::sleep(Duration::from_millis(50));
-
-        // Then release Cmd
-        simulate(&EventType::KeyRelease(RdevKey::MetaLeft))
-            .map_err(|e| format!("Failed to release Meta key: {:?}", e))?;
-
-        Ok(())
+        if output.status.success() {
+            Ok(())
+        } else {
+            let error = String::from_utf8_lossy(&output.stderr);
+            Err(format!("AppleScript failed: {}", error).into())
+        }
     }
 
     /// Paste using enigo on Windows/Linux
+    /// Simulates Ctrl+V keystroke
     #[cfg(not(target_os = "macos"))]
     fn paste_with_enigo(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
         let settings = Settings::default();
         let mut enigo = Enigo::new(&settings)
             .map_err(|e| format!("Failed to initialize enigo: {:?}", e))?;
 
+        // Windows/Linux: Use Control key
         enigo
             .key(Key::Control, Direction::Press)
             .map_err(|e| format!("Failed to press Control key: {:?}", e))?;

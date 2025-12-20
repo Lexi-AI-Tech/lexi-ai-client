@@ -6,7 +6,8 @@
 // are also emitted to the frontend for debugging purposes.
 
 use rdev::{listen, Event, EventType, Key};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use crate::RecordingCommand;
 
@@ -52,9 +53,23 @@ fn is_trigger_key_event(event_type: &EventType) -> Option<RecordingCommand> {
 /// * `recording_tx` - Channel sender to signal start/stop recording
 pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<RecordingCommand>) {
     std::thread::spawn(move || {
+        // Debounce mechanism to prevent race conditions on rapid key presses
+        // Ignore trigger events that occur within 50ms of the previous trigger
+        let debounce_time = Arc::new(Mutex::new(Instant::now()));
+        let debounce_duration = Duration::from_millis(50);
+        
         let callback = move |event: Event| {
             // Check if this is a trigger key event that should trigger recording
             if let Some(command) = is_trigger_key_event(&event.event_type) {
+                // Check debounce: ignore events that are too close together
+                let mut last_trigger = debounce_time.lock().unwrap();
+                if last_trigger.elapsed() < debounce_duration {
+                    // Event too soon after previous trigger, ignore it
+                    return;
+                }
+                *last_trigger = Instant::now();
+                drop(last_trigger); // Release lock early
+                
                 // Log the Fn key trigger
                 let trigger_type = match command {
                     RecordingCommand::Start => "PRESSED",
