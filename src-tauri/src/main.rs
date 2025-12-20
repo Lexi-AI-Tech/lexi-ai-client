@@ -25,10 +25,12 @@ mod pill;           // Handles pill overlay window creation, positioning, and vi
 mod cursor_context;  // Handles cursor context retrieval using macOS Accessibility API (AXUIElement)
 mod google_oauth;   // Handles Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod config;         // Handles application configuration (API base URL, OAuth redirect URI)
+mod config_store;   // Handles persistent user configuration (hotkeys)
 
 use audio_recorder::AudioRecorder;
 use stt_service::SttService;
 use text_injector::TextInjector;
+use config_store::{ConfigStore, HotkeyConfig};
 
 use permissions::{
     request_accessibility_permission,
@@ -108,6 +110,18 @@ fn inject_text(text: String) -> Result<(), String> {
     injector
         .inject_text(&text)
         .map_err(|e| format!("Injection failed: {}", e))
+}
+
+/// Get the current hotkey configuration
+#[tauri::command]
+fn get_hotkey_config(state: tauri::State<ConfigStore>) -> HotkeyConfig {
+    state.get_hotkey()
+}
+
+/// Set the hotkey configuration
+#[tauri::command]
+fn set_hotkey_config(state: tauri::State<ConfigStore>, config: HotkeyConfig) -> Result<(), String> {
+    state.set_hotkey(config)
 }
 
 // Re-export pill functions as Tauri commands
@@ -266,7 +280,9 @@ pub fn main() {
             toggle_pill_window,
             start_google_login,
             get_pkce_verifier,
-            set_auth_token
+            set_auth_token,
+            get_hotkey_config,
+            set_hotkey_config
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
@@ -280,6 +296,10 @@ pub fn main() {
             }
             
             let app_handle = app.handle();
+            
+            // Initialize ConfigStore
+            let config_store = ConfigStore::new(app_handle);
+            app.manage(config_store);
             
 
             // Initialize and position the pill window at the center of the screen

@@ -144,6 +144,7 @@ export const TranscriptsList: React.FC = () => {
     <div className="settings">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <h3>Transcripts {total > 0 && <span style={{ fontSize: '12px', fontWeight: 'normal', opacity: 0.6 }}>({total})</span>}</h3>
+
         {totalPages > 1 && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
