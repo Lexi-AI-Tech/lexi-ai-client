@@ -42,6 +42,13 @@ use permissions::{
 use google_oauth::{OAuthState, start_google_login, get_pkce_verifier};
 use std::sync::Mutex;
 
+/// Command to control recording state
+#[derive(Debug, Clone, Copy)]
+pub enum RecordingCommand {
+    Start,
+    Stop,
+}
+
 /// Auth token state for storing the current access token
 #[derive(Default)]
 struct AuthTokenState {
@@ -113,13 +120,9 @@ fn toggle_pill_window(app: AppHandle) -> Result<(), String> {
 /// 3. Injecting the transcribed text into the active application using TextInjector
 /// 4. Emitting events to the frontend to update UI state (processing_start, transcription_success, etc.)
 /// 
-/// This function runs in a separate thread to avoid blocking the main thread.
-/// It creates a new Tokio runtime since it's called from a non-async context.
-fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
-    thread::spawn(move || {
-        // Create a new Tokio runtime for async operations
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+/// This function uses the shared Tokio runtime handle to avoid creating a new runtime per call.
+fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle, rt_handle: tokio::runtime::Handle) {
+    rt_handle.spawn(async move {
             println!("Processing audio, size: {} bytes", audio_data.len());
             
             // Notify frontend that transcription has started
@@ -170,7 +173,6 @@ fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     app_handle.emit("transcription_error", e.to_string()).unwrap_or_default();
                 }
             }
-        });
     });
 }
 
@@ -218,6 +220,19 @@ pub fn main() {
             
             let app_handle = app.handle();
             
+            // Create a shared Tokio runtime for async operations
+            // This avoids the overhead of creating a new runtime for each audio processing task
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+            let rt_handle = rt.handle().clone();
+            
+            // Spawn the runtime in a background thread so it can process async tasks
+            thread::spawn(move || {
+                rt.block_on(async {
+                    // Keep the runtime alive
+                    std::future::pending::<()>().await;
+                });
+            });
+            
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup
             if let Err(e) = pill::init_pill_window(app_handle.clone()) {
@@ -226,7 +241,7 @@ pub fn main() {
             
             // Channel to communicate with the recording thread
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
-            let (recording_tx, recording_rx) = mpsc::channel::<bool>(); // true = start, false = stop
+            let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
             
             // Start the global input listener (rdev) in a background thread
             // Pass the channel sender so it can trigger recording on Function key press/release
@@ -256,12 +271,13 @@ pub fn main() {
                 // This thread will handle creating, starting, and stopping the recorder
                 // It receives signals from the global key listener via the channel
                 let app_handle_for_recording = app_handle.clone();
+                let rt_handle_for_recording = rt_handle.clone();
                 thread::spawn(move || {
                     let mut recorder: Option<AudioRecorder> = None;
                     
                     loop {
                         match recording_rx.recv() {
-                            Ok(true) => {
+                            Ok(RecordingCommand::Start) => {
                                 // Start recording (Function key pressed)
                                 if recorder.is_none() {
                                     println!("Function key (fn) pressed - Starting recording in dedicated thread...");
@@ -286,7 +302,7 @@ pub fn main() {
                                     }
                                 }
                             }
-                            Ok(false) => {
+                            Ok(RecordingCommand::Stop) => {
                                 // Stop recording (Function key released)
                                 if let Some(mut rec) = recorder.take() {
                                     println!("Function key (fn) released - Stopping recording in dedicated thread...");
@@ -294,8 +310,8 @@ pub fn main() {
                                     match rec.stop_recording() {
                                         Ok(audio_data) => {
                                             app_handle_for_recording.emit("recording_stopped", ()).unwrap_or_default();
-                                            // Process the audio in a separate thread
-                                            process_audio(audio_data, app_handle_for_recording.clone());
+                                            // Process the audio using the shared Tokio runtime
+                                            process_audio(audio_data, app_handle_for_recording.clone(), rt_handle_for_recording.clone());
                                         }
                                         Err(e) => {
                                             eprintln!("Failed to stop recording: {}", e);
