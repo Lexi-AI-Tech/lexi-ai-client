@@ -2,6 +2,17 @@
 //! 
 //! This module provides functionality to get text context at the cursor position
 //! in the currently focused application using the macOS Accessibility API (AXUIElement).
+//! 
+//! Implementation details:
+//! - Uses NSWorkspace to get the frontmost application (PID and name)
+//! - Creates an AXUIElement for the application to access its accessibility tree
+//! - Enables enhanced UI mode for Chromium/Electron apps (handles lazy tree building)
+//! - Polls for focused UI element (handles async accessibility tree construction)
+//! - Extracts selected text via AXSelectedText attribute
+//! - Falls back to AXValue attribute if no selection is available
+//! - Uses CoreFoundation (CFString) for string conversion between C and Rust
+//! 
+//! Requires Accessibility permission on macOS. Returns None on non-macOS platforms.
 
 // Suppress warnings from objc crate's msg_send! macro about unexpected cfg conditions
 #![allow(unexpected_cfgs)]
@@ -66,11 +77,16 @@ fn get_frontmost_app() -> Option<(i32, Option<String>)> {
 
 /// Get cursor context using macOS Accessibility API
 /// 
-/// This function attempts to:
-/// 1. Get the frontmost application
-/// 2. Get the focused UI element
-/// 3. Extract selected text if available
-/// 4. Fallback to getting text at cursor position
+/// This function attempts to retrieve text context from the currently focused application:
+/// 1. Gets the frontmost application using NSWorkspace (returns PID and app name)
+/// 2. Creates an AXUIElement for the application process
+/// 3. Enables enhanced UI mode for Chromium/Electron apps (AXEnhancedUserInterface, AXManualAccessibility)
+/// 4. Polls for the focused UI element (handles lazy accessibility tree building with up to 5 retries)
+/// 5. Extracts selected text via AXSelectedText attribute if available
+/// 6. Falls back to AXValue attribute (text content) if no selection exists
+/// 
+/// Returns a CursorContext with selected text, app name, and PID, or None if retrieval fails.
+/// Requires Accessibility permission on macOS.
 #[cfg(target_os = "macos")]
 pub fn get_cursor_context() -> Option<CursorContext> {
     let (pid, app_name) = get_frontmost_app()?;

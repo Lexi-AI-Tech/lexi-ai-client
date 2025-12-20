@@ -1,8 +1,17 @@
 // Pill window management module
 // 
 // This module handles the creation, positioning, and display of the pill overlay window.
-// The pill window is a small transparent overlay that displays the current recording status.
-// The window is created dynamically in Rust rather than from the config file for better control.
+// The pill window is a small transparent overlay (200x50px) that displays the current recording status.
+// The window is created dynamically in Rust using Tauri's WebviewWindowBuilder for better control.
+// 
+// Key window properties:
+// - Always on top: Floats above all other windows
+// - Visible on all workspaces: Appears across all macOS spaces/desktops
+// - Transparent: No decorations, fully transparent background
+// - Skip taskbar: Doesn't appear in Dock or app switcher
+// - Positioned at bottom center: Responsively positioned above taskbar/dock
+// 
+// The window is created at app startup via init_pill_window() and shown/hidden during recording.
 
 use tauri::{AppHandle, Manager, LogicalPosition, WebviewUrl, WebviewWindowBuilder};
 
