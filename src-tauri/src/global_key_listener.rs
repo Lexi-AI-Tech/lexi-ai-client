@@ -20,13 +20,16 @@ fn event_type_to_string(event_type: &EventType) -> Option<String> {
 }
 
 /// Checks if the event is a trigger key press/release
-/// Supports both Function key (fn) and Option key (Alt) for recording
+/// Supports Function key (fn) for recording
 /// On some macOS systems, fn key is reported as Unknown(179) instead of Key::Function
 fn is_trigger_key_event(event_type: &EventType) -> Option<bool> {
     match event_type {
-        // Function key (fn) - primary trigger
+        // Function key (fn) - primary trigger (standard variant)
         EventType::KeyPress(Key::Function) => Some(true),
         EventType::KeyRelease(Key::Function) => Some(false),
+        // Function key (fn) - alternative variant for some macOS systems
+        EventType::KeyPress(Key::Unknown(179)) => Some(true),
+        EventType::KeyRelease(Key::Unknown(179)) => Some(false),
         _ => None, // Not a trigger key we care about
     }
 }
