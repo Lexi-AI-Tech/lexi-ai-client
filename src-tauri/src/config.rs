@@ -1,5 +1,9 @@
 // Configuration module for managing application configuration
-// All values are hardcoded here for the built application.
+// 
+// This module provides centralized configuration values for the application.
+// All values are hardcoded here for the built application. The API base URL
+// points to the local Lexi AI Server, and the OAuth redirect URI points to
+// the server's Google OAuth callback endpoint.
 
 /// Get the API base URL for the Lexi AI Server
 pub fn api_base_url() -> &'static str {

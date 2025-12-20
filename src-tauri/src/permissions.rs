@@ -1,3 +1,14 @@
+// Permissions module for handling macOS system permission requests and checks
+// 
+// This module provides Tauri commands to request and check system permissions required
+// for the application to function:
+// - Microphone permission: Required for audio recording (triggers dialog via AudioRecorder)
+// - Input Monitoring permission: Required for global keyboard listener (rdev) to work
+// - Accessibility permission: Required for text injection and cursor context retrieval
+// 
+// On non-macOS platforms, these functions return true as permissions are typically
+// handled differently or not required.
+
 use tauri::AppHandle;
 
 use crate::audio_recorder::AudioRecorder;

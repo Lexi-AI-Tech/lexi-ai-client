@@ -1,5 +1,9 @@
 // OAuth module for handling Google OAuth authentication with PKCE
-// This module provides secure OAuth 2.0 authentication flow using PKCE (Proof Key for Code Exchange)
+// 
+// This module provides a secure OAuth 2.0 authentication flow using PKCE (Proof Key for Code Exchange).
+// It generates cryptographically secure verifiers and challenges, builds Google OAuth authorization URLs,
+// opens the browser for user authentication, and stores PKCE verifiers in state for later token exchange.
+// The OAuth callback is handled by the Lexi AI Server UI route, not a local callback server.
 
 use std::collections::HashMap;
 use std::sync::Mutex;

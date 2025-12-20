@@ -1,3 +1,10 @@
+// Global keyboard listener module using rdev
+// 
+// This module provides global keyboard event monitoring that works system-wide,
+// even when the application is not in focus. It listens for Function key (fn)
+// press/release events to trigger audio recording start/stop. All keyboard events
+// are also emitted to the frontend for debugging purposes.
+
 use rdev::{listen, Event, EventType, Key};
 use std::sync::mpsc;
 use tauri::{AppHandle, Emitter};
