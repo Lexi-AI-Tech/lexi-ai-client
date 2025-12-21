@@ -1,9 +1,26 @@
-// STT (Speech-to-Text) Service module handles communication with Lexi AI Server for speech-to-text transcription
-// 
-// This module sends WAV audio data to the Lexi AI Server API endpoint via HTTP multipart form request.
-// The server handles the Groq Whisper API integration internally, so no Groq API key is needed in the client.
-// Authentication is handled via Bearer token in the Authorization header. The server returns
-// transcribed text as JSON with a "text" field.
+//! Speech-to-Text (STT) Service Module
+//!
+//! This module handles communication with the Lexi AI Server for speech-to-text transcription.
+//! It sends WAV audio data to the server API endpoint via HTTP multipart form requests.
+//!
+//! ## Architecture
+//!
+//! The client sends audio to the Lexi AI Server, which handles the Groq Whisper API integration
+//! internally. This means:
+//! - No Groq API key is needed in the client
+//! - Authentication is handled via Bearer token (JWT) in the Authorization header
+//! - The server manages API rate limiting, retries, and error handling
+//!
+//! ## Request/Response Format
+//!
+//! - **Request**: Multipart form data with WAV audio file
+//! - **Response**: JSON object with `{"text": "transcribed text here"}`
+//!
+//! ## Features
+//!
+//! - **Cancellation Support**: HTTP requests can be cancelled via tokio oneshot channel
+//! - **Error Handling**: Comprehensive error messages for debugging
+//! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
 use std::error::Error;
 use reqwest::multipart;

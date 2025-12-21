@@ -1,9 +1,26 @@
-// AudioRecorder module handles capturing audio from the system's default microphone
-// 
-// This module uses the cpal (Cross-Platform Audio Library) to interface with the audio system.
-// It records audio data as 32-bit floating point samples in real-time, storing them in a
-// shared buffer. When recording stops, the samples are converted to 16-bit PCM WAV format
-// for compatibility with the Lexi AI Server transcription API.
+//! Audio Recorder Module
+//!
+//! This module handles capturing audio from the system's default microphone using the
+//! `cpal` (Cross-Platform Audio Library) crate. It provides a simple interface for
+//! starting and stopping audio recording, with automatic conversion to WAV format.
+//!
+//! ## Features
+//!
+//! - **Real-time Audio Capture**: Records audio as 32-bit floating point samples in real-time
+//! - **Shared Buffer**: Stores captured samples in a thread-safe shared buffer (Arc<Mutex>)
+//! - **WAV Conversion**: Automatically converts captured audio to 16-bit PCM WAV format
+//!   for compatibility with speech-to-text APIs
+//! - **Default Device**: Automatically uses the system's default input device (microphone)
+//!
+//! ## Audio Format
+//!
+//! - **Input**: 32-bit floating point samples from cpal (typically 44.1kHz or 48kHz sample rate)
+//! - **Output**: 16-bit PCM WAV format (standard for speech-to-text APIs)
+//! - **Channels**: Supports mono and stereo (preserves original channel configuration)
+//!
+//! ## Permissions Required
+//!
+//! - **Microphone** (macOS): Required for audio input access
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};

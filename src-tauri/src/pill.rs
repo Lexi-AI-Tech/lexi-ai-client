@@ -1,17 +1,33 @@
-// Pill window management module
-// 
-// This module handles the creation, positioning, and display of the pill overlay window.
-// The pill window is a small transparent overlay (200x50px) that displays the current recording status.
-// The window is created dynamically in Rust using Tauri's WebviewWindowBuilder for better control.
-// 
-// Key window properties:
-// - Always on top: Floats above all other windows
-// - Visible on all workspaces: Appears across all macOS spaces/desktops
-// - Transparent: No decorations, fully transparent background
-// - Skip taskbar: Doesn't appear in Dock or app switcher
-// - Positioned at bottom center: Responsively positioned above taskbar/dock
-// 
-// The window is created at app startup via init_pill_window() and shown/hidden during recording.
+//! Pill Overlay Window Module
+//!
+//! This module handles the creation, positioning, and display of the pill overlay window,
+//! a small transparent overlay that displays the current recording status.
+//!
+//! ## Window Properties
+//!
+//! The pill window is a floating overlay with the following characteristics:
+//!
+//! - **Size**: 200x50 pixels (fixed, non-resizable)
+//! - **Position**: Bottom center of primary monitor, above taskbar/dock
+//! - **Always on Top**: Floats above all other windows
+//! - **Visible on All Workspaces**: Appears across all macOS spaces/desktops
+//! - **Transparent**: No window decorations, fully transparent background
+//! - **Skip Taskbar**: Doesn't appear in Dock or app switcher
+//! - **Non-Focusable**: Doesn't steal focus from active application
+//!
+//! ## Window Lifecycle
+//!
+//! 1. **Initialization**: Window is created at app startup via `init_pill_window()`
+//! 2. **Recording Start**: Window is shown when recording begins
+//! 3. **Recording Stop**: Window is hidden when recording ends
+//! 4. **Positioning**: Window position is calculated responsively based on screen size
+//!
+//! ## Implementation Details
+//!
+//! The window is created dynamically in Rust using Tauri's `WebviewWindowBuilder` for
+//! better control over window properties. Permanent properties (always_on_top,
+//! visible_on_all_workspaces) are set immediately after window creation to ensure
+//! they are applied correctly by the OS window manager.
 
 use tauri::{AppHandle, Manager, LogicalPosition, WebviewUrl, WebviewWindowBuilder};
 

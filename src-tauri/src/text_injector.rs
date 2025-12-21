@@ -1,12 +1,31 @@
-// TextInjector module handles injecting transcribed text into the currently active application
-// 
-// This module uses cross-platform Rust crates to insert text at the current cursor position:
-// - arboard: Cross-platform clipboard management (macOS, Windows, Linux/X11)
-// - AppleScript: Keyboard event simulation on macOS (via osascript)
-// - enigo: Cross-platform keyboard event simulation (Windows, Linux)
-// 
-// The injection method uses clipboard + paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere),
-// which works across all applications. This requires Accessibility permission on macOS.
+//! Text Injector Module
+//!
+//! This module handles injecting transcribed text into the currently active application
+//! at the current cursor position. It uses a clipboard + paste keystroke approach that
+//! works across all applications and platforms.
+//!
+//! ## Implementation Strategy
+//!
+//! The injection method uses a two-step process:
+//! 1. **Clipboard**: Copy the text to the system clipboard using `arboard`
+//! 2. **Paste Keystroke**: Simulate the paste keyboard shortcut
+//!    - macOS: Cmd+V (via AppleScript)
+//!    - Windows/Linux: Ctrl+V (via `enigo`)
+//!
+//! This approach is more reliable than direct text injection because:
+//! - Works in all applications (browsers, text editors, terminals, etc.)
+//! - Respects application-specific paste behavior
+//! - Doesn't require low-level window manipulation
+//!
+//! ## Dependencies
+//!
+//! - **arboard**: Cross-platform clipboard management (macOS, Windows, Linux/X11)
+//! - **AppleScript** (macOS): Keyboard event simulation via `osascript`
+//! - **enigo** (Windows/Linux): Cross-platform keyboard event simulation
+//!
+//! ## Permissions Required
+//!
+//! - **Accessibility** (macOS): Required for AppleScript keyboard simulation
 
 use std::error::Error;
 use std::process::Command;

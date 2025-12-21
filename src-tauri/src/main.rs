@@ -1,14 +1,42 @@
+//! Lexi AI Client - Main Application Entry Point
+//!
+//! This is the main entry point for the Lexi AI Tauri application, a voice-to-text desktop app
+//! that enables users to record audio and have it automatically transcribed and inserted into
+//! any active text field using a global hotkey.
+//!
+//! ## Core Functionality
+//!
+//! The application provides the following features:
+//!
+//! 1. **Global Hotkey Monitoring**: Listens for configurable hotkey press/release events
+//!    (default: Function key) via `rdev` to start/stop audio recording system-wide
+//! 2. **Audio Recording**: Captures audio from the default microphone using `cpal`
+//!    (Cross-Platform Audio Library) and converts it to WAV format
+//! 3. **Speech-to-Text Transcription**: Sends audio to Lexi AI Server API endpoint
+//!    (server handles Groq's Whisper API integration internally)
+//! 4. **Text Injection**: Injects transcribed text into the currently active application
+//!    using clipboard + paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere)
+//! 5. **Pill Overlay Window**: Manages a small transparent overlay window that displays
+//!    recording status and floats above all windows
+//! 6. **Google OAuth Authentication**: Handles user authentication via Google OAuth 2.0
+//!    with PKCE (Proof Key for Code Exchange) for secure token exchange
+//! 7. **Cursor Context Retrieval**: Retrieves text context at cursor position using
+//!    macOS Accessibility API (for future context-aware features)
+//!
+//! ## Architecture
+//!
+//! - **Frontend**: React + TypeScript UI for settings and status display
+//! - **Backend**: Rust + Tauri for system-level operations (audio, hotkeys, text injection)
+//! - **Server**: Lexi AI Server (separate service) handles transcription via Groq API
+//!
+//! ## Permissions Required (macOS)
+//!
+//! - **Microphone**: For audio recording
+//! - **Input Monitoring**: For global keyboard event listening (rdev)
+//! - **Accessibility**: For text injection and cursor context retrieval
+
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
-// This is the main entry point for the Lexi AI Tauri application.
-// The application provides a voice-to-text overlay that:
-// 1. Listens for Function key (fn) press/release via global keyboard listener to start/stop audio recording
-// 2. Captures audio from the default microphone using cpal (Cross-Platform Audio Library)
-// 3. Transcribes the audio using Lexi AI Server API endpoint (server handles Groq's Whisper API integration)
-// 4. Injects the transcribed text into the currently active application using clipboard + paste keystroke
-// 5. Manages a pill overlay window that displays recording status
-// 6. Handles Google OAuth authentication with PKCE for user authentication
 
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -18,15 +46,15 @@ use tokio::sync::watch;
 use serde_json;
 
 // Module declarations for core functionality
-mod audio_recorder;  // Handles audio capture from default microphone using cpal, converts to WAV format
-mod stt_service;     // Communicates with Lexi AI Server API for speech-to-text transcription (server uses Groq)
-mod text_injector;   // Injects transcribed text into active application via clipboard + paste keystroke (rdev/enigo)
-mod global_key_listener;  // Handles global keyboard event listening via rdev, triggers recording on Function key
-mod permissions;     // Handles permission requests and checks for microphone, input monitoring, and accessibility (macOS)
-mod pill;           // Handles pill overlay window creation, positioning, and visibility management
-mod cursor_context;  // Handles cursor context retrieval using macOS Accessibility API (AXUIElement)
-mod google_oauth;   // Handles Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
-mod config;         // Handles application configuration (API base URL, OAuth redirect URI)
+mod audio_recorder;      // Audio capture from default microphone using cpal, converts to WAV format
+mod stt_service;         // HTTP client for Lexi AI Server API (speech-to-text transcription)
+mod text_injector;       // Text injection into active application via clipboard + paste keystroke
+mod global_key_listener; // Global keyboard event monitoring via rdev with configurable hotkey support
+mod permissions;         // macOS permission requests and checks (microphone, input monitoring, accessibility)
+mod pill;                // Pill overlay window creation, positioning, and visibility management
+mod cursor_context;      // Cursor context retrieval using macOS Accessibility API (AXUIElement)
+mod google_oauth;        // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
+mod config;              // Application configuration (API base URL, OAuth redirect URI)
 
 use audio_recorder::AudioRecorder;
 use stt_service::SttService;

@@ -1,13 +1,35 @@
-// Permissions module for handling macOS system permission requests and checks
-// 
-// This module provides Tauri commands to request and check system permissions required
-// for the application to function:
-// - Microphone permission: Required for audio recording (triggers dialog via AudioRecorder)
-// - Input Monitoring permission: Required for global keyboard listener (rdev) to work
-// - Accessibility permission: Required for text injection and cursor context retrieval
-// 
-// On non-macOS platforms, these functions return true as permissions are typically
-// handled differently or not required.
+//! Permissions Module
+//!
+//! This module provides Tauri commands to request and check macOS system permissions
+//! required for the application to function properly.
+//!
+//! ## Required Permissions
+//!
+//! 1. **Microphone Permission**
+//!    - Required for: Audio recording via `AudioRecorder`
+//!    - Triggered by: Attempting to access the default input device
+//!    - System Location: Privacy & Security → Microphone
+//!
+//! 2. **Input Monitoring Permission**
+//!    - Required for: Global keyboard event listening via `rdev::listen`
+//!    - Triggered by: Starting the keyboard listener
+//!    - System Location: Privacy & Security → Input Monitoring
+//!
+//! 3. **Accessibility Permission**
+//!    - Required for: Text injection (AppleScript) and cursor context retrieval (AXUIElement)
+//!    - Triggered by: Using System Events or Accessibility API
+//!    - System Location: Privacy & Security → Accessibility
+//!
+//! ## Platform Support
+//!
+//! - **macOS**: Full permission checking and requesting support
+//! - **Other Platforms**: Functions return `true` (permissions handled differently or not required)
+//!
+//! ## Implementation Notes
+//!
+//! Permission checks are simplified and may not be 100% accurate. In production, you might
+//! want to use platform-specific APIs (e.g., AVFoundation for microphone on macOS) for
+//! more reliable permission status checking.
 
 use tauri::AppHandle;
 
