@@ -1,9 +1,30 @@
-// OAuth module for handling Google OAuth authentication with PKCE
-// 
-// This module provides a secure OAuth 2.0 authentication flow using PKCE (Proof Key for Code Exchange).
-// It generates cryptographically secure verifiers and challenges, builds Google OAuth authorization URLs,
-// opens the browser for user authentication, and stores PKCE verifiers in state for later token exchange.
-// The OAuth callback is handled by the Lexi AI Server UI route, not a local callback server.
+//! Google OAuth Authentication Module
+//!
+//! This module provides a secure OAuth 2.0 authentication flow using PKCE (Proof Key for Code Exchange)
+//! for user authentication with Google accounts.
+//!
+//! ## OAuth Flow
+//!
+//! 1. **Generate PKCE Challenge/Verifier**: Creates cryptographically secure verifier and challenge pair
+//! 2. **Generate State**: Creates random state string for CSRF protection
+//! 3. **Build Authorization URL**: Constructs Google OAuth authorization URL with PKCE parameters
+//! 4. **Open Browser**: Opens the authorization URL in the user's default browser
+//! 5. **Store Verifier**: Stores PKCE verifier in application state for later token exchange
+//! 6. **Callback Handling**: OAuth callback is handled by the Lexi AI Server UI route (not a local server)
+//!
+//! ## Security Features
+//!
+//! - **PKCE**: Uses Proof Key for Code Exchange for enhanced security (required for public clients)
+//! - **CSRF Protection**: Random state parameter prevents cross-site request forgery attacks
+//! - **Cryptographically Secure**: Uses `rand` crate for secure random number generation
+//! - **Base64URL Encoding**: Uses URL-safe base64 encoding for challenge/verifier
+//!
+//! ## Implementation Details
+//!
+//! - **Verifier Generation**: 64 random bytes, base64url-encoded (43-128 characters)
+//! - **Challenge Generation**: SHA256 hash of verifier, base64url-encoded
+//! - **State Generation**: 32 random bytes, base64url-encoded
+//! - **Token Exchange**: Handled by Lexi AI Server (client retrieves verifier via `get_pkce_verifier` command)
 
 use std::collections::HashMap;
 use std::sync::Mutex;

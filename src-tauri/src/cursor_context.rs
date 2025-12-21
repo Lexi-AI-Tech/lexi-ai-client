@@ -1,18 +1,32 @@
-//! Cursor context retrieval using macOS Accessibility API
-//! 
-//! This module provides functionality to get text context at the cursor position
+//! Cursor Context Retrieval Module
+//!
+//! This module provides functionality to retrieve text context at the cursor position
 //! in the currently focused application using the macOS Accessibility API (AXUIElement).
-//! 
-//! Implementation details:
-//! - Uses NSWorkspace to get the frontmost application (PID and name)
-//! - Creates an AXUIElement for the application to access its accessibility tree
-//! - Enables enhanced UI mode for Chromium/Electron apps (handles lazy tree building)
-//! - Polls for focused UI element (handles async accessibility tree construction)
-//! - Extracts selected text via AXSelectedText attribute
-//! - Falls back to AXValue attribute if no selection is available
-//! - Uses CoreFoundation (CFString) for string conversion between C and Rust
-//! 
-//! Requires Accessibility permission on macOS. Returns None on non-macOS platforms.
+//!
+//! ## Features
+//!
+//! - **Application Detection**: Gets the frontmost application using NSWorkspace (PID and name)
+//! - **Accessibility Tree Access**: Creates an AXUIElement to access the application's UI tree
+//! - **Enhanced UI Mode**: Enables enhanced UI mode for Chromium/Electron apps to handle lazy tree building
+//! - **Focused Element Detection**: Polls for the focused UI element (handles async accessibility tree construction)
+//! - **Text Extraction**: Extracts selected text via `AXSelectedText` attribute, falls back to `AXValue` if no selection
+//!
+//! ## Implementation Details
+//!
+//! - Uses **NSWorkspace** to get the frontmost application (PID and name)
+//! - Creates an **AXUIElement** for the application to access its accessibility tree
+//! - Enables **AXEnhancedUserInterface** and **AXManualAccessibility** for Chromium/Electron apps
+//! - Polls for focused UI element (up to 5 retries with 10ms delays) to handle lazy tree building
+//! - Uses **CoreFoundation (CFString)** for string conversion between C and Rust
+//!
+//! ## Permissions Required
+//!
+//! - **Accessibility** (macOS): Required for accessing application UI elements
+//!
+//! ## Platform Support
+//!
+//! - **macOS**: Full functionality via Accessibility API
+//! - **Other Platforms**: Returns `None` (not supported)
 
 // Suppress warnings from objc crate's msg_send! macro about unexpected cfg conditions
 #![allow(unexpected_cfgs)]

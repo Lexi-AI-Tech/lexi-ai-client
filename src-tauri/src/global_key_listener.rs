@@ -1,9 +1,27 @@
-// Global keyboard listener module using rdev
-// 
-// This module provides global keyboard event monitoring that works system-wide,
-// even when the application is not in focus. It listens for configurable hotkey
-// press/release events to trigger audio recording start/stop. All keyboard events
-// are also emitted to the frontend for debugging purposes.
+//! Global Keyboard Listener Module
+//!
+//! This module provides system-wide keyboard event monitoring using the `rdev` crate.
+//! It listens for configurable hotkey press/release events to trigger audio recording
+//! start/stop, even when the application is not in focus.
+//!
+//! ## Features
+//!
+//! - **Configurable Hotkeys**: Supports any key or key combination (e.g., "Fn", "Ctrl+Shift+P", "Cmd+K")
+//! - **Dynamic Configuration**: Hotkey can be changed at runtime without restarting the listener
+//! - **Modifier Support**: Handles Command, Control, Option/Alt, and Shift modifiers
+//! - **Hotkey Recording Mode**: Emits key events to frontend for interactive hotkey selection
+//! - **Debouncing**: Prevents rapid trigger events from causing multiple recordings
+//!
+//! ## Architecture
+//!
+//! The listener runs in a manager thread that watches for configuration changes.
+//! When the hotkey config changes, it shuts down the old `rdev::listen` thread and
+//! spawns a new one with the updated configuration. This allows hotkey changes without
+//! restarting the entire application.
+//!
+//! ## Permissions Required
+//!
+//! - **Input Monitoring** (macOS): Required for `rdev::listen` to work system-wide
 
 use rdev::{listen, Event, EventType, Key};
 use std::sync::{mpsc, Arc, Mutex};
