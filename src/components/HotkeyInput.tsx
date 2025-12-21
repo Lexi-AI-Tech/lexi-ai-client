@@ -10,15 +10,49 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 export interface HotkeyConfig {
-  key: string;
-  alt_code?: number;
-  modifiers: {
-    cmd: boolean;
-    shift: boolean;
-    alt: boolean;
-    ctrl: boolean;
-  };
+  hotkey: string; // Human-readable format like "Ctrl+Shift+P"
 }
+
+// Helper to build hotkey string from key and modifiers
+function buildHotkeyString(key: string, modifiers: { cmd: boolean; ctrl: boolean; alt: boolean; shift: boolean }): string {
+  const parts: string[] = [];
+  
+  if (modifiers.cmd) parts.push('Cmd');
+  if (modifiers.ctrl) parts.push('Ctrl');
+  if (modifiers.alt) parts.push('Option');
+  if (modifiers.shift) parts.push('Shift');
+  
+  let keyDisplay = key;
+  if (keyDisplay.startsWith('Key')) {
+    keyDisplay = keyDisplay.substring(3);
+  } else if (keyDisplay.startsWith('Num')) {
+    keyDisplay = keyDisplay.substring(3);
+  } else if (keyDisplay === 'MetaLeft' || keyDisplay === 'MetaRight') {
+    keyDisplay = 'Cmd';
+  } else if (keyDisplay === 'ControlLeft' || keyDisplay === 'ControlRight') {
+    keyDisplay = 'Ctrl';
+  } else if (keyDisplay === 'Alt') {
+    keyDisplay = 'Option';
+  } else if (keyDisplay === 'ShiftLeft' || keyDisplay === 'ShiftRight') {
+    keyDisplay = 'Shift';
+  } else if (keyDisplay === 'Function') {
+    keyDisplay = 'Fn';
+  } else if (keyDisplay === 'Return') {
+    keyDisplay = 'Enter';
+  } else if (keyDisplay === 'UpArrow') {
+    keyDisplay = 'Up';
+  } else if (keyDisplay === 'DownArrow') {
+    keyDisplay = 'Down';
+  } else if (keyDisplay === 'LeftArrow') {
+    keyDisplay = 'Left';
+  } else if (keyDisplay === 'RightArrow') {
+    keyDisplay = 'Right';
+  }
+  parts.push(keyDisplay);
+  
+  return parts.join('+');
+}
+
 
 interface HotkeyInputProps {
   value: HotkeyConfig;
@@ -68,45 +102,17 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateDisplayText = useCallback((config: HotkeyConfig) => {
-    const parts: string[] = [];
-    
-    if (config.modifiers.cmd) {
-      parts.push('⌘');
-    }
-    if (config.modifiers.ctrl) {
-      parts.push('⌃');
-    }
-    if (config.modifiers.alt) {
-      parts.push('⌥');
-    }
-    if (config.modifiers.shift) {
-      parts.push('⇧');
-    }
-
-    // Format the main key
-    let keyDisplay = config.key;
-    if (keyDisplay.startsWith('Key')) {
-      keyDisplay = keyDisplay.substring(3); // Remove "Key" prefix
-    } else if (keyDisplay.startsWith('Num')) {
-      keyDisplay = keyDisplay.substring(3); // Remove "Num" prefix
-    } else if (keyDisplay === 'Space') {
-      keyDisplay = 'Space';
-    } else if (keyDisplay === 'Return') {
-      keyDisplay = 'Enter';
-    } else if (keyDisplay === 'MetaLeft' || keyDisplay === 'MetaRight') {
-      keyDisplay = '⌘';
-    } else if (keyDisplay === 'ControlLeft' || keyDisplay === 'ControlRight') {
-      keyDisplay = '⌃';
-    } else if (keyDisplay === 'Alt') {
-      keyDisplay = '⌥';
-    } else if (keyDisplay === 'ShiftLeft' || keyDisplay === 'ShiftRight') {
-      keyDisplay = '⇧';
-    } else if (keyDisplay === 'Function') {
-      keyDisplay = 'Fn';
-    }
-
-    parts.push(keyDisplay);
-    setDisplayText(parts.join(' + '));
+    const parts = config.hotkey.split('+').map(p => p.trim());
+    const displayParts = parts.map(part => {
+      const partLower = part.toLowerCase();
+      if (partLower === 'cmd' || partLower === 'command') return '⌘';
+      if (partLower === 'ctrl' || partLower === 'control') return '⌃';
+      if (partLower === 'alt' || partLower === 'option') return '⌥';
+      if (partLower === 'shift') return '⇧';
+      if (partLower === 'fn' || partLower === 'function') return 'Fn';
+      return part;
+    });
+    setDisplayText(displayParts.join(' + '));
   }, []);
 
   // Update display text when value changes
@@ -242,10 +248,9 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
     // If a non-modifier key is pressed, finalize immediately
     // This allows combinations like Cmd+K to be captured properly
     if (!isCurrentKeyModifier) {
+      const hotkeyStr = buildHotkeyString(mappedKey, modifiers);
       const newConfig: HotkeyConfig = {
-        key: mappedKey,
-        alt_code: mappedKey === 'Function' ? 179 : undefined,
-        modifiers,
+        hotkey: hotkeyStr,
       };
 
       onChange(newConfig);
@@ -258,10 +263,9 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
       timeoutRef.current = setTimeout(() => {
         if (pendingKeyRef.current) {
           // Timeout fired - treat as modifier-only hotkey
+          const hotkeyStr = buildHotkeyString(pendingKeyRef.current.key, pendingKeyRef.current.modifiers);
           const newConfig: HotkeyConfig = {
-            key: pendingKeyRef.current.key,
-            alt_code: pendingKeyRef.current.key === 'Function' ? 179 : undefined,
-            modifiers: pendingKeyRef.current.modifiers,
+            hotkey: hotkeyStr,
           };
 
           onChange(newConfig);
@@ -334,10 +338,9 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
           // Wait to see if user wants modifier-only or modifier+key
           timeoutRef.current = setTimeout(() => {
             if (pendingKeyRef.current) {
+              const hotkeyStr = buildHotkeyString(pendingKeyRef.current.key, pendingKeyRef.current.modifiers);
               const newConfig: HotkeyConfig = {
-                key: pendingKeyRef.current.key,
-                alt_code: pendingKeyRef.current.key === 'Function' ? 179 : undefined,
-                modifiers: pendingKeyRef.current.modifiers,
+                hotkey: hotkeyStr,
               };
               
               onChange(newConfig);
@@ -348,10 +351,9 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
           }, 800);
         } else {
           // Non-modifier key - finalize immediately
+          const hotkeyStr = buildHotkeyString(mappedKey, modifiers);
           const newConfig: HotkeyConfig = {
-            key: mappedKey,
-            alt_code: mappedKey === 'Function' ? 179 : undefined,
-            modifiers,
+            hotkey: hotkeyStr,
           };
           
           onChange(newConfig);
@@ -396,10 +398,9 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
     
     // If there's a pending key, process it now
     if (pendingKeyRef.current) {
+      const hotkeyStr = buildHotkeyString(pendingKeyRef.current.key, pendingKeyRef.current.modifiers);
       const newConfig: HotkeyConfig = {
-        key: pendingKeyRef.current.key,
-        alt_code: pendingKeyRef.current.key === 'Function' ? 179 : undefined,
-        modifiers: pendingKeyRef.current.modifiers,
+        hotkey: hotkeyStr,
       };
       onChange(newConfig);
       pendingKeyRef.current = null;
