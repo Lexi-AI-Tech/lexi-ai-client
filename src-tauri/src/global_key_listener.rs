@@ -68,6 +68,10 @@ fn parse_key(key_str: &str) -> Option<Key> {
         "Control" | "Ctrl" => Some(Key::ControlLeft), // Use ControlLeft as default
         "Option" | "Alt" => Some(Key::Alt),
         "Shift" => Some(Key::ShiftLeft), // Use ShiftLeft as default
+        // Handle rdev Key enum variant names directly (from frontend)
+        "MetaLeft" | "MetaRight" => Some(Key::MetaLeft), // Both map to MetaLeft for matching
+        "ControlLeft" | "ControlRight" => Some(Key::ControlLeft), // Both map to ControlLeft for matching
+        "ShiftLeft" | "ShiftRight" => Some(Key::ShiftLeft), // Both map to ShiftLeft for matching
         _ => {
             // Try to parse as Key enum variant name (e.g., "KeyA", "Space", "Return")
             // This handles all other keys like letters, numbers, etc.
@@ -122,7 +126,18 @@ fn is_trigger_key_event(
             // Parse the config key
             let config_key = parse_key(&config.key);
             let key_matches = match config_key {
-                Some(k) => *key == k,
+                Some(k) => {
+                    // For modifier keys, match both left and right variants
+                    match k {
+                        Key::MetaLeft => matches!(key, Key::MetaLeft | Key::MetaRight),
+                        Key::MetaRight => matches!(key, Key::MetaLeft | Key::MetaRight),
+                        Key::ControlLeft => matches!(key, Key::ControlLeft | Key::ControlRight),
+                        Key::ControlRight => matches!(key, Key::ControlLeft | Key::ControlRight),
+                        Key::ShiftLeft => matches!(key, Key::ShiftLeft | Key::ShiftRight),
+                        Key::ShiftRight => matches!(key, Key::ShiftLeft | Key::ShiftRight),
+                        _ => *key == k,
+                    }
+                },
                 None => {
                     // Try string comparison for keys like "KeyA", "Space", etc.
                     key_to_string(key) == config.key || 
@@ -166,7 +181,18 @@ fn is_trigger_key_event(
             // For release, we check if the main key is released
             let config_key = parse_key(&config.key);
             let key_matches = match config_key {
-                Some(k) => *key == k,
+                Some(k) => {
+                    // For modifier keys, match both left and right variants
+                    match k {
+                        Key::MetaLeft => matches!(key, Key::MetaLeft | Key::MetaRight),
+                        Key::MetaRight => matches!(key, Key::MetaLeft | Key::MetaRight),
+                        Key::ControlLeft => matches!(key, Key::ControlLeft | Key::ControlRight),
+                        Key::ControlRight => matches!(key, Key::ControlLeft | Key::ControlRight),
+                        Key::ShiftLeft => matches!(key, Key::ShiftLeft | Key::ShiftRight),
+                        Key::ShiftRight => matches!(key, Key::ShiftLeft | Key::ShiftRight),
+                        _ => *key == k,
+                    }
+                },
                 None => {
                     key_to_string(key) == config.key || 
                     matches!(config.alt_code, Some(code) if *key == Key::Unknown(code))
