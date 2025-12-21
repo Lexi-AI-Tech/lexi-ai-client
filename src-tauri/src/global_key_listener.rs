@@ -63,6 +63,11 @@ fn parse_key(key_str: &str) -> Option<Key> {
         "F10" => Some(Key::F10),
         "F11" => Some(Key::F11),
         "F12" => Some(Key::F12),
+        // Handle normalized modifier names from key_to_string
+        "Command" | "Cmd" => Some(Key::MetaLeft), // Use MetaLeft as default
+        "Control" | "Ctrl" => Some(Key::ControlLeft), // Use ControlLeft as default
+        "Option" | "Alt" => Some(Key::Alt),
+        "Shift" => Some(Key::ShiftLeft), // Use ShiftLeft as default
         _ => {
             // Try to parse as Key enum variant name (e.g., "KeyA", "Space", "Return")
             // This handles all other keys like letters, numbers, etc.
@@ -106,7 +111,7 @@ fn get_modifier_state(pressed_keys: &HashSet<Key>) -> ModifierFlags {
 }
 
 /// Checks if the event is a trigger key press/release using the current config
-/// This now checks for modifier combinations
+/// Supports any key or key combination, including modifier-only hotkeys
 fn is_trigger_key_event(
     event_type: &EventType,
     config: &HotkeyConfig,
@@ -125,13 +130,33 @@ fn is_trigger_key_event(
                 }
             };
 
-            if key_matches && !is_modifier_key(key) {
-                // Check if modifiers match
+            if key_matches {
+                // Get current modifier state
                 let current_modifiers = get_modifier_state(pressed_keys);
-                if current_modifiers.cmd == config.modifiers.cmd &&
-                   current_modifiers.shift == config.modifiers.shift &&
-                   current_modifiers.alt == config.modifiers.alt &&
-                   current_modifiers.ctrl == config.modifiers.ctrl {
+                
+                // Determine what the primary key is (for modifier exclusion)
+                let is_primary_key_modifier = is_modifier_key(key);
+                
+                // Build expected modifier state, excluding the primary key if it's a modifier
+                let mut expected_modifiers = config.modifiers.clone();
+                
+                // If the primary key is a modifier, exclude it from the expected modifiers
+                // (e.g., if Option is the primary key, don't also require it in modifiers)
+                if is_primary_key_modifier {
+                    match key {
+                        Key::MetaLeft | Key::MetaRight => expected_modifiers.cmd = false,
+                        Key::ShiftLeft | Key::ShiftRight => expected_modifiers.shift = false,
+                        Key::Alt => expected_modifiers.alt = false,
+                        Key::ControlLeft | Key::ControlRight => expected_modifiers.ctrl = false,
+                        _ => {}
+                    }
+                }
+                
+                // Check if modifiers match
+                if current_modifiers.cmd == expected_modifiers.cmd &&
+                   current_modifiers.shift == expected_modifiers.shift &&
+                   current_modifiers.alt == expected_modifiers.alt &&
+                   current_modifiers.ctrl == expected_modifiers.ctrl {
                     return Some(RecordingCommand::Start);
                 }
             }
@@ -148,9 +173,8 @@ fn is_trigger_key_event(
                 }
             };
 
-            if key_matches && !is_modifier_key(key) {
+            if key_matches {
                 // On release, check if modifiers still match (they might be released after)
-                let _current_modifiers = get_modifier_state(pressed_keys);
                 // For release, we're more lenient - if the main key is released, trigger stop
                 // even if modifiers are already released
                 return Some(RecordingCommand::Stop);
