@@ -65,7 +65,7 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
   const inputRef = useRef<HTMLDivElement>(null);
   const [rustRecordingActive, setRustRecordingActive] = useState(false);
   const pendingKeyRef = useRef<{ key: string; modifiers: { cmd: boolean; ctrl: boolean; alt: boolean; shift: boolean } } | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateDisplayText = useCallback((config: HotkeyConfig) => {
     const parts: string[] = [];
@@ -239,29 +239,43 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
       clearTimeout(timeoutRef.current);
     }
 
-    // Wait a bit to see if more modifiers are pressed (for combinations like Cmd+Shift)
-    // This gives time for the user to press multiple modifiers
-    timeoutRef.current = setTimeout(() => {
-      if (pendingKeyRef.current) {
-        const newConfig: HotkeyConfig = {
-          key: pendingKeyRef.current.key,
-          alt_code: pendingKeyRef.current.key === 'Function' ? 179 : undefined,
-          modifiers: pendingKeyRef.current.modifiers,
-        };
+    // If a non-modifier key is pressed, finalize immediately
+    // This allows combinations like Cmd+K to be captured properly
+    if (!isCurrentKeyModifier) {
+      const newConfig: HotkeyConfig = {
+        key: mappedKey,
+        alt_code: mappedKey === 'Function' ? 179 : undefined,
+        modifiers,
+      };
 
-        onChange(newConfig);
-        setIsCapturing(false);
-        pendingKeyRef.current = null;
-      }
-    }, 150); // 150ms delay to capture modifier combinations
+      onChange(newConfig);
+      setIsCapturing(false);
+      pendingKeyRef.current = null;
+    } else {
+      // Modifier key pressed - wait to see if user wants:
+      // 1. Modifier-only hotkey (wait for timeout)
+      // 2. Modifier + key combination (wait for non-modifier key)
+      timeoutRef.current = setTimeout(() => {
+        if (pendingKeyRef.current) {
+          // Timeout fired - treat as modifier-only hotkey
+          const newConfig: HotkeyConfig = {
+            key: pendingKeyRef.current.key,
+            alt_code: pendingKeyRef.current.key === 'Function' ? 179 : undefined,
+            modifiers: pendingKeyRef.current.modifiers,
+          };
+
+          onChange(newConfig);
+          setIsCapturing(false);
+          pendingKeyRef.current = null;
+        }
+      }, 800); // Wait 800ms for modifier-only hotkeys (gives time to press another key)
+    }
   }, [disabled, isCapturing, onChange]);
 
   // Listen for hotkey events from Rust (for Fn key and other special keys)
   // This takes priority over browser events for better detection
   useEffect(() => {
     if (!isCapturing || disabled) return;
-
-    let rustEventReceived = false;
 
     const setupListener = async () => {
       try {
@@ -274,7 +288,6 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
 
       const unlisten = await listen<{ key: string; modifiers: string[] }>('hotkey-recorded', (event) => {
         console.log('Hotkey recorded from Rust:', event.payload);
-        rustEventReceived = true;
         
         const rustKey = event.payload.key;
         const rustModifiers = event.payload.modifiers;
@@ -301,15 +314,51 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({ value, onChange, disab
           mappedKey = 'Function';
         }
         
-        const newConfig: HotkeyConfig = {
-          key: mappedKey,
-          alt_code: mappedKey === 'Function' ? 179 : undefined,
-          modifiers,
-        };
+        // Check if this is a modifier key
+        const isModifier = ['MetaLeft', 'ControlLeft', 'Alt', 'ShiftLeft'].includes(mappedKey);
         
-        onChange(newConfig);
-        setIsCapturing(false);
-        setRustRecordingActive(false);
+        // If it's a modifier, store it and wait for a non-modifier key
+        // If it's a non-modifier, finalize immediately
+        if (isModifier) {
+          // Store pending modifier combination
+          pendingKeyRef.current = {
+            key: mappedKey,
+            modifiers,
+          };
+          
+          // Clear existing timeout
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+          
+          // Wait to see if user wants modifier-only or modifier+key
+          timeoutRef.current = setTimeout(() => {
+            if (pendingKeyRef.current) {
+              const newConfig: HotkeyConfig = {
+                key: pendingKeyRef.current.key,
+                alt_code: pendingKeyRef.current.key === 'Function' ? 179 : undefined,
+                modifiers: pendingKeyRef.current.modifiers,
+              };
+              
+              onChange(newConfig);
+              setIsCapturing(false);
+              setRustRecordingActive(false);
+              pendingKeyRef.current = null;
+            }
+          }, 800);
+        } else {
+          // Non-modifier key - finalize immediately
+          const newConfig: HotkeyConfig = {
+            key: mappedKey,
+            alt_code: mappedKey === 'Function' ? 179 : undefined,
+            modifiers,
+          };
+          
+          onChange(newConfig);
+          setIsCapturing(false);
+          setRustRecordingActive(false);
+          pendingKeyRef.current = null;
+        }
       });
 
       return unlisten;
