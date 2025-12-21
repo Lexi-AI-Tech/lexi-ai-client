@@ -10,6 +10,7 @@ import { OnboardingFlow } from './components/onboarding/OnboardingFlow'
 import { useOnboardingStore } from './store/onboardingStore'
 import { useAuthStore } from './store/authStore'
 import { TranscriptsList } from './components/TranscriptsList'
+import { HotkeySettings } from './components/HotkeySettings'
 
 function App() {
   // Check if onboarding is completed
@@ -36,10 +37,11 @@ function App() {
     return <OnboardingFlow />;
   }
 
-  // Render only the transcripts list
+  // Render transcripts list and hotkey settings
   return (
     <div className="app">
       <div className="container">
+        <HotkeySettings />
         <TranscriptsList />
       </div>
     </div>
