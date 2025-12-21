@@ -35,11 +35,6 @@ pub struct ModifierFlags {
     pub ctrl: bool,
 }
 
-impl ModifierFlags {
-    pub fn is_empty(&self) -> bool {
-        !self.cmd && !self.shift && !self.alt && !self.ctrl
-    }
-}
 
 /// Helper to convert keyboard EventType to a string for frontend emission
 /// Only handles keyboard events (KeyPress and KeyRelease)
@@ -148,7 +143,7 @@ fn is_trigger_key_event(
 
             if key_matches && !is_modifier_key(key) {
                 // On release, check if modifiers still match (they might be released after)
-                let current_modifiers = get_modifier_state(pressed_keys);
+                let _current_modifiers = get_modifier_state(pressed_keys);
                 // For release, we're more lenient - if the main key is released, trigger stop
                 // even if modifiers are already released
                 return Some(RecordingCommand::Stop);
@@ -168,13 +163,20 @@ fn is_trigger_key_event(
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
 /// * `recording_tx` - Channel sender to signal start/stop recording
 /// * `config_rx` - Watch receiver for hotkey config changes
-pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<RecordingCommand>, mut config_rx: watch::Receiver<HotkeyConfig>) {
+/// * `recording_state` - Shared state to check if we're in hotkey recording mode
+pub fn start_listener(
+    app: AppHandle, 
+    recording_tx: mpsc::Sender<RecordingCommand>, 
+    mut config_rx: watch::Receiver<HotkeyConfig>,
+    recording_state: Arc<Mutex<bool>>
+) {
     // Manager thread: Watches config, restarts listener on change
     std::thread::spawn(move || {
         let debounce_time = Arc::new(Mutex::new(Instant::now()));
         let debounce_duration = Duration::from_millis(50);
         let app_clone = app.clone();
         let recording_tx_clone = recording_tx.clone();
+        let recording_state_clone = recording_state.clone();
 
         loop {
             // Get current config
@@ -187,6 +189,7 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<RecordingComman
             let debounce_clone = debounce_time.clone();
             let app_for_callback = app_clone.clone();
             let recording_tx_for_callback = recording_tx_clone.clone();
+            let recording_state_for_callback = recording_state_clone.clone();
 
             // Spawn the actual rdev listener thread
             let listener_thread = std::thread::spawn(move || {
@@ -199,10 +202,40 @@ pub fn start_listener(app: AppHandle, recording_tx: mpsc::Sender<RecordingComman
                         return;  // Early exit if shutdown signaled
                     }
 
+                    // Check if we're in hotkey recording mode
+                    let is_recording = recording_state_for_callback.lock().map(|guard| *guard).unwrap_or(false);
+                    
                     // Update pressed keys set
                     match event.event_type {
                         EventType::KeyPress(ref key) => {
                             pressed_keys_clone.lock().unwrap().insert(key.clone());
+                            
+                            // If in recording mode, emit key events to frontend
+                            if is_recording {
+                                let key_str = key_to_string(key);
+                                let modifier_state = get_modifier_state(&pressed_keys_clone.lock().unwrap());
+                                
+                                // Build modifiers list, excluding the current key if it's a modifier
+                                let mut modifiers = Vec::new();
+                                if modifier_state.shift && key_str != "Shift" {
+                                    modifiers.push("Shift".to_string());
+                                }
+                                if modifier_state.ctrl && key_str != "Control" {
+                                    modifiers.push("Control".to_string());
+                                }
+                                if modifier_state.alt && key_str != "Option" {
+                                    modifiers.push("Option".to_string());
+                                }
+                                if modifier_state.cmd && key_str != "Command" {
+                                    modifiers.push("Command".to_string());
+                                }
+                                
+                                // Emit hotkey recording event
+                                let _ = app_for_callback.emit("hotkey-recorded", serde_json::json!({
+                                    "key": key_str,
+                                    "modifiers": modifiers
+                                }));
+                            }
                         }
                         EventType::KeyRelease(ref key) => {
                             pressed_keys_clone.lock().unwrap().remove(key);

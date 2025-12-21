@@ -10,7 +10,7 @@
 // 5. Manages a pill overlay window that displays recording status
 // 6. Handles Google OAuth authentication with PKCE for user authentication
 
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
 use tauri::{AppHandle, Manager, Emitter};
@@ -43,7 +43,6 @@ use permissions::{
 };
 
 use google_oauth::{OAuthState, start_google_login, get_pkce_verifier};
-use std::sync::Mutex;
 
 /// Command to control recording state
 #[derive(Debug, Clone, Copy)]
@@ -67,6 +66,11 @@ struct TranscriptionTaskState {
 
 /// State for watch sender (to broadcast config changes)
 struct HotkeyWatchState(watch::Sender<HotkeyConfig>);
+
+/// Hotkey recording state - tracks if we're in recording mode for hotkey selection
+struct HotkeyRecordingState {
+    is_recording: Arc<Mutex<bool>>,
+}
 
 /// Set the authentication token from frontend
 /// 
@@ -151,6 +155,24 @@ fn update_hotkey(config_json: String, app: AppHandle, state: tauri::State<Hotkey
 fn get_current_hotkey(state: tauri::State<HotkeyWatchState>) -> String {
     let config = state.0.borrow().clone();
     serde_json::to_string(&config).unwrap_or_else(|_| "{}".to_string())
+}
+
+/// Start hotkey recording mode - enables key event emission for hotkey selection
+#[tauri::command]
+fn start_hotkey_recording(state: tauri::State<HotkeyRecordingState>) {
+    if let Ok(mut recording) = state.is_recording.lock() {
+        *recording = true;
+        println!("🎹 Started hotkey recording mode");
+    }
+}
+
+/// Stop hotkey recording mode
+#[tauri::command]
+fn stop_hotkey_recording(state: tauri::State<HotkeyRecordingState>) {
+    if let Ok(mut recording) = state.is_recording.lock() {
+        *recording = false;
+        println!("🎹 Stopped hotkey recording mode");
+    }
 }
 
 // Re-export pill functions as Tauri commands
@@ -311,7 +333,9 @@ pub fn main() {
             get_pkce_verifier,
             set_auth_token,
             update_hotkey,
-            get_current_hotkey
+            get_current_hotkey,
+            start_hotkey_recording,
+            stop_hotkey_recording
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
@@ -344,11 +368,17 @@ pub fn main() {
                 modifiers: global_key_listener::ModifierFlags::default(),
             };
             let (config_tx, config_rx) = watch::channel(initial_config);
+            
+            // Create recording state and manage it
+            let recording_state_arc = Arc::new(Mutex::new(false));
             app.manage(HotkeyWatchState(config_tx));
+            app.manage(HotkeyRecordingState {
+                is_recording: recording_state_arc.clone(),
+            });
             
             // Start the global input listener (rdev) in a background thread
             // Pass the channel sender and config receiver so it can trigger recording on hotkey press/release
-            global_key_listener::start_listener(app_handle.clone(), recording_tx, config_rx);
+            global_key_listener::start_listener(app_handle.clone(), recording_tx, config_rx, recording_state_arc);
 
             let window = app.get_webview_window("main").unwrap();
             
