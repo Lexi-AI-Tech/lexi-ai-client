@@ -73,9 +73,16 @@ fn parse_key(key_str: &str) -> Option<Key> {
     }
 }
 
-/// Convert rdev Key to string representation
+/// Convert rdev Key to string representation for frontend
+/// Normalizes key names to match frontend expectations
 fn key_to_string(key: &Key) -> String {
-    format!("{:?}", key)
+    match key {
+        Key::MetaLeft | Key::MetaRight => "Command".to_string(),
+        Key::ControlLeft | Key::ControlRight => "Control".to_string(),
+        Key::Alt => "Option".to_string(),
+        Key::ShiftLeft | Key::ShiftRight => "Shift".to_string(),
+        _ => format!("{:?}", key),
+    }
 }
 
 /// Check if a key is a modifier key
@@ -217,16 +224,17 @@ pub fn start_listener(
                                 
                                 // Build modifiers list, excluding the current key if it's a modifier
                                 let mut modifiers = Vec::new();
-                                if modifier_state.shift && key_str != "Shift" {
+                                // Only add modifiers if they're pressed AND the current key is not that modifier
+                                if modifier_state.shift && !matches!(key, Key::ShiftLeft | Key::ShiftRight) {
                                     modifiers.push("Shift".to_string());
                                 }
-                                if modifier_state.ctrl && key_str != "Control" {
+                                if modifier_state.ctrl && !matches!(key, Key::ControlLeft | Key::ControlRight) {
                                     modifiers.push("Control".to_string());
                                 }
-                                if modifier_state.alt && key_str != "Option" {
+                                if modifier_state.alt && !matches!(key, Key::Alt) {
                                     modifiers.push("Option".to_string());
                                 }
-                                if modifier_state.cmd && key_str != "Command" {
+                                if modifier_state.cmd && !matches!(key, Key::MetaLeft | Key::MetaRight) {
                                     modifiers.push("Command".to_string());
                                 }
                                 
