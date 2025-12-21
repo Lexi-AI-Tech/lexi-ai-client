@@ -363,9 +363,7 @@ pub fn main() {
             
             // Create watch channel with initial config (Function key default)
             let initial_config = HotkeyConfig {
-                key: "Function".to_string(),
-                alt_code: Some(179u32),
-                modifiers: global_key_listener::ModifierFlags::default(),
+                hotkey: "Fn".to_string(),
             };
             let (config_tx, config_rx) = watch::channel(initial_config);
             

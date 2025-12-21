@@ -16,14 +16,85 @@ use serde::{Deserialize, Serialize};
 use crate::RecordingCommand;
 
 /// Configurable hotkey definition with modifier support
+/// Stores hotkey as a human-readable string (e.g., "Ctrl+Shift+P", "Cmd+K", "Option")
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HotkeyConfig {
-    /// Primary key (e.g., Key::F1, Key::KeyA)
-    pub key: String,
-    /// Alternative code for special keys (e.g., 179 for Fn on some macOS)
-    pub alt_code: Option<u32>,
-    /// Modifier keys that must be pressed
-    pub modifiers: ModifierFlags,
+    /// Human-readable hotkey string (e.g., "Ctrl+Shift+P", "Cmd+K", "Option")
+    pub hotkey: String,
+}
+
+impl HotkeyConfig {
+    /// Parse a hotkey string (e.g., "Ctrl+Shift+P") and extract structured key and modifiers for internal use
+    pub fn get_key_and_modifiers(&self) -> (String, Option<u32>, ModifierFlags) {
+        let parts: Vec<&str> = self.hotkey.split('+').map(|s| s.trim()).collect();
+        
+        let mut modifiers = ModifierFlags::default();
+        let mut key = None;
+        let mut alt_code = None;
+        
+        for part in parts {
+            let part_lower = part.to_lowercase();
+            match part_lower.as_str() {
+                "cmd" | "command" | "meta" => modifiers.cmd = true,
+                "ctrl" | "control" => modifiers.ctrl = true,
+                "alt" | "option" => modifiers.alt = true,
+                "shift" => modifiers.shift = true,
+                "fn" | "function" => {
+                    key = Some("Function".to_string());
+                    alt_code = Some(179);
+                }
+                _ => {
+                    // This should be the main key
+                    if key.is_none() {
+                        // Map common key names
+                        key = Some(match part {
+                            "Space" => "Space".to_string(),
+                            "Enter" | "Return" => "Return".to_string(),
+                            "Escape" | "Esc" => "Escape".to_string(),
+                            "Tab" => "Tab".to_string(),
+                            "Backspace" => "Backspace".to_string(),
+                            "Up" | "UpArrow" => "UpArrow".to_string(),
+                            "Down" | "DownArrow" => "DownArrow".to_string(),
+                            "Left" | "LeftArrow" => "LeftArrow".to_string(),
+                            "Right" | "RightArrow" => "RightArrow".to_string(),
+                            _ => {
+                                // Handle function keys
+                                if part.starts_with('F') && part.len() > 1 {
+                                    part.to_string()
+                                } else if part.len() == 1 {
+                                    // Single character key
+                                    format!("Key{}", part.to_uppercase())
+                                } else if part.starts_with("Num") {
+                                    part.to_string()
+                                } else {
+                                    part.to_string()
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        
+        // If no key was found but we have modifiers, the modifier itself is the key
+        if key.is_none() {
+            if modifiers.cmd {
+                key = Some("MetaLeft".to_string());
+            } else if modifiers.ctrl {
+                key = Some("ControlLeft".to_string());
+            } else if modifiers.alt {
+                key = Some("Alt".to_string());
+            } else if modifiers.shift {
+                key = Some("ShiftLeft".to_string());
+            }
+        }
+        
+        (
+            key.unwrap_or_else(|| "Function".to_string()),
+            alt_code,
+            modifiers,
+        )
+    }
 }
 
 /// Modifier key flags
@@ -121,10 +192,13 @@ fn is_trigger_key_event(
     config: &HotkeyConfig,
     pressed_keys: &HashSet<Key>,
 ) -> Option<RecordingCommand> {
+    // Get structured key and modifiers from config
+    let (config_key_str, alt_code, config_modifiers) = config.get_key_and_modifiers();
+    
     match event_type {
         EventType::KeyPress(ref key) => {
             // Parse the config key
-            let config_key = parse_key(&config.key);
+            let config_key = parse_key(&config_key_str);
             let key_matches = match config_key {
                 Some(k) => {
                     // For modifier keys, match both left and right variants
@@ -140,8 +214,8 @@ fn is_trigger_key_event(
                 },
                 None => {
                     // Try string comparison for keys like "KeyA", "Space", etc.
-                    key_to_string(key) == config.key || 
-                    matches!(config.alt_code, Some(code) if *key == Key::Unknown(code))
+                    key_to_string(key) == config_key_str || 
+                    matches!(alt_code, Some(code) if *key == Key::Unknown(code))
                 }
             };
 
@@ -153,7 +227,7 @@ fn is_trigger_key_event(
                 let is_primary_key_modifier = is_modifier_key(key);
                 
                 // Build expected modifier state, excluding the primary key if it's a modifier
-                let mut expected_modifiers = config.modifiers.clone();
+                let mut expected_modifiers = config_modifiers.clone();
                 
                 // If the primary key is a modifier, exclude it from the expected modifiers
                 // (e.g., if Option is the primary key, don't also require it in modifiers)
@@ -179,7 +253,7 @@ fn is_trigger_key_event(
         }
         EventType::KeyRelease(ref key) => {
             // For release, we check if the main key is released
-            let config_key = parse_key(&config.key);
+            let config_key = parse_key(&config_key_str);
             let key_matches = match config_key {
                 Some(k) => {
                     // For modifier keys, match both left and right variants
@@ -194,8 +268,8 @@ fn is_trigger_key_event(
                     }
                 },
                 None => {
-                    key_to_string(key) == config.key || 
-                    matches!(config.alt_code, Some(code) if *key == Key::Unknown(code))
+                    key_to_string(key) == config_key_str || 
+                    matches!(alt_code, Some(code) if *key == Key::Unknown(code))
                 }
             };
 

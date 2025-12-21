@@ -11,14 +11,7 @@ import { listen } from '@tauri-apps/api/event';
 import { HotkeyInput, HotkeyConfig } from './HotkeyInput';
 
 const DEFAULT_HOTKEY: HotkeyConfig = {
-  key: 'Function',
-  alt_code: 179,
-  modifiers: {
-    cmd: false,
-    shift: false,
-    alt: false,
-    ctrl: false,
-  },
+  hotkey: 'Fn',
 };
 
 export const HotkeySettings: React.FC = () => {
@@ -81,14 +74,7 @@ export const HotkeySettings: React.FC = () => {
 
   const handleHotkeyChange = async () => {
     // Check if hotkey actually changed
-    const isSame = 
-      selectedHotkey.key === currentHotkey.key &&
-      selectedHotkey.modifiers.cmd === currentHotkey.modifiers.cmd &&
-      selectedHotkey.modifiers.shift === currentHotkey.modifiers.shift &&
-      selectedHotkey.modifiers.alt === currentHotkey.modifiers.alt &&
-      selectedHotkey.modifiers.ctrl === currentHotkey.modifiers.ctrl;
-
-    if (isSame) {
+    if (selectedHotkey.hotkey === currentHotkey.hotkey) {
       return; // No change needed
     }
 
@@ -111,12 +97,7 @@ export const HotkeySettings: React.FC = () => {
     setSelectedHotkey(config);
   };
 
-  const isHotkeyChanged = 
-    selectedHotkey.key !== currentHotkey.key ||
-    selectedHotkey.modifiers.cmd !== currentHotkey.modifiers.cmd ||
-    selectedHotkey.modifiers.shift !== currentHotkey.modifiers.shift ||
-    selectedHotkey.modifiers.alt !== currentHotkey.modifiers.alt ||
-    selectedHotkey.modifiers.ctrl !== currentHotkey.modifiers.ctrl;
+  const isHotkeyChanged = selectedHotkey.hotkey !== currentHotkey.hotkey;
 
   return (
     <div className="settings">
