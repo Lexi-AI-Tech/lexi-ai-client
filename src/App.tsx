@@ -4,18 +4,22 @@
  * Displays the transcripts list on the homepage.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow'
 import { useOnboardingStore } from './store/onboardingStore'
 import { useAuthStore } from './store/authStore'
 import { TranscriptsList } from './components/TranscriptsList'
-import { HotkeySettings } from './components/HotkeySettings'
+import { SettingsPage } from './components/SettingsPage'
+import { Sidebar } from './components/Sidebar'
+
+type Page = 'transcripts' | 'settings';
 
 function App() {
   // Check if onboarding is completed
   const { isCompleted } = useOnboardingStore();
   const { tokens } = useAuthStore();
+  const [currentPage, setCurrentPage] = useState<Page>('transcripts');
   
   // Sync auth token to Rust backend whenever it changes
   useEffect(() => {
@@ -37,12 +41,15 @@ function App() {
     return <OnboardingFlow />;
   }
 
-  // Render transcripts list and hotkey settings
+  // Render app with sidebar and page content
   return (
     <div className="app">
-      <div className="container">
-        <HotkeySettings />
-        <TranscriptsList />
+      <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+      <div className="main-content">
+        <div className="container">
+          {currentPage === 'transcripts' && <TranscriptsList />}
+          {currentPage === 'settings' && <SettingsPage />}
+        </div>
       </div>
     </div>
   )
