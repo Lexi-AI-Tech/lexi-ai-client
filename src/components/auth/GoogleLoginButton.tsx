@@ -19,11 +19,14 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const oauthPollingRef = useRef<{ isPolling: boolean; interval: NodeJS.Timeout | null }>({ isPolling: false, interval: null });
 
-  // Check localStorage for tokens (in case callback page stored them)
+  // Check persistent storage for tokens (in case callback page stored them)
   const checkStoredAuth = React.useCallback(() => {
     try {
-      const stored = localStorage.getItem('lexi-auth');
-      console.log('Checking localStorage for auth:', stored ? 'found' : 'not found');
+      // Use sync version for immediate checks (falls back to localStorage)
+      // The authStore will handle async Tauri Store loading on initialization
+      const { getStorageItemSync } = require('../lib/persistentStorage');
+      const stored = getStorageItemSync('lexi-auth');
+      console.log('Checking persistent storage for auth:', stored ? 'found' : 'not found');
       if (stored) {
         const parsed = JSON.parse(stored);
         console.log('Parsed auth data:', { 
@@ -38,7 +41,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         const user = parsed.user;
         
         if (tokens?.access_token && user) {
-          console.log('✅ Found stored auth in localStorage, using it');
+          console.log('✅ Found stored auth in persistent storage, using it');
           // Found stored auth, use it
           setAuthData(tokens, user);
           setLoading(false);
@@ -50,8 +53,8 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
             timeoutRef.current = null;
           }
           
-          // Clear the stored auth so we don't keep checking
-          localStorage.removeItem('lexi-auth');
+          // Note: We don't remove the stored auth here since authStore manages it
+          // The authStore will persist it properly using Tauri Store
           
           if (onSuccess) {
             onSuccess(user);
