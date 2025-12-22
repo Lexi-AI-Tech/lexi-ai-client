@@ -2,6 +2,7 @@
   "name": "lexi-ai",
   "version": "0.1.0",
   "description": "Speech-to-text overlay app for macOS",
+  "author": "anadi45",
   "main": "src-tauri/src/main.rs",
   "scripts": {
     "tauri": "tauri",
