@@ -113,6 +113,16 @@ The app will be created at:
 
 You can then move the `.app` to your Applications folder or distribute the `.dmg`.
 
+### Run the Built App with Logs
+
+To run the built app from the command line and see logs:
+
+```bash
+"/Applications/Lexi AI.app/Contents/MacOS/lexi-ai"
+```
+
+This is useful for debugging issues in the production build, as all debug output will appear in the terminal.
+
 ## Project Structure
 
 ```
