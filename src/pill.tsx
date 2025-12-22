@@ -38,12 +38,7 @@ const Pill: React.FC = () => {
           setStatus('recording')
           // Resize window to circular size
           const window = getCurrentWindow()
-          try {
-            await window.setSize(new LogicalSize(80, 80))
-            console.log('Window resized to 80x80 for recording')
-          } catch (error) {
-            console.error('Failed to resize window:', error)
-          }
+          await window.setSize(new LogicalSize(40, 40))
         })
 
         // Listen for recording stopped
@@ -51,7 +46,7 @@ const Pill: React.FC = () => {
           setStatus('processing')
           // Keep circular size for processing
           const window = getCurrentWindow()
-          await window.setSize(new LogicalSize(80, 80))
+          await window.setSize(new LogicalSize(40, 40))
         })
 
         // Listen for processing start
@@ -59,7 +54,7 @@ const Pill: React.FC = () => {
           setStatus('processing')
           // Keep circular size for processing
           const window = getCurrentWindow()
-          await window.setSize(new LogicalSize(80, 80))
+          await window.setSize(new LogicalSize(40, 40))
         })
 
         // Listen for transcription success
@@ -67,12 +62,7 @@ const Pill: React.FC = () => {
           setStatus('idle')
           // Resize window to thin rectangular size
           const window = getCurrentWindow()
-          try {
-            await window.setSize(new LogicalSize(40, 6.6))
-            console.log('Window resized to 40x6.6 for idle')
-          } catch (error) {
-            console.error('Failed to resize window:', error)
-          }
+          await window.setSize(new LogicalSize(40, 6.6))
         })
 
         // Listen for transcription error
@@ -98,20 +88,6 @@ const Pill: React.FC = () => {
 
     setupListeners()
   }, [])
-
-  // Debug: Log window size when status changes
-  useEffect(() => {
-    const checkWindowSize = async () => {
-      try {
-        const window = getCurrentWindow()
-        const size = await window.innerSize()
-        console.log(`Pill status: ${status}, Window size: ${size.width}x${size.height}`)
-      } catch (error) {
-        console.error('Failed to get window size:', error)
-      }
-    }
-    checkWindowSize()
-  }, [status])
 
   /**
    * Returns the background color based on the current status
@@ -221,12 +197,12 @@ const Pill: React.FC = () => {
       : '0 2px 4px -1px rgba(0, 0, 0, 0.1)'
   } else if (status === 'recording') {
     // Recording: expand to circle - MUST be perfect square
-    baseStyle.width = '80px'
-    baseStyle.height = '80px'
-    baseStyle.minWidth = '80px'
-    baseStyle.minHeight = '80px'
-    baseStyle.maxWidth = '80px'
-    baseStyle.maxHeight = '80px'
+    baseStyle.width = '40px'
+    baseStyle.height = '40px'
+    baseStyle.minWidth = '40px'
+    baseStyle.minHeight = '40px'
+    baseStyle.maxWidth = '40px'
+    baseStyle.maxHeight = '40px'
     baseStyle.borderRadius = '50%' // Perfect circle
     baseStyle.border = '1px solid rgba(255, 255, 255, 0.1)'
     baseStyle.boxShadow = isHovered
@@ -234,12 +210,12 @@ const Pill: React.FC = () => {
       : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
   } else if (status === 'processing') {
     // Processing: circle - MUST be perfect square
-    baseStyle.width = '80px'
-    baseStyle.height = '80px'
-    baseStyle.minWidth = '80px'
-    baseStyle.minHeight = '80px'
-    baseStyle.maxWidth = '80px'
-    baseStyle.maxHeight = '80px'
+    baseStyle.width = '40px'
+    baseStyle.height = '40px'
+    baseStyle.minWidth = '40px'
+    baseStyle.minHeight = '40px'
+    baseStyle.maxWidth = '40px'
+    baseStyle.maxHeight = '40px'
     baseStyle.borderRadius = '50%' // Perfect circle
     baseStyle.border = '1px solid rgba(255, 255, 255, 0.1)'
     baseStyle.boxShadow = isHovered
@@ -260,8 +236,8 @@ const Pill: React.FC = () => {
           <div
             style={{
               position: 'absolute',
-              width: '80px',
-              height: '80px',
+              width: '40px',
+              height: '40px',
               borderRadius: '50%',
               backgroundColor: 'rgba(239, 68, 68, 0.2)',
               animation: 'ripple 2s ease-out infinite',
@@ -270,8 +246,8 @@ const Pill: React.FC = () => {
           <div
             style={{
               position: 'absolute',
-              width: '80px',
-              height: '80px',
+              width: '40px',
+              height: '40px',
               borderRadius: '50%',
               backgroundColor: 'rgba(239, 68, 68, 0.25)',
               animation: 'ripple 2s ease-out infinite',
@@ -281,8 +257,8 @@ const Pill: React.FC = () => {
           <div
             style={{
               position: 'absolute',
-              width: '80px',
-              height: '80px',
+              width: '40px',
+              height: '40px',
               borderRadius: '50%',
               backgroundColor: 'rgba(239, 68, 68, 0.3)',
               animation: 'ripple 2s ease-out infinite',
@@ -292,8 +268,8 @@ const Pill: React.FC = () => {
           <div
             style={{
               position: 'absolute',
-              width: '72px',
-              height: '72px',
+              width: '36px',
+              height: '36px',
               borderRadius: '50%',
               backgroundColor: 'rgba(239, 68, 68, 0.35)',
               animation: 'pulse 2s ease-in-out infinite',
@@ -308,19 +284,19 @@ const Pill: React.FC = () => {
           <div
             style={{
               position: 'absolute',
-              width: '64px',
-              height: '64px',
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
-              border: '4px solid rgba(59, 130, 246, 0.2)',
+              border: '2px solid rgba(59, 130, 246, 0.2)',
             }}
           />
           <div
             style={{
               position: 'absolute',
-              width: '64px',
-              height: '64px',
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
-              border: '4px solid transparent',
+              border: '2px solid transparent',
               borderTopColor: 'rgba(255, 255, 255, 0.8)',
               animation: 'spin 1s linear infinite',
             }}
@@ -341,9 +317,9 @@ const Pill: React.FC = () => {
           }}
         >
           {status === 'processing' ? (
-            <LoaderIcon size={24} color="white" />
+            <LoaderIcon size={16} color="white" />
           ) : (
-            <MicIcon size={24} color="white" />
+            <MicIcon size={16} color="white" />
           )}
         </div>
       )}
