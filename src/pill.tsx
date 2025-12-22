@@ -38,7 +38,12 @@ const Pill: React.FC = () => {
           setStatus('recording')
           // Resize window to circular size
           const window = getCurrentWindow()
-          await window.setSize(new LogicalSize(80, 80))
+          try {
+            await window.setSize(new LogicalSize(80, 80))
+            console.log('Window resized to 80x80 for recording')
+          } catch (error) {
+            console.error('Failed to resize window:', error)
+          }
         })
 
         // Listen for recording stopped
@@ -62,7 +67,12 @@ const Pill: React.FC = () => {
           setStatus('idle')
           // Resize window to thin rectangular size
           const window = getCurrentWindow()
-          await window.setSize(new LogicalSize(40, 6.6))
+          try {
+            await window.setSize(new LogicalSize(40, 6.6))
+            console.log('Window resized to 40x6.6 for idle')
+          } catch (error) {
+            console.error('Failed to resize window:', error)
+          }
         })
 
         // Listen for transcription error
@@ -88,6 +98,20 @@ const Pill: React.FC = () => {
 
     setupListeners()
   }, [])
+
+  // Debug: Log window size when status changes
+  useEffect(() => {
+    const checkWindowSize = async () => {
+      try {
+        const window = getCurrentWindow()
+        const size = await window.innerSize()
+        console.log(`Pill status: ${status}, Window size: ${size.width}x${size.height}`)
+      } catch (error) {
+        console.error('Failed to get window size:', error)
+      }
+    }
+    checkWindowSize()
+  }, [status])
 
   /**
    * Returns the background color based on the current status
@@ -151,45 +175,26 @@ const Pill: React.FC = () => {
     </svg>
   )
 
-  // Determine container dimensions and shape based on status
-  const isIdle = status === 'idle'
-  const isCircular = status === 'recording' || status === 'processing'
-  // When circular, ensure both width and height are exactly 80px for perfect circle
-  const containerWidth = isCircular ? '80px' : '40px'
-  const containerHeight = isCircular ? '80px' : '6.6px'
-  const borderRadius = isCircular ? '50%' : '3.3px'
-
   // Get background color - gray when hovered, otherwise status color
   const getBackgroundColor = () => {
     if (isHovered) {
       return '#6b7280' // Gray-500 for hover state
     }
-    if (isIdle) {
+    if (status === 'idle') {
       return 'rgba(31, 41, 55, 0.4)' // Transparent gray for idle
     }
     return getStatusColor()
   }
 
-  // Build style object with circular-specific overrides
-  const containerStyle: React.CSSProperties = {
+  // Build base style object
+  const baseStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: containerWidth,
-    height: containerHeight,
-    borderRadius: borderRadius,
     cursor: 'move',
-    transition: 'all 0.3s ease',
+    transition: 'all 0.5s ease-in-out', // Longer transition like AudioRecorder
     transform: isHovered ? 'scale(1.05)' : 'scale(1)',
-    boxShadow: isHovered
-      ? '0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)'
-      : isIdle 
-      ? '0 2px 4px -1px rgba(0, 0, 0, 0.1)' 
-      : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
     userSelect: 'none',
-    border: isIdle 
-      ? '1px solid rgba(255, 255, 255, 0.15)' 
-      : '1px solid rgba(255, 255, 255, 0.1)',
     backgroundColor: getBackgroundColor(),
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
@@ -200,15 +205,46 @@ const Pill: React.FC = () => {
     flexShrink: 0,
   }
 
-  // When circular, enforce perfect square dimensions
-  if (isCircular) {
-    containerStyle.width = '80px'
-    containerStyle.height = '80px'
-    containerStyle.minWidth = '80px'
-    containerStyle.minHeight = '80px'
-    containerStyle.maxWidth = '80px'
-    containerStyle.maxHeight = '80px'
-    containerStyle.aspectRatio = '1 / 1'
+  // Apply state-specific styles (following AudioRecorder pattern)
+  if (status === 'idle') {
+    // Idle: thin pill shape
+    baseStyle.width = '40px'
+    baseStyle.height = '6.6px'
+    baseStyle.minWidth = '40px'
+    baseStyle.minHeight = '6.6px'
+    baseStyle.maxWidth = '40px'
+    baseStyle.maxHeight = '6.6px'
+    baseStyle.borderRadius = '3.3px'
+    baseStyle.border = '1px solid rgba(255, 255, 255, 0.15)'
+    baseStyle.boxShadow = isHovered
+      ? '0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)'
+      : '0 2px 4px -1px rgba(0, 0, 0, 0.1)'
+  } else if (status === 'recording') {
+    // Recording: expand to circle - MUST be perfect square
+    baseStyle.width = '80px'
+    baseStyle.height = '80px'
+    baseStyle.minWidth = '80px'
+    baseStyle.minHeight = '80px'
+    baseStyle.maxWidth = '80px'
+    baseStyle.maxHeight = '80px'
+    baseStyle.borderRadius = '50%' // Perfect circle
+    baseStyle.border = '1px solid rgba(255, 255, 255, 0.1)'
+    baseStyle.boxShadow = isHovered
+      ? '0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)'
+      : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+  } else if (status === 'processing') {
+    // Processing: circle - MUST be perfect square
+    baseStyle.width = '80px'
+    baseStyle.height = '80px'
+    baseStyle.minWidth = '80px'
+    baseStyle.minHeight = '80px'
+    baseStyle.maxWidth = '80px'
+    baseStyle.maxHeight = '80px'
+    baseStyle.borderRadius = '50%' // Perfect circle
+    baseStyle.border = '1px solid rgba(255, 255, 255, 0.1)'
+    baseStyle.boxShadow = isHovered
+      ? '0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)'
+      : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
   }
 
   return (
@@ -216,7 +252,7 @@ const Pill: React.FC = () => {
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={containerStyle}
+      style={baseStyle}
     >
       {/* Rippling effect rings when recording */}
       {status === 'recording' && (
@@ -293,7 +329,7 @@ const Pill: React.FC = () => {
       )}
 
       {/* Icon container - only show for recording/processing */}
-      {!isIdle && (
+      {status !== 'idle' && (
         <div
           style={{
             position: 'relative',
@@ -326,15 +362,19 @@ const PillApp: React.FC = () => {
         margin: 0,
         padding: 0,
         background: 'transparent',
-        height: '100vh',
-        width: '100vw',
+        height: '100%',
+        width: '100%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif",
         overflow: 'hidden',
         pointerEvents: 'none',
-        position: 'relative',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
       }}
     >
       <Pill />
