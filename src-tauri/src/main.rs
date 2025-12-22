@@ -373,6 +373,7 @@ pub fn main() {
     
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .manage(OAuthState::default())
         .manage(AuthTokenState::default())
         .manage(TranscriptionTaskState {

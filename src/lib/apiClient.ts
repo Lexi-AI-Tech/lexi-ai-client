@@ -26,12 +26,14 @@ export interface AuthResponse {
   expires_in?: number;
 }
 
+import { getStorageItemSync } from './persistentStorage';
+
 /**
- * Get the current access token from localStorage
+ * Get the current access token from persistent storage
  */
 function getAccessToken(): string | null {
   try {
-    const stored = localStorage.getItem('lexi-auth');
+    const stored = getStorageItemSync('lexi-auth');
     if (stored) {
       const parsed = JSON.parse(stored);
       return parsed.tokens?.access_token || null;
@@ -43,11 +45,11 @@ function getAccessToken(): string | null {
 }
 
 /**
- * Get the refresh token from localStorage
+ * Get the refresh token from persistent storage
  */
 function getRefreshToken(): string | null {
   try {
-    const stored = localStorage.getItem('lexi-auth');
+    const stored = getStorageItemSync('lexi-auth');
     if (stored) {
       const parsed = JSON.parse(stored);
       return parsed.tokens?.refresh_token || null;
@@ -93,7 +95,8 @@ async function refreshAccessToken(): Promise<string | null> {
     if (data.access_token) {
       // Update stored tokens
       try {
-        const stored = localStorage.getItem('lexi-auth');
+        const { getStorageItem, setStorageItem } = await import('./persistentStorage');
+        const stored = await getStorageItem('lexi-auth');
         if (stored) {
           const parsed = JSON.parse(stored);
           parsed.tokens = {
@@ -105,7 +108,8 @@ async function refreshAccessToken(): Promise<string | null> {
               ? Date.now() + data.expires_in * 1000 
               : parsed.tokens.expires_at,
           };
-          localStorage.setItem('lexi-auth', JSON.stringify(parsed));
+          // Use async storage for persistence
+          await setStorageItem('lexi-auth', JSON.stringify(parsed));
         }
       } catch (e) {
         console.error('Failed to update tokens:', e);
@@ -152,7 +156,8 @@ export async function authenticatedFetch(
       });
     } else {
       // Refresh failed, clear auth
-      localStorage.removeItem('lexi-auth');
+      const { removeStorageItem } = await import('./persistentStorage');
+      await removeStorageItem('lexi-auth');
       // Dispatch event to notify app of auth failure
       window.dispatchEvent(new CustomEvent('auth-expired'));
     }
