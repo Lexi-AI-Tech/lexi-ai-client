@@ -35,6 +35,37 @@ function App() {
     
     syncAuthToken();
   }, [tokens?.access_token]);
+
+  // Load and sync config from DB on mount
+  useEffect(() => {
+    const loadAndSyncConfig = async () => {
+      if (!tokens?.access_token) {
+        return; // Wait for auth
+      }
+
+      try {
+        const { getUserConfig } = await import('./lib/apiClient');
+        const { getDeviceInfo } = await import('./lib/deviceInfo');
+        
+        // Detect system type
+        const deviceInfo = getDeviceInfo();
+        const systemType = deviceInfo.system_type || 'mac';
+        
+        const config = await getUserConfig(systemType);
+        
+        // Sync hotkey to Rust backend
+        if (config.hotkey) {
+          const hotkeyConfig = { hotkey: config.hotkey };
+          await invoke('update_hotkey', { configJson: JSON.stringify(hotkeyConfig) });
+          console.log('✅ Config synced to Rust backend:', config);
+        }
+      } catch (error) {
+        console.warn('Failed to load config from DB (using defaults):', error);
+      }
+    };
+
+    loadAndSyncConfig();
+  }, [tokens?.access_token]);
   
   // If onboarding is not completed, show onboarding flow
   if (!isCompleted) {

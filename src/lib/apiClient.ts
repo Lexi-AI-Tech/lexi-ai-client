@@ -559,3 +559,57 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
     throw new Error(errorData.error || errorData.detail || `Failed to delete transcript: ${response.status}`);
   }
 }
+
+/**
+ * User config types
+ */
+export interface UserConfig {
+  system_type: string;
+  hotkey: string;
+  language: string;
+}
+
+export interface UserConfigUpdateRequest {
+  system_type?: string;  // 'mac' or 'windows'
+  hotkey?: string;
+  language?: string;
+}
+
+/**
+ * Get current user's configuration
+ */
+export async function getUserConfig(systemType: 'mac' | 'windows' = 'mac'): Promise<UserConfig> {
+  const params = new URLSearchParams({ system_type: systemType });
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/users/me/config?${params.toString()}`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || errorData.detail || `Failed to get user config: ${response.status}`);
+  }
+
+  const data: ApiResponse<UserConfig> = await response.json();
+  return (data.data || data) as UserConfig;
+}
+
+/**
+ * Update current user's configuration
+ */
+export async function updateUserConfig(config: UserConfigUpdateRequest): Promise<UserConfig> {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/users/me/config`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(config),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || errorData.detail || `Failed to update user config: ${response.status}`);
+  }
+
+  const data: ApiResponse<UserConfig> = await response.json();
+  return (data.data || data) as UserConfig;
+}
