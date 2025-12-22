@@ -10,6 +10,7 @@ import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { LogicalSize } from '@tauri-apps/api/window'
 import './index.css'
 
 /**
@@ -32,28 +33,43 @@ const Pill: React.FC = () => {
     const setupListeners = async () => {
       try {
         // Listen for recording started
-        const unlistenStarted = await listen('recording_started', () => {
+        const unlistenStarted = await listen('recording_started', async () => {
           setStatus('recording')
+          // Resize window to circular size
+          const window = getCurrentWindow()
+          await window.setSize(new LogicalSize(80, 80))
         })
 
         // Listen for recording stopped
-        const unlistenStopped = await listen('recording_stopped', () => {
+        const unlistenStopped = await listen('recording_stopped', async () => {
           setStatus('processing')
+          // Keep circular size for processing
+          const window = getCurrentWindow()
+          await window.setSize(new LogicalSize(80, 80))
         })
 
         // Listen for processing start
-        const unlistenProcessing = await listen('processing_start', () => {
+        const unlistenProcessing = await listen('processing_start', async () => {
           setStatus('processing')
+          // Keep circular size for processing
+          const window = getCurrentWindow()
+          await window.setSize(new LogicalSize(80, 80))
         })
 
         // Listen for transcription success
-        const unlistenSuccess = await listen('transcription_success', () => {
+        const unlistenSuccess = await listen('transcription_success', async () => {
           setStatus('idle')
+          // Resize window to thin rectangular size
+          const window = getCurrentWindow()
+          await window.setSize(new LogicalSize(120, 6))
         })
 
         // Listen for transcription error
-        const unlistenError = await listen('transcription_error', () => {
+        const unlistenError = await listen('transcription_error', async () => {
           setStatus('idle')
+          // Resize window to thin rectangular size
+          const window = getCurrentWindow()
+          await window.setSize(new LogicalSize(120, 6))
         })
 
         // Cleanup function
@@ -134,6 +150,12 @@ const Pill: React.FC = () => {
     </svg>
   )
 
+  // Determine container dimensions and shape based on status
+  const isIdle = status === 'idle'
+  const containerWidth = isIdle ? '120px' : '80px'
+  const containerHeight = isIdle ? '6px' : '80px'
+  const borderRadius = isIdle ? '3px' : '50%'
+
   return (
     <div
       onMouseDown={handleMouseDown}
@@ -141,15 +163,21 @@ const Pill: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '80px',
-        height: '80px',
-        borderRadius: '50%',
+        width: containerWidth,
+        height: containerHeight,
+        borderRadius: borderRadius,
         cursor: 'move',
-        transition: 'background-color 0.3s ease',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        transition: 'all 0.3s ease',
+        boxShadow: isIdle 
+          ? '0 2px 4px -1px rgba(0, 0, 0, 0.1)' 
+          : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
         userSelect: 'none',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        backgroundColor: getStatusColor(),
+        border: isIdle 
+          ? '1px solid rgba(255, 255, 255, 0.15)' 
+          : '1px solid rgba(255, 255, 255, 0.1)',
+        backgroundColor: isIdle 
+          ? 'rgba(31, 41, 55, 0.4)' // Transparent gray for idle
+          : getStatusColor(),
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         pointerEvents: 'auto',
@@ -231,24 +259,25 @@ const Pill: React.FC = () => {
         </>
       )}
 
-      {/* Icon container */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 10,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-        }}
-      >
-        {status === 'processing' ? (
-          <LoaderIcon size={24} color="white" />
-        ) : (
-          <MicIcon size={24} color="white" />
-        )}
-      </div>
-
+      {/* Icon container - only show for recording/processing */}
+      {!isIdle && (
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+          }}
+        >
+          {status === 'processing' ? (
+            <LoaderIcon size={24} color="white" />
+          ) : (
+            <MicIcon size={24} color="white" />
+          )}
+        </div>
+      )}
     </div>
   )
 }
