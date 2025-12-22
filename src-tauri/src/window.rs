@@ -15,6 +15,7 @@ fn activate_app_ignoring_others() {
     use objc::*;
     unsafe {
         let ns_app = NSApp();
+        #[allow(unexpected_cfgs)]
         let _: () = msg_send![ns_app, activateIgnoringOtherApps: cocoa::base::YES];
         println!("🍎 Activated app ignoring other apps (Cocoa call)");
     }

@@ -88,7 +88,7 @@ fn create_pill_window(app: &AppHandle) -> Result<(), String> {
     let pill_builder = WebviewWindowBuilder::new(
         app,
         "pill",
-        WebviewUrl::App("screens/pill.html".into()),
+        WebviewUrl::App("pill.html".into()),
     )
     .title("Pill")
     .inner_size(pill_width, pill_height)
