@@ -61,7 +61,7 @@ const Pill: React.FC = () => {
           setStatus('idle')
           // Resize window to thin rectangular size
           const window = getCurrentWindow()
-          await window.setSize(new LogicalSize(120, 6))
+          await window.setSize(new LogicalSize(40, 6.6))
         })
 
         // Listen for transcription error
@@ -69,7 +69,7 @@ const Pill: React.FC = () => {
           setStatus('idle')
           // Resize window to thin rectangular size
           const window = getCurrentWindow()
-          await window.setSize(new LogicalSize(120, 6))
+          await window.setSize(new LogicalSize(40, 6.6))
         })
 
         // Cleanup function
@@ -152,9 +152,9 @@ const Pill: React.FC = () => {
 
   // Determine container dimensions and shape based on status
   const isIdle = status === 'idle'
-  const containerWidth = isIdle ? '120px' : '80px'
-  const containerHeight = isIdle ? '6px' : '80px'
-  const borderRadius = isIdle ? '3px' : '50%'
+  const containerWidth = isIdle ? '40px' : '80px'
+  const containerHeight = isIdle ? '6.6px' : '80px'
+  const borderRadius = isIdle ? '3.3px' : '50%'
 
   return (
     <div
