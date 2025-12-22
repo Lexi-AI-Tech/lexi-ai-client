@@ -86,32 +86,6 @@ const Pill: React.FC = () => {
     }
   }
 
-  /**
-   * Returns the text label based on the current status
-   */
-  const getStatusText = () => {
-    switch (status) {
-      case 'recording':
-        return 'Recording...'
-      case 'processing':
-        return 'Processing...'
-      default:
-        return 'Ready'
-    }
-  }
-
-  /**
-   * Returns the icon based on the current status
-   */
-  const getStatusIcon = () => {
-    switch (status) {
-      case 'recording':
-        return '⏹'
-      default:
-        return '🎤'
-    }
-  }
-
   const handleMouseDown = async () => {
     // Start dragging the window when clicking on the pill
     try {
@@ -122,6 +96,44 @@ const Pill: React.FC = () => {
     }
   }
 
+  // Mic icon SVG
+  const MicIcon = ({ size = 20, color = 'white' }: { size?: number; color?: string }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="23" />
+      <line x1="8" y1="23" x2="16" y2="23" />
+    </svg>
+  )
+
+  // Loader icon SVG (spinning)
+  const LoaderIcon = ({ size = 20, color = 'white' }: { size?: number; color?: string }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{
+        animation: 'spin 1s linear infinite',
+      }}
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  )
+
   return (
     <div
       onMouseDown={handleMouseDown}
@@ -129,9 +141,9 @@ const Pill: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '180px',
-        height: '50px',
-        borderRadius: '9999px',
+        width: '80px',
+        height: '80px',
+        borderRadius: '50%',
         cursor: 'move',
         transition: 'background-color 0.3s ease',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
@@ -141,21 +153,102 @@ const Pill: React.FC = () => {
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         pointerEvents: 'auto',
+        position: 'relative',
+        overflow: 'visible',
       }}
     >
+      {/* Rippling effect rings when recording */}
+      {status === 'recording' && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              animation: 'ripple 2s ease-out infinite',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(239, 68, 68, 0.25)',
+              animation: 'ripple 2s ease-out infinite',
+              animationDelay: '0.3s',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(239, 68, 68, 0.3)',
+              animation: 'ripple 2s ease-out infinite',
+              animationDelay: '0.6s',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(239, 68, 68, 0.35)',
+              animation: 'pulse 2s ease-in-out infinite',
+            }}
+          />
+        </>
+      )}
+
+      {/* Processing spinner rings */}
+      {status === 'processing' && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              border: '4px solid rgba(59, 130, 246, 0.2)',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              border: '4px solid transparent',
+              borderTopColor: 'rgba(255, 255, 255, 0.8)',
+              animation: 'spin 1s linear infinite',
+            }}
+          />
+        </>
+      )}
+
+      {/* Icon container */}
       <div
         style={{
+          position: 'relative',
+          zIndex: 10,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          justifyContent: 'center',
           color: 'white',
-          fontWeight: 500,
-          fontSize: '14px',
         }}
       >
-        <span style={{ fontSize: '16px' }}>{getStatusIcon()}</span>
-        <span>{getStatusText()}</span>
+        {status === 'processing' ? (
+          <LoaderIcon size={24} color="white" />
+        ) : (
+          <MicIcon size={24} color="white" />
+        )}
       </div>
+
     </div>
   )
 }

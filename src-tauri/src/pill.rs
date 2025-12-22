@@ -48,9 +48,9 @@ fn calculate_bottom_position(app: &AppHandle) -> Result<(f64, f64), String> {
     let monitor_width = monitor_size.width as f64 / scale_factor;
     let monitor_height = monitor_size.height as f64 / scale_factor;
     
-    // Pill window dimensions
-    let pill_width = 200.0;
-    let pill_height = 50.0;
+    // Pill window dimensions (circular button)
+    let pill_width = 80.0;
+    let pill_height = 80.0;
     
     // Calculate bottom position: horizontally centered, positioned above taskbar/dock
     // Use a responsive offset that scales with screen height but has a minimum
@@ -80,9 +80,9 @@ fn create_pill_window(app: &AppHandle) -> Result<(), String> {
     // Calculate bottom position
     let (position_x, position_y) = calculate_bottom_position(app)?;
     
-    // Pill window dimensions
-    let pill_width = 200.0;
-    let pill_height = 50.0;
+    // Pill window dimensions (circular button)
+    let pill_width = 80.0;
+    let pill_height = 80.0;
     
     // Create the window builder
     let pill_builder = WebviewWindowBuilder::new(
