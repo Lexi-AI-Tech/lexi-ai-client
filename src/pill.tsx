@@ -153,9 +153,11 @@ const Pill: React.FC = () => {
 
   // Determine container dimensions and shape based on status
   const isIdle = status === 'idle'
-  const containerWidth = isIdle ? '40px' : '80px'
-  const containerHeight = isIdle ? '6.6px' : '80px'
-  const borderRadius = isIdle ? '3.3px' : '50%'
+  const isCircular = status === 'recording' || status === 'processing'
+  // When circular, ensure both width and height are exactly 80px for perfect circle
+  const containerWidth = isCircular ? '80px' : '40px'
+  const containerHeight = isCircular ? '80px' : '6.6px'
+  const borderRadius = isCircular ? '50%' : '3.3px'
 
   // Get background color - gray when hovered, otherwise status color
   const getBackgroundColor = () => {
@@ -168,37 +170,53 @@ const Pill: React.FC = () => {
     return getStatusColor()
   }
 
+  // Build style object with circular-specific overrides
+  const containerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: containerWidth,
+    height: containerHeight,
+    borderRadius: borderRadius,
+    cursor: 'move',
+    transition: 'all 0.3s ease',
+    transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+    boxShadow: isHovered
+      ? '0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)'
+      : isIdle 
+      ? '0 2px 4px -1px rgba(0, 0, 0, 0.1)' 
+      : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    userSelect: 'none',
+    border: isIdle 
+      ? '1px solid rgba(255, 255, 255, 0.15)' 
+      : '1px solid rgba(255, 255, 255, 0.1)',
+    backgroundColor: getBackgroundColor(),
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    pointerEvents: 'auto',
+    position: 'relative',
+    overflow: 'visible',
+    boxSizing: 'border-box',
+    flexShrink: 0,
+  }
+
+  // When circular, enforce perfect square dimensions
+  if (isCircular) {
+    containerStyle.width = '80px'
+    containerStyle.height = '80px'
+    containerStyle.minWidth = '80px'
+    containerStyle.minHeight = '80px'
+    containerStyle.maxWidth = '80px'
+    containerStyle.maxHeight = '80px'
+    containerStyle.aspectRatio = '1 / 1'
+  }
+
   return (
     <div
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: containerWidth,
-        height: containerHeight,
-        borderRadius: borderRadius,
-        cursor: 'move',
-        transition: 'all 0.3s ease',
-        transform: isHovered ? 'scale(1.05)' : 'scale(1)',
-        boxShadow: isHovered
-          ? '0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)'
-          : isIdle 
-          ? '0 2px 4px -1px rgba(0, 0, 0, 0.1)' 
-          : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        userSelect: 'none',
-        border: isIdle 
-          ? '1px solid rgba(255, 255, 255, 0.15)' 
-          : '1px solid rgba(255, 255, 255, 0.1)',
-        backgroundColor: getBackgroundColor(),
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        pointerEvents: 'auto',
-        position: 'relative',
-        overflow: 'visible',
-      }}
+      style={containerStyle}
     >
       {/* Rippling effect rings when recording */}
       {status === 'recording' && (
@@ -316,6 +334,7 @@ const PillApp: React.FC = () => {
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif",
         overflow: 'hidden',
         pointerEvents: 'none',
+        position: 'relative',
       }}
     >
       <Pill />
