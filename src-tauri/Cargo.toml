@@ -18,9 +18,10 @@ tauri-build = { version = "2.0", features = [] }
 custom-protocol = ["tauri/custom-protocol"]
 
 [dependencies]
-tauri = { version = "2.0", features = [ "macos-private-api", "devtools"] }
+tauri = { version = "2.0", features = [ "macos-private-api", "devtools", "tray-icon"] }
 tauri-plugin-shell = "2.0"
 tauri-plugin-store = "2.0"
+tauri-plugin-single-instance = "2"
 hyper = { version = "1.0", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
 http-body-util = "0.1"

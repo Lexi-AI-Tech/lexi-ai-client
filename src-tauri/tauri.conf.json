@@ -24,7 +24,8 @@
       "exceptionDomain": "",
       "frameworks": [],
       "providerShortName": null,
-      "signingIdentity": "Apple Development: ranjeetbaraik15@gmail.com (Q7WQTDB93C)"
+      "signingIdentity": "Apple Development: ranjeetbaraik15@gmail.com (Q7WQTDB93C)",
+      "infoPlist": "Info.plist"
     }
   },
   "app": {
@@ -42,11 +43,12 @@
         "minWidth": 350,
         "minHeight": 400,
         "alwaysOnTop": false,
-        "skipTaskbar": false,
+        "skipTaskbar": true,
         "decorations": true,
         "transparent": false,
         "url": "screens/main.html",
-        "devtools": true
+        "devtools": true,
+        "visible": true
       }
     ],
     "macOSPrivateApi": true
