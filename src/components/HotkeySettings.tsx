@@ -147,15 +147,12 @@ export const HotkeySettings: React.FC = () => {
       }
 
       // Save to DB (both hotkey and language) with system type
-      const updateData: { system_type?: string; hotkey?: string; language?: string } = {
+      // Always send both values to ensure consistency
+      const updateData: { system_type: string; hotkey: string; language: string } = {
         system_type: systemType,
+        hotkey: selectedHotkey.hotkey,
+        language: selectedLanguage,
       };
-      if (hotkeyChanged) {
-        updateData.hotkey = selectedHotkey.hotkey;
-      }
-      if (languageChanged) {
-        updateData.language = selectedLanguage;
-      }
 
       await updateAppConfig(updateData);
 
