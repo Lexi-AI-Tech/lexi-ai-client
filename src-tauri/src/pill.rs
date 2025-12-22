@@ -57,8 +57,8 @@ fn calculate_bottom_position(app: &AppHandle) -> Result<(f64, f64), String> {
     // Using a conservative estimate that works for both platforms
     let taskbar_height: f64 = 60.0; // Estimated taskbar/dock height in logical pixels
     
-    // Offset above taskbar (5-10px range, using 7px as middle ground)
-    let offset_above_taskbar: f64 = 7.0;
+    // Offset above taskbar
+    let offset_above_taskbar: f64 = 12.0;
     
     // Calculate bottom position: horizontally centered, positioned 5-10px above taskbar/dock
     // Position = screen_height - taskbar_height - pill_height - offset_above_taskbar
