@@ -48,19 +48,22 @@ fn calculate_bottom_position(app: &AppHandle) -> Result<(f64, f64), String> {
     let monitor_width = monitor_size.width as f64 / scale_factor;
     let monitor_height = monitor_size.height as f64 / scale_factor;
     
-    // Pill window dimensions
-    let pill_width = 200.0;
-    let pill_height = 50.0;
+    // Pill window dimensions (thin rectangular for idle, will resize to circular when recording)
+    let pill_width = 40.0;
+    let pill_height = 6.6;
     
-    // Calculate bottom position: horizontally centered, positioned above taskbar/dock
-    // Use a responsive offset that scales with screen height but has a minimum
-    // This accounts for different taskbar/dock sizes across platforms
-    let base_offset: f64 = 60.0; // Base offset in logical pixels
-    let responsive_offset: f64 = monitor_height * 0.02; // 2% of screen height for larger screens
-    let bottom_offset = base_offset.max(responsive_offset);
+    // Estimate taskbar/dock height when visible
+    // macOS dock: typically 60-80px, Windows taskbar: typically 40-48px
+    // Using a conservative estimate that works for both platforms
+    let taskbar_height: f64 = 60.0; // Estimated taskbar/dock height in logical pixels
     
+    // Offset above taskbar
+    let offset_above_taskbar: f64 = 12.0;
+    
+    // Calculate bottom position: horizontally centered, positioned 5-10px above taskbar/dock
+    // Position = screen_height - taskbar_height - pill_height - offset_above_taskbar
     let x = (monitor_width - pill_width) / 2.0; // Horizontally centered
-    let y = monitor_height - pill_height - bottom_offset; // Just above taskbar/dock
+    let y = monitor_height - taskbar_height - pill_height - offset_above_taskbar;
     
     Ok((x, y))
 }
@@ -80,9 +83,9 @@ fn create_pill_window(app: &AppHandle) -> Result<(), String> {
     // Calculate bottom position
     let (position_x, position_y) = calculate_bottom_position(app)?;
     
-    // Pill window dimensions
-    let pill_width = 200.0;
-    let pill_height = 50.0;
+    // Pill window dimensions (thin rectangular for idle, will resize to circular when recording)
+    let pill_width = 40.0;
+    let pill_height = 6.6;
     
     // Create the window builder
     let pill_builder = WebviewWindowBuilder::new(
