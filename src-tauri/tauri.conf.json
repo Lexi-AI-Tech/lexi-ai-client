@@ -45,7 +45,8 @@
         "skipTaskbar": false,
         "decorations": true,
         "transparent": false,
-        "url": "screens/main.html"
+        "url": "screens/main.html",
+        "devtools": true
       }
     ],
     "macOSPrivateApi": true
