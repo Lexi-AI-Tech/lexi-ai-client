@@ -52,12 +52,9 @@ fn calculate_bottom_position(app: &AppHandle) -> Result<(f64, f64), String> {
     let pill_width = 40.0;
     let pill_height = 6.6;
     
-    // Calculate bottom position: horizontally centered, positioned above taskbar/dock
-    // Use a responsive offset that scales with screen height but has a minimum
-    // This accounts for different taskbar/dock sizes across platforms
-    let base_offset: f64 = 60.0; // Base offset in logical pixels
-    let responsive_offset: f64 = monitor_height * 0.02; // 2% of screen height for larger screens
-    let bottom_offset = base_offset.max(responsive_offset);
+    // Calculate bottom position: horizontally centered, positioned 5-10px above taskbar/dock
+    // Use a small fixed offset to position the pill just above the taskbar
+    let bottom_offset: f64 = 10.0; // 10px above taskbar/dock
     
     let x = (monitor_width - pill_width) / 2.0; // Horizontally centered
     let y = monitor_height - pill_height - bottom_offset; // Just above taskbar/dock
