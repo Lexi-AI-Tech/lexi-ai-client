@@ -376,6 +376,62 @@ pub fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            println!("🔄 Second instance launch detected (e.g., from Spotlight)");
+            
+            // When a second instance is launched (e.g., from Spotlight), 
+            // bring the existing window to focus and ensure it's visible
+            #[cfg(target_os = "macos")]
+            {
+                // Re-apply Accessory policy to keep Dock icon hidden
+                if let Err(e) = app.set_activation_policy(tauri::ActivationPolicy::Accessory) {
+                    eprintln!("Failed to re-apply Accessory activation policy: {}", e);
+                } else {
+                    println!("🍎 Re-applied Accessory activation policy (Dock icon hidden)");
+                }
+            }
+            
+            // Use a small delay to ensure app is fully activated before showing window
+            let app_handle = app.app_handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    println!("🔍 Found main window, showing and focusing...");
+                    
+                    // Always show the window, even if it thinks it's visible
+                    if let Err(e) = window.show() {
+                        eprintln!("❌ Failed to show window: {}", e);
+                    } else {
+                        println!("✅ Window shown");
+                        
+                        // Give it a moment, then focus
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                        if let Err(e) = window.set_focus() {
+                            eprintln!("⚠️  Failed to focus window: {}", e);
+                        } else {
+                            println!("✅ Window focused");
+                            
+                            // Bring to front (macOS specific)
+                            #[cfg(target_os = "macos")]
+                            {
+                                if let Err(e) = window.set_always_on_top(true) {
+                                    eprintln!("⚠️  Failed to set always on top: {}", e);
+                                } else {
+                                    // Reset after a moment to allow normal window behavior
+                                    std::thread::spawn(move || {
+                                        std::thread::sleep(std::time::Duration::from_millis(100));
+                                        let _ = window.set_always_on_top(false);
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    eprintln!("❌ Main window not found!");
+                }
+            });
+        }))
         .manage(OAuthState::default())
         .manage(AuthTokenState::default())
         .manage(TranscriptionTaskState {
@@ -414,6 +470,49 @@ pub fn main() {
             
             let app_handle = app.handle();
             
+            // Ensure main window is visible and focused on first launch
+            // This handles the case when app is launched from Spotlight/Dock
+            // Use a small delay to ensure window is fully initialized
+            let app_handle_for_window = app_handle.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(200));
+                if let Some(window) = app_handle_for_window.get_webview_window("main") {
+                    println!("🔍 Main window found on first launch, ensuring visibility...");
+                    
+                    // Always show the window on first launch
+                    if let Err(e) = window.show() {
+                        eprintln!("❌ Failed to show window on first launch: {}", e);
+                    } else {
+                        println!("✅ Window shown on first launch");
+                        
+                        // Give it a moment, then focus
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        if let Err(e) = window.set_focus() {
+                            eprintln!("⚠️  Failed to focus window on first launch: {}", e);
+                        } else {
+                            println!("✅ Window focused on first launch");
+                            
+                            // Bring to front (macOS specific) to ensure it's on top
+                            #[cfg(target_os = "macos")]
+                            {
+                                if let Err(e) = window.set_always_on_top(true) {
+                                    eprintln!("⚠️  Failed to set always on top: {}", e);
+                                } else {
+                                    // Reset after a moment to allow normal window behavior
+                                    let window_clone = window.clone();
+                                    std::thread::spawn(move || {
+                                        std::thread::sleep(std::time::Duration::from_millis(200));
+                                        let _ = window_clone.set_always_on_top(false);
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    eprintln!("❌ Main window not found during setup!");
+                }
+            });
+            
 
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup
@@ -441,26 +540,6 @@ pub fn main() {
             // Start the global input listener (rdev) in a background thread
             // Pass the channel sender and config receiver so it can trigger recording on hotkey press/release
             global_key_listener::start_listener(app_handle.clone(), recording_tx, config_rx, recording_state_arc);
-
-            let window = app.get_webview_window("main").unwrap();
-            
-            // Prevent the app from closing when window is closed
-            // This keeps the global shortcut monitoring active
-            let window_clone = window.clone();
-            window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    // Hide the window instead of closing it
-                    // This keeps the app running in the background so hotkeys continue to work
-                    api.prevent_close();
-                    if let Err(e) = window_clone.hide() {
-                        eprintln!("Failed to hide window: {}", e);
-                    } else {
-                        println!("Window hidden - app continues running in background. Hotkeys will still work.");
-                        // Emit event to frontend for cleanup
-                        let _ = window_clone.emit("window-hide", ());
-                    }
-                }
-            });
             
             // Create system tray with menu
             let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
@@ -485,13 +564,37 @@ pub fn main() {
                     
                     if event_id == "show" {
                         if let Some(window) = app.get_webview_window("main") {
+                            println!("🔍 Showing window from tray menu...");
                             if let Err(e) = window.show() {
-                                eprintln!("Failed to show window: {}", e);
+                                eprintln!("❌ Failed to show window: {}", e);
                             } else {
-                                if let Err(e) = window.set_focus() {
-                                    eprintln!("Failed to focus window: {}", e);
-                                }
-                                println!("✅ Window shown and focused");
+                                println!("✅ Window shown");
+                                
+                                // Small delay then focus
+                                let window_clone = window.clone();
+                                std::thread::spawn(move || {
+                                    std::thread::sleep(std::time::Duration::from_millis(50));
+                                    if let Err(e) = window_clone.set_focus() {
+                                        eprintln!("⚠️  Failed to focus window: {}", e);
+                                    } else {
+                                        println!("✅ Window focused");
+                                        
+                                        // Bring to front (macOS specific)
+                                        #[cfg(target_os = "macos")]
+                                        {
+                                            if let Err(e) = window_clone.set_always_on_top(true) {
+                                                eprintln!("⚠️  Failed to set always on top: {}", e);
+                                            } else {
+                                                // Reset after a moment
+                                                let window_final = window_clone.clone();
+                                                std::thread::spawn(move || {
+                                                    std::thread::sleep(std::time::Duration::from_millis(100));
+                                                    let _ = window_final.set_always_on_top(false);
+                                                });
+                                            }
+                                        }
+                                    }
+                                });
                             }
                         }
                     } else if event_id == "quit" {
@@ -509,20 +612,46 @@ pub fn main() {
                     {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
+                            let is_visible = window.is_visible().unwrap_or(false);
+                            if is_visible {
+                                println!("🔄 Hiding window via tray click");
                                 if let Err(e) = window.hide() {
-                                    eprintln!("Failed to hide window: {}", e);
+                                    eprintln!("❌ Failed to hide window: {}", e);
                                 } else {
-                                    println!("Window hidden via tray click");
+                                    println!("✅ Window hidden via tray click");
                                 }
                             } else {
+                                println!("🔄 Showing window via tray click");
                                 if let Err(e) = window.show() {
-                                    eprintln!("Failed to show window: {}", e);
+                                    eprintln!("❌ Failed to show window: {}", e);
                                 } else {
-                                    if let Err(e) = window.set_focus() {
-                                        eprintln!("Failed to focus window: {}", e);
-                                    }
-                                    println!("Window shown via tray click");
+                                    println!("✅ Window shown");
+                                    
+                                    // Small delay then focus
+                                    let window_clone = window.clone();
+                                    std::thread::spawn(move || {
+                                        std::thread::sleep(std::time::Duration::from_millis(50));
+                                        if let Err(e) = window_clone.set_focus() {
+                                            eprintln!("⚠️  Failed to focus window: {}", e);
+                                        } else {
+                                            println!("✅ Window focused");
+                                            
+                                            // Bring to front (macOS specific)
+                                            #[cfg(target_os = "macos")]
+                                            {
+                                                if let Err(e) = window_clone.set_always_on_top(true) {
+                                                    eprintln!("⚠️  Failed to set always on top: {}", e);
+                                                } else {
+                                                    // Reset after a moment
+                                                    let window_final = window_clone.clone();
+                                                    std::thread::spawn(move || {
+                                                        std::thread::sleep(std::time::Duration::from_millis(100));
+                                                        let _ = window_final.set_always_on_top(false);
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    });
                                 }
                             }
                         }
@@ -596,6 +725,63 @@ pub fn main() {
             }
             
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Handle window events for all windows
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    // Only hide the main window instead of closing it
+                    // This keeps the app running in the background so hotkeys continue to work
+                    if window.label() == "main" {
+                        api.prevent_close();
+                        if let Err(e) = window.hide() {
+                            eprintln!("Failed to hide window: {}", e);
+                        } else {
+                            println!("Window hidden - app continues running in background. Hotkeys will still work.");
+                            // Emit event to frontend for cleanup
+                            let _ = window.emit("window-hide", ());
+                        }
+                    }
+                }
+                tauri::WindowEvent::Focused(focused) => {
+                    if *focused && window.label() == "main" {
+                        // When main window gets focus (e.g., from Dock/Spotlight activation), 
+                        // ensure it's visible and re-apply Accessory policy to keep Dock icon hidden
+                        #[cfg(target_os = "macos")]
+                        {
+                            if let Err(e) = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory) {
+                                eprintln!("Failed to re-apply Accessory activation policy: {}", e);
+                            } else {
+                                println!("🍎 Re-applied Accessory activation policy (Dock icon hidden)");
+                            }
+                        }
+                        // Always show window when it gets focus (even if already visible, ensures it's on top)
+                        if !window.is_visible().unwrap_or(false) {
+                            if let Err(e) = window.show() {
+                                eprintln!("Failed to show window on focus: {}", e);
+                            } else {
+                                if let Err(e) = window.set_focus() {
+                                    eprintln!("Failed to focus window: {}", e);
+                                }
+                                println!("Window shown on focus/activation");
+                            }
+                        } else {
+                            // Window is already visible, but ensure it's focused
+                            if let Err(e) = window.set_focus() {
+                                eprintln!("Failed to focus window: {}", e);
+                            }
+                        }
+                    }
+                }
+                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                    // Re-apply activation policy on window interactions to ensure Dock stays hidden
+                    #[cfg(target_os = "macos")]
+                    if window.label() == "main" {
+                        let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
+                    }
+                }
+                _ => {}
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

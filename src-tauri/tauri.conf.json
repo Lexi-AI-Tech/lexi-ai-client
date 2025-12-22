@@ -24,7 +24,8 @@
       "exceptionDomain": "",
       "frameworks": [],
       "providerShortName": null,
-      "signingIdentity": "Apple Development: ranjeetbaraik15@gmail.com (Q7WQTDB93C)"
+      "signingIdentity": "Apple Development: ranjeetbaraik15@gmail.com (Q7WQTDB93C)",
+      "infoPlist": "Info.plist"
     }
   },
   "app": {
