@@ -44,14 +44,14 @@ function App() {
       }
 
       try {
-        const { getUserConfig } = await import('./lib/apiClient');
+        const { getAppConfig } = await import('./lib/apiClient');
         const { getDeviceInfo } = await import('./lib/deviceInfo');
         
         // Detect system type
         const deviceInfo = getDeviceInfo();
         const systemType = deviceInfo.system_type || 'mac';
         
-        const config = await getUserConfig(systemType);
+        const config = await getAppConfig(systemType);
         
         // Sync hotkey to Rust backend
         if (config.hotkey) {

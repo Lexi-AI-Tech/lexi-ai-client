@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { HotkeyInput, HotkeyConfig } from './HotkeyInput';
-import { getUserConfig, updateUserConfig } from '../lib/apiClient';
+import { getAppConfig, updateAppConfig } from '../lib/apiClient';
 
 const DEFAULT_HOTKEY: HotkeyConfig = {
   hotkey: 'Fn',
@@ -67,7 +67,7 @@ export const HotkeySettings: React.FC = () => {
 
         // Load from DB (for both hotkey and language) with system type
         try {
-          const config = await getUserConfig(detectedSystemType);
+          const config = await getAppConfig(detectedSystemType);
           if (config.hotkey) {
             const dbHotkey: HotkeyConfig = { hotkey: config.hotkey };
             setCurrentHotkey(dbHotkey);
@@ -157,7 +157,7 @@ export const HotkeySettings: React.FC = () => {
         updateData.language = selectedLanguage;
       }
 
-      await updateUserConfig(updateData);
+      await updateAppConfig(updateData);
 
       // Update local state
       if (hotkeyChanged) {
