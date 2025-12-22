@@ -214,6 +214,38 @@ fn toggle_pill_window(app: AppHandle) -> Result<(), String> {
     pill::toggle_pill_window(app)
 }
 
+/// Open DevTools for the specified window
+/// 
+/// This command allows the frontend to open the web inspector (DevTools) for debugging.
+/// It can open DevTools on the main window or any other window by label.
+/// 
+/// # Arguments
+/// * `window_label` - Optional window label (defaults to "main" if not provided)
+/// 
+/// # Returns
+/// * `Ok(())` - Successfully opened DevTools
+/// * `Err(String)` - An error message if the window was not found
+#[tauri::command]
+fn open_devtools(app: AppHandle, window_label: Option<String>) -> Result<(), String> {
+    let label = window_label.as_deref().unwrap_or("main");
+    
+    if let Some(window) = app.get_webview_window(label) {
+        window.open_devtools();
+        println!("🔧 DevTools opened for window: {}", label);
+        Ok(())
+    } else {
+        let available_windows: Vec<String> = app
+            .webview_windows()
+            .keys()
+            .map(|k| k.to_string())
+            .collect();
+        Err(format!(
+            "Window '{}' not found. Available windows: {:?}",
+            label, available_windows
+        ))
+    }
+}
+
 /// Processes recorded audio data by:
 /// 1. Aborting any ongoing transcription task
 /// 2. Getting the authentication token from AuthTokenState
@@ -341,6 +373,7 @@ pub fn main() {
     
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .manage(OAuthState::default())
         .manage(AuthTokenState::default())
         .manage(TranscriptionTaskState {
@@ -357,6 +390,7 @@ pub fn main() {
             inject_text,
             show_pill_window,
             toggle_pill_window,
+            open_devtools,
             start_google_login,
             get_pkce_verifier,
             set_auth_token,

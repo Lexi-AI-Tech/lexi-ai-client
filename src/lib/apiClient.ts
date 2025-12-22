@@ -26,12 +26,14 @@ export interface AuthResponse {
   expires_in?: number;
 }
 
+import { getStorageItemSync } from './persistentStorage';
+
 /**
- * Get the current access token from localStorage
+ * Get the current access token from persistent storage
  */
 function getAccessToken(): string | null {
   try {
-    const stored = localStorage.getItem('lexi-auth');
+    const stored = getStorageItemSync('lexi-auth');
     if (stored) {
       const parsed = JSON.parse(stored);
       return parsed.tokens?.access_token || null;
@@ -43,11 +45,11 @@ function getAccessToken(): string | null {
 }
 
 /**
- * Get the refresh token from localStorage
+ * Get the refresh token from persistent storage
  */
 function getRefreshToken(): string | null {
   try {
-    const stored = localStorage.getItem('lexi-auth');
+    const stored = getStorageItemSync('lexi-auth');
     if (stored) {
       const parsed = JSON.parse(stored);
       return parsed.tokens?.refresh_token || null;
@@ -93,7 +95,8 @@ async function refreshAccessToken(): Promise<string | null> {
     if (data.access_token) {
       // Update stored tokens
       try {
-        const stored = localStorage.getItem('lexi-auth');
+        const { getStorageItem, setStorageItem } = await import('./persistentStorage');
+        const stored = await getStorageItem('lexi-auth');
         if (stored) {
           const parsed = JSON.parse(stored);
           parsed.tokens = {
@@ -105,7 +108,8 @@ async function refreshAccessToken(): Promise<string | null> {
               ? Date.now() + data.expires_in * 1000 
               : parsed.tokens.expires_at,
           };
-          localStorage.setItem('lexi-auth', JSON.stringify(parsed));
+          // Use async storage for persistence
+          await setStorageItem('lexi-auth', JSON.stringify(parsed));
         }
       } catch (e) {
         console.error('Failed to update tokens:', e);
@@ -152,7 +156,8 @@ export async function authenticatedFetch(
       });
     } else {
       // Refresh failed, clear auth
-      localStorage.removeItem('lexi-auth');
+      const { removeStorageItem } = await import('./persistentStorage');
+      await removeStorageItem('lexi-auth');
       // Dispatch event to notify app of auth failure
       window.dispatchEvent(new CustomEvent('auth-expired'));
     }
@@ -558,4 +563,58 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(errorData.error || errorData.detail || `Failed to delete transcript: ${response.status}`);
   }
+}
+
+/**
+ * App config types
+ */
+export interface AppConfig {
+  system_type: string;
+  hotkey: string;
+  language: string;
+}
+
+export interface AppConfigUpdateRequest {
+  system_type?: string;  // 'mac' or 'windows'
+  hotkey?: string;
+  language?: string;
+}
+
+/**
+ * Get current user's application configuration
+ */
+export async function getAppConfig(systemType: 'mac' | 'windows' = 'mac'): Promise<AppConfig> {
+  const params = new URLSearchParams({ system_type: systemType });
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/users/me/config?${params.toString()}`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || errorData.detail || `Failed to get app config: ${response.status}`);
+  }
+
+  const data: ApiResponse<AppConfig> = await response.json();
+  return (data.data || data) as AppConfig;
+}
+
+/**
+ * Update current user's application configuration
+ */
+export async function updateAppConfig(config: AppConfigUpdateRequest): Promise<AppConfig> {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/users/me/config`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(config),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || errorData.detail || `Failed to update app config: ${response.status}`);
+  }
+
+  const data: ApiResponse<AppConfig> = await response.json();
+  return (data.data || data) as AppConfig;
 }
