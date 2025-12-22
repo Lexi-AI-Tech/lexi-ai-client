@@ -285,7 +285,6 @@ export const HotkeySettings: React.FC = () => {
         >
           {isUpdating ? 'Saving...' : 'Save Configuration'}
         </button>
-      </div>
 
         {error && (
           <div className="permission-message" style={{ 
