@@ -561,24 +561,24 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
 }
 
 /**
- * User config types
+ * App config types
  */
-export interface UserConfig {
+export interface AppConfig {
   system_type: string;
   hotkey: string;
   language: string;
 }
 
-export interface UserConfigUpdateRequest {
+export interface AppConfigUpdateRequest {
   system_type?: string;  // 'mac' or 'windows'
   hotkey?: string;
   language?: string;
 }
 
 /**
- * Get current user's configuration
+ * Get current user's application configuration
  */
-export async function getUserConfig(systemType: 'mac' | 'windows' = 'mac'): Promise<UserConfig> {
+export async function getAppConfig(systemType: 'mac' | 'windows' = 'mac'): Promise<AppConfig> {
   const params = new URLSearchParams({ system_type: systemType });
   const response = await authenticatedFetch(`${API_BASE_URL}/api/users/me/config?${params.toString()}`, {
     method: 'GET',
@@ -586,17 +586,17 @@ export async function getUserConfig(systemType: 'mac' | 'windows' = 'mac'): Prom
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || errorData.detail || `Failed to get user config: ${response.status}`);
+    throw new Error(errorData.error || errorData.detail || `Failed to get app config: ${response.status}`);
   }
 
-  const data: ApiResponse<UserConfig> = await response.json();
-  return (data.data || data) as UserConfig;
+  const data: ApiResponse<AppConfig> = await response.json();
+  return (data.data || data) as AppConfig;
 }
 
 /**
- * Update current user's configuration
+ * Update current user's application configuration
  */
-export async function updateUserConfig(config: UserConfigUpdateRequest): Promise<UserConfig> {
+export async function updateAppConfig(config: AppConfigUpdateRequest): Promise<AppConfig> {
   const response = await authenticatedFetch(`${API_BASE_URL}/api/users/me/config`, {
     method: 'PUT',
     headers: {
@@ -607,9 +607,9 @@ export async function updateUserConfig(config: UserConfigUpdateRequest): Promise
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || errorData.detail || `Failed to update user config: ${response.status}`);
+    throw new Error(errorData.error || errorData.detail || `Failed to update app config: ${response.status}`);
   }
 
-  const data: ApiResponse<UserConfig> = await response.json();
-  return (data.data || data) as UserConfig;
+  const data: ApiResponse<AppConfig> = await response.json();
+  return (data.data || data) as AppConfig;
 }
