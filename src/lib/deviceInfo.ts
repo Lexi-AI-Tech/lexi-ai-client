@@ -5,6 +5,7 @@
 export interface DeviceInfo {
   device_name: string;
   device_type: string;
+  system_type: 'mac' | 'windows';  // Operating system type
 }
 
 /**
@@ -42,9 +43,21 @@ export function getDeviceInfo(): DeviceInfo {
     deviceName = 'Tauri App';
   }
   
+  // Detect system type (mac or windows)
+  let systemType: 'mac' | 'windows' = 'mac';
+  if (/windows/i.test(userAgent)) {
+    systemType = 'windows';
+  } else if (/macintosh|mac os x/i.test(userAgent)) {
+    systemType = 'mac';
+  } else {
+    // Default to mac for other systems (Linux, etc.)
+    systemType = 'mac';
+  }
+  
   return {
     device_name: deviceName,
     device_type: deviceType,
+    system_type: systemType,
   };
 }
 

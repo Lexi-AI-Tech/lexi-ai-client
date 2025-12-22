@@ -3,7 +3,10 @@
  * 
  * Manages authentication state for Lexi AI.
  * Stores user info, tokens, and authentication status.
+ * Uses persistent storage (Tauri Store in production, localStorage as fallback).
  */
+
+import { getStorageItem, setStorageItem, removeStorageItem, getStorageItemSync } from '../lib/persistentStorage';
 
 export interface AuthUser {
   email: string;
@@ -36,45 +39,81 @@ let user: AuthUser | null = null;
 let tokens: AuthTokens | null = null;
 let isLoading: boolean = false;
 let error: string | null = null;
+let storageInitialized: boolean = false;
 
-// Load from localStorage on initialization
-const loadFromStorage = () => {
+// Load from persistent storage on initialization
+const loadFromStorage = async () => {
   try {
-    const stored = localStorage.getItem('lexi-auth');
+    // First try sync localStorage for immediate access (fallback)
+    const storedSync = getStorageItemSync('lexi-auth');
+    if (storedSync) {
+      try {
+        const parsed = JSON.parse(storedSync);
+        isAuthenticated = parsed.isAuthenticated || false;
+        user = parsed.user || null;
+        tokens = parsed.tokens || null;
+        
+        // Check if tokens are expired
+        if (tokens?.expires_at && tokens.expires_at < Date.now()) {
+          // Tokens expired, clear auth
+          isAuthenticated = false;
+          user = null;
+          tokens = null;
+          await saveToStorage();
+        } else {
+          storageInitialized = true;
+          notifyListeners();
+        }
+      } catch (e) {
+        console.error('Failed to parse stored auth data:', e);
+      }
+    }
+    
+    // Then try async persistent storage (Tauri Store)
+    const stored = await getStorageItem('lexi-auth');
     if (stored) {
-      const parsed = JSON.parse(stored);
-      isAuthenticated = parsed.isAuthenticated || false;
-      user = parsed.user || null;
-      tokens = parsed.tokens || null;
-      
-      // Check if tokens are expired
-      if (tokens?.expires_at && tokens.expires_at < Date.now()) {
-        // Tokens expired, clear auth
-        isAuthenticated = false;
-        user = null;
-        tokens = null;
-        saveToStorage();
+      try {
+        const parsed = JSON.parse(stored);
+        isAuthenticated = parsed.isAuthenticated || false;
+        user = parsed.user || null;
+        tokens = parsed.tokens || null;
+        
+        // Check if tokens are expired
+        if (tokens?.expires_at && tokens.expires_at < Date.now()) {
+          // Tokens expired, clear auth
+          isAuthenticated = false;
+          user = null;
+          tokens = null;
+          await saveToStorage();
+        } else {
+          storageInitialized = true;
+          notifyListeners();
+        }
+      } catch (e) {
+        console.error('Failed to parse stored auth data:', e);
       }
     }
   } catch (e) {
     console.error('Failed to load auth state:', e);
   }
+  storageInitialized = true;
 };
 
-// Save to localStorage
-const saveToStorage = () => {
+// Save to persistent storage
+const saveToStorage = async () => {
   try {
-    localStorage.setItem('lexi-auth', JSON.stringify({
+    const data = JSON.stringify({
       isAuthenticated,
       user,
       tokens
-    }));
+    });
+    await setStorageItem('lexi-auth', data);
   } catch (e) {
     console.error('Failed to save auth state:', e);
   }
 };
 
-// Initialize from storage
+// Initialize from storage (async, but don't block)
 loadFromStorage();
 
 // Listeners for state changes
@@ -111,7 +150,10 @@ export const authStore: AuthState = {
       tokens.expires_at = Date.now() + tokens.expires_in * 1000;
     }
     
-    saveToStorage();
+    // Save to storage (async, but don't block)
+    saveToStorage().catch(err => {
+      console.error('Failed to save auth data:', err);
+    });
     notifyListeners();
   },
   clearAuth: () => {
@@ -119,7 +161,10 @@ export const authStore: AuthState = {
     user = null;
     tokens = null;
     error = null;
-    saveToStorage();
+    // Remove from storage (async, but don't block)
+    removeStorageItem('lexi-auth').catch(err => {
+      console.error('Failed to clear auth data:', err);
+    });
     notifyListeners();
   },
   setLoading: (loading: boolean) => {
