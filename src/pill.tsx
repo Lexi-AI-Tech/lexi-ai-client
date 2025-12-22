@@ -28,6 +28,7 @@ import './index.css'
  */
 const Pill: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'recording' | 'processing'>('idle')
+  const [isHovered, setIsHovered] = useState(false)
 
   useEffect(() => {
     const setupListeners = async () => {
@@ -156,9 +157,22 @@ const Pill: React.FC = () => {
   const containerHeight = isIdle ? '6.6px' : '80px'
   const borderRadius = isIdle ? '3.3px' : '50%'
 
+  // Get background color - gray when hovered, otherwise status color
+  const getBackgroundColor = () => {
+    if (isHovered) {
+      return '#6b7280' // Gray-500 for hover state
+    }
+    if (isIdle) {
+      return 'rgba(31, 41, 55, 0.4)' // Transparent gray for idle
+    }
+    return getStatusColor()
+  }
+
   return (
     <div
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -168,16 +182,17 @@ const Pill: React.FC = () => {
         borderRadius: borderRadius,
         cursor: 'move',
         transition: 'all 0.3s ease',
-        boxShadow: isIdle 
+        transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+        boxShadow: isHovered
+          ? '0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)'
+          : isIdle 
           ? '0 2px 4px -1px rgba(0, 0, 0, 0.1)' 
           : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
         userSelect: 'none',
         border: isIdle 
           ? '1px solid rgba(255, 255, 255, 0.15)' 
           : '1px solid rgba(255, 255, 255, 0.1)',
-        backgroundColor: isIdle 
-          ? 'rgba(31, 41, 55, 0.4)' // Transparent gray for idle
-          : getStatusColor(),
+        backgroundColor: getBackgroundColor(),
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         pointerEvents: 'auto',
