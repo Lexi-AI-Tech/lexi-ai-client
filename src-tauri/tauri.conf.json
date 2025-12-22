@@ -46,7 +46,7 @@
         "skipTaskbar": true,
         "decorations": true,
         "transparent": false,
-        "url": "screens/main.html",
+        "url": "index.html",
         "devtools": true,
         "visible": true
       }

@@ -2,7 +2,7 @@
 name = "lexi-ai"
 version = "0.1.0"
 description = "Speech-to-text overlay app for macOS"
-authors = ["you"]
+authors = ["anadi45"]
 license = ""
 repository = ""
 edition = "2021"
