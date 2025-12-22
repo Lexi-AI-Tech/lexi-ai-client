@@ -42,6 +42,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
 use tauri::{AppHandle, Manager, Emitter};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tokio::sync::watch;
 use serde_json;
 
@@ -454,9 +456,81 @@ pub fn main() {
                         eprintln!("Failed to hide window: {}", e);
                     } else {
                         println!("Window hidden - app continues running in background. Hotkeys will still work.");
+                        // Emit event to frontend for cleanup
+                        let _ = window_clone.emit("window-hide", ());
                     }
                 }
             });
+            
+            // Create system tray with menu
+            let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            
+            // Get the default window icon for the tray
+            let tray_icon = app.default_window_icon()
+                .ok_or_else(|| {
+                    eprintln!("⚠️  Warning: Default window icon not found, tray icon may not display correctly");
+                    std::io::Error::new(std::io::ErrorKind::NotFound, "Default window icon not available")
+                })?;
+            
+            // Create the tray icon
+            let _tray = TrayIconBuilder::with_id("main")
+                .icon(tray_icon.clone())
+                .tooltip("Lexi AI")
+                .menu(&tray_menu)
+                .on_menu_event(move |app, event| {
+                    let event_id = event.id.as_ref().to_string();
+                    println!("📋 Tray menu event: {}", event_id);
+                    
+                    if event_id == "show" {
+                        if let Some(window) = app.get_webview_window("main") {
+                            if let Err(e) = window.show() {
+                                eprintln!("Failed to show window: {}", e);
+                            } else {
+                                if let Err(e) = window.set_focus() {
+                                    eprintln!("Failed to focus window: {}", e);
+                                }
+                                println!("✅ Window shown and focused");
+                            }
+                        }
+                    } else if event_id == "quit" {
+                        println!("👋 Quitting application");
+                        app.exit(0);
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    // Handle left-click on tray icon to show/hide window
+                    if let TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        button_state: tauri::tray::MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                if let Err(e) = window.hide() {
+                                    eprintln!("Failed to hide window: {}", e);
+                                } else {
+                                    println!("Window hidden via tray click");
+                                }
+                            } else {
+                                if let Err(e) = window.show() {
+                                    eprintln!("Failed to show window: {}", e);
+                                } else {
+                                    if let Err(e) = window.set_focus() {
+                                        eprintln!("Failed to focus window: {}", e);
+                                    }
+                                    println!("Window shown via tray click");
+                                }
+                            }
+                        }
+                    }
+                })
+                .build(app)?;
+            
+            println!("🎯 System tray created successfully");
             
             #[cfg(desktop)]
             {

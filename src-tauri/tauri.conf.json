@@ -42,11 +42,12 @@
         "minWidth": 350,
         "minHeight": 400,
         "alwaysOnTop": false,
-        "skipTaskbar": false,
+        "skipTaskbar": true,
         "decorations": true,
         "transparent": false,
         "url": "screens/main.html",
-        "devtools": true
+        "devtools": true,
+        "visible": true
       }
     ],
     "macOSPrivateApi": true
