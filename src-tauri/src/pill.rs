@@ -52,12 +52,18 @@ fn calculate_bottom_position(app: &AppHandle) -> Result<(f64, f64), String> {
     let pill_width = 40.0;
     let pill_height = 6.6;
     
-    // Calculate bottom position: horizontally centered, positioned 5-10px above taskbar/dock
-    // Use a small fixed offset to position the pill just above the taskbar
-    let bottom_offset: f64 = 10.0; // 10px above taskbar/dock
+    // Estimate taskbar/dock height when visible
+    // macOS dock: typically 60-80px, Windows taskbar: typically 40-48px
+    // Using a conservative estimate that works for both platforms
+    let taskbar_height: f64 = 60.0; // Estimated taskbar/dock height in logical pixels
     
+    // Offset above taskbar (5-10px range, using 7px as middle ground)
+    let offset_above_taskbar: f64 = 7.0;
+    
+    // Calculate bottom position: horizontally centered, positioned 5-10px above taskbar/dock
+    // Position = screen_height - taskbar_height - pill_height - offset_above_taskbar
     let x = (monitor_width - pill_width) / 2.0; // Horizontally centered
-    let y = monitor_height - pill_height - bottom_offset; // Just above taskbar/dock
+    let y = monitor_height - taskbar_height - pill_height - offset_above_taskbar;
     
     Ok((x, y))
 }
