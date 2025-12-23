@@ -29,11 +29,30 @@ function App() {
         await invoke('set_auth_token', { token });
         console.log('✅ Auth token synced to Rust backend');
 
-        // Start text monitoring
-        await invoke('start_monitoring');
-        console.log('✅ Text monitoring started');
+        // Check accessibility permission before starting text monitoring
+        try {
+          const hasPermission = await invoke<boolean>('check_accessibility_permission', {});
+          if (hasPermission) {
+            // Start text monitoring
+            await invoke('start_monitoring');
+            console.log('✅ Text monitoring started');
+          } else {
+            console.warn('⚠️ Accessibility permission not granted. Text monitoring will not start.');
+            console.warn('💡 Please grant accessibility permission in System Settings > Privacy & Security > Accessibility');
+            console.warn('💡 Then restart the app or call request_accessibility_permission');
+          }
+        } catch (error) {
+          console.error('Failed to check accessibility permission:', error);
+          // Try to start monitoring anyway - it will fail with a clear error if permission is denied
+          try {
+            await invoke('start_monitoring');
+            console.log('✅ Text monitoring started');
+          } catch (monitorError) {
+            console.error('Failed to start text monitoring:', monitorError);
+          }
+        }
       } catch (error) {
-        console.error('Failed to sync auth token or start monitoring:', error);
+        console.error('Failed to sync auth token:', error);
       }
     };
 
