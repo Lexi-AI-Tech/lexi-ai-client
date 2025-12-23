@@ -6,8 +6,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use system_configuration::core_foundation::string::CFString;
-use system_configuration::core_foundation::base::TCFType;
-use crate::grammar_checker::{check_grammar_internal, GrammarCheckResult};
+use crate::grammar_checker::check_grammar_internal;
 
 // Helper function to get element bounds (x, y, width, height)
 // AXBounds returns a CFDictionary - TODO: Properly parse CFDictionary to extract X, Y, Width, Height values
@@ -22,6 +21,7 @@ fn _get_element_bounds(_elem: &AXUIElement) -> Option<(f64, f64, f64, f64)> {
 }
 
 #[derive(Serialize, Clone)]
+#[allow(dead_code)] // Reserved for future use if we need to emit text-change events
 pub struct TextChangePayload {
     pub text: String,
     pub cursor_pos: usize,
@@ -53,7 +53,7 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
 
         let mut last_text = String::new();
         let mut last_grammar_check_text = String::new();
-        let mut last_focused_elem: Option<AXUIElement> = None;
+        let mut _last_focused_elem: Option<AXUIElement> = None; // Reserved for future use when parsing AXBounds
         let mut grammar_check_timer: Option<std::time::Instant> = None;
         const GRAMMAR_CHECK_DEBOUNCE_MS: u64 = 500; // Wait 500ms after typing stops
 
@@ -91,8 +91,8 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
             }
 
             if let Some(focused_elem) = focused_elem_option {
-                // Store the focused element for getting bounds later
-                last_focused_elem = Some(focused_elem.clone());
+                // Store the focused element for getting bounds later (when we implement AXBounds parsing)
+                _last_focused_elem = Some(focused_elem.clone());
                 
                 // Try to read text value
                 let value_attr = AXAttribute::new(&CFString::from_static_string("AXValue"));
@@ -156,7 +156,7 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
                 }
             } else {
                 // No focused element, clear the stored element
-                last_focused_elem = None;
+                _last_focused_elem = None;
             }
             
             thread::sleep(Duration::from_millis(300)); // Debounce
