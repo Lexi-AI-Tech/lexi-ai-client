@@ -33,12 +33,17 @@ pub fn ensure_overlay_window_exists(app: &AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn show_overlay_window(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
+pub fn show_overlay_window(app: AppHandle, x: Option<f64>, y: Option<f64>) -> Result<(), String> {
+    println!("🪟 show_overlay_window called - x: {:?}, y: {:?}", x, y);
     ensure_overlay_window_exists(&app)?;
     
     if let Some(window) = app.get_webview_window("correction-overlay") {
-        window.set_position(LogicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+        // Set position if provided, otherwise use default
+        if let (Some(x_pos), Some(y_pos)) = (x, y) {
+            window.set_position(LogicalPosition::new(x_pos, y_pos)).map_err(|e| e.to_string())?;
+        }
         window.show().map_err(|e| e.to_string())?;
+        println!("✅ Overlay window shown");
         // window.set_focus().map_err(|e| e.to_string())?; // Maybe avoid steal focus? grammar bubles usually don't steal until clicked.
         Ok(())
     } else {

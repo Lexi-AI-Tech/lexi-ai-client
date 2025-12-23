@@ -17,17 +17,23 @@ pub struct GrammarCheckResult {
     pub suggestions: Vec<GrammarSuggestion>,
 }
 
-#[tauri::command]
-pub async fn check_grammar(text: String, cursor_pos: usize) -> Result<GrammarCheckResult, String> {
-    println!("🔍 check_grammar called - text length: {}, cursor_pos: {}", text.len(), cursor_pos);
+// Internal function to check grammar (called from text monitor)
+// Made synchronous for now since we're using hardcoded data
+// When re-enabling LanguageTool API, this will need to be async again
+pub fn check_grammar_internal(text: String, cursor_pos: usize) -> GrammarCheckResult {
+    println!("🔍 check_grammar_internal called - text length: {}, cursor_pos: {}", text.len(), cursor_pos);
     
     // For now, return hardcoded suggestion for testing
     // TODO: Re-enable LanguageTool API integration later
-    // let client = ServerClient::new("https://api.languagetool.org/v2", "");
-    // let request = CheckRequest::default()
-    //     .with_text(text.clone())
-    //     .with_language("en-US".to_string());
-    // let response = client.check(&request).await?;
+    // This will need to be async when using the API:
+    // pub async fn check_grammar_internal(text: String, cursor_pos: usize) -> GrammarCheckResult {
+    //     let client = ServerClient::new("https://api.languagetool.org/v2", "");
+    //     let request = CheckRequest::default()
+    //         .with_text(text.clone())
+    //         .with_language("en-US".to_string());
+    //     let response = client.check(&request).await?;
+    //     ...
+    // }
     
     // Return a hardcoded suggestion if text is not empty
     let suggestions = if !text.is_empty() && text.len() > 5 {
@@ -43,7 +49,13 @@ pub async fn check_grammar(text: String, cursor_pos: usize) -> Result<GrammarChe
     };
     
     println!("✅ Returning {} hardcoded suggestions", suggestions.len());
-    Ok(GrammarCheckResult { suggestions })
+    GrammarCheckResult { suggestions }
+}
+
+// Keep the command for manual invocation if needed
+#[tauri::command]
+pub fn check_grammar(text: String, cursor_pos: usize) -> Result<GrammarCheckResult, String> {
+    Ok(check_grammar_internal(text, cursor_pos))
 }
 
 // Placeholder – we'll implement real replacement later

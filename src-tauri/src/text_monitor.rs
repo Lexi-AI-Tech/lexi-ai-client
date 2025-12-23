@@ -6,11 +6,17 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use system_configuration::core_foundation::string::CFString;
+use crate::grammar_checker::{check_grammar_internal, GrammarCheckResult};
 
 #[derive(Serialize, Clone)]
 pub struct TextChangePayload {
     pub text: String,
     pub cursor_pos: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub struct GrammarSuggestionsPayload {
+    pub suggestions: Vec<crate::grammar_checker::GrammarSuggestion>,
 }
 
 pub struct TextMonitor {
@@ -31,6 +37,9 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
         println!("📡 Text monitoring thread started");
 
         let mut last_text = String::new();
+        let mut last_grammar_check_text = String::new();
+        let mut grammar_check_timer: Option<std::time::Instant> = None;
+        const GRAMMAR_CHECK_DEBOUNCE_MS: u64 = 500; // Wait 500ms after typing stops
 
         loop {
 
@@ -83,20 +92,42 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
                             last_text = text.clone();
                             
                             // Try to get cursor position
-                            let cursor_pos = 0;
+                            let _cursor_pos = 0;
                             let selected_range_attr = AXAttribute::new(&CFString::from_static_string("AXSelectedTextRange"));
                             if let Ok(_selected_range_val) = focused_elem.attribute(&selected_range_attr) {
                                 // TODO: Parse cursor position from AXSelectedTextRange
                                 // For now, default to 0
                             }
 
-                            // Emit to frontend
-                            let payload = TextChangePayload {
-                                text: text.clone(),
-                                cursor_pos, 
-                            };
-                            println!("📤 Emitting text-change event to frontend (text length: {}, cursor_pos: {})", text.len(), cursor_pos);
-                            let _ = app_handle.emit("text-change", payload);
+                            // Reset grammar check timer when text changes
+                            grammar_check_timer = Some(std::time::Instant::now());
+                            last_grammar_check_text = text.clone();
+                        }
+                        
+                        // Check if it's time to run grammar check (debounced)
+                        if let Some(timer) = grammar_check_timer {
+                            if timer.elapsed().as_millis() >= GRAMMAR_CHECK_DEBOUNCE_MS as u128 {
+                                grammar_check_timer = None;
+                                
+                                // Only check grammar if text is meaningful
+                                if !last_grammar_check_text.is_empty() && last_grammar_check_text.len() >= 3 {
+                                    println!("🔍 Running grammar check for text (length: {})", last_grammar_check_text.len());
+                                    
+                                    // Run grammar check (synchronous for now)
+                                    let app_handle_clone = app_handle.clone();
+                                    let text_to_check = last_grammar_check_text.clone();
+                                    let cursor_pos_for_check = 0; // TODO: Get actual cursor position
+                                    
+                                    let result = check_grammar_internal(text_to_check, cursor_pos_for_check);
+                                    
+                                    // Emit grammar suggestions to frontend
+                                    let payload = GrammarSuggestionsPayload {
+                                        suggestions: result.suggestions.clone(),
+                                    };
+                                    println!("📤 Emitting grammar-suggestions event ({} suggestions)", result.suggestions.len());
+                                    let _ = app_handle_clone.emit("grammar-suggestions", payload);
+                                }
+                            }
                         }
                     }
                 }

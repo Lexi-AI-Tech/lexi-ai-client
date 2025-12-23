@@ -14,68 +14,43 @@ interface GrammarCheckResult {
     suggestions: GrammarSuggestion[];
 }
 
-interface TextChangePayload {
-    text: string;
-    cursor_pos: number;
+interface GrammarSuggestionsPayload {
+    suggestions: GrammarSuggestion[];
 }
 
 const CorrectionOverlay = () => {
     const [suggestions, setSuggestions] = useState<GrammarSuggestion[]>([]);
-    const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        // Listen to text-change events from the text monitor
+        console.log('🎬 CorrectionOverlay: Component mounted, setting up listener...');
+        // Listen to grammar-suggestions events from the text monitor (grammar check happens automatically in Rust)
         let unlisten: () => void;
 
         const setupListener = async () => {
-            unlisten = await listen<TextChangePayload>('text-change', async (event) => {
-                const { text, cursor_pos } = event.payload;
+            console.log('🎧 CorrectionOverlay: Setting up grammar-suggestions listener...');
+            unlisten = await listen<GrammarSuggestionsPayload>('grammar-suggestions', async (event) => {
+                console.log('📨 CorrectionOverlay: Received grammar-suggestions event:', event.payload);
+                const { suggestions } = event.payload;
 
-                // Debounce grammar checks to avoid excessive API calls
-                // Clear previous timer
-                if (debounceTimerRef.current) {
-                    clearTimeout(debounceTimerRef.current);
-                }
-
-                // Only check grammar if text is not empty and has reasonable length
-                if (!text || text.trim().length === 0 || text.length < 3) {
-                    setSuggestions([]);
-                    return;
-                }
-
-                // Debounce: wait 500ms after user stops typing before checking grammar
-                debounceTimerRef.current = setTimeout(async () => {
+                if (suggestions && suggestions.length > 0) {
+                    console.log('✅ Got {} grammar suggestions', suggestions.length);
+                    setSuggestions(suggestions);
+                    // Show overlay window (position is optional)
                     try {
-                        console.log('🔍 Checking grammar for text (length:', text.length, ', cursor_pos:', cursor_pos, ')');
-                        
-                        const result = await invoke<GrammarCheckResult>('check_grammar', { 
-                            text, 
-                            cursor_pos: cursor_pos 
-                        });
-
-                        console.log('📝 Grammar check result:', result);
-
-                        if (result.suggestions && result.suggestions.length > 0) {
-                            setSuggestions(result.suggestions);
-                            // Show overlay window
-                            try {
-                                await invoke('show_overlay_window');
-                            } catch (e) {
-                                console.warn('Failed to show overlay window:', e);
-                            }
-                        } else {
-                            setSuggestions([]);
-                            try {
-                                await invoke('hide_overlay_window');
-                            } catch (e) {
-                                console.warn('Failed to hide overlay window:', e);
-                            }
-                        }
+                        await invoke('show_overlay_window', { x: 100.0, y: 100.0 });
+                        console.log('✅ Overlay window shown');
                     } catch (e) {
-                        console.error('Failed to check grammar:', e);
-                        setSuggestions([]);
+                        console.warn('Failed to show overlay window:', e);
                     }
-                }, 500); // 500ms debounce
+                } else {
+                    console.log('✓ No grammar suggestions');
+                    setSuggestions([]);
+                    try {
+                        await invoke('hide_overlay_window');
+                    } catch (e) {
+                        console.warn('Failed to hide overlay window:', e);
+                    }
+                }
             });
         };
 
@@ -83,9 +58,6 @@ const CorrectionOverlay = () => {
 
         return () => {
             if (unlisten) unlisten();
-            if (debounceTimerRef.current) {
-                clearTimeout(debounceTimerRef.current);
-            }
         };
     }, []);
 
