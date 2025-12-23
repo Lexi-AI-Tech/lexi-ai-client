@@ -20,7 +20,7 @@ function App() {
   const { isCompleted } = useOnboardingStore();
   const { tokens } = useAuthStore();
   const [currentPage, setCurrentPage] = useState<Page>('transcripts');
-  
+
   // Sync auth token to Rust backend whenever it changes
   useEffect(() => {
     const syncAuthToken = async () => {
@@ -28,13 +28,18 @@ function App() {
         const token = tokens?.access_token || null;
         await invoke('set_auth_token', { token });
         console.log('✅ Auth token synced to Rust backend');
+
+        // Start text monitoring
+        await invoke('start_monitoring');
+        console.log('✅ Text monitoring started');
       } catch (error) {
-        console.error('Failed to sync auth token to Rust:', error);
+        console.error('Failed to sync auth token or start monitoring:', error);
       }
     };
-    
+
     syncAuthToken();
   }, [tokens?.access_token]);
+
 
   // Load and sync config from DB on mount
   useEffect(() => {
@@ -46,13 +51,13 @@ function App() {
       try {
         const { getAppConfig } = await import('./lib/apiClient');
         const { getDeviceInfo } = await import('./lib/deviceInfo');
-        
+
         // Detect system type
         const deviceInfo = getDeviceInfo();
         const systemType = deviceInfo.system_type || 'mac';
-        
+
         const config = await getAppConfig(systemType);
-        
+
         // Sync hotkey to Rust backend
         if (config.hotkey) {
           const hotkeyConfig = { hotkey: config.hotkey };
@@ -66,7 +71,7 @@ function App() {
 
     loadAndSyncConfig();
   }, [tokens?.access_token]);
-  
+
   // If onboarding is not completed, show onboarding flow
   if (!isCompleted) {
     return <OnboardingFlow />;

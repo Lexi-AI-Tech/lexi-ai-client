@@ -59,6 +59,11 @@ mod window;              // Window management utilities (show, focus, activate)
 mod audio_processor;     // Audio processing and transcription orchestration
 mod recording_thread;    // Recording thread management
 mod commands;            // Tauri commands organized by functionality
+mod text_monitor;        // System-wide text monitoring
+mod grammar_checker;     // Grammar checking and text replacement
+mod overlay_window;      // Overlay window management
+
+
 
 use global_key_listener::HotkeyConfig;
 use state::{
@@ -128,6 +133,8 @@ pub fn main() {
             task_handle: Mutex::new(None),
             cancel_tx: Mutex::new(None),
         })
+        .manage(text_monitor::TextMonitor::new())
+
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
             request_input_monitoring_permission,
@@ -145,7 +152,15 @@ pub fn main() {
             update_hotkey,
             get_current_hotkey,
             start_hotkey_recording,
-            stop_hotkey_recording
+            start_hotkey_recording,
+            stop_hotkey_recording,
+            text_monitor::start_monitoring,
+            grammar_checker::check_grammar,
+            grammar_checker::replace_text,
+            overlay_window::show_overlay_window,
+            overlay_window::hide_overlay_window
+
+
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
@@ -165,6 +180,11 @@ pub fn main() {
             if let Err(e) = pill::init_pill_window(app_handle.clone()) {
                 eprintln!("Failed to initialize pill window: {}", e);
             }
+
+            if let Err(e) = overlay_window::create_overlay_window(&app_handle) {
+                eprintln!("Failed to initialize overlay window: {}", e);
+            }
+
 
             // Channel to communicate with the recording thread
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread

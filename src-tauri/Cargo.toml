@@ -42,3 +42,7 @@ objc = "0.2"
 rdev = { git = "https://github.com/fufesou/rdev" }  # Fork fixes macOS issues
 arboard = "3.4"  # Cross-platform clipboard
 enigo = "0.6.1"    # Cross-platform input simulation
+accessibility = "0.1" # macOS Accessibility API
+languagetool-rust = "2.1" # LanguageTool API client
+system-configuration = "0.5" # CoreFoundation types for macOS
+
