@@ -1,6 +1,6 @@
 // src-tauri/src/grammar_checker.rs
 
-use languagetool_rust::{check::CheckRequest, server::ServerClient};
+// use languagetool_rust::{check::CheckRequest, server::ServerClient};
 use serde::Serialize;
 
 #[derive(Serialize, Clone)]
@@ -21,45 +21,28 @@ pub struct GrammarCheckResult {
 pub async fn check_grammar(text: String, cursor_pos: usize) -> Result<GrammarCheckResult, String> {
     println!("🔍 check_grammar called - text length: {}, cursor_pos: {}", text.len(), cursor_pos);
     
-    // Use public LanguageTool API (rate-limited but fine for testing/MVP)
-    let client = ServerClient::new("https://api.languagetool.org/v2", "");
-
-    let request = CheckRequest::default()
-        .with_text(text.clone())
-        .with_language("en-US".to_string());
-
-    println!("📤 Sending request to LanguageTool API...");
-    let response = client
-        .check(&request)
-        .await
-        .map_err(|e| {
-            println!("❌ LanguageTool API error: {}", e);
-            format!("LanguageTool API error: {}", e)
-        })?;
+    // For now, return hardcoded suggestion for testing
+    // TODO: Re-enable LanguageTool API integration later
+    // let client = ServerClient::new("https://api.languagetool.org/v2", "");
+    // let request = CheckRequest::default()
+    //     .with_text(text.clone())
+    //     .with_language("en-US".to_string());
+    // let response = client.check(&request).await?;
     
-    println!("✅ Received response from LanguageTool API ({} matches)", response.matches.len());
-
-    let mut suggestions = Vec::new();
-
-    for mat in response.matches {
-        let start = mat.offset;
-        let end = mat.offset + mat.length;
-
-        // Only include suggestions near the cursor (±30 chars) to avoid noise
-        if cursor_pos >= start.saturating_sub(30) && cursor_pos <= end.saturating_add(30) {
-            if let Some(replacement) = mat.replacements.first() {
-                suggestions.push(GrammarSuggestion {
-                    start,
-                    end,
-                    original: text[start..end].to_string(),
-                    replacement: replacement.value.clone(),
-                    explanation: mat.message.clone(),
-                });
-            }
-        }
-    }
-
-    println!("📝 Returning {} suggestions near cursor position {}", suggestions.len(), cursor_pos);
+    // Return a hardcoded suggestion if text is not empty
+    let suggestions = if !text.is_empty() && text.len() > 5 {
+        vec![GrammarSuggestion {
+            start: 0,
+            end: 5.min(text.len()),
+            original: text[0..5.min(text.len())].to_string(),
+            replacement: "hardcoded text".to_string(),
+            explanation: "This is a hardcoded suggestion for testing".to_string(),
+        }]
+    } else {
+        Vec::new()
+    };
+    
+    println!("✅ Returning {} hardcoded suggestions", suggestions.len());
     Ok(GrammarCheckResult { suggestions })
 }
 
