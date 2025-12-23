@@ -6,7 +6,20 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use system_configuration::core_foundation::string::CFString;
+use system_configuration::core_foundation::base::TCFType;
 use crate::grammar_checker::{check_grammar_internal, GrammarCheckResult};
+
+// Helper function to get element bounds (x, y, width, height)
+// AXBounds returns a CFDictionary - TODO: Properly parse CFDictionary to extract X, Y, Width, Height values
+// For now, this is a placeholder - we'll implement proper parsing later
+fn _get_element_bounds(_elem: &AXUIElement) -> Option<(f64, f64, f64, f64)> {
+    // TODO: Parse AXBounds CFDictionary to extract:
+    // - X: CFNumber
+    // - Y: CFNumber  
+    // - Width: CFNumber
+    // - Height: CFNumber
+    None
+}
 
 #[derive(Serialize, Clone)]
 pub struct TextChangePayload {
@@ -17,6 +30,8 @@ pub struct TextChangePayload {
 #[derive(Serialize, Clone)]
 pub struct GrammarSuggestionsPayload {
     pub suggestions: Vec<crate::grammar_checker::GrammarSuggestion>,
+    pub x: Option<f64>,
+    pub y: Option<f64>,
 }
 
 pub struct TextMonitor {
@@ -38,6 +53,7 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
 
         let mut last_text = String::new();
         let mut last_grammar_check_text = String::new();
+        let mut last_focused_elem: Option<AXUIElement> = None;
         let mut grammar_check_timer: Option<std::time::Instant> = None;
         const GRAMMAR_CHECK_DEBOUNCE_MS: u64 = 500; // Wait 500ms after typing stops
 
@@ -75,6 +91,9 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
             }
 
             if let Some(focused_elem) = focused_elem_option {
+                // Store the focused element for getting bounds later
+                last_focused_elem = Some(focused_elem.clone());
+                
                 // Try to read text value
                 let value_attr = AXAttribute::new(&CFString::from_static_string("AXValue"));
                 if let Ok(text_val) = focused_elem.attribute(&value_attr) {
@@ -90,14 +109,6 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
                         if text != last_text {
                             println!("🔄 Text changed detected! Previous length: {}, New length: {}", last_text.len(), text.len());
                             last_text = text.clone();
-                            
-                            // Try to get cursor position
-                            let _cursor_pos = 0;
-                            let selected_range_attr = AXAttribute::new(&CFString::from_static_string("AXSelectedTextRange"));
-                            if let Ok(_selected_range_val) = focused_elem.attribute(&selected_range_attr) {
-                                // TODO: Parse cursor position from AXSelectedTextRange
-                                // For now, default to 0
-                            }
 
                             // Reset grammar check timer when text changes
                             grammar_check_timer = Some(std::time::Instant::now());
@@ -113,6 +124,15 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
                                 if !last_grammar_check_text.is_empty() && last_grammar_check_text.len() >= 3 {
                                     println!("🔍 Running grammar check for text (length: {})", last_grammar_check_text.len());
                                     
+                                    // Get element bounds for positioning overlay
+                                    // TODO: Properly parse AXBounds CFDictionary to get actual element position
+                                    // For now, use a reasonable default position (top-right area of screen)
+                                    // In the future, we'll parse the AXBounds dictionary to get the actual
+                                    // x, y, width, height of the focused text element
+                                    let overlay_x = Some(500.0);
+                                    let overlay_y = Some(200.0);
+                                    println!("📍 Positioning overlay at default position: x={}, y={}", overlay_x.unwrap(), overlay_y.unwrap());
+                                    
                                     // Run grammar check (synchronous for now)
                                     let app_handle_clone = app_handle.clone();
                                     let text_to_check = last_grammar_check_text.clone();
@@ -120,17 +140,23 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
                                     
                                     let result = check_grammar_internal(text_to_check, cursor_pos_for_check);
                                     
-                                    // Emit grammar suggestions to frontend
+                                    // Emit grammar suggestions to frontend with position
                                     let payload = GrammarSuggestionsPayload {
                                         suggestions: result.suggestions.clone(),
+                                        x: overlay_x,
+                                        y: overlay_y,
                                     };
-                                    println!("📤 Emitting grammar-suggestions event ({} suggestions)", result.suggestions.len());
+                                    println!("📤 Emitting grammar-suggestions event ({} suggestions, position: {:?}, {:?})", 
+                                        result.suggestions.len(), overlay_x, overlay_y);
                                     let _ = app_handle_clone.emit("grammar-suggestions", payload);
                                 }
                             }
                         }
                     }
                 }
+            } else {
+                // No focused element, clear the stored element
+                last_focused_elem = None;
             }
             
             thread::sleep(Duration::from_millis(300)); // Debounce

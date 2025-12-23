@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core'; // Tauri v2
 import { listen } from '@tauri-apps/api/event';
 
@@ -10,12 +10,10 @@ interface GrammarSuggestion {
     explanation: string;
 }
 
-interface GrammarCheckResult {
-    suggestions: GrammarSuggestion[];
-}
-
 interface GrammarSuggestionsPayload {
     suggestions: GrammarSuggestion[];
+    x?: number;
+    y?: number;
 }
 
 const CorrectionOverlay = () => {
@@ -30,15 +28,17 @@ const CorrectionOverlay = () => {
             console.log('🎧 CorrectionOverlay: Setting up grammar-suggestions listener...');
             unlisten = await listen<GrammarSuggestionsPayload>('grammar-suggestions', async (event) => {
                 console.log('📨 CorrectionOverlay: Received grammar-suggestions event:', event.payload);
-                const { suggestions } = event.payload;
+                const { suggestions, x, y } = event.payload;
 
                 if (suggestions && suggestions.length > 0) {
-                    console.log('✅ Got {} grammar suggestions', suggestions.length);
+                    console.log('✅ Got {} grammar suggestions at position ({}, {})', suggestions.length, x, y);
                     setSuggestions(suggestions);
-                    // Show overlay window (position is optional)
+                    // Show overlay window at the provided position (or default)
                     try {
-                        await invoke('show_overlay_window', { x: 100.0, y: 100.0 });
-                        console.log('✅ Overlay window shown');
+                        const posX = x ?? 100.0;
+                        const posY = y ?? 100.0;
+                        await invoke('show_overlay_window', { x: posX, y: posY });
+                        console.log('✅ Overlay window shown at position ({}, {})', posX, posY);
                     } catch (e) {
                         console.warn('Failed to show overlay window:', e);
                     }
