@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core'; // Tauri v2
 import { listen } from '@tauri-apps/api/event';
 
@@ -21,65 +21,61 @@ interface TextChangePayload {
 
 const CorrectionOverlay = () => {
     const [suggestions, setSuggestions] = useState<GrammarSuggestion[]>([]);
+    const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        // Listen to text-change events
-        // Note: The global listener is in the Main process or Main Window usually.
-        // But if we emit "text-change" globally to all windows, we can catch it here.
-        // However, this window might be hidden. 
-        // Better architecture: Main window listens, then tells Overlay to update and show.
-        // But let's try direct listening first if the window exists (it's just hidden).
-
+        // Listen to text-change events from the text monitor
         let unlisten: () => void;
 
         const setupListener = async () => {
             unlisten = await listen<TextChangePayload>('text-change', async (event) => {
                 const { text, cursor_pos } = event.payload;
 
-                // Call grammar check
-                try {
-                    const resultStr = await invoke<string>('check_grammar', { text, cursorPos: cursor_pos });
-
-                    // Let's check invoke signature. Rust: check_grammar(text: String, cursor_pos: usize).
-                    // Tauri invoke expects { text: ..., cursorPos: ... } or snake_case depending on config. Default is camelCase in JS map to snake_case in Rust.
-
-                    const result = JSON.parse(resultStr) as GrammarCheckResult;
-
-                    if (result.suggestions.length > 0) {
-                        setSuggestions(result.suggestions);
-                        // Show window
-                        // Calculate position based on cursor? 
-                        // We need screen coordinates of cursor. 
-                        // Rust TextMonitor doesn't give screen coords yet, only text offset.
-                        // But we can approximate or ask Rust to give us cursor coords.
-                        // Wait, `check_grammar` returns suggestions.
-                        // We need to position the window.
-                        // Maybe `TextMonitor` should also emit cursor screen position?
-                        // AXSelectedTextRange doesn't give screen coords.
-                        // We need `AXBounds` of the selected text range or focused element bounds + offset.
-
-                        // For MVP, let's put it at fixed location or top-right of focused element?
-                        // Or use mouse cursor position if typing usually happens near mouse? Not always.
-                        // Let's ask Rust to get mouse position as fallback.
-
-                        // Calling `show_overlay_window` from here (Overlay Window itself) might be weird if it's hidden and event loop is paused? 
-                        // No, hidden windows still run JS in Tauri usually if not suspended.
-
-                        // But we need screen coordinates. 
-
-                        // IMPLEMENTATION DETAIL:
-                        // We will assume for now we just show it. 
-                        // Real implementations need `AXBounds`.
-
-                        // Let's invoke `show_overlay_window` with dummy coords for now or ask backend.
-                        // I'll add a helper in backend to get cursor position or mouse position.
-                    } else {
-                        setSuggestions([]);
-                        await invoke('hide_overlay_window');
-                    }
-                } catch (e) {
-                    console.error(e);
+                // Debounce grammar checks to avoid excessive API calls
+                // Clear previous timer
+                if (debounceTimerRef.current) {
+                    clearTimeout(debounceTimerRef.current);
                 }
+
+                // Only check grammar if text is not empty and has reasonable length
+                if (!text || text.trim().length === 0 || text.length < 3) {
+                    setSuggestions([]);
+                    return;
+                }
+
+                // Debounce: wait 500ms after user stops typing before checking grammar
+                debounceTimerRef.current = setTimeout(async () => {
+                    try {
+                        console.log('🔍 Checking grammar for text (length:', text.length, ', cursor_pos:', cursor_pos, ')');
+                        
+                        const result = await invoke<GrammarCheckResult>('check_grammar', { 
+                            text, 
+                            cursor_pos: cursor_pos 
+                        });
+
+                        console.log('📝 Grammar check result:', result);
+
+                        if (result.suggestions && result.suggestions.length > 0) {
+                            setSuggestions(result.suggestions);
+                            // Show overlay window
+                            try {
+                                await invoke('show_overlay_window');
+                            } catch (e) {
+                                console.warn('Failed to show overlay window:', e);
+                            }
+                        } else {
+                            setSuggestions([]);
+                            try {
+                                await invoke('hide_overlay_window');
+                            } catch (e) {
+                                console.warn('Failed to hide overlay window:', e);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed to check grammar:', e);
+                        setSuggestions([]);
+                    }
+                }, 500); // 500ms debounce
             });
         };
 
@@ -87,6 +83,9 @@ const CorrectionOverlay = () => {
 
         return () => {
             if (unlisten) unlisten();
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
         };
     }, []);
 
