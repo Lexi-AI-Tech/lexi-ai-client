@@ -6,7 +6,7 @@ use core_graphics::geometry::{CGRect, CGPoint, CGSize};
 use serde::Serialize;
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use system_configuration::core_foundation::string::CFString;
 use system_configuration::core_foundation::base::TCFType;
 
@@ -20,16 +20,25 @@ extern "C" {
 const K_AX_VALUE_TYPE_CF_RANGE: u32 = 1;   // CFRange - character offsets
 const K_AX_VALUE_TYPE_CG_RECT: u32 = 4;    // CGRect - bounding rectangle of selection
 
-// Helper: Get cursor position (character offset) or fallback to text length
-fn get_cursor_position(elem: &AXUIElement, text: &str) -> usize {
+// Cursor position and bounds information
+#[derive(Debug, Clone)]
+pub struct CursorInfo {
+    pub position: usize,
+    pub bounds: Option<CGRect>, // Screen coordinates of selection/cursor
+}
+
+// Helper: Get cursor position and bounds (character offset + optional CGRect)
+fn get_cursor_info(elem: &AXUIElement, text: &str) -> CursorInfo {
     let selected_range_attr = AXAttribute::new(&CFString::from_static_string("AXSelectedTextRange"));
+    let mut bounds: Option<CGRect> = None;
+    let mut position = text.len(); // Default fallback
 
     match elem.attribute(&selected_range_attr) {
         Ok(range_val) => {
             let ax_value_ptr = range_val.as_CFTypeRef();
             if ax_value_ptr.is_null() {
                 println!("⚠️ AXSelectedTextRange returned null pointer");
-                return text.len();
+                return CursorInfo { position, bounds };
             }
 
             unsafe {
@@ -43,12 +52,12 @@ fn get_cursor_position(elem: &AXUIElement, text: &str) -> usize {
                             K_AX_VALUE_TYPE_CF_RANGE,
                             &mut cf_range as *mut _ as *mut std::ffi::c_void,
                         ) {
-                            let pos = (cf_range.location + cf_range.length) as usize;
+                            position = (cf_range.location + cf_range.length) as usize;
+                            position = position.min(text.len());
                             println!(
                                 "📍 Cursor (CFRange): {} (selection length: {})",
-                                pos, cf_range.length
+                                position, cf_range.length
                             );
-                            return pos.min(text.len());
                         }
                     }
 
@@ -62,12 +71,13 @@ fn get_cursor_position(elem: &AXUIElement, text: &str) -> usize {
                             K_AX_VALUE_TYPE_CG_RECT,
                             &mut rect as *mut _ as *mut std::ffi::c_void,
                         ) {
+                            bounds = Some(rect);
                             println!(
                                 "📍 Selection bounds (CGRect): x={:.1}, y={:.1}, w={:.1}, h={:.1}",
                                 rect.origin.x, rect.origin.y, rect.size.width, rect.size.height
                             );
-                            // Fallback to end of text (we can use rect for overlay later)
-                            return text.len();
+                            // When we have CGRect but no character position, use end of text
+                            position = text.len();
                         }
                     }
 
@@ -82,8 +92,7 @@ fn get_cursor_position(elem: &AXUIElement, text: &str) -> usize {
         }
     }
 
-    // Ultimate fallback: end of text
-    text.len()
+    CursorInfo { position, bounds }
 }
 
 // Placeholder for future overlay positioning
@@ -166,13 +175,13 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
                         let text = cf_string.to_string();
 
                         if text != last_text || last_text.is_empty() {
-                            let cursor_pos = get_cursor_position(&focused_elem, &text);
+                            let cursor_info = get_cursor_info(&focused_elem, &text);
 
                             println!(
                                 "🔄 Text changed | len: {} → {} | cursor: {} | preview: {}",
                                 last_text.len(),
                                 text.len(),
-                                cursor_pos,
+                                cursor_info.position,
                                 if text.len() > 80 {
                                     format!("{}...", &text[..80])
                                 } else {
@@ -193,28 +202,93 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
                                 if !last_grammar_check_text.is_empty() && last_grammar_check_text.len() >= 5 {
                                     println!("🔍 Running grammar check (debounced)");
 
-                                    // TODO: Use real bounds when implemented
-                                    let overlay_x = Some(600.0);
-                                    let overlay_y = Some(300.0);
-
-                                    let cursor_pos = get_cursor_position(&focused_elem, &last_grammar_check_text);
+                                    let cursor_info = get_cursor_info(&focused_elem, &last_grammar_check_text);
 
                                     let result = crate::grammar_checker::check_grammar_internal(
                                         last_grammar_check_text.clone(),
-                                        cursor_pos,
+                                        cursor_info.position,
                                     );
 
+                                    // Always center the overlay on screen for now
+                                    let (overlay_x, overlay_y) = {
+                                        // Get primary monitor to calculate center
+                                        if let Ok(Some(monitor)) = app_handle.primary_monitor() {
+                                            let monitor_size = monitor.size();
+                                            let scale_factor = monitor.scale_factor();
+                                            
+                                            // Convert to logical pixels
+                                            let monitor_width = monitor_size.width as f64 / scale_factor;
+                                            let monitor_height = monitor_size.height as f64 / scale_factor;
+                                            
+                                            // Overlay window dimensions
+                                            let overlay_width = 320.0;
+                                            let overlay_height = 180.0;
+                                            
+                                            // Center position
+                                            let x = (monitor_width - overlay_width) / 2.0;
+                                            let y = (monitor_height - overlay_height) / 2.0;
+                                            
+                                            (Some(x), Some(y))
+                                        } else {
+                                            // Fallback to center of default screen (1920x1080)
+                                            (Some(800.0), Some(480.0))
+                                        }
+                                    };
+
                                     let payload = GrammarSuggestionsPayload {
-                                        suggestions: result.suggestions,
+                                        suggestions: result.suggestions.clone(),
                                         x: overlay_x,
                                         y: overlay_y,
                                     };
 
-                                    println!(
-                                        "📤 Emitting grammar-suggestions ({} items)",
-                                        payload.suggestions.len()
-                                    );
-                                    let _ = app_handle.emit("grammar-suggestions", payload);
+                                    // Emit to the overlay window directly if we have suggestions
+                                    if !result.suggestions.is_empty() {
+                                        // Ensure overlay window exists
+                                        if let Err(e) = crate::overlay_window::ensure_overlay_window_exists(&app_handle) {
+                                            println!("⚠️ Failed to ensure overlay window exists: {}", e);
+                                        }
+                                        
+                                        if let Some(overlay_window) = app_handle.get_webview_window("correction-overlay") {
+                                            // Position the window at center
+                                            if let (Some(x), Some(y)) = (overlay_x, overlay_y) {
+                                                if let Err(e) = overlay_window.set_position(tauri::LogicalPosition::new(x, y)) {
+                                                    println!("⚠️ Failed to set overlay position: {}", e);
+                                                } else {
+                                                    println!("✅ Positioned overlay at ({:.1}, {:.1})", x, y);
+                                                }
+                                            }
+                                            
+                                            // Emit the event to the overlay window
+                                            if let Err(e) = overlay_window.emit("grammar-suggestions", &payload) {
+                                                println!("⚠️ Failed to emit to overlay window: {}", e);
+                                            } else {
+                                                println!("✅ Emitted grammar-suggestions event to overlay");
+                                            }
+                                            
+                                            // Show the window
+                                            if let Err(e) = overlay_window.show() {
+                                                println!("⚠️ Failed to show overlay window: {}", e);
+                                            } else {
+                                                println!("✅ Overlay window shown");
+                                            }
+                                            
+                                            println!(
+                                                "📤 Showing overlay with {} suggestions at ({:.1}, {:.1})",
+                                                result.suggestions.len(),
+                                                overlay_x.unwrap_or(0.0),
+                                                overlay_y.unwrap_or(0.0)
+                                            );
+                                        } else {
+                                            println!("⚠️ Overlay window not found after ensuring it exists");
+                                            // Fallback: emit to all windows
+                                            let _ = app_handle.emit("grammar-suggestions", payload);
+                                        }
+                                    } else {
+                                        // Hide overlay if no suggestions
+                                        if let Some(overlay_window) = app_handle.get_webview_window("correction-overlay") {
+                                            let _ = overlay_window.hide();
+                                        }
+                                    }
                                 }
                             }
                         }

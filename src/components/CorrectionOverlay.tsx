@@ -21,35 +21,25 @@ const CorrectionOverlay = () => {
 
     useEffect(() => {
         console.log('🎬 CorrectionOverlay: Component mounted, setting up listener...');
-        // Listen to grammar-suggestions events from the text monitor (grammar check happens automatically in Rust)
+        console.log('🎬 Root element:', document.getElementById('root'));
+        console.log('🎬 Body background:', window.getComputedStyle(document.body).backgroundColor);
+        // Listen to grammar-suggestions events from the text monitor
+        // The Rust backend handles window positioning and visibility
         let unlisten: () => void;
 
         const setupListener = async () => {
             console.log('🎧 CorrectionOverlay: Setting up grammar-suggestions listener...');
-            unlisten = await listen<GrammarSuggestionsPayload>('grammar-suggestions', async (event) => {
+            unlisten = await listen<GrammarSuggestionsPayload>('grammar-suggestions', (event) => {
                 console.log('📨 CorrectionOverlay: Received grammar-suggestions event:', event.payload);
-                const { suggestions, x, y } = event.payload;
+                const { suggestions } = event.payload;
 
                 if (suggestions && suggestions.length > 0) {
-                    console.log('✅ Got {} grammar suggestions at position ({}, {})', suggestions.length, x, y);
+                    console.log('✅ Got {} grammar suggestions', suggestions.length);
                     setSuggestions(suggestions);
-                    // Show overlay window at the provided position (or default)
-                    try {
-                        const posX = x ?? 100.0;
-                        const posY = y ?? 100.0;
-                        await invoke('show_overlay_window', { x: posX, y: posY });
-                        console.log('✅ Overlay window shown at position ({}, {})', posX, posY);
-                    } catch (e) {
-                        console.warn('Failed to show overlay window:', e);
-                    }
+                    // Window positioning and visibility is handled by Rust backend
                 } else {
                     console.log('✓ No grammar suggestions');
                     setSuggestions([]);
-                    try {
-                        await invoke('hide_overlay_window');
-                    } catch (e) {
-                        console.warn('Failed to hide overlay window:', e);
-                    }
                 }
             });
         };
@@ -75,27 +65,112 @@ const CorrectionOverlay = () => {
         }
     };
 
-    if (suggestions.length === 0) return null;
+    // Always show something - placeholder when no suggestions
+    if (suggestions.length === 0) {
+        return (
+            <div 
+                style={{
+                    backgroundColor: '#FFEB3B',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '2px solid #FBC02D',
+                    maxWidth: '320px',
+                    minWidth: '280px',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '120px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                }}
+            >
+                <div style={{ 
+                    color: '#1a1a1a', 
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    textAlign: 'center'
+                }}>
+                    Waiting for grammar suggestions...
+                </div>
+            </div>
+        );
+    }
 
     const topSugg = suggestions[0]; // Just show top one
 
     return (
-        <div className="flex bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2 text-sm max-w-xs animate-in fade-in zoom-in duration-200">
-            <div className="flex-1 mr-2">
-                <div className="flex items-center space-x-1">
-                    <span className="line-through text-gray-400">{topSugg.original}</span>
-                    <span className="text-gray-400">→</span>
-                    <span className="font-bold text-green-600 dark:text-green-400">{topSugg.replacement}</span>
+        <div 
+            style={{
+                backgroundColor: '#FFEB3B', // Bright yellow background
+                borderRadius: '12px',
+                padding: '16px',
+                border: '2px solid #FBC02D',
+                maxWidth: '320px',
+                minWidth: '280px',
+                width: '100%',
+                boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '120px'
+            }}
+        >
+            <div style={{ marginBottom: '12px' }}>
+                {/* Show the corrected text prominently */}
+                <div style={{ 
+                    fontSize: '18px', 
+                    fontWeight: 'bold', 
+                    color: '#1a1a1a',
+                    marginBottom: '8px',
+                    lineHeight: '1.4'
+                }}>
+                    {topSugg.replacement}
                 </div>
+                
+                {/* Show original text with strikethrough */}
+                {topSugg.original !== topSugg.replacement && (
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#666',
+                        textDecoration: 'line-through',
+                        marginBottom: '4px'
+                    }}>
+                        {topSugg.original}
+                    </div>
+                )}
+                
+                {/* Show explanation if available */}
                 {topSugg.explanation && (
-                    <div className="text-xs text-gray-500 mt-1">{topSugg.explanation}</div>
+                    <div style={{ 
+                        fontSize: '12px', 
+                        color: '#555',
+                        marginTop: '8px',
+                        fontStyle: 'italic'
+                    }}>
+                        {topSugg.explanation}
+                    </div>
                 )}
             </div>
+            
             <button
                 onClick={() => handleApply(topSugg)}
-                className="bg-green-500 hover:bg-green-600 text-white rounded px-2 py-1 font-medium transition-colors"
+                style={{
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    width: '100%',
+                    transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#45a049'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4CAF50'}
             >
-                Fix
+                Apply Correction
             </button>
         </div>
     );

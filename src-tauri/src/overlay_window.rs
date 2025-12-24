@@ -7,21 +7,32 @@ pub fn create_overlay_window(app: &AppHandle) -> Result<(), String> {
         WebviewUrl::App("overlay.html".into()),
     )
     .title("Correction Overlay")
-    .inner_size(200.0, 100.0) // Initial size, can be adjusted by frontend content
+    .inner_size(320.0, 180.0) // Size for grammar suggestion overlay (taller for better content display)
     .resizable(false)
     .maximizable(false)
     .minimizable(false)
     .always_on_top(true)
+    .visible_on_all_workspaces(true)
     .decorations(false)
     .transparent(true)
     .skip_taskbar(true)
-    .visible(false)
+    .visible(true) // Start visible for testing - will be hidden/shown by text monitor
     .focused(false);
 
-    builder
+    let window = builder
         .build()
         .map_err(|e| format!("Failed to create overlay window: {}", e))?;
 
+    // Ensure always on top and visible on all workspaces are set
+    window
+        .set_always_on_top(true)
+        .map_err(|e| format!("Failed to set always on top: {}", e))?;
+    
+    window
+        .set_visible_on_all_workspaces(true)
+        .map_err(|e| format!("Failed to set visible on all workspaces: {}", e))?;
+
+    println!("✅ Grammar overlay window created successfully");
     Ok(())
 }
 
