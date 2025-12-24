@@ -1,27 +1,98 @@
 // src-tauri/src/text_monitor.rs
 
 use accessibility::{AXAttribute, AXUIElement};
+use core_foundation_sys::base::CFRange;
+use core_graphics::geometry::{CGRect, CGPoint, CGSize};
 use serde::Serialize;
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use system_configuration::core_foundation::string::CFString;
-use crate::grammar_checker::check_grammar_internal;
+use system_configuration::core_foundation::base::TCFType;
 
-// Helper function to get element bounds (x, y, width, height)
-// AXBounds returns a CFDictionary - TODO: Properly parse CFDictionary to extract X, Y, Width, Height values
-// For now, this is a placeholder - we'll implement proper parsing later
+// External declarations for AXValue handling
+extern "C" {
+    fn AXValueGetType(value: *const std::ffi::c_void) -> u32;
+    fn AXValueGetValue(value: *const std::ffi::c_void, value_type: u32, out_value: *mut std::ffi::c_void) -> bool;
+}
+
+// AXValue type constants (from ApplicationServices/AXValue.h)
+const K_AX_VALUE_TYPE_CF_RANGE: u32 = 1;   // CFRange - character offsets
+const K_AX_VALUE_TYPE_CG_RECT: u32 = 4;    // CGRect - bounding rectangle of selection
+
+// Helper: Get cursor position (character offset) or fallback to text length
+fn get_cursor_position(elem: &AXUIElement, text: &str) -> usize {
+    let selected_range_attr = AXAttribute::new(&CFString::from_static_string("AXSelectedTextRange"));
+
+    match elem.attribute(&selected_range_attr) {
+        Ok(range_val) => {
+            let ax_value_ptr = range_val.as_CFTypeRef();
+            if ax_value_ptr.is_null() {
+                println!("⚠️ AXSelectedTextRange returned null pointer");
+                return text.len();
+            }
+
+            unsafe {
+                let value_type = AXValueGetType(ax_value_ptr);
+
+                match value_type {
+                    K_AX_VALUE_TYPE_CF_RANGE => {
+                        let mut cf_range = CFRange { location: 0, length: 0 };
+                        if AXValueGetValue(
+                            ax_value_ptr,
+                            K_AX_VALUE_TYPE_CF_RANGE,
+                            &mut cf_range as *mut _ as *mut std::ffi::c_void,
+                        ) {
+                            let pos = (cf_range.location + cf_range.length) as usize;
+                            println!(
+                                "📍 Cursor (CFRange): {} (selection length: {})",
+                                pos, cf_range.length
+                            );
+                            return pos.min(text.len());
+                        }
+                    }
+
+                    K_AX_VALUE_TYPE_CG_RECT => {
+                        let mut rect: CGRect = CGRect {
+                            origin: CGPoint { x: 0.0, y: 0.0 },
+                            size: CGSize { width: 0.0, height: 0.0 },
+                        };
+                        if AXValueGetValue(
+                            ax_value_ptr,
+                            K_AX_VALUE_TYPE_CG_RECT,
+                            &mut rect as *mut _ as *mut std::ffi::c_void,
+                        ) {
+                            println!(
+                                "📍 Selection bounds (CGRect): x={:.1}, y={:.1}, w={:.1}, h={:.1}",
+                                rect.origin.x, rect.origin.y, rect.size.width, rect.size.height
+                            );
+                            // Fallback to end of text (we can use rect for overlay later)
+                            return text.len();
+                        }
+                    }
+
+                    other => {
+                        println!("⚠️ Unexpected AXValue type for selection range: {}", other);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            println!("⚠️ Failed to get AXSelectedTextRange attribute: {:?}", e);
+        }
+    }
+
+    // Ultimate fallback: end of text
+    text.len()
+}
+
+// Placeholder for future overlay positioning
 fn _get_element_bounds(_elem: &AXUIElement) -> Option<(f64, f64, f64, f64)> {
-    // TODO: Parse AXBounds CFDictionary to extract:
-    // - X: CFNumber
-    // - Y: CFNumber  
-    // - Width: CFNumber
-    // - Height: CFNumber
+    // TODO: Parse AXBounds (CFDictionary with X,Y,Width,Height)
     None
 }
 
 #[derive(Serialize, Clone)]
-#[allow(dead_code)] // Reserved for future use if we need to emit text-change events
 pub struct TextChangePayload {
     pub text: String,
     pub cursor_pos: usize,
@@ -53,16 +124,14 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
 
         let mut last_text = String::new();
         let mut last_grammar_check_text = String::new();
-        let mut _last_focused_elem: Option<AXUIElement> = None; // Reserved for future use when parsing AXBounds
         let mut grammar_check_timer: Option<std::time::Instant> = None;
-        const GRAMMAR_CHECK_DEBOUNCE_MS: u64 = 500; // Wait 500ms after typing stops
+        const GRAMMAR_CHECK_DEBOUNCE_MS: u64 = 800;
 
         loop {
-
             let system_wide = AXUIElement::system_wide();
             let mut focused_elem_option: Option<AXUIElement> = None;
 
-            // Method 1: Direct global focused UI element
+            // Try direct focused UI element first
             let focused_ui_attr = AXAttribute::new(&CFString::from_static_string("AXFocusedUIElement"));
             if let Ok(focused_ui) = system_wide.attribute(&focused_ui_attr) {
                 if let Some(elem) = focused_ui.downcast::<AXUIElement>() {
@@ -70,7 +139,7 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
                 }
             }
 
-            // Method 2: Fallback via frontmost app → focused window
+            // Fallback chain
             if focused_elem_option.is_none() {
                 let frontmost_attr = AXAttribute::new(&CFString::from_static_string("AXFrontmostApplication"));
                 if let Ok(frontmost) = system_wide.attribute(&frontmost_attr) {
@@ -91,78 +160,72 @@ pub fn start_monitoring(app_handle: AppHandle) -> Result<(), String> {
             }
 
             if let Some(focused_elem) = focused_elem_option {
-                // Store the focused element for getting bounds later (when we implement AXBounds parsing)
-                _last_focused_elem = Some(focused_elem.clone());
-                
-                // Try to read text value
                 let value_attr = AXAttribute::new(&CFString::from_static_string("AXValue"));
                 if let Ok(text_val) = focused_elem.attribute(&value_attr) {
                     if let Some(cf_string) = text_val.downcast::<CFString>() {
                         let text = cf_string.to_string();
-                        
-                        // Only log if text is non-empty or if it changed
-                        if text.len() > 0 || text != last_text {
-                            println!("📝 Text monitor read text (length: {}): {}", text.len(), 
-                                if text.len() > 100 { format!("{}...", &text[..100]) } else { text.clone() });
-                        }
-                        
-                        if text != last_text {
-                            println!("🔄 Text changed detected! Previous length: {}, New length: {}", last_text.len(), text.len());
-                            last_text = text.clone();
 
-                            // Reset grammar check timer when text changes
-                            grammar_check_timer = Some(std::time::Instant::now());
+                        if text != last_text || last_text.is_empty() {
+                            let cursor_pos = get_cursor_position(&focused_elem, &text);
+
+                            println!(
+                                "🔄 Text changed | len: {} → {} | cursor: {} | preview: {}",
+                                last_text.len(),
+                                text.len(),
+                                cursor_pos,
+                                if text.len() > 80 {
+                                    format!("{}...", &text[..80])
+                                } else {
+                                    text.clone()
+                                }
+                            );
+
+                            last_text = text.clone();
                             last_grammar_check_text = text.clone();
+                            grammar_check_timer = Some(std::time::Instant::now());
                         }
-                        
-                        // Check if it's time to run grammar check (debounced)
+
+                        // Debounced grammar check
                         if let Some(timer) = grammar_check_timer {
                             if timer.elapsed().as_millis() >= GRAMMAR_CHECK_DEBOUNCE_MS as u128 {
                                 grammar_check_timer = None;
-                                
-                                // Only check grammar if text is meaningful
-                                if !last_grammar_check_text.is_empty() && last_grammar_check_text.len() >= 3 {
-                                    println!("🔍 Running grammar check for text (length: {})", last_grammar_check_text.len());
-                                    
-                                    // Get element bounds for positioning overlay
-                                    // TODO: Properly parse AXBounds CFDictionary to get actual element position
-                                    // For now, use a reasonable default position (top-right area of screen)
-                                    // In the future, we'll parse the AXBounds dictionary to get the actual
-                                    // x, y, width, height of the focused text element
-                                    let overlay_x = Some(500.0);
-                                    let overlay_y = Some(200.0);
-                                    println!("📍 Positioning overlay at default position: x={}, y={}", overlay_x.unwrap(), overlay_y.unwrap());
-                                    
-                                    // Run grammar check (synchronous for now)
-                                    let app_handle_clone = app_handle.clone();
-                                    let text_to_check = last_grammar_check_text.clone();
-                                    let cursor_pos_for_check = 0; // TODO: Get actual cursor position
-                                    
-                                    let result = check_grammar_internal(text_to_check, cursor_pos_for_check);
-                                    
-                                    // Emit grammar suggestions to frontend with position
+
+                                if !last_grammar_check_text.is_empty() && last_grammar_check_text.len() >= 5 {
+                                    println!("🔍 Running grammar check (debounced)");
+
+                                    // TODO: Use real bounds when implemented
+                                    let overlay_x = Some(600.0);
+                                    let overlay_y = Some(300.0);
+
+                                    let cursor_pos = get_cursor_position(&focused_elem, &last_grammar_check_text);
+
+                                    let result = crate::grammar_checker::check_grammar_internal(
+                                        last_grammar_check_text.clone(),
+                                        cursor_pos,
+                                    );
+
                                     let payload = GrammarSuggestionsPayload {
-                                        suggestions: result.suggestions.clone(),
+                                        suggestions: result.suggestions,
                                         x: overlay_x,
                                         y: overlay_y,
                                     };
-                                    println!("📤 Emitting grammar-suggestions event ({} suggestions, position: {:?}, {:?})", 
-                                        result.suggestions.len(), overlay_x, overlay_y);
-                                    let _ = app_handle_clone.emit("grammar-suggestions", payload);
+
+                                    println!(
+                                        "📤 Emitting grammar-suggestions ({} items)",
+                                        payload.suggestions.len()
+                                    );
+                                    let _ = app_handle.emit("grammar-suggestions", payload);
                                 }
                             }
                         }
                     }
                 }
-            } else {
-                // No focused element, clear the stored element
-                _last_focused_elem = None;
             }
-            
-            thread::sleep(Duration::from_millis(300)); // Debounce
+
+            thread::sleep(Duration::from_millis(250));
         }
     });
-    
-    println!("✅ Text monitoring thread spawned successfully");
+
+    println!("✅ Monitoring thread spawned successfully");
     Ok(())
 }
