@@ -414,7 +414,10 @@ pub fn start_listener(
                         println!("=== HOTKEY TRIGGER: {} ({:?}) ===", trigger_type, current_config);
 
                         // Query cursor context
-                        crate::cursor_context::log_cursor_context();
+                        if let Some(context) = crate::cursor_context::get_cursor_context() {
+                            println!("Cursor context - App: {:?}, PID: {:?}, Text: {:?}", 
+                                context.app_name, context.pid, context.selected_text);
+                        }
 
                         println!("Hotkey {} - {} recording", 
                             match command {
@@ -443,7 +446,7 @@ pub fn start_listener(
 
                     // Emit all keyboard events for debug
                     if let Some(event_string) = event_type_to_string(&event.event_type) {
-                        println!("Keyboard event: {:?}", event);
+                        // println!("Keyboard event: {:?}", event);
                         if let Err(e) = app_for_callback.emit("global-input", &event_string) {
                             eprintln!("Failed to emit event: {:?}", e);
                         }
