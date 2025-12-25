@@ -16,7 +16,7 @@ pub fn create_overlay_window(app: &AppHandle) -> Result<(), String> {
     .decorations(false)
     .transparent(true)
     .skip_taskbar(true)
-    .visible(true) // Start visible for testing - will be hidden/shown by text monitor
+    .visible(false) // Start visible for testing - will be hidden/shown by text monitor
     .focused(false);
 
     let window = builder

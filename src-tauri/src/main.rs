@@ -133,8 +133,6 @@ pub fn main() {
             task_handle: Mutex::new(None),
             cancel_tx: Mutex::new(None),
         })
-        .manage(text_monitor::TextMonitor::new())
-
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
             request_input_monitoring_permission,
