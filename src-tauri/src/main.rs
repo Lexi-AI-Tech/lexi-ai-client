@@ -193,11 +193,14 @@ pub fn main() {
             let initial_config = HotkeyConfig {
                 hotkey: "Fn".to_string(),
             };
-            let (config_tx, config_rx) = watch::channel(initial_config);
+            let (config_tx, config_rx) = watch::channel(initial_config.clone());
 
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));
-            app.manage(HotkeyWatchState(config_tx));
+            app.manage(HotkeyWatchState {
+                sender: config_tx,
+                current: Mutex::new(initial_config),
+            });
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });

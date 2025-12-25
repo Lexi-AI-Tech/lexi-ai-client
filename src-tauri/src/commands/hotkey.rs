@@ -28,7 +28,18 @@ pub fn update_hotkey(
     let new_config: HotkeyConfig = serde_json::from_str(&config_json)
         .map_err(|e| format!("Failed to parse hotkey config: {}", e))?;
 
-    if state.0.send(new_config.clone()).is_err() {
+    // Check if the config actually changed
+    let mut current = state.current.lock().unwrap();
+    if *current == new_config {
+        // Config hasn't changed, no need to restart listener
+        return Ok(());
+    }
+
+    // Update current config
+    *current = new_config.clone();
+
+    // Send new config to listener (only if changed)
+    if state.sender.send(new_config.clone()).is_err() {
         return Err("Failed to update hotkey config".to_string());
     }
 
@@ -44,7 +55,7 @@ pub fn update_hotkey(
 /// * `String` - JSON string representation of the current HotkeyConfig
 #[tauri::command]
 pub fn get_current_hotkey(state: State<HotkeyWatchState>) -> String {
-    let config = state.0.borrow().clone();
+    let config = state.current.lock().unwrap().clone();
     serde_json::to_string(&config).unwrap_or_else(|_| "{}".to_string())
 }
 

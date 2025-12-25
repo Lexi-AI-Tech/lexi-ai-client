@@ -33,7 +33,12 @@ pub struct TranscriptionTaskState {
 /// 
 /// This state manages a watch channel that broadcasts hotkey configuration changes
 /// to the global key listener thread.
-pub struct HotkeyWatchState(pub watch::Sender<HotkeyConfig>);
+pub struct HotkeyWatchState {
+    /// Sender for broadcasting config changes
+    pub sender: watch::Sender<HotkeyConfig>,
+    /// Current config to prevent unnecessary updates
+    pub current: Mutex<HotkeyConfig>,
+}
 
 /// Hotkey recording state - tracks if we're in recording mode for hotkey selection
 /// 

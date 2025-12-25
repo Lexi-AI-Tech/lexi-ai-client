@@ -35,7 +35,7 @@ use crate::RecordingCommand;
 
 /// Configurable hotkey definition with modifier support
 /// Stores hotkey as a human-readable string (e.g., "Ctrl+Shift+P", "Cmd+K", "Option")
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HotkeyConfig {
     /// Human-readable hotkey string (e.g., "Ctrl+Shift+P", "Cmd+K", "Option")
     pub hotkey: String,
