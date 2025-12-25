@@ -29,6 +29,7 @@
 // Suppress warnings from objc crate's msg_send! macro about unexpected cfg conditions
 #![allow(unexpected_cfgs)]
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{thread, time::Duration};
 use tauri::AppHandle;
 
@@ -45,6 +46,9 @@ use crate::accessibility_utils::{
 /// Polling interval for text monitoring (milliseconds)
 const MONITORING_POLL_INTERVAL_MS: u64 = 300;
 
+/// Flag to track if monitoring is already running
+static IS_MONITORING: AtomicBool = AtomicBool::new(false);
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -52,26 +56,27 @@ const MONITORING_POLL_INTERVAL_MS: u64 = 300;
 /// Start monitoring text changes in the focused application
 ///
 /// This function spawns a background thread that continuously polls the focused
-/// text field for changes and logs them to the console.
+/// text field for changes. Only one monitoring thread can run at a time.
 ///
 /// # Note
 /// Currently uses a simple polling approach. For production, consider using
 /// accessibility notifications for better performance.
 #[tauri::command]
 pub fn start_monitoring(_app_handle: AppHandle) -> Result<(), String> {
-    println!("🚀 start_monitoring called");
+    // Check if monitoring is already running
+    if IS_MONITORING.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
 
     thread::spawn(move || {
-        println!("📡 Text monitoring thread started");
-
         let mut last_text = String::new();
 
         loop {
             #[cfg(target_os = "macos")]
             {
                 if let Some(text) = get_text_at_cursor() {
+                    println!("📝 Text : {}", text);
                     if text != last_text {
-                        println!("📝 Text changed: {}", text);
                         last_text = text;
                     }
                 }
