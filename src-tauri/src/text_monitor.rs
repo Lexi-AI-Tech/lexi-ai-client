@@ -104,6 +104,7 @@ pub fn start_monitoring(_app_handle: AppHandle) -> Result<(), String> {
 /// # Returns
 /// Returns the text at cursor position, or None if unavailable.
 #[cfg(target_os = "macos")]
+#[allow(dead_code)] // Public API function, may be used by external callers
 pub fn get_text_at_mouse_cursor() -> Option<String> {
     get_text_at_cursor()
 }
@@ -144,6 +145,7 @@ fn get_text_at_cursor() -> Option<String> {
 
 /// Stub implementation for non-macOS platforms
 #[cfg(not(target_os = "macos"))]
+#[allow(dead_code)] // Public API function, may be used by external callers
 pub fn get_text_at_mouse_cursor() -> Option<String> {
     None
 }
