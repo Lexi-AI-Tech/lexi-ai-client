@@ -290,38 +290,6 @@ unsafe fn cf_string_to_string(cf_string: *const c_void) -> String {
     }
 }
 
-/// Log cursor context to console
-pub fn log_cursor_context() {
-    #[cfg(target_os = "macos")]
-    {
-        match get_cursor_context() {
-            Some(context) => {
-                println!("=== CURSOR CONTEXT ===");
-                println!("App: {:?}", context.app_name);
-                println!("PID: {:?}", context.pid);
-                if let Some(selected_text) = &context.selected_text {
-                    println!("Selected/Context Text: {}", selected_text);
-                } else {
-                    println!("Selected/Context Text: (none)");
-                }
-                println!("======================");
-            }
-            None => {
-                println!("=== CURSOR CONTEXT ===");
-                println!("Failed to retrieve cursor context");
-                println!("======================");
-            }
-        }
-    }
-    
-    #[cfg(not(target_os = "macos"))]
-    {
-        println!("=== CURSOR CONTEXT ===");
-        println!("Cursor context is only available on macOS");
-        println!("======================");
-    }
-}
-
 /// Stub implementation for non-macOS platforms
 #[cfg(not(target_os = "macos"))]
 pub fn get_cursor_context() -> Option<CursorContext> {
