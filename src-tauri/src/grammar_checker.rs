@@ -57,7 +57,6 @@ pub fn check_grammar_internal(text: String, cursor_pos: usize) -> GrammarCheckRe
 pub fn check_grammar(text: String, cursor_pos: usize) -> Result<GrammarCheckResult, String> {
     Ok(check_grammar_internal(text, cursor_pos))
 }
-
 // Placeholder – we'll implement real replacement later
 #[tauri::command]
 pub fn replace_text(start: usize, end: usize, new_text: String) -> Result<(), String> {

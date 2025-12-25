@@ -62,7 +62,6 @@ mod recording_thread;    // Recording thread management
 mod commands;            // Tauri commands organized by functionality
 mod text_monitor;        // System-wide text monitoring
 mod grammar_checker;     // Grammar checking and text replacement
-mod overlay_window;      // Overlay window management
 
 
 
@@ -154,10 +153,7 @@ pub fn main() {
             start_hotkey_recording,
             stop_hotkey_recording,
             text_monitor::start_monitoring,
-            grammar_checker::check_grammar,
-            grammar_checker::replace_text,
-            overlay_window::show_overlay_window,
-            overlay_window::hide_overlay_window
+            grammar_checker::check_grammar
 
 
         ])
@@ -178,10 +174,6 @@ pub fn main() {
             // The window is created dynamically in Rust but shown at app startup
             if let Err(e) = pill::init_pill_window(app_handle.clone()) {
                 eprintln!("Failed to initialize pill window: {}", e);
-            }
-
-            if let Err(e) = overlay_window::create_overlay_window(&app_handle) {
-                eprintln!("Failed to initialize overlay window: {}", e);
             }
 
 
