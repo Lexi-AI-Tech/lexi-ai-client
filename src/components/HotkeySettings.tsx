@@ -164,6 +164,11 @@ export const HotkeySettings: React.FC = () => {
         const configJson = JSON.stringify(selectedHotkey);
         await invoke('update_hotkey', { configJson });
       }
+      
+      // Update Rust backend if language changed (works even without auth)
+      if (languageChanged) {
+        await invoke('set_language', { language: selectedLanguage });
+      }
 
       // Save to DB only if user is authenticated
       if (tokens?.access_token) {
