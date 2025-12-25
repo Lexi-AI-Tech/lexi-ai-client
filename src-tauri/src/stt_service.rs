@@ -58,6 +58,7 @@ impl SttService {
     /// # Arguments
     /// * `audio_data` - WAV file data as bytes (typically from AudioRecorder)
     /// * `auth_token` - Optional authentication token (Bearer token) for authenticated requests
+    /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
     /// 
     /// # Returns
@@ -67,6 +68,7 @@ impl SttService {
         &self,
         audio_data: Vec<u8>,
         auth_token: Option<String>,
+        language: String,
         cancel_rx: Option<oneshot::Receiver<()>>,
     ) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
@@ -87,8 +89,9 @@ impl SttService {
         // Build the request
         // Get API base URL from configuration
         let api_base_url = config::api_base_url();
+        let url = format!("{}/api/transcription/speech-to-text?language={}", api_base_url, urlencoding::encode(&language));
         let mut request = self.client
-            .post(format!("{}/api/transcription/speech-to-text", api_base_url))
+            .post(&url)
             .multipart(form);  // Attach the multipart form with audio file
 
         // Add authorization header if token is provided
