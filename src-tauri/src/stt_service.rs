@@ -80,7 +80,7 @@ impl SttService {
 
         // Build the multipart form with the audio file
         let form = multipart::Form::new()
-            .part("file", part);  // Attach the audio file
+            .part("audio_file", part);  // Attach the audio file
 
         println!("🔍 DEBUG: Sending request to Lexi AI Server...");
 
