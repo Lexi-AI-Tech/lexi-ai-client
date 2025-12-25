@@ -8,8 +8,9 @@
 //! 5. Emitting events to the frontend to update UI state
 
 use tauri::{AppHandle, Manager, Emitter};
-use crate::state::{AuthTokenState, TranscriptionTaskState};
+use crate::state::{AuthTokenState, TranscriptionTaskState, LanguageState};
 use crate::commands::auth::get_auth_token;
+use crate::commands::config::get_language;
 use crate::stt_service::SttService;
 use crate::text_injector::TextInjector;
 
@@ -71,11 +72,19 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             println!("✅ Auth token available (length: {})", auth_token.as_ref().unwrap().len());
         }
 
+        // Get language from state, default to "auto" if not set
+        let language = if let Some(state) = app_handle_for_task.try_state::<LanguageState>() {
+            get_language(&state).unwrap_or_else(|| "auto".to_string())
+        } else {
+            "auto".to_string()
+        };
+        println!("🌐 Using language: {}", language);
+
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
         let stt_service = SttService::new();
         let transcription_result = stt_service
-            .transcribe_audio(audio_data, auth_token, Some(cancel_rx))
+            .transcribe_audio(audio_data, auth_token, language, Some(cancel_rx))
             .await;
 
         // Check if the task was aborted (the JoinHandle will be cancelled)

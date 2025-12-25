@@ -57,8 +57,14 @@ function App() {
         if (config.hotkey) {
           const hotkeyConfig = { hotkey: config.hotkey };
           await invoke('update_hotkey', { configJson: JSON.stringify(hotkeyConfig) });
-          console.log('✅ Config synced to Rust backend:', config);
         }
+        
+        // Sync language to Rust backend
+        if (config.language) {
+          await invoke('set_language', { language: config.language });
+        }
+        
+        console.log('✅ Config synced to Rust backend:', config);
       } catch (error) {
         console.warn('Failed to load config from DB (using defaults):', error);
       }

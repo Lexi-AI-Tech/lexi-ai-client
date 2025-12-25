@@ -62,7 +62,7 @@ mod commands;            // Tauri commands organized by functionality
 
 use global_key_listener::HotkeyConfig;
 use state::{
-    AuthTokenState, TranscriptionTaskState, HotkeyWatchState, HotkeyRecordingState,
+    AuthTokenState, TranscriptionTaskState, HotkeyWatchState, HotkeyRecordingState, LanguageState,
 };
 use window::show_and_focus_main_window;
 use recording_thread::spawn_recording_thread;
@@ -75,6 +75,7 @@ use permissions::{
 };
 
 use commands::auth::{set_auth_token, start_google_login, get_pkce_verifier};
+use commands::config::set_language;
 use commands::hotkey::{
     update_hotkey, get_current_hotkey, start_hotkey_recording, stop_hotkey_recording,
 };
@@ -124,6 +125,7 @@ pub fn main() {
         }))
         .manage(OAuthState::default())
         .manage(AuthTokenState::default())
+        .manage(LanguageState::default())
         .manage(TranscriptionTaskState {
             task_handle: Mutex::new(None),
             cancel_tx: Mutex::new(None),
@@ -142,6 +144,7 @@ pub fn main() {
             start_google_login,
             get_pkce_verifier,
             set_auth_token,
+            set_language,
             update_hotkey,
             get_current_hotkey,
             start_hotkey_recording,
