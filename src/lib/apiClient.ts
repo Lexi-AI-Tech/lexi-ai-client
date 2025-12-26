@@ -652,12 +652,16 @@ export interface AppConfig {
   system_type: string;
   hotkey: string;
   language: string;
+  enhance_transcription: boolean;
+  transcribe_with_cursor_context: boolean;
 }
 
 export interface AppConfigUpdateRequest {
   system_type?: string; // 'mac' or 'windows'
   hotkey?: string;
   language?: string;
+  enhance_transcription?: boolean;
+  transcribe_with_cursor_context?: boolean;
 }
 
 /**

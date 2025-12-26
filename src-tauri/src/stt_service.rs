@@ -88,12 +88,14 @@ impl SttService {
         // Build the request
         // Get API base URL from configuration
         let api_base_url = config::api_base_url();
-        let enhance_transcription = false;
+        let enhance_transcription = false; // TODO: Use from app config
+        let transcribe_with_cursor_context = false; // TODO: Use from app config
         let url = format!(
-            "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}",
+            "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}",
             api_base_url,
             urlencoding::encode(&language),
             enhance_transcription
+            transcribe_with_cursor_context
         );
         let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
 
