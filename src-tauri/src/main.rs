@@ -106,7 +106,12 @@ pub fn main() {
         config::api_base_url()
     );
 
-    tauri::Builder::default()
+    // Initialize CrabNebula DevTools (only in debug builds)
+    // This should be called as early in the execution of the app as possible
+    #[cfg(debug_assertions)]
+    let devtools = tauri_plugin_devtools::init();
+
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -125,7 +130,15 @@ pub fn main() {
                     eprintln!("❌ Backup show failed!");
                 }
             });
-        }))
+        }));
+
+    // Add CrabNebula DevTools plugin (only in debug builds)
+    #[cfg(debug_assertions)]
+    {
+        builder = builder.plugin(devtools);
+    }
+
+    builder
         .manage(OAuthState::default())
         .manage(AuthTokenState::default())
         .manage(LanguageState::default())
