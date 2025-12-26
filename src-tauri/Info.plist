@@ -8,6 +8,8 @@
     <string>Lexi AI needs access to your microphone to record audio for speech-to-text transcription.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Lexi AI needs accessibility permissions to inject transcribed text at your cursor position.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Lexi AI needs accessibility permissions to identify the text field at your cursor position and provide context-aware transcription.</string>
 </dict>
 </plist>
 
