@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { listen } from '@tauri-apps/api/event';
-import { useOnboardingStore } from '../../store/onboardingStore';
-import './onboarding.css';
+import React, { useState, useEffect } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { useOnboardingStore } from "../../store/onboardingStore";
+import "./onboarding.css";
 
 export const FnKeyTestScreen: React.FC = () => {
   const { nextStep, previousStep } = useOnboardingStore();
@@ -11,26 +11,26 @@ export const FnKeyTestScreen: React.FC = () => {
   useEffect(() => {
     // Listen for global input events and recording events
     const setupListener = async () => {
-      const unlistenGlobal = await listen('global-input', (event: any) => {
+      const unlistenGlobal = await listen("global-input", (event: any) => {
         const eventString = event.payload as string;
         // Check if it's an Fn key event (Function key)
-        if (eventString.includes('Function')) {
-          if (eventString.includes('key_press')) {
+        if (eventString.includes("Function")) {
+          if (eventString.includes("key_press")) {
             setFnKeyPressed(true);
             setHasDetectedFn(true);
-          } else if (eventString.includes('key_release')) {
+          } else if (eventString.includes("key_release")) {
             setFnKeyPressed(false);
           }
         }
       });
 
       // Also listen for recording events as a fallback
-      const unlistenRecording = await listen('recording_started', () => {
+      const unlistenRecording = await listen("recording_started", () => {
         setFnKeyPressed(true);
         setHasDetectedFn(true);
       });
 
-      const unlistenStopped = await listen('recording_stopped', () => {
+      const unlistenStopped = await listen("recording_stopped", () => {
         setFnKeyPressed(false);
       });
 
@@ -42,7 +42,7 @@ export const FnKeyTestScreen: React.FC = () => {
     };
 
     let unlistenFn: (() => void) | undefined;
-    setupListener().then(unlisten => {
+    setupListener().then((unlisten) => {
       unlistenFn = unlisten;
     });
 
@@ -69,23 +69,30 @@ export const FnKeyTestScreen: React.FC = () => {
               Press the Fn key to test it out.
             </h1>
             <div className="text-base text-muted-foreground mb-8 max-w-md">
-              Press and hold the <span className="inline-flex items-center px-2 py-0.5 bg-neutral-100 border rounded text-xs font-mono ml-1">Fn</span> key at the bottom left of your keyboard
+              Press and hold the{" "}
+              <span className="inline-flex items-center px-2 py-0.5 bg-neutral-100 border rounded text-xs font-mono ml-1">
+                Fn
+              </span>{" "}
+              key at the bottom left of your keyboard
             </div>
           </div>
         </div>
       </div>
       <div className="flex w-[55%] items-center justify-center bg-gradient-to-b from-purple-50/10 to-purple-100 border-l-2 border-purple-100">
-        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center" style={{ minWidth: 500, maxHeight: 280 }}>
+        <div
+          className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center"
+          style={{ minWidth: 500, maxHeight: 280 }}
+        >
           <div className="text-lg font-medium mb-6 text-center">
-            {hasDetectedFn 
-              ? 'Great! The Fn key is working.'
-              : 'Does the button turn purple while pressing it?'}
+            {hasDetectedFn
+              ? "Great! The Fn key is working."
+              : "Does the button turn purple while pressing it?"}
           </div>
-          <div className={`fn-key-display-large ${fnKeyPressed ? 'pressed' : ''}`}>
+          <div
+            className={`fn-key-display-large ${fnKeyPressed ? "pressed" : ""}`}
+          >
             <div className="fn-key-label-large">Fn</div>
-            {fnKeyPressed && (
-              <div className="fn-key-indicator-large">●</div>
-            )}
+            {fnKeyPressed && <div className="fn-key-indicator-large">●</div>}
           </div>
           <div className="flex gap-2 mt-6 w-full justify-end">
             <button
@@ -93,7 +100,7 @@ export const FnKeyTestScreen: React.FC = () => {
               onClick={nextStep}
               disabled={!hasDetectedFn}
             >
-              {hasDetectedFn ? 'Yes' : 'Continue'}
+              {hasDetectedFn ? "Yes" : "Continue"}
             </button>
           </div>
         </div>

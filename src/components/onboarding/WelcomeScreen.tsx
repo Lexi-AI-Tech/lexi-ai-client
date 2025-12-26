@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
-import { useOnboardingStore } from '../../store/onboardingStore';
-import { GoogleLoginButton } from '../auth/GoogleLoginButton';
-import { useAuthStore } from '../../store/authStore';
-import { clearAllStorage, clearAuthStorage, clearOnboardingStorage } from '../../lib/storageUtils';
-import './onboarding.css';
+import React, { useState } from "react";
+import { useOnboardingStore } from "../../store/onboardingStore";
+import { GoogleLoginButton } from "../auth/GoogleLoginButton";
+import { useAuthStore } from "../../store/authStore";
+import {
+  clearAllStorage,
+  clearAuthStorage,
+  clearOnboardingStorage,
+} from "../../lib/storageUtils";
+import "./onboarding.css";
 
 export const WelcomeScreen: React.FC = () => {
   const { nextStep, resetOnboarding } = useOnboardingStore();
@@ -11,31 +15,33 @@ export const WelcomeScreen: React.FC = () => {
   const [showDebugMenu, setShowDebugMenu] = useState(false);
 
   const handleClearAll = () => {
-    if (confirm('Clear all app data? This will log you out and reset onboarding.')) {
+    if (
+      confirm("Clear all app data? This will log you out and reset onboarding.")
+    ) {
       clearAllStorage();
       clearAuth();
       resetOnboarding();
       setShowDebugMenu(false);
-      alert('All data cleared! Page will refresh.');
+      alert("All data cleared! Page will refresh.");
       window.location.reload();
     }
   };
 
   const handleClearAuth = () => {
-    if (confirm('Clear authentication data? You will be logged out.')) {
+    if (confirm("Clear authentication data? You will be logged out.")) {
       clearAuthStorage();
       clearAuth();
       setShowDebugMenu(false);
-      alert('Auth data cleared!');
+      alert("Auth data cleared!");
     }
   };
 
   const handleClearOnboarding = () => {
-    if (confirm('Reset onboarding? You will need to go through setup again.')) {
+    if (confirm("Reset onboarding? You will need to go through setup again.")) {
       clearOnboardingStorage();
       resetOnboarding();
       setShowDebugMenu(false);
-      alert('Onboarding reset!');
+      alert("Onboarding reset!");
     }
   };
 
@@ -44,9 +50,7 @@ export const WelcomeScreen: React.FC = () => {
       <div className="flex flex-col w-[45%] justify-center items-start px-24">
         <div className="flex flex-col h-full min-h-[400px] justify-between py-12">
           <div className="mt-8">
-            <h1 className="text-3xl mb-4 mt-12">
-              Welcome to Lexi AI
-            </h1>
+            <h1 className="text-3xl mb-4 mt-12">Welcome to Lexi AI</h1>
             <p className="text-base text-muted-foreground mb-8 max-w-md">
               Your voice-to-text assistant that works anywhere on your Mac
             </p>
@@ -71,19 +75,15 @@ export const WelcomeScreen: React.FC = () => {
                 <p className="text-sm text-muted-foreground mb-2">
                   Sign in to sync your preferences (optional)
                 </p>
-                <GoogleLoginButton 
+                <GoogleLoginButton
                   onSuccess={() => {
-                    console.log('Login successful');
+                    console.log("Login successful");
                   }}
                   onError={(err) => {
-                    console.error('Login error:', err);
+                    console.error("Login error:", err);
                   }}
                 />
-                {error && (
-                  <div className="auth-error">
-                    {error}
-                  </div>
-                )}
+                {error && <div className="auth-error">{error}</div>}
                 <div className="flex items-center gap-2 my-2 w-full">
                   <div className="flex-1 h-px bg-border"></div>
                   <span className="text-xs text-muted-foreground px-2">or</span>
@@ -91,13 +91,10 @@ export const WelcomeScreen: React.FC = () => {
                 </div>
               </div>
             )}
-            <button 
-              className="onboarding-button primary"
-              onClick={nextStep}
-            >
-              {isAuthenticated ? 'Continue' : 'Get Started'}
+            <button className="onboarding-button primary" onClick={nextStep}>
+              {isAuthenticated ? "Continue" : "Get Started"}
             </button>
-            
+
             {/* Debug Menu - Hold Shift and click to show */}
             <div className="mt-4">
               <button
@@ -108,9 +105,9 @@ export const WelcomeScreen: React.FC = () => {
                   setShowDebugMenu(!showDebugMenu);
                 }}
               >
-                {showDebugMenu ? '▼' : '▶'} Debug Menu
+                {showDebugMenu ? "▼" : "▶"} Debug Menu
               </button>
-              
+
               {showDebugMenu && (
                 <div className="mt-2 p-3 bg-muted rounded border border-border text-xs space-y-2">
                   <p className="font-semibold mb-2">Clear Storage:</p>

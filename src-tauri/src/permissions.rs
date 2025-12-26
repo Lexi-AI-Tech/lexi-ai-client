@@ -42,7 +42,7 @@ pub fn check_microphone_permission() -> Result<bool, String> {
     // On macOS, we can check microphone permission by trying to access it
     // This is a simplified check - in production you might want to use
     // AVFoundation APIs for a more accurate check
-    
+
     // Try to check using system_profiler or just return true if we can create a recorder
     // For now, we'll attempt to create a recorder as a check
     match std::panic::catch_unwind(|| {
@@ -84,7 +84,7 @@ pub fn check_input_monitoring_permission(_app: AppHandle) -> Result<bool, String
 #[cfg(target_os = "macos")]
 pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
     use std::process::Command;
-    
+
     // Check if we can access System Events (which requires Accessibility permission)
     let script = r#"
         tell application "System Events"
@@ -96,12 +96,8 @@ pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
             end try
         end tell
     "#;
-    
-    match Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()
-    {
+
+    match Command::new("osascript").arg("-e").arg(script).output() {
         Ok(output) => {
             let result = String::from_utf8_lossy(&output.stdout);
             let trimmed = result.trim();
@@ -125,11 +121,11 @@ pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
 pub fn request_microphone_permission() -> Result<bool, String> {
     use std::thread;
     use std::time::Duration;
-    
+
     // Spawn a thread to attempt microphone access, which triggers the permission dialog
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(100));
-        
+
         // Try to create an audio recorder, which will trigger the permission dialog
         // We do this in a separate thread to avoid blocking
         // If permission is denied, this will fail, but that's okay - we just want to trigger the dialog
@@ -138,7 +134,7 @@ pub fn request_microphone_permission() -> Result<bool, String> {
             println!("Microphone permission dialog should have appeared");
         });
     });
-    
+
     // Return immediately - the permission dialog will appear asynchronously
     Ok(true)
 }
@@ -155,14 +151,14 @@ pub fn request_microphone_permission() -> Result<bool, String> {
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> {
+    use rdev::{listen, Event};
     use std::thread;
     use std::time::Duration;
-    use rdev::{listen, Event};
-    
+
     // Spawn a thread to attempt starting a test listener, which triggers the permission dialog
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(100));
-        
+
         // Try to start a test listener, which will trigger Input Monitoring permission dialog
         // We do this in a separate thread to avoid blocking
         let _ = std::panic::catch_unwind(|| {
@@ -172,7 +168,7 @@ pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, Stri
             println!("Input Monitoring permission dialog should have appeared");
         });
     });
-    
+
     // Return immediately - the permission dialog will appear asynchronously
     Ok(true)
 }
@@ -192,11 +188,11 @@ pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String>
     use std::process::Command;
     use std::thread;
     use std::time::Duration;
-    
+
     // Spawn a thread to attempt using System Events, which triggers the permission dialog
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(100));
-        
+
         // Try to run a simple AppleScript that uses System Events
         // This will trigger the Accessibility permission dialog
         // We use a harmless command that just checks if we can access System Events
@@ -206,16 +202,13 @@ pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String>
                 get name of every process
             end tell
         "#;
-        
+
         let _ = std::panic::catch_unwind(|| {
-            let _ = Command::new("osascript")
-                .arg("-e")
-                .arg(script)
-                .output();
+            let _ = Command::new("osascript").arg("-e").arg(script).output();
             println!("Accessibility permission dialog should have appeared");
         });
     });
-    
+
     // Return immediately - the permission dialog will appear asynchronously
     Ok(true)
 }
@@ -226,4 +219,3 @@ pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String>
 pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
-

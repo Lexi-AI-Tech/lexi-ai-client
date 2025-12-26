@@ -1,74 +1,92 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { useAuthStore } from '../../store/authStore';
-import { refreshJWTToken, logout as backendLogout, checkOAuthStatus } from '../../lib/apiClient';
-import './auth.css';
+import React, { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useAuthStore } from "../../store/authStore";
+import {
+  refreshJWTToken,
+  logout as backendLogout,
+  checkOAuthStatus,
+} from "../../lib/apiClient";
+import "./auth.css";
 
 interface GoogleLoginButtonProps {
   onSuccess?: (user: any) => void;
   onError?: (error: string) => void;
 }
 
-export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ 
-  onSuccess, 
-  onError 
+export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
+  onSuccess,
+  onError,
 }) => {
-  const { clearAuth, setLoading, setError, setAuthData, user, isAuthenticated, tokens } = useAuthStore();
+  const {
+    clearAuth,
+    setLoading,
+    setError,
+    setAuthData,
+    user,
+    isAuthenticated,
+    tokens,
+  } = useAuthStore();
   const [loading, setLocalLoading] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const oauthPollingRef = useRef<{ isPolling: boolean; interval: NodeJS.Timeout | null }>({ isPolling: false, interval: null });
+  const oauthPollingRef = useRef<{
+    isPolling: boolean;
+    interval: NodeJS.Timeout | null;
+  }>({ isPolling: false, interval: null });
 
   // Check persistent storage for tokens (in case callback page stored them)
   const checkStoredAuth = React.useCallback(() => {
     try {
       // Use sync version for immediate checks (falls back to localStorage)
       // The authStore will handle async Tauri Store loading on initialization
-      const { getStorageItemSync } = require('../lib/persistentStorage');
-      const stored = getStorageItemSync('lexi-auth');
-      console.log('Checking persistent storage for auth:', stored ? 'found' : 'not found');
+      const { getStorageItemSync } = require("../lib/persistentStorage");
+      const stored = getStorageItemSync("lexi-auth");
+      console.log(
+        "Checking persistent storage for auth:",
+        stored ? "found" : "not found",
+      );
       if (stored) {
         const parsed = JSON.parse(stored);
-        console.log('Parsed auth data:', { 
-          hasTokens: !!parsed.tokens, 
+        console.log("Parsed auth data:", {
+          hasTokens: !!parsed.tokens,
           hasUser: !!parsed.user,
           tokenKeys: parsed.tokens ? Object.keys(parsed.tokens) : [],
-          userKeys: parsed.user ? Object.keys(parsed.user) : []
+          userKeys: parsed.user ? Object.keys(parsed.user) : [],
         });
-        
+
         // Handle both formats: { tokens, user } and { isAuthenticated, tokens, user }
         const tokens = parsed.tokens || parsed;
         const user = parsed.user;
-        
+
         if (tokens?.access_token && user) {
-          console.log('✅ Found stored auth in persistent storage, using it');
+          console.log("✅ Found stored auth in persistent storage, using it");
           // Found stored auth, use it
           setAuthData(tokens, user);
           setLoading(false);
           setLocalLoading(false);
-          
+
           // Clear timeout if it exists
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
           }
-          
+
           // Note: We don't remove the stored auth here since authStore manages it
           // The authStore will persist it properly using Tauri Store
-          
+
           if (onSuccess) {
             onSuccess(user);
           }
           return true;
         } else {
-          console.log('❌ Stored auth missing required fields:', {
+          console.log("❌ Stored auth missing required fields:", {
             hasAccessToken: !!tokens?.access_token,
-            hasUser: !!user
+            hasUser: !!user,
           });
         }
       }
     } catch (e) {
-      console.error('Error checking stored auth:', e);
+      console.error("Error checking stored auth:", e);
     }
     return false;
   }, [setAuthData, setLoading, onSuccess]);
@@ -76,31 +94,36 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   // Listen for OAuth callback messages from the callback page
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      console.log('Received postMessage:', event.data);
+      console.log("Received postMessage:", event.data);
       // Only accept messages from our backend
-      if (event.data?.type === 'oauth-success') {
-        const { access_token, refresh_token, user: authUser, expires_in } = event.data;
-        
+      if (event.data?.type === "oauth-success") {
+        const {
+          access_token,
+          refresh_token,
+          user: authUser,
+          expires_in,
+        } = event.data;
+
         const authTokens = {
           access_token,
           refresh_token,
           expires_in,
-          expires_at: expires_in ? Date.now() + expires_in * 1000 : undefined
+          expires_at: expires_in ? Date.now() + expires_in * 1000 : undefined,
         };
 
         setAuthData(authTokens, authUser);
         setLoading(false);
         setLocalLoading(false);
-        
+
         if (onSuccess) {
           onSuccess(authUser);
         }
-      } else if (event.data?.type === 'oauth-error') {
-        const errorMsg = event.data.error || 'Authentication failed';
+      } else if (event.data?.type === "oauth-error") {
+        const errorMsg = event.data.error || "Authentication failed";
         setError(errorMsg);
         setLoading(false);
         setLocalLoading(false);
-        
+
         if (onError) {
           onError(errorMsg);
         }
@@ -108,20 +131,20 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     };
 
     // Listen for postMessage (when opened from web)
-    window.addEventListener('message', handleMessage);
-    
+    window.addEventListener("message", handleMessage);
+
     // Listen for storage events (when callback page stores in localStorage)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'lexi-auth' && e.newValue) {
-        console.log('Storage event detected for lexi-auth');
+      if (e.key === "lexi-auth" && e.newValue) {
+        console.log("Storage event detected for lexi-auth");
         checkStoredAuth();
       }
     };
-    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
 
     return () => {
-      window.removeEventListener('message', handleMessage);
-      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("storage", handleStorageChange);
     };
   }, [setAuthData, setError, setLoading, onSuccess, onError, checkStoredAuth]);
 
@@ -136,11 +159,11 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       return;
     }
 
-    console.log('Starting to poll localStorage, loading:', loading);
+    console.log("Starting to poll localStorage, loading:", loading);
 
     // Check immediately
     if (checkStoredAuth()) {
-      console.log('Auth found immediately, stopping');
+      console.log("Auth found immediately, stopping");
       return; // Already found, no need to poll
     }
 
@@ -148,13 +171,13 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
     }
-    
+
     // Poll every 200ms (more frequent) until we find tokens
-    console.log('Starting polling interval');
+    console.log("Starting polling interval");
     pollIntervalRef.current = setInterval(() => {
-      console.log('Polling localStorage...');
+      console.log("Polling localStorage...");
       if (checkStoredAuth()) {
-        console.log('Auth found via polling, stopping');
+        console.log("Auth found via polling, stopping");
         if (pollIntervalRef.current) {
           clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
@@ -163,7 +186,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     }, 200); // Check every 200ms for faster detection
 
     return () => {
-      console.log('Cleaning up polling');
+      console.log("Cleaning up polling");
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
@@ -178,12 +201,12 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
     try {
       // Get client ID from environment
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
       if (!clientId) {
         throw new Error(
-          'Google OAuth credentials not configured. ' +
-          'Please set VITE_GOOGLE_CLIENT_ID in your .env file.'
+          "Google OAuth credentials not configured. " +
+            "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
         );
       }
 
@@ -195,56 +218,60 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         verifier: string;
         state: string;
         auth_url: string;
-      }>('start_google_login', { clientId });
+      }>("start_google_login", { clientId });
 
-      console.log('PKCE challenge generated, browser opened:', {
+      console.log("PKCE challenge generated, browser opened:", {
         state: pkceData.state,
         stateLength: pkceData.state.length,
         verifierLength: pkceData.verifier.length,
-        authUrl: pkceData.auth_url
+        authUrl: pkceData.auth_url,
       });
-      
+
       // Store verifier on backend (Redis) so callback page can retrieve it
       // This works even when callback opens in external browser
       try {
-        const { storePkceVerifier } = await import('../../lib/apiClient');
+        const { storePkceVerifier } = await import("../../lib/apiClient");
         await storePkceVerifier(pkceData.state, pkceData.verifier);
-        console.log('Stored PKCE verifier on backend (Redis):', {
+        console.log("Stored PKCE verifier on backend (Redis):", {
           state: pkceData.state,
           stateLength: pkceData.state.length,
-          verifierLength: pkceData.verifier.length
+          verifierLength: pkceData.verifier.length,
         });
       } catch (error) {
-        console.error('Failed to store verifier on backend:', error);
-        throw new Error('Failed to store OAuth verifier. Please try again.');
+        console.error("Failed to store verifier on backend:", error);
+        throw new Error("Failed to store OAuth verifier. Please try again.");
       }
-      
-      console.log('Waiting for OAuth callback...');
-      
+
+      console.log("Waiting for OAuth callback...");
+
       // Poll backend for OAuth completion (instead of localStorage)
       // This works across different browser contexts
       // Use ref to track polling state across async operations
       oauthPollingRef.current.isPolling = true;
       oauthPollingRef.current.interval = null;
-      
+
       const pollOAuthStatus = async (): Promise<boolean> => {
         if (!oauthPollingRef.current.isPolling) {
-          console.log('Polling already stopped, skipping');
+          console.log("Polling already stopped, skipping");
           return true; // Already stopped
         }
-        
+
         try {
           const status = await checkOAuthStatus(pkceData.state);
-          console.log('OAuth status check:', {
+          console.log("OAuth status check:", {
             status: status.status,
             hasAccessToken: !!status.access_token,
             hasUser: !!status.user,
-            fullResponse: status
+            fullResponse: status,
           });
-          
-          if (status.status === 'completed' && status.access_token && status.user) {
-            console.log('✅ OAuth completed, tokens received from backend');
-            
+
+          if (
+            status.status === "completed" &&
+            status.access_token &&
+            status.user
+          ) {
+            console.log("✅ OAuth completed, tokens received from backend");
+
             // Stop polling immediately BEFORE processing to prevent race conditions
             oauthPollingRef.current.isPolling = false;
             if (oauthPollingRef.current.interval) {
@@ -255,86 +282,90 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;
             }
-            
+
             // Process tokens
             const authTokens = {
               access_token: status.access_token,
-              refresh_token: status.refresh_token || '',
+              refresh_token: status.refresh_token || "",
               expires_in: status.expires_in,
-              expires_at: status.expires_in ? Date.now() + status.expires_in * 1000 : undefined
+              expires_at: status.expires_in
+                ? Date.now() + status.expires_in * 1000
+                : undefined,
             };
 
-            console.log('Setting auth data:', {
+            console.log("Setting auth data:", {
               hasAccessToken: !!authTokens.access_token,
               hasRefreshToken: !!authTokens.refresh_token,
-              userEmail: status.user?.email
+              userEmail: status.user?.email,
             });
 
             setAuthData(authTokens, status.user);
             setLoading(false);
             setLocalLoading(false);
-            
+
             if (onSuccess) {
               onSuccess(status.user);
             }
             return true; // Stop polling
-          } else if (status.status === 'pending') {
+          } else if (status.status === "pending") {
             // Still pending, continue polling
             return false;
           } else {
             // Unexpected status
-            console.warn('Unexpected OAuth status:', status);
+            console.warn("Unexpected OAuth status:", status);
             return false;
           }
         } catch (error) {
-          console.error('Error checking OAuth status:', error);
+          console.error("Error checking OAuth status:", error);
           // Don't stop polling on error - might be temporary network issue
           return false;
         }
       };
-      
+
       // Poll immediately, then every 500ms
       if (await pollOAuthStatus()) {
         return; // Already completed
       }
-      
+
       oauthPollingRef.current.interval = setInterval(async () => {
         if (await pollOAuthStatus()) {
           // Polling stopped, interval already cleared in pollOAuthStatus
         }
       }, 500);
-      
+
       // Set a timeout to stop polling after 5 minutes
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      timeoutRef.current = setTimeout(() => {
-        oauthPollingRef.current.isPolling = false;
-        if (oauthPollingRef.current.interval) {
-          clearInterval(oauthPollingRef.current.interval);
-          oauthPollingRef.current.interval = null;
-        }
-        console.log('OAuth timeout - no tokens detected');
-        setLocalLoading(false);
-        setLoading(false);
-        setError('Authentication timed out. Please try again.');
-        if (onError) {
-          onError('Authentication timed out');
-        }
-      }, 5 * 60 * 1000); // 5 minutes
-
+      timeoutRef.current = setTimeout(
+        () => {
+          oauthPollingRef.current.isPolling = false;
+          if (oauthPollingRef.current.interval) {
+            clearInterval(oauthPollingRef.current.interval);
+            oauthPollingRef.current.interval = null;
+          }
+          console.log("OAuth timeout - no tokens detected");
+          setLocalLoading(false);
+          setLoading(false);
+          setError("Authentication timed out. Please try again.");
+          if (onError) {
+            onError("Authentication timed out");
+          }
+        },
+        5 * 60 * 1000,
+      ); // 5 minutes
     } catch (error: any) {
-      const errorMessage = error?.message || 'Google login failed';
-      console.error('Google Login Failed:', error);
+      const errorMessage = error?.message || "Google login failed";
+      console.error("Google Login Failed:", error);
       setError(errorMessage);
       setLocalLoading(false);
       setLoading(false);
-      
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      
+
       if (onError) {
         onError(errorMessage);
       }
@@ -345,33 +376,33 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     try {
       setLocalLoading(true);
       setLoading(true);
-      
+
       // Logout from backend first (revokes all sessions)
       await backendLogout();
-      
+
       // Clear Rust backend auth token
       try {
-        await invoke('set_auth_token', { token: null });
-        console.log('✅ Auth token cleared from Rust backend');
+        await invoke("set_auth_token", { token: null });
+        console.log("✅ Auth token cleared from Rust backend");
       } catch (error) {
-        console.warn('Failed to clear Rust backend token:', error);
+        console.warn("Failed to clear Rust backend token:", error);
         // Continue with logout even if this fails
       }
-      
+
       // Clear local auth state
       clearAuth();
-      
-      console.log('✅ Logout successful');
+
+      console.log("✅ Logout successful");
     } catch (error) {
-      console.error('Logout Failed:', error);
+      console.error("Logout Failed:", error);
       // Still clear local auth even if logout fails
       clearAuth();
-      
+
       // Still try to clear Rust backend token
       try {
-        await invoke('set_auth_token', { token: null });
+        await invoke("set_auth_token", { token: null });
       } catch (rustError) {
-        console.warn('Failed to clear Rust backend token:', rustError);
+        console.warn("Failed to clear Rust backend token:", rustError);
       }
     } finally {
       setLocalLoading(false);
@@ -382,31 +413,31 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   const handleRefresh = async () => {
     try {
       setLoading(true);
-      
+
       // Get refresh token from store
       if (!tokens?.refresh_token) {
-        throw new Error('No refresh token available');
+        throw new Error("No refresh token available");
       }
 
       // Refresh backend JWT token
       const refreshed = await refreshJWTToken(tokens.refresh_token);
-      console.log('Token Refreshed:', refreshed);
-      
+      console.log("Token Refreshed:", refreshed);
+
       if (refreshed.access_token && user) {
         const authTokens = {
           access_token: refreshed.access_token,
           refresh_token: refreshed.refresh_token || tokens.refresh_token,
           expires_in: refreshed.expires_in,
-          expires_at: refreshed.expires_in 
-            ? Date.now() + refreshed.expires_in * 1000 
-            : undefined
+          expires_at: refreshed.expires_in
+            ? Date.now() + refreshed.expires_in * 1000
+            : undefined,
         };
-        
+
         setAuthData(authTokens, user);
       }
     } catch (error: any) {
-      console.error('Refresh Failed:', error);
-      setError(error?.message || 'Failed to refresh token');
+      console.error("Refresh Failed:", error);
+      setError(error?.message || "Failed to refresh token");
     } finally {
       setLoading(false);
     }
@@ -417,9 +448,9 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       <div className="auth-user-info">
         <div className="auth-user-details">
           {user.picture && (
-            <img 
-              src={user.picture} 
-              alt="Profile" 
+            <img
+              src={user.picture}
+              alt="Profile"
               className="auth-user-avatar"
             />
           )}
@@ -429,17 +460,14 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           </div>
         </div>
         <div className="auth-actions">
-          <button 
-            onClick={handleRefresh} 
+          <button
+            onClick={handleRefresh}
             className="auth-button secondary"
             disabled={loading}
           >
             Refresh Token
           </button>
-          <button 
-            onClick={handleLogout} 
-            className="auth-button secondary"
-          >
+          <button onClick={handleLogout} className="auth-button secondary">
             Sign Out
           </button>
         </div>
@@ -460,7 +488,12 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         </>
       ) : (
         <>
-          <svg className="google-icon" viewBox="0 0 24 24" width="20" height="20">
+          <svg
+            className="google-icon"
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+          >
             <path
               fill="#4285F4"
               d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
