@@ -346,6 +346,11 @@ pub fn start_listener(
                 let pressed_keys: Arc<Mutex<HashSet<Key>>> = Arc::new(Mutex::new(HashSet::new()));
                 let pressed_keys_clone = pressed_keys.clone();
                 
+                // State machine: Track if we're currently recording (i.e., Start was successfully sent)
+                // This prevents Stop commands from being processed if the corresponding Start was debounced
+                let is_recording_active: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+                let is_recording_active_clone = is_recording_active.clone();
+                
                 let callback = move |event: Event| {
                     if shutdown_for_callback.load(Ordering::Relaxed) {
                         return;  // Early exit if shutdown signaled
@@ -398,9 +403,30 @@ pub fn start_listener(
                     
                     // Check if this is a trigger key event
                     if let Some(command) = is_trigger_key_event(&event.event_type, &current_config, &keys) {
+                        // State machine check: For Stop commands, only process if we're actually recording
+                        // This prevents Stop from being processed if the corresponding Start was debounced
+                        if matches!(command, RecordingCommand::Stop) {
+                            let is_active = is_recording_active_clone.lock().unwrap();
+                            if !*is_active {
+                                println!("⚠️  IGNORING Stop command - no active recording (Start was likely debounced)");
+                                return;
+                            }
+                            drop(is_active);
+                        }
+                        
                         // Debounce check
                         let mut last_trigger = debounce_clone.lock().unwrap();
                         if last_trigger.elapsed() < debounce_duration {
+                            // Log debounced event for debugging
+                            let event_type_str = match &event.event_type {
+                                EventType::KeyPress(k) => format!("KeyPress({:?})", k),
+                                EventType::KeyRelease(k) => format!("KeyRelease({:?})", k),
+                                _ => "Other".to_string(),
+                            };
+                            println!("⚠️  DEBOUNCED: {} (elapsed: {:?}ms, required: {:?}ms)", 
+                                event_type_str, 
+                                last_trigger.elapsed().as_millis(),
+                                debounce_duration.as_millis());
                             return;
                         }
                         *last_trigger = Instant::now();
@@ -429,6 +455,19 @@ pub fn start_listener(
                         // Send to recording
                         if let Err(e) = recording_tx_for_callback.send(command) {
                             eprintln!("Failed to send recording signal: {:?}", e);
+                        } else {
+                            // Update state machine based on command
+                            let mut state = is_recording_active_clone.lock().unwrap();
+                            match command {
+                                RecordingCommand::Start => {
+                                    *state = true;
+                                    println!("✅ State: Recording ACTIVE");
+                                }
+                                RecordingCommand::Stop => {
+                                    *state = false;
+                                    println!("✅ State: Recording INACTIVE");
+                                }
+                            }
                         }
 
                         // Emit to frontend
