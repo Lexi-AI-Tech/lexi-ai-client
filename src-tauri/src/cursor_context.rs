@@ -1,31 +1,34 @@
 //! Cursor Context Retrieval Module
 //!
 //! This module provides functionality to retrieve text context at the cursor position
-//! in the currently focused application using the macOS Accessibility API (AXUIElement).
+//! using macOS Core Graphics and Accessibility API.
 //!
 //! ## Features
 //!
-//! - **Application Detection**: Gets the frontmost application using NSWorkspace (PID and name)
-//! - **Accessibility Tree Access**: Creates an AXUIElement to access the application's UI tree
-//! - **Enhanced UI Mode**: Enables enhanced UI mode for Chromium/Electron apps to handle lazy tree building
-//! - **Focused Element Detection**: Polls for the focused UI element (handles async accessibility tree construction)
-//! - **Text Extraction**: Extracts selected text via `AXSelectedText` attribute, falls back to `AXValue` if no selection
+//! - **Cursor Position Detection**: Gets the current mouse cursor coordinates using Core Graphics
+//! - **Element Identification**: Uses Accessibility API to identify the UI element at cursor position
+//! - **Hierarchy Traversal**: Traverses up the accessibility tree to find input fields and application details
+//! - **Text Extraction**: Extracts selected text and text content from input fields
 //!
 //! ## Implementation Details
 //!
-//! - Uses **NSWorkspace** to get the frontmost application (PID and name)
-//! - Creates an **AXUIElement** for the application to access its accessibility tree
-//! - Enables **AXEnhancedUserInterface** and **AXManualAccessibility** for Chromium/Electron apps
-//! - Polls for focused UI element (up to 5 retries with 10ms delays) to handle lazy tree building
-//! - Uses **CoreFoundation (CFString)** for string conversion between C and Rust
+//! - Uses **Core Graphics** (`CGEventGetLocation()`) to get cursor coordinates
+//! - Uses **Accessibility API** (`AXUIElementCopyElementAtPosition()`) to get element at cursor
+//! - Traverses accessibility hierarchy to find:
+//!   - Input fields (AXTextField, AXTextArea, etc.)
+//!   - Parent windows
+//!   - Parent applications
+//! - Extracts text via `AXSelectedText` and `AXValue` attributes
 //!
 //! ## Permissions Required
 //!
 //! - **Accessibility** (macOS): Required for accessing application UI elements
+//!   - Users must grant this in System Preferences → Security & Privacy → Privacy → Accessibility
+//!   - The app will need to prompt for this permission
 //!
 //! ## Platform Support
 //!
-//! - **macOS**: Full functionality via Accessibility API
+//! - **macOS**: Full functionality via Core Graphics and Accessibility API
 //! - **Other Platforms**: Returns `None` (not supported)
 
 // Suppress warnings from objc crate's msg_send! macro about unexpected cfg conditions
@@ -33,6 +36,7 @@
 
 #[cfg(target_os = "macos")]
 use objc::{msg_send, sel, sel_impl};
+#[cfg(target_os = "macos")]
 use std::ffi::c_void;
 
 // ============================================================================
@@ -48,13 +52,315 @@ pub struct CursorContext {
 }
 
 // ============================================================================
-// Application Information Helpers
+// Core Graphics Types and Functions
 // ============================================================================
 
-/// Helper to get the frontmost application
-/// Returns (pid, app_name) or None if unavailable
 #[cfg(target_os = "macos")]
-fn get_frontmost_app() -> Option<(i32, Option<String>)> {
+#[repr(C)]
+struct CGPoint {
+    x: f64,
+    y: f64,
+}
+
+// ============================================================================
+// Accessibility API Types and Functions
+// ============================================================================
+
+#[cfg(target_os = "macos")]
+type AXUIElementRef = *const c_void;
+#[cfg(target_os = "macos")]
+type CFStringRef = *const c_void;
+#[cfg(target_os = "macos")]
+type CFTypeRef = *const c_void;
+#[cfg(target_os = "macos")]
+type AXError = i32;
+
+#[cfg(target_os = "macos")]
+const K_AX_ERROR_SUCCESS: AXError = 0;
+
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn AXUIElementCopyElementAtPosition(
+        application: AXUIElementRef,
+        x: f32,
+        y: f32,
+        element: *mut AXUIElementRef,
+    ) -> AXError;
+    fn AXUIElementCopyAttributeValue(
+        element: AXUIElementRef,
+        attribute: CFStringRef,
+        value: *mut CFTypeRef,
+    ) -> AXError;
+    fn AXUIElementGetPid(element: AXUIElementRef, pid: *mut i32) -> AXError;
+    fn CFRelease(cf: CFTypeRef);
+}
+
+// ============================================================================
+// Public API
+// ============================================================================
+
+/// Get cursor context using macOS Core Graphics and Accessibility API
+///
+/// This function:
+/// 1. Gets the current cursor position using `CGEventGetLocation()`
+/// 2. Uses `AXUIElementCopyElementAtPosition()` to get the UI element at that position
+/// 3. Traverses up the accessibility hierarchy to find:
+///    - Input fields (text fields, text areas, etc.)
+///    - Parent windows
+///    - Parent applications
+/// 4. Extracts selected text and application details
+///
+/// Returns a CursorContext with selected text, app name, and PID, or None if retrieval fails.
+/// Requires Accessibility permission on macOS.
+#[cfg(target_os = "macos")]
+pub fn get_cursor_context() -> Option<CursorContext> {
+    unsafe {
+        // Get cursor position using Core Graphics via NSEvent
+        objc::rc::autoreleasepool(|| {
+            use cocoa::base::id;
+            
+            let ns_event_class = objc::runtime::Class::get("NSEvent").unwrap();
+            let mouse_location: CGPoint = msg_send![ns_event_class, mouseLocation];
+            
+            // Convert from AppKit coordinate system (bottom-left origin) to Core Graphics (top-left origin)
+            // Get screen height to convert Y coordinate
+            let screen_class = objc::runtime::Class::get("NSScreen").unwrap();
+            let screens: id = msg_send![screen_class, screens];
+            let main_screen: id = msg_send![screens, objectAtIndex: 0usize];
+            let frame: cocoa::foundation::NSRect = msg_send![main_screen, frame];
+            let screen_height = frame.size.height;
+            
+            // Convert Y coordinate: AppKit (bottom-left) -> Core Graphics (top-left)
+            let point = CGPoint {
+                x: mouse_location.x,
+                y: screen_height - mouse_location.y,
+            };
+
+            // Get the system-wide accessibility element (root)
+            // We need to get the element at the cursor position
+            // First, we'll try to get the element at the position using the system element
+            
+            // Create a system-wide element (PID 0 is the system)
+            let system_element = create_system_element();
+            if system_element.is_null() {
+                return None;
+            }
+
+            // Get element at cursor position
+            let mut element_at_cursor: AXUIElementRef = std::ptr::null_mut();
+            let ax_error = AXUIElementCopyElementAtPosition(
+                system_element,
+                point.x as f32,
+                point.y as f32,
+                &mut element_at_cursor,
+            );
+
+        if ax_error != K_AX_ERROR_SUCCESS || element_at_cursor.is_null() {
+            CFRelease(system_element);
+            return None;
+        }
+
+        // Traverse up the hierarchy to find input field and application
+        let (input_element, app_pid) = find_input_field_and_app(element_at_cursor);
+
+        // Extract text from the input element
+        let selected_text = if !input_element.is_null() {
+            extract_text_from_element(input_element)
+        } else {
+            None
+        };
+
+        // Get application name from PID
+        let app_name = if let Some(pid) = app_pid {
+            get_app_name_from_pid(pid)
+        } else {
+            None
+        };
+
+        // Cleanup
+        CFRelease(element_at_cursor);
+        if !input_element.is_null() && input_element != element_at_cursor {
+            CFRelease(input_element);
+        }
+        CFRelease(system_element);
+
+            Some(CursorContext {
+                selected_text,
+                app_name,
+                pid: app_pid,
+            })
+        })
+    }
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Create a system-wide accessibility element
+#[cfg(target_os = "macos")]
+unsafe fn create_system_element() -> AXUIElementRef {
+    extern "C" {
+        fn AXUIElementCreateSystemWide() -> AXUIElementRef;
+    }
+    AXUIElementCreateSystemWide()
+}
+
+/// Traverse up the accessibility hierarchy to find input field and application
+#[cfg(target_os = "macos")]
+unsafe fn find_input_field_and_app(
+    element: AXUIElementRef,
+) -> (AXUIElementRef, Option<i32>) {
+    let mut input_element: AXUIElementRef = std::ptr::null_mut();
+    let mut app_pid: Option<i32> = None;
+    let mut current_element = element;
+    let mut visited_elements = Vec::new();
+
+    // Traverse up the hierarchy (max 20 levels to avoid infinite loops)
+    for _ in 0..20 {
+        if current_element.is_null() {
+            break;
+        }
+
+        // Check if this is an input field
+        if input_element.is_null() {
+            let role = get_element_attribute(current_element, "AXRole");
+            if let Some(role) = role {
+                if is_input_field_role(&role) {
+                    input_element = current_element;
+                    // Don't release this element yet, we'll use it
+                }
+            }
+        }
+
+        // Try to get PID (application level)
+        if app_pid.is_none() {
+            let mut pid: i32 = 0;
+            let ax_error = AXUIElementGetPid(current_element, &mut pid);
+            if ax_error == K_AX_ERROR_SUCCESS && pid != 0 {
+                app_pid = Some(pid);
+                // Found the application, we can stop here
+                break;
+            }
+        }
+
+        // Get parent element using AXParent attribute
+        let parent_attr = create_cf_string("AXParent");
+        let mut parent_value: CFTypeRef = std::ptr::null_mut();
+        let ax_error = AXUIElementCopyAttributeValue(
+            current_element,
+            parent_attr,
+            &mut parent_value,
+        );
+        CFRelease(parent_attr);
+        
+        let parent = if ax_error == K_AX_ERROR_SUCCESS && !parent_value.is_null() {
+            // parent_value is an AXUIElementRef
+            parent_value as AXUIElementRef
+        } else {
+            std::ptr::null_mut()
+        };
+
+        // Release previous element if we're moving up (except if it's the input_element)
+        if current_element != element && current_element != input_element {
+            if !visited_elements.contains(&current_element) {
+                CFRelease(current_element);
+            }
+        }
+
+        if ax_error != K_AX_ERROR_SUCCESS || parent.is_null() {
+            break;
+        }
+
+        visited_elements.push(current_element);
+        current_element = parent;
+    }
+
+    // Cleanup any remaining elements we traversed (except input_element)
+    for elem in visited_elements {
+        if elem != input_element {
+            CFRelease(elem);
+        }
+    }
+
+    (input_element, app_pid)
+}
+
+/// Check if a role represents an input field
+#[cfg(target_os = "macos")]
+fn is_input_field_role(role: &str) -> bool {
+    matches!(
+        role,
+        "AXTextField"
+            | "AXTextArea"
+            | "AXStaticText"
+            | "AXEditableText"
+            | "AXSearchField"
+            | "AXSecureTextField"
+    )
+}
+
+/// Extract text from an element (selected text or value)
+#[cfg(target_os = "macos")]
+unsafe fn extract_text_from_element(element: AXUIElementRef) -> Option<String> {
+    // Try to get selected text first
+    let selected_text_attr = create_cf_string("AXSelectedText");
+    let mut selected_text_value: CFTypeRef = std::ptr::null_mut();
+
+    let ax_error = AXUIElementCopyAttributeValue(
+        element,
+        selected_text_attr,
+        &mut selected_text_value,
+    );
+
+    let selected_text = if ax_error == K_AX_ERROR_SUCCESS && !selected_text_value.is_null() {
+        let text = cf_string_to_string(selected_text_value);
+        CFRelease(selected_text_value);
+        if !text.is_empty() {
+            Some(text)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    CFRelease(selected_text_attr);
+
+    // If we have selected text, return it
+    if selected_text.is_some() {
+        return selected_text;
+    }
+
+    // Otherwise, try to get the value attribute
+    let value_attr = create_cf_string("AXValue");
+    let mut value: CFTypeRef = std::ptr::null_mut();
+
+    let ax_error = AXUIElementCopyAttributeValue(element, value_attr, &mut value);
+
+    let value_text = if ax_error == K_AX_ERROR_SUCCESS && !value.is_null() {
+        let text = cf_string_to_string(value);
+        CFRelease(value);
+        if !text.is_empty() {
+            Some(text)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    CFRelease(value_attr);
+
+    value_text
+}
+
+/// Get application name from PID
+#[cfg(target_os = "macos")]
+fn get_app_name_from_pid(pid: i32) -> Option<String> {
+    use objc::{msg_send, sel, sel_impl};
+    use std::ffi::c_void;
+
     unsafe {
         objc::rc::autoreleasepool(|| {
             use cocoa::base::id;
@@ -65,179 +371,50 @@ fn get_frontmost_app() -> Option<(i32, Option<String>)> {
                 return None;
             }
 
-            let front_app: id = msg_send![workspace, frontmostApplication];
-            if front_app.is_null() {
+            // Get running applications
+            let running_apps: id = msg_send![workspace, runningApplications];
+            if running_apps.is_null() {
                 return None;
             }
 
-            let pid: i32 = msg_send![front_app, processIdentifier];
+            // Iterate through applications to find the one with matching PID
+            let count: usize = msg_send![running_apps, count];
+            for i in 0..count {
+                let app: id = msg_send![running_apps, objectAtIndex: i];
+                if app.is_null() {
+                    continue;
+                }
 
-            // Try to get app name (optional, don't fail if unavailable)
-            let app_name: id = msg_send![front_app, localizedName];
-            let app_name_str = if !app_name.is_null() {
-                Some(cf_string_to_string(app_name as *const c_void))
-            } else {
-                None
-            };
+                let app_pid: i32 = msg_send![app, processIdentifier];
+                if app_pid == pid {
+                    let app_name: id = msg_send![app, localizedName];
+                    if !app_name.is_null() {
+                        return Some(cf_string_to_string(app_name as *const c_void));
+                    }
+                }
+            }
 
-            Some((pid, app_name_str))
+            None
         })
     }
 }
 
-// ============================================================================
-// Public API
-// ============================================================================
-
-/// Get cursor context using macOS Accessibility API
-///
-/// This function attempts to retrieve text context from the currently focused application:
-/// 1. Gets the frontmost application using NSWorkspace (returns PID and app name)
-/// 2. Creates an AXUIElement for the application process
-/// 3. Enables enhanced UI mode for Chromium/Electron apps (AXEnhancedUserInterface, AXManualAccessibility)
-/// 4. Polls for the focused UI element (handles lazy accessibility tree building with up to 5 retries)
-/// 5. Extracts selected text via AXSelectedText attribute if available
-/// 6. Falls back to AXValue attribute (text content) if no selection exists
-///
-/// Returns a CursorContext with selected text, app name, and PID, or None if retrieval fails.
-/// Requires Accessibility permission on macOS.
+/// Get an element attribute value
 #[cfg(target_os = "macos")]
-pub fn get_cursor_context() -> Option<CursorContext> {
-    let (pid, app_name) = get_frontmost_app()?;
+unsafe fn get_element_attribute(element: AXUIElementRef, attribute: &str) -> Option<String> {
+    let attr_cf = create_cf_string(attribute);
+    let mut value: CFTypeRef = std::ptr::null_mut();
 
-    unsafe {
-        objc::rc::autoreleasepool(|| {
-            use std::ptr;
+    let ax_error = AXUIElementCopyAttributeValue(element, attr_cf, &mut value);
 
-            // Import CoreFoundation types
-            type CFTypeRef = *const c_void;
-            type AXUIElementRef = CFTypeRef;
-            type CFStringRef = CFTypeRef;
-            type AXError = i32;
+    CFRelease(attr_cf);
 
-            // CoreFoundation function declarations
-            extern "C" {
-                fn AXUIElementCreateApplication(pid: i32) -> AXUIElementRef;
-                fn AXUIElementCopyAttributeValue(
-                    element: AXUIElementRef,
-                    attribute: CFStringRef,
-                    value: *mut CFTypeRef,
-                ) -> AXError;
-                fn CFRelease(cf: CFTypeRef);
-            }
-
-            // Constants
-            const K_AX_ERROR_SUCCESS: AXError = 0;
-
-            // Create AXUIElement for the application
-            let app_element = AXUIElementCreateApplication(pid);
-            if app_element.is_null() {
-                return Some(CursorContext {
-                    selected_text: None,
-                    app_name,
-                    pid: Some(pid),
-                });
-            }
-
-            // Enable enhanced UI for Chromium/Electron apps
-            let enhanced_ui_attr = create_cf_string("AXEnhancedUserInterface");
-            let manual_accessibility_attr = create_cf_string("AXManualAccessibility");
-
-            let _ = AXUIElementCopyAttributeValue(app_element, enhanced_ui_attr, ptr::null_mut());
-            let _ = AXUIElementCopyAttributeValue(
-                app_element,
-                manual_accessibility_attr,
-                ptr::null_mut(),
-            );
-
-            // Get focused element
-            let focused_attr = create_cf_string("AXFocusedUIElement");
-            let mut focused_element: CFTypeRef = ptr::null_mut();
-
-            // Poll for focused element (handles lazy tree building in Chromium/Electron apps)
-            let mut ax_error =
-                AXUIElementCopyAttributeValue(app_element, focused_attr, &mut focused_element);
-            for _ in 0..5 {
-                if ax_error == K_AX_ERROR_SUCCESS && !focused_element.is_null() {
-                    break;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(10));
-                ax_error =
-                    AXUIElementCopyAttributeValue(app_element, focused_attr, &mut focused_element);
-            }
-
-            if ax_error != K_AX_ERROR_SUCCESS || focused_element.is_null() {
-                CFRelease(focused_attr);
-                CFRelease(enhanced_ui_attr);
-                CFRelease(manual_accessibility_attr);
-                return Some(CursorContext {
-                    selected_text: None,
-                    app_name,
-                    pid: Some(pid),
-                });
-            }
-
-            // Try to get selected text
-            let selected_text_attr = create_cf_string("AXSelectedText");
-            let mut selected_text_value: CFTypeRef = ptr::null_mut();
-
-            ax_error = AXUIElementCopyAttributeValue(
-                focused_element,
-                selected_text_attr,
-                &mut selected_text_value,
-            );
-
-            let selected_text = if ax_error == K_AX_ERROR_SUCCESS && !selected_text_value.is_null()
-            {
-                // Check if it's a string
-                let text = cf_string_to_string(selected_text_value);
-                if !text.is_empty() {
-                    Some(text)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            // Try to get value attribute (text content)
-            let value_attr = create_cf_string("AXValue");
-            let mut value: CFTypeRef = ptr::null_mut();
-
-            ax_error = AXUIElementCopyAttributeValue(focused_element, value_attr, &mut value);
-
-            let value_text = if ax_error == K_AX_ERROR_SUCCESS && !value.is_null() {
-                cf_string_to_string(value)
-            } else {
-                String::new()
-            };
-
-            // Cleanup
-            CFRelease(focused_attr);
-            CFRelease(selected_text_attr);
-            CFRelease(value_attr);
-            CFRelease(enhanced_ui_attr);
-            CFRelease(manual_accessibility_attr);
-            if !selected_text_value.is_null() {
-                CFRelease(selected_text_value);
-            }
-            if !value.is_null() {
-                CFRelease(value);
-            }
-
-            // Return context with selected text or value text
-            Some(CursorContext {
-                selected_text: selected_text.or_else(|| {
-                    if !value_text.is_empty() {
-                        Some(value_text)
-                    } else {
-                        None
-                    }
-                }),
-                app_name,
-                pid: Some(pid),
-            })
-        })
+    if ax_error == K_AX_ERROR_SUCCESS && !value.is_null() {
+        let result = cf_string_to_string(value);
+        CFRelease(value);
+        Some(result)
+    } else {
+        None
     }
 }
 
@@ -247,13 +424,13 @@ pub fn get_cursor_context() -> Option<CursorContext> {
 
 /// Helper function to create a CFString from a Rust string
 #[cfg(target_os = "macos")]
-unsafe fn create_cf_string(s: &str) -> *const c_void {
+unsafe fn create_cf_string(s: &str) -> CFStringRef {
     extern "C" {
         fn CFStringCreateWithCString(
             alloc: *const c_void,
             c_str: *const i8,
             encoding: u32,
-        ) -> *const c_void;
+        ) -> CFStringRef;
     }
     const K_CF_STRING_ENCODING_UTF8: u32 = 0x08000100;
 
