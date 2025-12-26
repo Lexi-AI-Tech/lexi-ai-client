@@ -1,23 +1,23 @@
-import React from 'react';
-import { useOnboardingStore } from '../../store/onboardingStore';
-import { WelcomeScreen } from './WelcomeScreen';
-import { PermissionsScreen } from './PermissionsScreen';
-import { FnKeyTestScreen } from './FnKeyTestScreen';
-import { MicrophoneTestScreen } from './MicrophoneTestScreen';
-import { OnboardingTitlebar } from './OnboardingTitlebar';
+import React from "react";
+import { useOnboardingStore } from "../../store/onboardingStore";
+import { WelcomeScreen } from "./WelcomeScreen";
+import { PermissionsScreen } from "./PermissionsScreen";
+import { FnKeyTestScreen } from "./FnKeyTestScreen";
+import { MicrophoneTestScreen } from "./MicrophoneTestScreen";
+import { OnboardingTitlebar } from "./OnboardingTitlebar";
 
 export const OnboardingFlow: React.FC = () => {
   const { currentStep } = useOnboardingStore();
 
   const renderStep = () => {
     switch (currentStep) {
-      case 'welcome':
+      case "welcome":
         return <WelcomeScreen />;
-      case 'permissions':
+      case "permissions":
         return <PermissionsScreen />;
-      case 'fn-key-test':
+      case "fn-key-test":
         return <FnKeyTestScreen />;
-      case 'microphone-test':
+      case "microphone-test":
         return <MicrophoneTestScreen />;
       default:
         return <WelcomeScreen />;
@@ -29,9 +29,7 @@ export const OnboardingFlow: React.FC = () => {
       <div className="onboarding-titlebar-container">
         <OnboardingTitlebar />
       </div>
-      <div className="onboarding-content-wrapper">
-        {renderStep()}
-      </div>
+      <div className="onboarding-content-wrapper">{renderStep()}</div>
     </div>
   );
 };

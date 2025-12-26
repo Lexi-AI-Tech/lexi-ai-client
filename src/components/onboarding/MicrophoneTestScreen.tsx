@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { listen } from '@tauri-apps/api/event';
-import { useOnboardingStore } from '../../store/onboardingStore';
-import './onboarding.css';
+import React, { useState, useEffect } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { useOnboardingStore } from "../../store/onboardingStore";
+import "./onboarding.css";
 
 export const MicrophoneTestScreen: React.FC = () => {
   const { nextStep, previousStep, completeOnboarding } = useOnboardingStore();
@@ -13,18 +13,18 @@ export const MicrophoneTestScreen: React.FC = () => {
     // Listen for volume updates (if backend emits them)
     const setupListener = async () => {
       try {
-        const unlisten = await listen('volume-update', (event: any) => {
+        const unlisten = await listen("volume-update", (event: any) => {
           setVolume(event.payload as number);
         });
         return unlisten;
       } catch (error) {
-        console.log('Volume update event not available:', error);
+        console.log("Volume update event not available:", error);
         return () => {};
       }
     };
 
     let unlistenFn: (() => void) | undefined;
-    setupListener().then(unlisten => {
+    setupListener().then((unlisten) => {
       unlistenFn = unlisten;
     });
 
@@ -38,18 +38,20 @@ export const MicrophoneTestScreen: React.FC = () => {
   // Smooth volume updates
   useEffect(() => {
     const smoothing = 0.4;
-    setSmoothedVolume(prev => prev * (1 - smoothing) + volume * smoothing);
+    setSmoothedVolume((prev) => prev * (1 - smoothing) + volume * smoothing);
   }, [volume]);
 
   // Generate volume bars
   const generateVolumeBars = () => {
     const bars = 12;
     const minHeight = 0.2;
-    return Array(bars).fill(0).map((_, i) => {
-      const threshold = (i / bars) * 0.5;
-      const normalizedVolume = Math.min(smoothedVolume * 8, 1);
-      return normalizedVolume > threshold ? 1 : minHeight;
-    });
+    return Array(bars)
+      .fill(0)
+      .map((_, i) => {
+        const threshold = (i / bars) * 0.5;
+        const normalizedVolume = Math.min(smoothedVolume * 8, 1);
+        return normalizedVolume > threshold ? 1 : minHeight;
+      });
   };
 
   const handleContinue = () => {
@@ -79,19 +81,25 @@ export const MicrophoneTestScreen: React.FC = () => {
         </div>
       </div>
       <div className="flex w-[55%] items-center justify-center bg-gradient-to-b from-purple-50/10 to-purple-100 border-l-2 border-purple-100">
-        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center" style={{ minWidth: 500, maxHeight: 280 }}>
+        <div
+          className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center"
+          style={{ minWidth: 500, maxHeight: 280 }}
+        >
           <div className="text-lg font-medium mb-6 text-center">
             Do you see purple bars moving while you speak?
           </div>
-          <div className="flex gap-1 py-4 px-4 items-end bg-neutral-100 rounded-md" style={{ height: 120, width: '100%' }}>
+          <div
+            className="flex gap-1 py-4 px-4 items-end bg-neutral-100 rounded-md"
+            style={{ height: 120, width: "100%" }}
+          >
             {generateVolumeBars().map((level, i) => (
               <div
                 key={i}
-                className={`mx-2 h-full ${level > 0.2 ? 'bg-purple-300' : 'bg-neutral-300'}`}
+                className={`mx-2 h-full ${level > 0.2 ? "bg-purple-300" : "bg-neutral-300"}`}
                 style={{
                   width: 18,
                   borderRadius: 6,
-                  transition: 'height 0.18s cubic-bezier(.4,2,.6,1)',
+                  transition: "height 0.18s cubic-bezier(.4,2,.6,1)",
                   height: `${level * 100}%`,
                 }}
               />

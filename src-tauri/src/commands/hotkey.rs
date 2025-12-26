@@ -2,19 +2,19 @@
 //!
 //! This module provides Tauri commands for managing hotkey configuration.
 
-use tauri::{AppHandle, State, Emitter};
-use serde_json;
-use crate::state::{HotkeyWatchState, HotkeyRecordingState};
 use crate::global_key_listener::HotkeyConfig;
+use crate::state::{HotkeyRecordingState, HotkeyWatchState};
+use serde_json;
+use tauri::{AppHandle, Emitter, State};
 
 /// Update the hotkey configuration dynamically
-/// 
+///
 /// This command allows the frontend to change the hotkey that triggers recording.
 /// The listener will automatically restart with the new configuration.
-/// 
+///
 /// # Arguments
 /// * `config_json` - JSON string representation of HotkeyConfig
-/// 
+///
 /// # Returns
 /// * `Ok(())` - Successfully updated the hotkey
 /// * `Err(String)` - An error message if parsing failed or update failed
@@ -39,7 +39,7 @@ pub fn update_hotkey(
 }
 
 /// Get the current hotkey configuration
-/// 
+///
 /// # Returns
 /// * `String` - JSON string representation of the current HotkeyConfig
 #[tauri::command]
@@ -65,4 +65,3 @@ pub fn stop_hotkey_recording(state: State<HotkeyRecordingState>) {
         println!("🎹 Stopped hotkey recording mode");
     }
 }
-

@@ -22,22 +22,22 @@
 //! - **Error Handling**: Comprehensive error messages for debugging
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
-use std::error::Error;
-use reqwest::multipart;
-use tokio::sync::oneshot;
 use crate::config;
+use reqwest::multipart;
+use std::error::Error;
+use tokio::sync::oneshot;
 
 /// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
-/// 
+///
 /// This struct manages HTTP requests to the Lexi AI Server endpoint for speech-to-text conversion.
 /// The server handles the Groq API integration internally.
 pub struct SttService {
-    client: reqwest::Client,  // HTTP client for making API requests
+    client: reqwest::Client, // HTTP client for making API requests
 }
 
 impl SttService {
     /// Creates a new SttService instance
-    /// 
+    ///
     /// Initializes the HTTP client.
     pub fn new() -> Self {
         Self {
@@ -46,21 +46,23 @@ impl SttService {
     }
 
     /// Transcribes audio data to text using Lexi AI Server
-    /// 
+    ///
     /// This function:
     /// 1. Creates a multipart form request with the audio file
     /// 2. Sends the request to Lexi AI Server transcription endpoint
     /// 3. Parses the JSON response to extract the transcribed text
-    /// 
+    ///
     /// The request can be cancelled by aborting the tokio task, which will cause
     /// the HTTP request to be dropped and cancelled.
-    /// 
+    ///
     /// # Arguments
     /// * `audio_data` - WAV file data as bytes (typically from AudioRecorder)
     /// * `auth_token` - Optional authentication token (Bearer token) for authenticated requests
     /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
+    /// * `enhance_transcription` - Whether to enhance the transcription with AI
+    /// * `transcribe_with_cursor_context` - Whether to use cursor context for transcription
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
-    /// 
+    ///
     /// # Returns
     /// * `Ok(String)` - The transcribed text on success
     /// * `Err(Box<dyn Error>)` - An error if the API call fails or if the request was cancelled
@@ -69,6 +71,8 @@ impl SttService {
         audio_data: Vec<u8>,
         auth_token: Option<String>,
         language: String,
+        enhance_transcription: bool,
+        transcribe_with_cursor_context: bool,
         cancel_rx: Option<oneshot::Receiver<()>>,
     ) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
@@ -77,28 +81,35 @@ impl SttService {
         // Create a multipart form part for the audio file
         // The server expects the audio file to be sent as a multipart form field
         let part = multipart::Part::bytes(audio_data)
-            .file_name("audio.wav")        // Filename hint for the server
-            .mime_str("audio/wav")?;       // MIME type indicating WAV audio format
+            .file_name("audio.wav") // Filename hint for the server
+            .mime_str("audio/wav")?; // MIME type indicating WAV audio format
 
         // Build the multipart form with the audio file
-        let form = multipart::Form::new()
-            .part("audio_file", part);  // Attach the audio file
+        let form = multipart::Form::new().part("audio_file", part); // Attach the audio file
 
         println!("🔍 DEBUG: Sending request to Lexi AI Server...");
 
         // Build the request
         // Get API base URL from configuration
         let api_base_url = config::api_base_url();
-        let enhance_transcription = false;
-        let url = format!("{}/api/transcription/speech-to-text?language={}&enhance_transcription={}", api_base_url, urlencoding::encode(&language), enhance_transcription);
-        let mut request = self.client
-            .post(&url)
-            .multipart(form);  // Attach the multipart form with audio file
+
+        // Build URL with required parameters
+        let url = format!(
+            "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}",
+            api_base_url,
+            urlencoding::encode(&language),
+            enhance_transcription,
+            transcribe_with_cursor_context
+        );
+        let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
 
         // Add authorization header if token is provided
         if let Some(token) = &auth_token {
             request = request.header("Authorization", format!("Bearer {}", token));
-            println!("🔍 DEBUG: Added Authorization header (token length: {})", token.len());
+            println!(
+                "🔍 DEBUG: Added Authorization header (token length: {})",
+                token.len()
+            );
         } else {
             println!("🔍 DEBUG: No auth token provided - request will likely fail with 401");
         }
@@ -137,14 +148,14 @@ impl SttService {
         // Parse the JSON response
         // The server returns a JSON object with a "text" field containing the transcription
         let json: serde_json::Value = res.json().await?;
-        println!("🔍 DEBUG: Full server response: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
-        
+        println!(
+            "🔍 DEBUG: Full server response: {}",
+            serde_json::to_string_pretty(&json).unwrap_or_default()
+        );
+
         // Extract the transcribed text from the JSON response
         // The response format is: { "text": "transcribed text here" }
-        let text = json["text"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let text = json["text"].as_str().unwrap_or("").to_string();
         println!("🔍 DEBUG: Extracted text: {}", text);
 
         Ok(text)
