@@ -27,14 +27,14 @@
 //!
 //! - **Accessibility** (macOS): Required for AppleScript keyboard simulation
 
+use arboard::Clipboard;
 use std::error::Error;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
-use arboard::Clipboard;
 
 #[cfg(not(target_os = "macos"))]
-use enigo::{Enigo, Key, Keyboard, Direction, Settings};
+use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
 /// TextInjector provides cross-platform functionality to inject text into the active application
 ///
@@ -136,8 +136,8 @@ impl TextInjector {
     #[cfg(not(target_os = "macos"))]
     fn paste_with_enigo(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
         let settings = Settings::default();
-        let mut enigo = Enigo::new(&settings)
-            .map_err(|e| format!("Failed to initialize enigo: {:?}", e))?;
+        let mut enigo =
+            Enigo::new(&settings).map_err(|e| format!("Failed to initialize enigo: {:?}", e))?;
 
         // Windows/Linux: Use Control key
         enigo

@@ -6,7 +6,7 @@
 use tauri::{AppHandle, Manager};
 
 /// Forces macOS app activation to bring windows to front (for Accessory mode).
-/// 
+///
 /// Call this BEFORE window.show() or set_focus() on relaunches to ensure
 /// the window appears above other applications.
 #[cfg(target_os = "macos")]
@@ -27,16 +27,16 @@ fn activate_app_ignoring_others() {
 }
 
 /// Unified helper to show and focus the main window with macOS activation.
-/// 
+///
 /// This function:
 /// 1. Activates the app (macOS only)
 /// 2. Shows the main window
 /// 3. Focuses the window with retries
 /// 4. Temporarily sets always-on-top to ensure visibility (macOS only)
-/// 
+///
 /// # Arguments
 /// * `app` - The Tauri AppHandle
-/// 
+///
 /// # Returns
 /// * `true` - Successfully showed and focused the window
 /// * `false` - Failed to show the window (window not found)
@@ -87,4 +87,3 @@ pub fn show_and_focus_main_window(app: &AppHandle) -> bool {
         false
     }
 }
-

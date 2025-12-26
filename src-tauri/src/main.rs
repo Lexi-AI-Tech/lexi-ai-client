@@ -39,49 +39,49 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::{mpsc, Arc, Mutex};
-use tokio::sync::watch;
-use tauri::{Manager, RunEvent, Emitter};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::{Emitter, Manager, RunEvent};
+use tokio::sync::watch;
 
 // Module declarations for core functionality
-mod audio_recorder;      // Audio capture from default microphone using cpal, converts to WAV format
-mod stt_service;         // HTTP client for Lexi AI Server API (speech-to-text transcription)
-mod text_injector;       // Text injection into active application via clipboard + paste keystroke
+mod audio_processor; // Audio processing and transcription orchestration
+mod audio_recorder; // Audio capture from default microphone using cpal, converts to WAV format
+mod commands;
+mod config; // Application configuration (API base URL, OAuth redirect URI)
+mod cursor_context; // Cursor context retrieval using macOS Accessibility API (AXUIElement)
 mod global_key_listener; // Global keyboard event monitoring via rdev with configurable hotkey support
-mod permissions;         // macOS permission requests and checks (microphone, input monitoring, accessibility)
-mod pill;                // Pill overlay window creation, positioning, and visibility management
-mod cursor_context;      // Cursor context retrieval using macOS Accessibility API (AXUIElement)
-mod google_oauth;        // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
-mod config;              // Application configuration (API base URL, OAuth redirect URI)
-mod state;               // Application state management (auth tokens, transcription tasks, hotkey config)
-mod window;              // Window management utilities (show, focus, activate)
-mod audio_processor;     // Audio processing and transcription orchestration
-mod recording_thread;    // Recording thread management
-mod commands;            // Tauri commands organized by functionality
+mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
+mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
+mod pill; // Pill overlay window creation, positioning, and visibility management
+mod recording_thread; // Recording thread management
+mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
+mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
+mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use global_key_listener::HotkeyConfig;
+use google_oauth::OAuthState;
+use recording_thread::spawn_recording_thread;
 use state::{
-    AuthTokenState, TranscriptionTaskState, HotkeyWatchState, HotkeyRecordingState, LanguageState,
+    AuthTokenState, HotkeyRecordingState, HotkeyWatchState, LanguageState, TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
-use recording_thread::spawn_recording_thread;
-use google_oauth::OAuthState;
 
 use permissions::{
+    check_accessibility_permission, check_input_monitoring_permission, check_microphone_permission,
     request_accessibility_permission, request_input_monitoring_permission,
-    request_microphone_permission, check_accessibility_permission,
-    check_input_monitoring_permission, check_microphone_permission,
+    request_microphone_permission,
 };
 
-use commands::auth::{set_auth_token, start_google_login, get_pkce_verifier};
+use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
 use commands::config::set_language;
 use commands::hotkey::{
-    update_hotkey, get_current_hotkey, start_hotkey_recording, stop_hotkey_recording,
+    get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
+use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;
 use commands::window::open_devtools;
-use commands::pill::{show_pill_window, toggle_pill_window};
 
 /// Command to control recording state
 #[derive(Debug, Clone, Copy)]
@@ -101,7 +101,10 @@ pub enum RecordingCommand {
 /// 6. Registers Tauri commands for permissions, OAuth, text injection, and pill window control
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
-    println!("🔧 Configuration loaded - API Base URL: {}", config::api_base_url());
+    println!(
+        "🔧 Configuration loaded - API Base URL: {}",
+        config::api_base_url()
+    );
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

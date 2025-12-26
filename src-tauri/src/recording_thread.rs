@@ -4,22 +4,25 @@
 //! It receives start/stop commands from the global key listener and manages
 //! the AudioRecorder lifecycle.
 
+use crate::audio_processor::process_audio;
+use crate::audio_recorder::AudioRecorder;
+use crate::RecordingCommand;
 use std::sync::mpsc;
 use std::thread;
-use tauri::{AppHandle, Manager, Emitter};
-use crate::audio_recorder::AudioRecorder;
-use crate::audio_processor::process_audio;
-use crate::RecordingCommand;
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Spawns a dedicated thread to manage the audio recorder.
-/// 
+///
 /// This thread handles creating, starting, and stopping the recorder.
 /// It receives signals from the global key listener via the channel.
-/// 
+///
 /// # Arguments
 /// * `app_handle` - The Tauri AppHandle for emitting events
 /// * `recording_rx` - Receiver for recording commands (Start/Stop)
-pub fn spawn_recording_thread(app_handle: AppHandle, recording_rx: mpsc::Receiver<RecordingCommand>) {
+pub fn spawn_recording_thread(
+    app_handle: AppHandle,
+    recording_rx: mpsc::Receiver<RecordingCommand>,
+) {
     thread::spawn(move || {
         let mut recorder: Option<AudioRecorder> = None;
 
@@ -28,7 +31,9 @@ pub fn spawn_recording_thread(app_handle: AppHandle, recording_rx: mpsc::Receive
                 Ok(RecordingCommand::Start) => {
                     // Start recording (Function key pressed)
                     if recorder.is_none() {
-                        println!("Function key (fn) pressed - Starting recording in dedicated thread...");
+                        println!(
+                            "Function key (fn) pressed - Starting recording in dedicated thread..."
+                        );
 
                         // Show the pill window when recording starts (it's already created at startup)
                         if let Some(pill_window) = app_handle.get_webview_window("pill") {
@@ -80,4 +85,3 @@ pub fn spawn_recording_thread(app_handle: AppHandle, recording_rx: mpsc::Receive
         }
     });
 }
-
