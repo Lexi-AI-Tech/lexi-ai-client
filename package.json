@@ -10,7 +10,8 @@
     "build": "tauri build",
     "dev:frontend": "vite",
     "build:frontend": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format": "cd src-tauri && cargo fmt && cd .."
   },
   "dependencies": {
     "@choochmeque/tauri-plugin-google-auth-api": "^0.1.2",
