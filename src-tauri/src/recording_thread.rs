@@ -26,8 +26,6 @@ enum RecordingPhase {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RecordingError {
     AudioStreamFailed,
-    DeviceLost,
-    BufferOverflow,
     StopFailed,
 }
 
