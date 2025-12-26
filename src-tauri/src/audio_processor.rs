@@ -12,6 +12,7 @@ use crate::commands::config::get_language;
 use crate::state::{AuthTokenState, LanguageState, TranscriptionTaskState};
 use crate::stt_service::SttService;
 use crate::text_injector::TextInjector;
+use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 
 /// Processes recorded audio data by transcribing it and injecting the result.
@@ -90,15 +91,21 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
         let stt_service = SttService::new();
+        let transcription_start = Instant::now();
         let transcription_result = stt_service
             .transcribe_audio(audio_data, auth_token, language, Some(cancel_rx))
             .await;
+        let transcription_duration = transcription_start.elapsed();
 
         // Check if the task was aborted (the JoinHandle will be cancelled)
         // If aborted, the result will be an error, but we should check for cancellation
         match transcription_result {
             Ok(transcription) => {
-                println!("Transcription: {}", transcription);
+                println!(
+                    "✅ Transcription completed in {:.2}s: {}",
+                    transcription_duration.as_secs_f64(),
+                    transcription
+                );
 
                 // Notify frontend of successful transcription
                 app_handle_for_task
@@ -129,12 +136,19 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 // Check if this is a cancellation error
                 let error_msg = e.to_string();
                 if error_msg.contains("cancelled") || error_msg.contains("aborted") {
-                    println!("🛑 Transcription was cancelled");
+                    println!(
+                        "🛑 Transcription was cancelled after {:.2}s",
+                        transcription_duration.as_secs_f64()
+                    );
                     // Don't emit error event for cancellation - it's expected
                     return;
                 }
 
-                eprintln!("Transcription failed: {}", e);
+                eprintln!(
+                    "❌ Transcription failed after {:.2}s: {}",
+                    transcription_duration.as_secs_f64(),
+                    e
+                );
                 // Notify frontend of transcription failure
                 app_handle_for_task
                     .emit("transcription_error", error_msg)

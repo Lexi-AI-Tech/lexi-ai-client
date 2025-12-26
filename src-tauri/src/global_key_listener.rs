@@ -10,7 +10,6 @@
 //! - **Dynamic Configuration**: Hotkey can be changed at runtime without restarting the listener
 //! - **Modifier Support**: Handles Command, Control, Option/Alt, and Shift modifiers
 //! - **Hotkey Recording Mode**: Emits key events to frontend for interactive hotkey selection
-//! - **Debouncing**: Prevents rapid trigger events from causing multiple recordings
 //!
 //! ## Architecture
 //!
@@ -29,7 +28,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::watch;
 
@@ -325,8 +323,6 @@ pub fn start_listener(
 ) {
     // Manager thread: Watches config, restarts listener on change
     std::thread::spawn(move || {
-        let debounce_time = Arc::new(Mutex::new(Instant::now()));
-        let debounce_duration = Duration::from_millis(50);
         let app_clone = app.clone();
         let recording_tx_clone = recording_tx.clone();
         let recording_state_clone = recording_state.clone();
@@ -339,7 +335,6 @@ pub fn start_listener(
             // Shutdown flag for this listener instance
             let shutdown = Arc::new(AtomicBool::new(false));
             let shutdown_for_callback = shutdown.clone();
-            let debounce_clone = debounce_time.clone();
             let app_for_callback = app_clone.clone();
             let recording_tx_for_callback = recording_tx_clone.clone();
             let recording_state_for_callback = recording_state_clone.clone();
@@ -349,11 +344,6 @@ pub fn start_listener(
                 // Track currently pressed keys (including modifiers)
                 let pressed_keys: Arc<Mutex<HashSet<Key>>> = Arc::new(Mutex::new(HashSet::new()));
                 let pressed_keys_clone = pressed_keys.clone();
-
-                // State machine: Track if we're currently recording (i.e., Start was successfully sent)
-                // This prevents Stop commands from being processed if the corresponding Start was debounced
-                let is_recording_active: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-                let is_recording_active_clone = is_recording_active.clone();
 
                 let callback = move |event: Event| {
                     if shutdown_for_callback.load(Ordering::Relaxed) {
@@ -418,41 +408,20 @@ pub fn start_listener(
                     // Get current pressed keys for checking
                     let keys = pressed_keys_clone.lock().unwrap().clone();
 
+                    // Debug: Check if event matches trigger before processing
+                    let is_trigger =
+                        is_trigger_key_event(&event.event_type, &current_config, &keys);
+                    if let Some(cmd) = &is_trigger {
+                        let event_type_str = match &event.event_type {
+                            EventType::KeyPress(k) => format!("KeyPress({:?})", k),
+                            EventType::KeyRelease(k) => format!("KeyRelease({:?})", k),
+                            _ => "Other".to_string(),
+                        };
+                        println!("🎯 TRIGGER DETECTED: {} -> {:?}", event_type_str, cmd);
+                    }
+
                     // Check if this is a trigger key event
-                    if let Some(command) =
-                        is_trigger_key_event(&event.event_type, &current_config, &keys)
-                    {
-                        // State machine check: For Stop commands, only process if we're actually recording
-                        // This prevents Stop from being processed if the corresponding Start was debounced
-                        if matches!(command, RecordingCommand::Stop) {
-                            let is_active = is_recording_active_clone.lock().unwrap();
-                            if !*is_active {
-                                println!("⚠️  IGNORING Stop command - no active recording (Start was likely debounced)");
-                                return;
-                            }
-                            drop(is_active);
-                        }
-
-                        // Debounce check
-                        let mut last_trigger = debounce_clone.lock().unwrap();
-                        if last_trigger.elapsed() < debounce_duration {
-                            // Log debounced event for debugging
-                            let event_type_str = match &event.event_type {
-                                EventType::KeyPress(k) => format!("KeyPress({:?})", k),
-                                EventType::KeyRelease(k) => format!("KeyRelease({:?})", k),
-                                _ => "Other".to_string(),
-                            };
-                            println!(
-                                "⚠️  DEBOUNCED: {} (elapsed: {:?}ms, required: {:?}ms)",
-                                event_type_str,
-                                last_trigger.elapsed().as_millis(),
-                                debounce_duration.as_millis()
-                            );
-                            return;
-                        }
-                        *last_trigger = Instant::now();
-                        drop(last_trigger);
-
+                    if let Some(command) = is_trigger {
                         // Log the trigger
                         let trigger_type = match command {
                             RecordingCommand::Start => "PRESSED",
@@ -481,19 +450,6 @@ pub fn start_listener(
                         // Send to recording
                         if let Err(e) = recording_tx_for_callback.send(command) {
                             eprintln!("Failed to send recording signal: {:?}", e);
-                        } else {
-                            // Update state machine based on command
-                            let mut state = is_recording_active_clone.lock().unwrap();
-                            match command {
-                                RecordingCommand::Start => {
-                                    *state = true;
-                                    println!("✅ State: Recording ACTIVE");
-                                }
-                                RecordingCommand::Stop => {
-                                    *state = false;
-                                    println!("✅ State: Recording INACTIVE");
-                                }
-                            }
                         }
 
                         // Emit to frontend
