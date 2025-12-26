@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { useOnboardingStore } from '../../store/onboardingStore';
-import './onboarding.css';
+import React, { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useOnboardingStore } from "../../store/onboardingStore";
+import "./onboarding.css";
 
 interface PermissionState {
   granted: boolean;
@@ -10,9 +10,18 @@ interface PermissionState {
 
 export const PermissionsScreen: React.FC = () => {
   const { nextStep, previousStep } = useOnboardingStore();
-  const [microphone, setMicrophone] = useState<PermissionState>({ granted: false, checking: false });
-  const [accessibility, setAccessibility] = useState<PermissionState>({ granted: false, checking: false });
-  const [inputMonitoring, setInputMonitoring] = useState<PermissionState>({ granted: false, checking: false });
+  const [microphone, setMicrophone] = useState<PermissionState>({
+    granted: false,
+    checking: false,
+  });
+  const [accessibility, setAccessibility] = useState<PermissionState>({
+    granted: false,
+    checking: false,
+  });
+  const [inputMonitoring, setInputMonitoring] = useState<PermissionState>({
+    granted: false,
+    checking: false,
+  });
 
   // Check permissions on mount
   useEffect(() => {
@@ -26,56 +35,61 @@ export const PermissionsScreen: React.FC = () => {
     try {
       // Note: We'll need to add these commands to the Rust backend
       // For now, we'll use the existing commands
-      const micGranted = await invoke<boolean>('check_microphone_permission');
-      const accGranted = await invoke<boolean>('check_accessibility_permission');
-      const inputGranted = await invoke<boolean>('check_input_monitoring_permission');
-      
-      setMicrophone(prev => ({ ...prev, granted: micGranted }));
-      setAccessibility(prev => ({ ...prev, granted: accGranted }));
-      setInputMonitoring(prev => ({ ...prev, granted: inputGranted }));
+      const micGranted = await invoke<boolean>("check_microphone_permission");
+      const accGranted = await invoke<boolean>(
+        "check_accessibility_permission",
+      );
+      const inputGranted = await invoke<boolean>(
+        "check_input_monitoring_permission",
+      );
+
+      setMicrophone((prev) => ({ ...prev, granted: micGranted }));
+      setAccessibility((prev) => ({ ...prev, granted: accGranted }));
+      setInputMonitoring((prev) => ({ ...prev, granted: inputGranted }));
     } catch (error) {
-      console.error('Failed to check permissions:', error);
+      console.error("Failed to check permissions:", error);
     }
   };
 
   const requestMicrophone = async () => {
-    setMicrophone(prev => ({ ...prev, checking: true }));
+    setMicrophone((prev) => ({ ...prev, checking: true }));
     try {
-      await invoke<boolean>('request_microphone_permission');
+      await invoke<boolean>("request_microphone_permission");
       // Start polling for permission change
       setTimeout(checkPermissions, 1000);
     } catch (error) {
-      console.error('Failed to request microphone permission:', error);
+      console.error("Failed to request microphone permission:", error);
     } finally {
-      setMicrophone(prev => ({ ...prev, checking: false }));
+      setMicrophone((prev) => ({ ...prev, checking: false }));
     }
   };
 
   const requestAccessibility = async () => {
-    setAccessibility(prev => ({ ...prev, checking: true }));
+    setAccessibility((prev) => ({ ...prev, checking: true }));
     try {
-      await invoke<boolean>('request_accessibility_permission');
+      await invoke<boolean>("request_accessibility_permission");
       setTimeout(checkPermissions, 1000);
     } catch (error) {
-      console.error('Failed to request accessibility permission:', error);
+      console.error("Failed to request accessibility permission:", error);
     } finally {
-      setAccessibility(prev => ({ ...prev, checking: false }));
+      setAccessibility((prev) => ({ ...prev, checking: false }));
     }
   };
 
   const requestInputMonitoring = async () => {
-    setInputMonitoring(prev => ({ ...prev, checking: true }));
+    setInputMonitoring((prev) => ({ ...prev, checking: true }));
     try {
-      await invoke<boolean>('request_input_monitoring_permission');
+      await invoke<boolean>("request_input_monitoring_permission");
       setTimeout(checkPermissions, 1000);
     } catch (error) {
-      console.error('Failed to request input monitoring permission:', error);
+      console.error("Failed to request input monitoring permission:", error);
     } finally {
-      setInputMonitoring(prev => ({ ...prev, checking: false }));
+      setInputMonitoring((prev) => ({ ...prev, checking: false }));
     }
   };
 
-  const allGranted = microphone.granted && accessibility.granted && inputMonitoring.granted;
+  const allGranted =
+    microphone.granted && accessibility.granted && inputMonitoring.granted;
 
   return (
     <div className="flex flex-row h-full w-full bg-background">
@@ -91,25 +105,30 @@ export const PermissionsScreen: React.FC = () => {
             </button>
             <h1 className="text-3xl mb-4 mt-12 pr-24">
               {allGranted
-                ? 'Thank you for trusting us. We take your privacy seriously.'
-                : 'Set up Lexi AI on your computer'}
+                ? "Thank you for trusting us. We take your privacy seriously."
+                : "Set up Lexi AI on your computer"}
             </h1>
             <div className="flex flex-col gap-4 my-8 pr-24">
-              <div className={`border rounded-lg p-4 flex flex-col gap-2 bg-background border-border ${microphone.granted ? 'border-green-500' : 'border-2'}`}>
-                <div className={`flex items-center gap-2 ${microphone.granted ? '' : 'mb-2'}`}>
+              <div
+                className={`border rounded-lg p-4 flex flex-col gap-2 bg-background border-border ${microphone.granted ? "border-green-500" : "border-2"}`}
+              >
+                <div
+                  className={`flex items-center gap-2 ${microphone.granted ? "" : "mb-2"}`}
+                >
                   {microphone.granted && (
                     <span className="text-green-500 text-xl">✓</span>
                   )}
                   <div className="font-medium text-base flex">
                     {microphone.granted
-                      ? 'Lexi AI can use your microphone.'
-                      : 'Allow Lexi AI to use your microphone.'}
+                      ? "Lexi AI can use your microphone."
+                      : "Allow Lexi AI to use your microphone."}
                   </div>
                 </div>
                 {!microphone.granted && (
                   <>
                     <div className="text-sm text-muted-foreground mb-2">
-                      This lets Lexi AI hear your voice and transcribe your speech
+                      This lets Lexi AI hear your voice and transcribe your
+                      speech
                     </div>
                     <div className="flex items-center justify-between">
                       <button
@@ -117,7 +136,7 @@ export const PermissionsScreen: React.FC = () => {
                         onClick={requestMicrophone}
                         disabled={microphone.checking}
                       >
-                        {microphone.checking ? 'Requesting...' : 'Allow'}
+                        {microphone.checking ? "Requesting..." : "Allow"}
                       </button>
                       {microphone.checking && (
                         <div className="text-sm text-muted-foreground">
@@ -128,21 +147,26 @@ export const PermissionsScreen: React.FC = () => {
                   </>
                 )}
               </div>
-              <div className={`border rounded-lg p-4 flex flex-col gap-2 bg-background border-border ${inputMonitoring.granted ? 'border-green-500' : 'border-2'}`}>
-                <div className={`flex items-center gap-2 ${inputMonitoring.granted ? '' : 'mb-2'}`}>
+              <div
+                className={`border rounded-lg p-4 flex flex-col gap-2 bg-background border-border ${inputMonitoring.granted ? "border-green-500" : "border-2"}`}
+              >
+                <div
+                  className={`flex items-center gap-2 ${inputMonitoring.granted ? "" : "mb-2"}`}
+                >
                   {inputMonitoring.granted && (
                     <span className="text-green-500 text-xl">✓</span>
                   )}
                   <div className="font-medium text-base flex">
                     {inputMonitoring.granted
-                      ? 'Lexi AI can detect Fn key presses.'
-                      : 'Allow Lexi AI to detect Fn key presses.'}
+                      ? "Lexi AI can detect Fn key presses."
+                      : "Allow Lexi AI to detect Fn key presses."}
                   </div>
                 </div>
                 {!inputMonitoring.granted && (
                   <>
                     <div className="text-sm text-muted-foreground mb-2">
-                      This lets Lexi AI detect when you press the Fn key to start recording
+                      This lets Lexi AI detect when you press the Fn key to
+                      start recording
                     </div>
                     <div className="flex items-center justify-between">
                       <button
@@ -150,7 +174,7 @@ export const PermissionsScreen: React.FC = () => {
                         onClick={requestInputMonitoring}
                         disabled={inputMonitoring.checking}
                       >
-                        {inputMonitoring.checking ? 'Requesting...' : 'Allow'}
+                        {inputMonitoring.checking ? "Requesting..." : "Allow"}
                       </button>
                       {inputMonitoring.checking && (
                         <div className="text-sm text-muted-foreground">
@@ -161,21 +185,26 @@ export const PermissionsScreen: React.FC = () => {
                   </>
                 )}
               </div>
-              <div className={`border rounded-lg p-4 flex flex-col gap-2 bg-background border-border ${accessibility.granted ? 'border-green-500' : 'border-2'}`}>
-                <div className={`flex items-center gap-2 ${accessibility.granted ? '' : 'mb-2'}`}>
+              <div
+                className={`border rounded-lg p-4 flex flex-col gap-2 bg-background border-border ${accessibility.granted ? "border-green-500" : "border-2"}`}
+              >
+                <div
+                  className={`flex items-center gap-2 ${accessibility.granted ? "" : "mb-2"}`}
+                >
                   {accessibility.granted && (
                     <span className="text-green-500 text-xl">✓</span>
                   )}
                   <div className="font-medium text-base flex">
                     {accessibility.granted
-                      ? 'Lexi AI can insert and edit text.'
-                      : 'Allow Lexi AI to insert spoken words.'}
+                      ? "Lexi AI can insert and edit text."
+                      : "Allow Lexi AI to insert spoken words."}
                   </div>
                 </div>
                 {!accessibility.granted && (
                   <>
                     <div className="text-sm text-muted-foreground mb-2">
-                      This lets Lexi AI put your spoken words in the right textbox
+                      This lets Lexi AI put your spoken words in the right
+                      textbox
                     </div>
                     <div className="flex items-center justify-between">
                       <button
@@ -183,7 +212,7 @@ export const PermissionsScreen: React.FC = () => {
                         onClick={requestAccessibility}
                         disabled={accessibility.checking}
                       >
-                        {accessibility.checking ? 'Requesting...' : 'Allow'}
+                        {accessibility.checking ? "Requesting..." : "Allow"}
                       </button>
                       {accessibility.checking && (
                         <div className="text-sm text-muted-foreground">
@@ -198,7 +227,7 @@ export const PermissionsScreen: React.FC = () => {
           </div>
           <div className="flex flex-col items-start mb-8">
             <button
-              className={`onboarding-button primary w-24 ${allGranted ? '' : 'hidden'}`}
+              className={`onboarding-button primary w-24 ${allGranted ? "" : "hidden"}`}
               onClick={nextStep}
             >
               Continue
