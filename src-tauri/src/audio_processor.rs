@@ -88,12 +88,24 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         };
         println!("🌐 Using language: {}", language);
 
+        // TODO: Get enhance_transcription and transcribe_with_cursor_context from app config state
+        // For now, using default values of true (matching database defaults)
+        let enhance_transcription = true;
+        let transcribe_with_cursor_context = true;
+
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
         let stt_service = SttService::new();
         let transcription_start = Instant::now();
         let transcription_result = stt_service
-            .transcribe_audio(audio_data, auth_token, language, Some(cancel_rx))
+            .transcribe_audio(
+                audio_data,
+                auth_token,
+                language,
+                enhance_transcription,
+                transcribe_with_cursor_context,
+                Some(cancel_rx),
+            )
             .await;
         let transcription_duration = transcription_start.elapsed();
 
