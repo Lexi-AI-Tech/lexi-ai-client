@@ -1,5 +1,4 @@
 import React from "react";
-import { HotkeySettings } from "./HotkeySettings";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
 export const SettingsPage: React.FC = () => {
@@ -30,21 +29,6 @@ export const SettingsPage: React.FC = () => {
           Account
         </h3>
         <GoogleLoginButton />
-      </div>
-
-      <div>
-        <h3
-          style={{
-            margin: 0,
-            marginBottom: "16px",
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#ffffff",
-          }}
-        >
-          Hotkeys
-        </h3>
-        <HotkeySettings />
       </div>
     </div>
   );
