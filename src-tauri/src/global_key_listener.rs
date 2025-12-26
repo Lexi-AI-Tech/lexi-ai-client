@@ -172,6 +172,13 @@ pub fn start_listener(
                             println!("Cursor context - App: {:?}, PID: {:?}, Text: {:?}", 
                                 context.app_name, context.pid, context.selected_text);
                         }
+                        
+                        // Capture screen and save to file
+                        if let Some(file_path) = crate::cursor_context::capture_screen_to_file() {
+                            println!("📸 Screen captured: {}", file_path.display());
+                        } else {
+                            eprintln!("⚠️  Failed to capture screen");
+                        }
 
                         println!(
                             "Hotkey {} - {} recording",
