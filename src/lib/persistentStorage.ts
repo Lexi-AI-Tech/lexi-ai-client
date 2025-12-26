@@ -1,6 +1,6 @@
 /**
  * Persistent Storage Utility
- * 
+ *
  * Provides a unified storage interface that uses Tauri Store in production
  * and falls back to localStorage for development/web environments.
  * This ensures tokens persist reliably in production builds.
@@ -11,15 +11,18 @@ let isTauriAvailable = false;
 
 // Initialize Tauri store if available
 const initStore = async () => {
-  if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+  if (typeof window !== "undefined" && (window as any).__TAURI__) {
     try {
-      const { Store } = await import('@tauri-apps/plugin-store');
-      storeInstance = new Store('.auth.dat');
+      const { Store } = await import("@tauri-apps/plugin-store");
+      storeInstance = new Store(".auth.dat");
       isTauriAvailable = true;
-      console.log('✅ Using Tauri Store for persistent storage');
+      console.log("✅ Using Tauri Store for persistent storage");
       return true;
     } catch (error) {
-      console.warn('Failed to initialize Tauri Store, falling back to localStorage:', error);
+      console.warn(
+        "Failed to initialize Tauri Store, falling back to localStorage:",
+        error,
+      );
       isTauriAvailable = false;
       return false;
     }
@@ -41,7 +44,7 @@ const getStore = async (): Promise<boolean> => {
  */
 export async function getStorageItem(key: string): Promise<string | null> {
   await getStore();
-  
+
   if (isTauriAvailable && storeInstance) {
     try {
       const value = await storeInstance.get(key);
@@ -70,9 +73,12 @@ export async function getStorageItem(key: string): Promise<string | null> {
 /**
  * Set a value in persistent storage
  */
-export async function setStorageItem(key: string, value: string): Promise<void> {
+export async function setStorageItem(
+  key: string,
+  value: string,
+): Promise<void> {
   await getStore();
-  
+
   if (isTauriAvailable && storeInstance) {
     try {
       await storeInstance.set(key, value);
@@ -103,7 +109,7 @@ export async function setStorageItem(key: string, value: string): Promise<void> 
  */
 export async function removeStorageItem(key: string): Promise<void> {
   await getStore();
-  
+
   if (isTauriAvailable && storeInstance) {
     try {
       await storeInstance.delete(key);
@@ -157,4 +163,3 @@ export function removeStorageItemSync(key: string): void {
     console.error(`Failed to remove ${key} from localStorage (sync):`, error);
   }
 }
-

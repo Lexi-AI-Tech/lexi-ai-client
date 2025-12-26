@@ -6,7 +6,6 @@
 pub mod auth;
 pub mod config;
 pub mod hotkey;
+pub mod pill;
 pub mod text;
 pub mod window;
-pub mod pill;
-

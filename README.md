@@ -40,6 +40,7 @@ npm install
 ### 3. Start Lexi AI Server
 
 The client requires the Lexi AI Server to be running. The server handles:
+
 - Speech-to-text transcription via Groq's Whisper API
 - Google OAuth authentication
 - User management and token storage
@@ -60,6 +61,7 @@ The app needs three macOS permissions:
    - System Settings → Privacy & Security → Accessibility
 
 **To grant permissions:**
+
 1. Open **System Settings** → **Privacy & Security**
 2. Click the **lock icon** and enter your password
 3. Add your **Terminal** app (or the built Lexi AI app) to each required permission
@@ -108,6 +110,7 @@ npm run build
 ```
 
 The app will be created at:
+
 - **App Bundle**: `src-tauri/target/release/bundle/macos/Lexi AI.app`
 - **DMG Installer**: `src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg`
 
@@ -157,6 +160,7 @@ lexi-ai-client/
 ### Hotkey Not Working
 
 **Possible causes:**
+
 - Input Monitoring permission not granted
 - Another app is using the same hotkey
 - Try restarting the app after granting permissions
@@ -164,7 +168,8 @@ lexi-ai-client/
 
 ### Microphone Not Recording
 
-**Solution**: 
+**Solution**:
+
 1. Check System Settings → Privacy & Security → Microphone
 2. Ensure the app (or Terminal) has microphone access
 3. Make sure no other app is using the microphone
@@ -173,6 +178,7 @@ lexi-ai-client/
 ### Transcription Fails or Returns 401 Error
 
 **Possible causes:**
+
 - Lexi AI Server is not running (should be at `http://localhost:1230`)
 - Not logged in (authenticate via Google OAuth in the app)
 - Server API key not configured (check server configuration)
@@ -181,6 +187,7 @@ lexi-ai-client/
 ### Input Monitoring Permission Not Working
 
 **Solution**:
+
 1. System Settings → Privacy & Security → Input Monitoring
 2. Add Terminal (for dev) or Lexi AI app (for production)
 3. Restart the app completely after granting permission
@@ -189,6 +196,7 @@ lexi-ai-client/
 ### Pill Window Not Appearing
 
 **Solution**:
+
 1. Check that the app has Accessibility permission
 2. Try toggling the pill window via the UI
 3. Check terminal output for window creation errors
@@ -204,6 +212,7 @@ npm run dev
 ### View Logs
 
 All debug output appears in the terminal where you ran `npm run dev`. Look for:
+
 - `Starting recording...` - When recording starts
 - `Stopping recording...` - When recording stops
 - `🔍 DEBUG: Audio data size: XXX bytes` - Audio capture info
@@ -212,6 +221,7 @@ All debug output appears in the terminal where you ran `npm run dev`. Look for:
 ### Modify the Default Hotkey
 
 The default hotkey is set in `src-tauri/src/main.rs`:
+
 ```rust
 let initial_config = HotkeyConfig {
     hotkey: "Fn".to_string(),

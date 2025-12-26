@@ -26,11 +26,11 @@
 //! - **State Generation**: 32 random bytes, base64url-encoded
 //! - **Token Exchange**: Handled by Lexi AI Server (client retrieves verifier via `get_pkce_verifier` command)
 
+use crate::config;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
-use crate::config;
 
 /// OAuth state management for storing PKCE verifiers
 /// Maps OAuth state strings to their corresponding PKCE verifiers
@@ -51,9 +51,9 @@ pub struct PkceChallenge {
 /// Generates a cryptographically secure random string for PKCE verifier
 /// Returns a base64url-encoded string (43-128 characters)
 fn generate_pkce_verifier() -> String {
-    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
     use rand::Rng;
-    
+
     let mut rng = rand::thread_rng();
     let bytes: Vec<u8> = (0..64).map(|_| rng.gen()).collect();
     URL_SAFE_NO_PAD.encode(&bytes)
@@ -62,9 +62,9 @@ fn generate_pkce_verifier() -> String {
 /// Generates PKCE challenge from verifier using SHA256
 /// Returns a base64url-encoded SHA256 hash of the verifier
 fn generate_pkce_challenge(verifier: &str) -> String {
-    use sha2::{Sha256, Digest};
-    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-    
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    use sha2::{Digest, Sha256};
+
     let mut hasher = Sha256::new();
     hasher.update(verifier.as_bytes());
     let hash = hasher.finalize();
@@ -74,16 +74,21 @@ fn generate_pkce_challenge(verifier: &str) -> String {
 /// Generates a random state string for CSRF protection
 /// Returns a base64url-encoded random string
 fn generate_oauth_state() -> String {
-    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
     use rand::Rng;
-    
+
     let mut rng = rand::thread_rng();
     let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
     URL_SAFE_NO_PAD.encode(&bytes)
 }
 
 /// Builds Google OAuth authorization URL with PKCE parameters
-fn build_google_oauth_url(client_id: &str, redirect_uri: &str, state: &str, challenge: &str) -> String {
+fn build_google_oauth_url(
+    client_id: &str,
+    redirect_uri: &str,
+    state: &str,
+    challenge: &str,
+) -> String {
     let scopes = "openid email profile";
     format!(
         "https://accounts.google.com/o/oauth2/v2/auth?\
@@ -108,7 +113,7 @@ fn build_google_oauth_url(client_id: &str, redirect_uri: &str, state: &str, chal
 /// Platform-specific implementation for macOS, Windows, and Linux
 fn open_browser(url: &str, app: AppHandle) {
     use std::process::Command;
-    
+
     let url_clone = url.to_string();
     tauri::async_runtime::spawn(async move {
         let result = {
@@ -118,7 +123,9 @@ fn open_browser(url: &str, app: AppHandle) {
             }
             #[cfg(target_os = "windows")]
             {
-                Command::new("cmd").args(["/C", "start", &url_clone]).spawn()
+                Command::new("cmd")
+                    .args(["/C", "start", &url_clone])
+                    .spawn()
             }
             #[cfg(target_os = "linux")]
             {
@@ -126,10 +133,13 @@ fn open_browser(url: &str, app: AppHandle) {
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
             {
-                Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "Unsupported platform"))
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "Unsupported platform",
+                ))
             }
         };
-        
+
         if let Err(e) = result {
             eprintln!("Failed to open browser: {}", e);
             let _ = app.emit("oauth-error", format!("Failed to open browser: {}", e));
@@ -138,7 +148,7 @@ fn open_browser(url: &str, app: AppHandle) {
 }
 
 /// Start Google OAuth login flow with PKCE
-/// 
+///
 /// This command:
 /// 1. Generates PKCE challenge/verifier pair
 /// 2. Generates a random state for CSRF protection
@@ -154,27 +164,27 @@ pub async fn start_google_login(
     // Generate PKCE verifier and challenge
     let verifier = generate_pkce_verifier();
     let challenge = generate_pkce_challenge(&verifier);
-    
+
     // Generate state for CSRF protection
     let oauth_state = generate_oauth_state();
-    
+
     // Store verifier with state as key
     {
         let mut verifiers = state.verifiers.lock().unwrap();
         verifiers.insert(oauth_state.clone(), verifier.clone());
     }
-    
+
     // Build Google OAuth URL with configured redirect URI
     let redirect_uri = config::oauth_redirect_uri();
     let auth_url = build_google_oauth_url(&client_id, redirect_uri, &oauth_state, &challenge);
-    
+
     // Open browser
     open_browser(&auth_url, app.clone());
-    
+
     // Note: OAuth callback is now handled by the UI route (/auth/google/callback)
     // The verifier is stored in state and can be retrieved via get_pkce_verifier command
     // No need to start a separate callback server
-    
+
     Ok(PkceChallenge {
         challenge,
         verifier,
@@ -185,11 +195,7 @@ pub async fn start_google_login(
 
 /// Get PKCE verifier for a given state
 #[tauri::command]
-pub fn get_pkce_verifier(
-    state: State<'_, OAuthState>,
-    oauth_state: String,
-) -> Option<String> {
+pub fn get_pkce_verifier(state: State<'_, OAuthState>, oauth_state: String) -> Option<String> {
     let verifiers = state.verifiers.lock().unwrap();
     verifiers.get(&oauth_state).cloned()
 }
-
