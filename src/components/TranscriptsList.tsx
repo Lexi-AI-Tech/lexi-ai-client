@@ -237,9 +237,9 @@ export const TranscriptsList: React.FC = () => {
                   {deletingId === transcript.id ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
-              {transcript.text ? (
+              {transcript.original_text ? (
                 <div className="transcript-item-text">
-                  {transcript.text}
+                  {transcript.original_text}
                 </div>
               ) : (
                 <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)', fontStyle: 'italic' }}>
