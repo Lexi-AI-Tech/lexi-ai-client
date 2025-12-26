@@ -53,9 +53,5 @@
     ],
     "macOSPrivateApi": true
   },
-  "plugins": {
-    "shell": {
-      "open": true
-    }
-  }
+  "plugins": {}
 }
