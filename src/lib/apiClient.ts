@@ -472,7 +472,13 @@ export async function checkOAuthStatus(state: string): Promise<{
 export interface Transcript {
   id: number;
   user_id: number;
-  text: string | null;
+  original_text: string | null;
+  original_text_word_count: number;
+  original_text_character_count: number;
+  is_enhanced: boolean;
+  enhanced_text: string | null;
+  enhanced_text_word_count: number | null;
+  enhanced_text_character_count: number | null;
   audio_file_url: string | null;
   audio_file_size: number | null;
   provider: string | null;
