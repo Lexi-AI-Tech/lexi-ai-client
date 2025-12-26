@@ -50,7 +50,10 @@ impl RecordingContext {
     }
 
     fn transition_to(&mut self, new_phase: RecordingPhase) {
-        println!("🔄 Recording phase transition: {:?} → {:?}", self.phase, new_phase);
+        println!(
+            "🔄 Recording phase transition: {:?} → {:?}",
+            self.phase, new_phase
+        );
         self.phase = new_phase;
         self.last_command_at = Instant::now();
     }
@@ -130,7 +133,9 @@ pub fn spawn_recording_thread(
                         }
                         Err(e) => {
                             eprintln!("❌ Failed to start recording: {}", e);
-                            ctx.transition_to(RecordingPhase::Error(RecordingError::AudioStreamFailed));
+                            ctx.transition_to(RecordingPhase::Error(
+                                RecordingError::AudioStreamFailed,
+                            ));
                             app_handle
                                 .emit("recording_error", e.to_string())
                                 .unwrap_or_default();
@@ -145,10 +150,8 @@ pub fn spawn_recording_thread(
                     if let Some(mut rec) = ctx.recorder.take() {
                         match rec.stop_recording() {
                             Ok(audio_data) => {
-                                let duration = ctx
-                                    .started_at
-                                    .map(|t| t.elapsed())
-                                    .unwrap_or_default();
+                                let duration =
+                                    ctx.started_at.map(|t| t.elapsed()).unwrap_or_default();
                                 println!(
                                     "✅ Recording stopped successfully (duration: {:.2}s, audio size: {} bytes)",
                                     duration.as_secs_f64(),
@@ -162,7 +165,9 @@ pub fn spawn_recording_thread(
                             }
                             Err(e) => {
                                 eprintln!("❌ Failed to stop recording: {}", e);
-                                ctx.transition_to(RecordingPhase::Error(RecordingError::StopFailed));
+                                ctx.transition_to(RecordingPhase::Error(
+                                    RecordingError::StopFailed,
+                                ));
                                 app_handle
                                     .emit("recording_error", e.to_string())
                                     .unwrap_or_default();
@@ -172,16 +177,15 @@ pub fn spawn_recording_thread(
                         }
                     } else {
                         // Rare but possible race condition
-                        eprintln!("⚠️  Stop command received but no recorder found (race condition?)");
+                        eprintln!(
+                            "⚠️  Stop command received but no recorder found (race condition?)"
+                        );
                         ctx.transition_to(RecordingPhase::Idle);
                     }
                 }
 
                 // ── Ignored / invalid transitions (with logging!) ──
-                (
-                    RecordingCommand::Start,
-                    RecordingPhase::Starting | RecordingPhase::Recording,
-                ) => {
+                (RecordingCommand::Start, RecordingPhase::Starting | RecordingPhase::Recording) => {
                     println!(
                         "⚠️  Ignoring Start command - already in {:?} phase",
                         ctx.phase
