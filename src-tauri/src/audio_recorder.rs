@@ -24,37 +24,37 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
-use std::sync::{Arc, Mutex};
 use std::io::Cursor;
+use std::sync::{Arc, Mutex};
 
 /// AudioRecorder manages audio capture from the default input device
-/// 
+///
 /// The recorder captures audio samples in real-time and stores them in a shared buffer.
 /// When recording stops, the samples are converted to WAV format (16-bit PCM) for
 /// compatibility with speech-to-text APIs.
 pub struct AudioRecorder {
-    device: Device,                    // The audio input device (microphone)
-    config: StreamConfig,              // Audio configuration (sample rate, channels, etc.)
-    stream: Option<Stream>,            // Active audio stream (None when not recording)
+    device: Device,                   // The audio input device (microphone)
+    config: StreamConfig,             // Audio configuration (sample rate, channels, etc.)
+    stream: Option<Stream>,           // Active audio stream (None when not recording)
     audio_data: Arc<Mutex<Vec<f32>>>, // Shared buffer storing captured audio samples
 }
 
 impl AudioRecorder {
     /// Creates a new AudioRecorder instance
-    /// 
+    ///
     /// Initializes the recorder with the system's default audio input device
     /// and its default configuration (sample rate, channels, format).
     /// This will typically use the system's default microphone.
     pub fn new() -> Self {
         // Get the default audio host for the current platform
         let host = cpal::default_host();
-        
+
         // Get the default input device (microphone)
         // Panics if no input device is available (shouldn't happen on most systems)
         let device = host
             .default_input_device()
             .expect("Failed to get default input device");
-        
+
         // Get the default configuration for the device
         // This includes sample rate, number of channels, and sample format
         let config = device
@@ -65,23 +65,23 @@ impl AudioRecorder {
         Self {
             device,
             config,
-            stream: None, // No active stream initially
+            stream: None,                                 // No active stream initially
             audio_data: Arc::new(Mutex::new(Vec::new())), // Empty audio buffer
         }
     }
 
     /// Starts recording audio from the input device
-    /// 
+    ///
     /// Creates an audio input stream that continuously captures audio samples
     /// and stores them in the internal buffer. The stream runs in a separate
     /// thread managed by cpal, calling the callback function whenever new
     /// audio data is available.
-    /// 
+    ///
     /// Returns an error if the stream cannot be created or started.
     pub fn start_recording(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // Clone the Arc to share the audio buffer with the stream callback
         let audio_data = Arc::clone(&self.audio_data);
-        
+
         // Clear any previous recording data
         audio_data.lock().unwrap().clear();
 
@@ -111,20 +111,20 @@ impl AudioRecorder {
 
         // Start the stream (begin capturing audio)
         stream.play()?;
-        
+
         // Store the stream so we can stop it later
         self.stream = Some(stream);
         Ok(())
     }
 
     /// Stops recording and converts the captured audio to WAV format
-    /// 
+    ///
     /// This function:
     /// 1. Stops the audio stream (drops it, which automatically stops recording)
     /// 2. Retrieves all captured audio samples from the buffer
     /// 3. Converts the 32-bit float samples to 16-bit integer PCM format
     /// 4. Writes the data as a WAV file in memory
-    /// 
+    ///
     /// Returns the WAV file data as a byte vector, ready to be sent to the API.
     /// Returns an error if the conversion fails.
     pub fn stop_recording(&mut self) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
@@ -142,10 +142,10 @@ impl AudioRecorder {
         // Define WAV file specification
         // We convert to 16-bit PCM format, which is widely supported by APIs
         let spec = hound::WavSpec {
-            channels: self.config.channels,           // Number of audio channels (1 = mono, 2 = stereo)
-            sample_rate: self.config.sample_rate.0,   // Sample rate in Hz (e.g., 44100, 48000)
-            bits_per_sample: 16,                      // 16-bit samples (standard for WAV)
-            sample_format: hound::SampleFormat::Int,  // Integer format (not float)
+            channels: self.config.channels, // Number of audio channels (1 = mono, 2 = stereo)
+            sample_rate: self.config.sample_rate.0, // Sample rate in Hz (e.g., 44100, 48000)
+            bits_per_sample: 16,            // 16-bit samples (standard for WAV)
+            sample_format: hound::SampleFormat::Int, // Integer format (not float)
         };
 
         // Create an in-memory buffer to write the WAV file
@@ -153,7 +153,7 @@ impl AudioRecorder {
         {
             // Create a WAV writer that writes to our in-memory buffer
             let mut writer = hound::WavWriter::new(&mut cursor, spec)?;
-            
+
             // Convert each 32-bit float sample to 16-bit integer
             for sample in audio_data {
                 // Normalize the float sample (-1.0 to 1.0) to 16-bit integer range
@@ -162,7 +162,7 @@ impl AudioRecorder {
                 // Clamp and convert: sample * amplitude converts to integer range
                 writer.write_sample((sample * amplitude) as i16)?;
             }
-            
+
             // Finalize the WAV file (writes headers, etc.)
             writer.finalize()?;
         }

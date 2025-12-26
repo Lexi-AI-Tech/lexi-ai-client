@@ -7,18 +7,18 @@
 //! 4. Injecting the transcribed text into the active application using TextInjector
 //! 5. Emitting events to the frontend to update UI state
 
-use tauri::{AppHandle, Manager, Emitter};
-use crate::state::{AuthTokenState, TranscriptionTaskState, LanguageState};
 use crate::commands::auth::get_auth_token;
 use crate::commands::config::get_language;
+use crate::state::{AuthTokenState, LanguageState, TranscriptionTaskState};
 use crate::stt_service::SttService;
 use crate::text_injector::TextInjector;
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Processes recorded audio data by transcribing it and injecting the result.
-/// 
+///
 /// This function uses tokio to spawn async tasks with abort handles for cancellation support.
 /// It will cancel any ongoing transcription before starting a new one.
-/// 
+///
 /// # Arguments
 /// * `audio_data` - The WAV audio data to transcribe
 /// * `app_handle` - The Tauri AppHandle for emitting events and accessing state
@@ -56,7 +56,9 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         println!("Processing audio, size: {} bytes", audio_data.len());
 
         // Notify frontend that transcription has started
-        app_handle_for_task.emit("processing_start", ()).unwrap_or_default();
+        app_handle_for_task
+            .emit("processing_start", ())
+            .unwrap_or_default();
 
         // Get authentication token from state
         let auth_token = if let Some(state) = app_handle_for_task.try_state::<AuthTokenState>() {
@@ -66,10 +68,15 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         };
 
         if auth_token.is_none() {
-            eprintln!("⚠️  Warning: No authentication token available. Transcription will fail with 401.");
+            eprintln!(
+                "⚠️  Warning: No authentication token available. Transcription will fail with 401."
+            );
             eprintln!("💡 Tip: Make sure you're logged in and the frontend has synced the token using set_auth_token");
         } else {
-            println!("✅ Auth token available (length: {})", auth_token.as_ref().unwrap().len());
+            println!(
+                "✅ Auth token available (length: {})",
+                auth_token.as_ref().unwrap().len()
+            );
         }
 
         // Get language from state, default to "auto" if not set
@@ -143,4 +150,3 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         }
     }
 }
-

@@ -23,15 +23,15 @@
 //!
 //! - **Input Monitoring** (macOS): Required for `rdev::listen` to work system-wide
 
+use crate::RecordingCommand;
 use rdev::{listen, Event, EventType, Key};
-use std::sync::{mpsc, Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::watch;
-use serde::{Deserialize, Serialize};
-use crate::RecordingCommand;
 
 /// Configurable hotkey definition with modifier support
 /// Stores hotkey as a human-readable string (e.g., "Ctrl+Shift+P", "Cmd+K", "Option")
@@ -45,11 +45,11 @@ impl HotkeyConfig {
     /// Parse a hotkey string (e.g., "Ctrl+Shift+P") and extract structured key and modifiers for internal use
     pub fn get_key_and_modifiers(&self) -> (String, Option<u32>, ModifierFlags) {
         let parts: Vec<&str> = self.hotkey.split('+').map(|s| s.trim()).collect();
-        
+
         let mut modifiers = ModifierFlags::default();
         let mut key = None;
         let mut alt_code = None;
-        
+
         for part in parts {
             let part_lower = part.to_lowercase();
             match part_lower.as_str() {
@@ -93,7 +93,7 @@ impl HotkeyConfig {
                 }
             }
         }
-        
+
         // If no key was found but we have modifiers, the modifier itself is the key
         if key.is_none() {
             if modifiers.cmd {
@@ -106,7 +106,7 @@ impl HotkeyConfig {
                 key = Some("ShiftLeft".to_string());
             }
         }
-        
+
         (
             key.unwrap_or_else(|| "Function".to_string()),
             alt_code,
@@ -123,7 +123,6 @@ pub struct ModifierFlags {
     pub alt: bool,
     pub ctrl: bool,
 }
-
 
 /// Helper to convert keyboard EventType to a string for frontend emission
 /// Only handles keyboard events (KeyPress and KeyRelease)
@@ -185,11 +184,15 @@ fn key_to_string(key: &Key) -> String {
 
 /// Check if a key is a modifier key
 fn is_modifier_key(key: &Key) -> bool {
-    matches!(key, 
-        Key::MetaLeft | Key::MetaRight |
-        Key::ShiftLeft | Key::ShiftRight |
-        Key::Alt |
-        Key::ControlLeft | Key::ControlRight
+    matches!(
+        key,
+        Key::MetaLeft
+            | Key::MetaRight
+            | Key::ShiftLeft
+            | Key::ShiftRight
+            | Key::Alt
+            | Key::ControlLeft
+            | Key::ControlRight
     )
 }
 
@@ -212,7 +215,7 @@ fn is_trigger_key_event(
 ) -> Option<RecordingCommand> {
     // Get structured key and modifiers from config
     let (config_key_str, alt_code, config_modifiers) = config.get_key_and_modifiers();
-    
+
     match event_type {
         EventType::KeyPress(ref key) => {
             // Parse the config key
@@ -229,24 +232,24 @@ fn is_trigger_key_event(
                         Key::ShiftRight => matches!(key, Key::ShiftLeft | Key::ShiftRight),
                         _ => *key == k,
                     }
-                },
+                }
                 None => {
                     // Try string comparison for keys like "KeyA", "Space", etc.
-                    key_to_string(key) == config_key_str || 
-                    matches!(alt_code, Some(code) if *key == Key::Unknown(code))
+                    key_to_string(key) == config_key_str
+                        || matches!(alt_code, Some(code) if *key == Key::Unknown(code))
                 }
             };
 
             if key_matches {
                 // Get current modifier state
                 let current_modifiers = get_modifier_state(pressed_keys);
-                
+
                 // Determine what the primary key is (for modifier exclusion)
                 let is_primary_key_modifier = is_modifier_key(key);
-                
+
                 // Build expected modifier state, excluding the primary key if it's a modifier
                 let mut expected_modifiers = config_modifiers.clone();
-                
+
                 // If the primary key is a modifier, exclude it from the expected modifiers
                 // (e.g., if Option is the primary key, don't also require it in modifiers)
                 if is_primary_key_modifier {
@@ -258,12 +261,13 @@ fn is_trigger_key_event(
                         _ => {}
                     }
                 }
-                
+
                 // Check if modifiers match
-                if current_modifiers.cmd == expected_modifiers.cmd &&
-                   current_modifiers.shift == expected_modifiers.shift &&
-                   current_modifiers.alt == expected_modifiers.alt &&
-                   current_modifiers.ctrl == expected_modifiers.ctrl {
+                if current_modifiers.cmd == expected_modifiers.cmd
+                    && current_modifiers.shift == expected_modifiers.shift
+                    && current_modifiers.alt == expected_modifiers.alt
+                    && current_modifiers.ctrl == expected_modifiers.ctrl
+                {
                     return Some(RecordingCommand::Start);
                 }
             }
@@ -284,10 +288,10 @@ fn is_trigger_key_event(
                         Key::ShiftRight => matches!(key, Key::ShiftLeft | Key::ShiftRight),
                         _ => *key == k,
                     }
-                },
+                }
                 None => {
-                    key_to_string(key) == config_key_str || 
-                    matches!(alt_code, Some(code) if *key == Key::Unknown(code))
+                    key_to_string(key) == config_key_str
+                        || matches!(alt_code, Some(code) if *key == Key::Unknown(code))
                 }
             };
 
@@ -304,20 +308,20 @@ fn is_trigger_key_event(
 }
 
 /// Starts the global keyboard listener in a background thread with dynamic config support.
-/// 
+///
 /// This spawns a manager thread that watches for config changes via `config_rx`.
 /// On change, it shuts down the old rdev listener and spawns a new one with the updated config.
-/// 
+///
 /// # Arguments
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
 /// * `recording_tx` - Channel sender to signal start/stop recording
 /// * `config_rx` - Watch receiver for hotkey config changes
 /// * `recording_state` - Shared state to check if we're in hotkey recording mode
 pub fn start_listener(
-    app: AppHandle, 
-    recording_tx: mpsc::Sender<RecordingCommand>, 
+    app: AppHandle,
+    recording_tx: mpsc::Sender<RecordingCommand>,
     mut config_rx: watch::Receiver<HotkeyConfig>,
-    recording_state: Arc<Mutex<bool>>
+    recording_state: Arc<Mutex<bool>>,
 ) {
     // Manager thread: Watches config, restarts listener on change
     std::thread::spawn(move || {
@@ -345,51 +349,64 @@ pub fn start_listener(
                 // Track currently pressed keys (including modifiers)
                 let pressed_keys: Arc<Mutex<HashSet<Key>>> = Arc::new(Mutex::new(HashSet::new()));
                 let pressed_keys_clone = pressed_keys.clone();
-                
+
                 // State machine: Track if we're currently recording (i.e., Start was successfully sent)
                 // This prevents Stop commands from being processed if the corresponding Start was debounced
                 let is_recording_active: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
                 let is_recording_active_clone = is_recording_active.clone();
-                
+
                 let callback = move |event: Event| {
                     if shutdown_for_callback.load(Ordering::Relaxed) {
-                        return;  // Early exit if shutdown signaled
+                        return; // Early exit if shutdown signaled
                     }
 
                     // Check if we're in hotkey recording mode
-                    let is_recording = recording_state_for_callback.lock().map(|guard| *guard).unwrap_or(false);
-                    
+                    let is_recording = recording_state_for_callback
+                        .lock()
+                        .map(|guard| *guard)
+                        .unwrap_or(false);
+
                     // Update pressed keys set
                     match event.event_type {
                         EventType::KeyPress(ref key) => {
                             pressed_keys_clone.lock().unwrap().insert(key.clone());
-                            
+
                             // If in recording mode, emit key events to frontend
                             if is_recording {
                                 let key_str = key_to_string(key);
-                                let modifier_state = get_modifier_state(&pressed_keys_clone.lock().unwrap());
-                                
+                                let modifier_state =
+                                    get_modifier_state(&pressed_keys_clone.lock().unwrap());
+
                                 // Build modifiers list, excluding the current key if it's a modifier
                                 let mut modifiers = Vec::new();
                                 // Only add modifiers if they're pressed AND the current key is not that modifier
-                                if modifier_state.shift && !matches!(key, Key::ShiftLeft | Key::ShiftRight) {
+                                if modifier_state.shift
+                                    && !matches!(key, Key::ShiftLeft | Key::ShiftRight)
+                                {
                                     modifiers.push("Shift".to_string());
                                 }
-                                if modifier_state.ctrl && !matches!(key, Key::ControlLeft | Key::ControlRight) {
+                                if modifier_state.ctrl
+                                    && !matches!(key, Key::ControlLeft | Key::ControlRight)
+                                {
                                     modifiers.push("Control".to_string());
                                 }
                                 if modifier_state.alt && !matches!(key, Key::Alt) {
                                     modifiers.push("Option".to_string());
                                 }
-                                if modifier_state.cmd && !matches!(key, Key::MetaLeft | Key::MetaRight) {
+                                if modifier_state.cmd
+                                    && !matches!(key, Key::MetaLeft | Key::MetaRight)
+                                {
                                     modifiers.push("Command".to_string());
                                 }
-                                
+
                                 // Emit hotkey recording event
-                                let _ = app_for_callback.emit("hotkey-recorded", serde_json::json!({
-                                    "key": key_str,
-                                    "modifiers": modifiers
-                                }));
+                                let _ = app_for_callback.emit(
+                                    "hotkey-recorded",
+                                    serde_json::json!({
+                                        "key": key_str,
+                                        "modifiers": modifiers
+                                    }),
+                                );
                             }
                         }
                         EventType::KeyRelease(ref key) => {
@@ -400,9 +417,11 @@ pub fn start_listener(
 
                     // Get current pressed keys for checking
                     let keys = pressed_keys_clone.lock().unwrap().clone();
-                    
+
                     // Check if this is a trigger key event
-                    if let Some(command) = is_trigger_key_event(&event.event_type, &current_config, &keys) {
+                    if let Some(command) =
+                        is_trigger_key_event(&event.event_type, &current_config, &keys)
+                    {
                         // State machine check: For Stop commands, only process if we're actually recording
                         // This prevents Stop from being processed if the corresponding Start was debounced
                         if matches!(command, RecordingCommand::Stop) {
@@ -413,7 +432,7 @@ pub fn start_listener(
                             }
                             drop(is_active);
                         }
-                        
+
                         // Debounce check
                         let mut last_trigger = debounce_clone.lock().unwrap();
                         if last_trigger.elapsed() < debounce_duration {
@@ -423,10 +442,12 @@ pub fn start_listener(
                                 EventType::KeyRelease(k) => format!("KeyRelease({:?})", k),
                                 _ => "Other".to_string(),
                             };
-                            println!("⚠️  DEBOUNCED: {} (elapsed: {:?}ms, required: {:?}ms)", 
-                                event_type_str, 
+                            println!(
+                                "⚠️  DEBOUNCED: {} (elapsed: {:?}ms, required: {:?}ms)",
+                                event_type_str,
                                 last_trigger.elapsed().as_millis(),
-                                debounce_duration.as_millis());
+                                debounce_duration.as_millis()
+                            );
                             return;
                         }
                         *last_trigger = Instant::now();
@@ -437,12 +458,16 @@ pub fn start_listener(
                             RecordingCommand::Start => "PRESSED",
                             RecordingCommand::Stop => "RELEASED",
                         };
-                        println!("=== HOTKEY TRIGGER: {} ({:?}) ===", trigger_type, current_config);
+                        println!(
+                            "=== HOTKEY TRIGGER: {} ({:?}) ===",
+                            trigger_type, current_config
+                        );
 
                         // Query cursor context
                         crate::cursor_context::log_cursor_context();
 
-                        println!("Hotkey {} - {} recording", 
+                        println!(
+                            "Hotkey {} - {} recording",
                             match command {
                                 RecordingCommand::Start => "pressed",
                                 RecordingCommand::Stop => "released",
@@ -450,7 +475,8 @@ pub fn start_listener(
                             match command {
                                 RecordingCommand::Start => "Starting",
                                 RecordingCommand::Stop => "Stopping",
-                            });
+                            }
+                        );
 
                         // Send to recording
                         if let Err(e) = recording_tx_for_callback.send(command) {
@@ -511,7 +537,7 @@ pub fn start_listener(
                     }
                 }
             };
-            
+
             if changed_result.is_err() {
                 // Channel closed, shutdown and exit
                 shutdown_for_wait.store(true, Ordering::Relaxed);
@@ -524,8 +550,7 @@ pub fn start_listener(
             shutdown.store(true, Ordering::Relaxed);
             // Unpark the listener thread if blocked (rdev::listen is blocking, but AtomicBool check is polled)
             // Note: rdev doesn't have built-in shutdown; the flag + next event will exit loop implicitly
-            let _ = listener_thread.join();  // Wait for clean shutdown
+            let _ = listener_thread.join(); // Wait for clean shutdown
         }
     });
 }
-

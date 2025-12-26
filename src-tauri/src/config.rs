@@ -26,4 +26,3 @@ pub fn api_base_url() -> &'static str {
 pub fn oauth_redirect_uri() -> &'static str {
     "http://localhost:1230/api/auth/google/callback"
 }
-
