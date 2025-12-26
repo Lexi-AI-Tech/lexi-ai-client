@@ -3,12 +3,12 @@
 //! This module defines all application state structures that are managed by Tauri.
 //! These states are shared across the application and can be accessed via Tauri's state management.
 
+use crate::global_key_listener::HotkeyConfig;
 use std::sync::Mutex;
 use tokio::sync::watch;
-use crate::global_key_listener::HotkeyConfig;
 
 /// Authentication token state for storing the current access token
-/// 
+///
 /// This state is updated by the frontend whenever the authentication token changes.
 /// The token is used for authenticated API requests to the Lexi AI Server.
 #[derive(Default)]
@@ -18,7 +18,7 @@ pub struct AuthTokenState {
 }
 
 /// Language state for storing the current transcription language
-/// 
+///
 /// This state is updated by the frontend whenever the language preference changes.
 /// The language is used for speech-to-text transcription requests.
 #[derive(Default)]
@@ -28,7 +28,7 @@ pub struct LanguageState {
 }
 
 /// Transcription task state for managing abort handles
-/// 
+///
 /// This allows canceling ongoing transcriptions when a new one starts.
 /// Each transcription task has a JoinHandle for cancellation and a oneshot channel
 /// for canceling the underlying HTTP request.
@@ -40,17 +40,16 @@ pub struct TranscriptionTaskState {
 }
 
 /// State for watch sender (to broadcast config changes)
-/// 
+///
 /// This state manages a watch channel that broadcasts hotkey configuration changes
 /// to the global key listener thread.
 pub struct HotkeyWatchState(pub watch::Sender<HotkeyConfig>);
 
 /// Hotkey recording state - tracks if we're in recording mode for hotkey selection
-/// 
+///
 /// When in recording mode, the global key listener emits key events to the frontend
 /// so users can interactively select their desired hotkey.
 pub struct HotkeyRecordingState {
     /// Whether hotkey recording mode is currently active
     pub is_recording: std::sync::Arc<Mutex<bool>>,
 }
-

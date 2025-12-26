@@ -1,16 +1,16 @@
 /**
  * Onboarding Store
- * 
+ *
  * Manages the onboarding flow state for Lexi AI.
  * Stores the current step and completion status.
  */
 
-export type OnboardingStep = 
-  | 'welcome'
-  | 'permissions'
-  | 'fn-key-test'
-  | 'microphone-test'
-  | 'home';
+export type OnboardingStep =
+  | "welcome"
+  | "permissions"
+  | "fn-key-test"
+  | "microphone-test"
+  | "home";
 
 export interface OnboardingState {
   currentStep: OnboardingStep;
@@ -24,40 +24,43 @@ export interface OnboardingState {
 
 // Step order for navigation
 const STEP_ORDER: OnboardingStep[] = [
-  'welcome',
-  'permissions',
-  'fn-key-test',
-  'microphone-test',
-  'home'
+  "welcome",
+  "permissions",
+  "fn-key-test",
+  "microphone-test",
+  "home",
 ];
 
 // Store state
-let currentStep: OnboardingStep = 'welcome';
+let currentStep: OnboardingStep = "welcome";
 let isCompleted: boolean = false;
 
 // Load from localStorage on initialization
 const loadFromStorage = () => {
   try {
-    const stored = localStorage.getItem('lexi-onboarding');
+    const stored = localStorage.getItem("lexi-onboarding");
     if (stored) {
       const parsed = JSON.parse(stored);
-      currentStep = parsed.currentStep || 'welcome';
+      currentStep = parsed.currentStep || "welcome";
       isCompleted = parsed.isCompleted || false;
     }
   } catch (e) {
-    console.error('Failed to load onboarding state:', e);
+    console.error("Failed to load onboarding state:", e);
   }
 };
 
 // Save to localStorage
 const saveToStorage = () => {
   try {
-    localStorage.setItem('lexi-onboarding', JSON.stringify({
-      currentStep,
-      isCompleted
-    }));
+    localStorage.setItem(
+      "lexi-onboarding",
+      JSON.stringify({
+        currentStep,
+        isCompleted,
+      }),
+    );
   } catch (e) {
-    console.error('Failed to save onboarding state:', e);
+    console.error("Failed to save onboarding state:", e);
   }
 };
 
@@ -68,7 +71,7 @@ loadFromStorage();
 const listeners: Set<() => void> = new Set();
 
 const notifyListeners = () => {
-  listeners.forEach(listener => listener());
+  listeners.forEach((listener) => listener());
 };
 
 export const onboardingStore: OnboardingState = {
@@ -101,25 +104,25 @@ export const onboardingStore: OnboardingState = {
   },
   completeOnboarding: () => {
     isCompleted = true;
-    currentStep = 'home';
+    currentStep = "home";
     saveToStorage();
     notifyListeners();
   },
   resetOnboarding: () => {
-    currentStep = 'welcome';
+    currentStep = "welcome";
     isCompleted = false;
     saveToStorage();
     notifyListeners();
-  }
+  },
 };
 
 // Import React for the hook
-import React from 'react';
+import React from "react";
 
 // React hook to subscribe to store changes
 export const useOnboardingStore = () => {
-  const [, forceUpdate] = React.useReducer(x => x + 1, 0);
-  
+  const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+
   React.useEffect(() => {
     const listener = () => forceUpdate();
     listeners.add(listener);
@@ -127,6 +130,6 @@ export const useOnboardingStore = () => {
       listeners.delete(listener);
     };
   }, []);
-  
+
   return onboardingStore;
 };
