@@ -84,7 +84,7 @@ use commands::text::inject_text;
 use commands::window::open_devtools;
 
 /// Command to control recording state
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecordingCommand {
     Start,
     Stop,

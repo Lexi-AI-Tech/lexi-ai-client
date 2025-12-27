@@ -92,6 +92,14 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         let enhance_transcription = false;
         let transcribe_with_cursor_context = false;
 
+        // Capture screen and encode as base64 (captured when hotkey is released)
+        let base64_image = crate::cursor_context::capture_current_screen();
+        if let Some(ref image) = base64_image {
+            println!("📸 Screen captured for transcription (length: {})", image.len());
+        } else {
+            println!("⚠️  Failed to capture screen for transcription");
+        }
+
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
         let stt_service = SttService::new();
@@ -103,6 +111,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 language,
                 enhance_transcription,
                 transcribe_with_cursor_context,
+                base64_image,
                 Some(cancel_rx),
             )
             .await;
