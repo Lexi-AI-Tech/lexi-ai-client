@@ -9,7 +9,7 @@
 //! - **Element Identification**: Uses Accessibility API to identify the UI element at cursor position
 //! - **Hierarchy Traversal**: Traverses up the accessibility tree to find input fields and application details
 //! - **Text Extraction**: Extracts selected text and text content from input fields
-//! - **Screen Capture**: Captures the entire screen and saves it to a local file
+//! - **Screen Capture**: Captures the entire screen and returns it as a base64-encoded PNG string
 //!
 //! ## Implementation Details
 //!
@@ -21,7 +21,7 @@
 //!   - Parent applications
 //! - Extracts text via `AXSelectedText` and `AXValue` attributes
 //! - Uses **Core Graphics** (`CGWindowListCreateImage()`) to capture screen
-//! - Saves screenshots to `~/Desktop/` directory
+//! - Encodes screenshots as base64-encoded PNG strings
 //!
 //! ## Permissions Required
 //!
@@ -43,8 +43,6 @@
 use objc::{msg_send, sel, sel_impl};
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
-#[cfg(target_os = "macos")]
-use std::path::PathBuf;
 
 // ============================================================================
 // Public Types
@@ -497,20 +495,21 @@ unsafe fn cf_string_to_string(cf_string: *const c_void) -> String {
     }
 }
 
-/// Capture the entire screen and save it to a local file
+/// Capture the entire screen and return it as a base64-encoded PNG string
 ///
 /// This function:
 /// 1. Captures the entire screen using `CGWindowListCreateImage()`
 /// 2. Converts the CGImage to PNG format using NSImage
-/// 3. Saves it to `~/Desktop/` directory with a timestamp
+/// 3. Encodes the PNG data as base64 and logs it
 ///
-/// Returns the file path if successful, or None if capture fails.
+/// Returns the base64-encoded PNG string if successful, or None if capture fails.
 /// Requires Screen Recording permission on macOS.
 #[cfg(target_os = "macos")]
-pub fn capture_screen_to_file() -> Option<PathBuf> {
+pub fn capture_current_screen() -> Option<String> {
     unsafe {
         objc::rc::autoreleasepool(|| {
             use cocoa::base::id;
+            use base64::{engine::general_purpose::STANDARD, Engine as _};
             
             // Get the main display bounds
             let screen_class = objc::runtime::Class::get("NSScreen").unwrap();
@@ -565,22 +564,6 @@ pub fn capture_screen_to_file() -> Option<PathBuf> {
             // Release CGImage as we now have NSImage
             CGImageRelease(cg_image);
             
-            // Get the Desktop directory
-            let home_dir = match std::env::var("HOME") {
-                Ok(dir) => dir,
-                Err(_) => {
-                    eprintln!("Failed to get HOME directory");
-                    return None;
-                }
-            };
-            
-            let desktop_dir = PathBuf::from(&home_dir).join("Desktop");
-            
-            // Generate filename with timestamp
-            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S_%3f");
-            let filename = format!("screenshot_{}.png", timestamp);
-            let file_path = desktop_dir.join(&filename);
-            
             // Convert NSImage to PNG data
             let tiff_data: id = msg_send![ns_image, TIFFRepresentation];
             if tiff_data.is_null() {
@@ -606,7 +589,7 @@ pub fn capture_screen_to_file() -> Option<PathBuf> {
                 return None;
             }
             
-            // Write to file using Rust file I/O
+            // Get PNG data bytes
             let ns_data_len: usize = msg_send![png_data, length];
             let ns_data_bytes: *const u8 = msg_send![png_data, bytes];
             
@@ -617,16 +600,13 @@ pub fn capture_screen_to_file() -> Option<PathBuf> {
             
             let png_slice = std::slice::from_raw_parts(ns_data_bytes, ns_data_len);
             
-            match std::fs::write(&file_path, png_slice) {
-                Ok(_) => {
-                    println!("✅ Screen captured and saved to: {}", file_path.display());
-                    Some(file_path)
-                }
-                Err(e) => {
-                    eprintln!("Failed to write PNG data to file: {}", e);
-                    None
-                }
-            }
+            // Encode to base64
+            let base64_string = STANDARD.encode(png_slice);
+            
+            // Log the base64 string
+            println!("✅ Screen captured - Base64 encoded PNG (length: {}):", base64_string.len());
+            
+            Some(base64_string)
         })
     }
 }
@@ -639,6 +619,6 @@ pub fn get_cursor_context() -> Option<CursorContext> {
 
 /// Stub implementation for non-macOS platforms
 #[cfg(not(target_os = "macos"))]
-pub fn capture_screen_to_file() -> Option<std::path::PathBuf> {
+pub fn capture_current_screen() -> Option<String> {
     None
 }

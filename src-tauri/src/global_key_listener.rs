@@ -173,10 +173,10 @@ pub fn start_listener(
                                 context.app_name, context.pid, context.selected_text);
                         }
                         
-                        // Capture screen and save to file (only on key press, not release)
+                        // Capture screen and get base64 encoded image (only on key press, not release)
                         if matches!(command, RecordingCommand::Start) {
-                            if let Some(file_path) = crate::cursor_context::capture_screen_to_file() {
-                                println!("📸 Screen captured: {}", file_path.display());
+                            if let Some(base64_image) = crate::cursor_context::capture_current_screen() {
+                                println!("📸 Screen captured - Base64 encoded PNG (length: {})", base64_image.len());
                             } else {
                                 eprintln!("⚠️  Failed to capture screen");
                             }
