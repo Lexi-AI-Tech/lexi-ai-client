@@ -137,10 +137,10 @@ pub fn get_cursor_context() -> Option<CursorContext> {
         // Get cursor position using Core Graphics via NSEvent
         objc::rc::autoreleasepool(|| {
             use cocoa::base::id;
-            
+
             let ns_event_class = objc::runtime::Class::get("NSEvent").unwrap();
             let mouse_location: CGPoint = msg_send![ns_event_class, mouseLocation];
-            
+
             // Convert from AppKit coordinate system (bottom-left origin) to Core Graphics (top-left origin)
             // Get screen height to convert Y coordinate
             let screen_class = objc::runtime::Class::get("NSScreen").unwrap();
@@ -148,7 +148,7 @@ pub fn get_cursor_context() -> Option<CursorContext> {
             let main_screen: id = msg_send![screens, objectAtIndex: 0usize];
             let frame: cocoa::foundation::NSRect = msg_send![main_screen, frame];
             let screen_height = frame.size.height;
-            
+
             // Convert Y coordinate: AppKit (bottom-left) -> Core Graphics (top-left)
             let point = CGPoint {
                 x: mouse_location.x,
@@ -158,7 +158,7 @@ pub fn get_cursor_context() -> Option<CursorContext> {
             // Get the system-wide accessibility element (root)
             // We need to get the element at the cursor position
             // First, we'll try to get the element at the position using the system element
-            
+
             // Create a system-wide element (PID 0 is the system)
             let system_element = create_system_element();
             if system_element.is_null() {
@@ -174,34 +174,34 @@ pub fn get_cursor_context() -> Option<CursorContext> {
                 &mut element_at_cursor,
             );
 
-        if ax_error != K_AX_ERROR_SUCCESS || element_at_cursor.is_null() {
+            if ax_error != K_AX_ERROR_SUCCESS || element_at_cursor.is_null() {
+                CFRelease(system_element);
+                return None;
+            }
+
+            // Traverse up the hierarchy to find input field and application
+            let (input_element, app_pid) = find_input_field_and_app(element_at_cursor);
+
+            // Extract text from the input element
+            let selected_text = if !input_element.is_null() {
+                extract_text_from_element(input_element)
+            } else {
+                None
+            };
+
+            // Get application name from PID
+            let app_name = if let Some(pid) = app_pid {
+                get_app_name_from_pid(pid)
+            } else {
+                None
+            };
+
+            // Cleanup
+            CFRelease(element_at_cursor);
+            if !input_element.is_null() && input_element != element_at_cursor {
+                CFRelease(input_element);
+            }
             CFRelease(system_element);
-            return None;
-        }
-
-        // Traverse up the hierarchy to find input field and application
-        let (input_element, app_pid) = find_input_field_and_app(element_at_cursor);
-
-        // Extract text from the input element
-        let selected_text = if !input_element.is_null() {
-            extract_text_from_element(input_element)
-        } else {
-            None
-        };
-
-        // Get application name from PID
-        let app_name = if let Some(pid) = app_pid {
-            get_app_name_from_pid(pid)
-        } else {
-            None
-        };
-
-        // Cleanup
-        CFRelease(element_at_cursor);
-        if !input_element.is_null() && input_element != element_at_cursor {
-            CFRelease(input_element);
-        }
-        CFRelease(system_element);
 
             Some(CursorContext {
                 selected_text,
@@ -227,9 +227,7 @@ unsafe fn create_system_element() -> AXUIElementRef {
 
 /// Traverse up the accessibility hierarchy to find input field and application
 #[cfg(target_os = "macos")]
-unsafe fn find_input_field_and_app(
-    element: AXUIElementRef,
-) -> (AXUIElementRef, Option<i32>) {
+unsafe fn find_input_field_and_app(element: AXUIElementRef) -> (AXUIElementRef, Option<i32>) {
     let mut input_element: AXUIElementRef = std::ptr::null_mut();
     let mut app_pid: Option<i32> = None;
     let mut current_element = element;
@@ -266,13 +264,10 @@ unsafe fn find_input_field_and_app(
         // Get parent element using AXParent attribute
         let parent_attr = create_cf_string("AXParent");
         let mut parent_value: CFTypeRef = std::ptr::null_mut();
-        let ax_error = AXUIElementCopyAttributeValue(
-            current_element,
-            parent_attr,
-            &mut parent_value,
-        );
+        let ax_error =
+            AXUIElementCopyAttributeValue(current_element, parent_attr, &mut parent_value);
         CFRelease(parent_attr);
-        
+
         let parent = if ax_error == K_AX_ERROR_SUCCESS && !parent_value.is_null() {
             // parent_value is an AXUIElementRef
             parent_value as AXUIElementRef
@@ -326,11 +321,8 @@ unsafe fn extract_text_from_element(element: AXUIElementRef) -> Option<String> {
     let selected_text_attr = create_cf_string("AXSelectedText");
     let mut selected_text_value: CFTypeRef = std::ptr::null_mut();
 
-    let ax_error = AXUIElementCopyAttributeValue(
-        element,
-        selected_text_attr,
-        &mut selected_text_value,
-    );
+    let ax_error =
+        AXUIElementCopyAttributeValue(element, selected_text_attr, &mut selected_text_value);
 
     let selected_text = if ax_error == K_AX_ERROR_SUCCESS && !selected_text_value.is_null() {
         let text = cf_string_to_string(selected_text_value);
@@ -508,15 +500,15 @@ unsafe fn cf_string_to_string(cf_string: *const c_void) -> String {
 pub fn capture_current_screen() -> Option<String> {
     unsafe {
         objc::rc::autoreleasepool(|| {
-            use cocoa::base::id;
             use base64::{engine::general_purpose::STANDARD, Engine as _};
-            
+            use cocoa::base::id;
+
             // Get the main display bounds
             let screen_class = objc::runtime::Class::get("NSScreen").unwrap();
             let screens: id = msg_send![screen_class, screens];
             let main_screen: id = msg_send![screens, objectAtIndex: 0usize];
             let frame: cocoa::foundation::NSRect = msg_send![main_screen, frame];
-            
+
             // Capture the screen using Core Graphics
             extern "C" {
                 fn CGWindowListCreateImage(
@@ -527,11 +519,11 @@ pub fn capture_current_screen() -> Option<String> {
                 ) -> *const c_void; // CGImageRef
                 fn CGImageRelease(image: *const c_void);
             }
-            
+
             const K_CGWINDOW_LIST_OPTION_ON_SCREEN_ONLY: u32 = 1;
             const K_CGWINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS: u32 = 16;
             const K_CG_WINDOW_IMAGE_DEFAULT: u32 = 0;
-            
+
             // Convert NSRect to CGRect (they have the same memory layout)
             let cg_rect = CGRect {
                 origin: CGPoint {
@@ -543,69 +535,73 @@ pub fn capture_current_screen() -> Option<String> {
                     height: frame.size.height,
                 },
             };
-            
+
             let cg_image = CGWindowListCreateImage(
                 cg_rect,
                 K_CGWINDOW_LIST_OPTION_ON_SCREEN_ONLY | K_CGWINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS,
                 0, // kCGNullWindowID
                 K_CG_WINDOW_IMAGE_DEFAULT,
             );
-            
+
             if cg_image.is_null() {
                 eprintln!("Failed to capture screen: CGWindowListCreateImage returned null");
                 return None;
             }
-            
+
             // Convert CGImage to NSImage for easier PNG export
             let ns_image_class = objc::runtime::Class::get("NSImage").unwrap();
             let ns_image: id = msg_send![ns_image_class, alloc];
             let ns_image: id = msg_send![ns_image, initWithCGImage: cg_image size: frame.size];
-            
+
             // Release CGImage as we now have NSImage
             CGImageRelease(cg_image);
-            
+
             // Convert NSImage to PNG data
             let tiff_data: id = msg_send![ns_image, TIFFRepresentation];
             if tiff_data.is_null() {
                 eprintln!("Failed to get TIFF representation");
                 return None;
             }
-            
+
             let bitmap_image_rep_class = objc::runtime::Class::get("NSBitmapImageRep").unwrap();
             let bitmap_rep: id = msg_send![bitmap_image_rep_class, imageRepWithData: tiff_data];
             if bitmap_rep.is_null() {
                 eprintln!("Failed to create bitmap representation");
                 return None;
             }
-            
+
             // Convert to PNG (NSBitmapImageFileTypePNG = 4)
             // Create empty dictionary for PNG properties
             let ns_dict_class = objc::runtime::Class::get("NSDictionary").unwrap();
             let png_props: id = msg_send![ns_dict_class, dictionary];
-            let png_data: id = msg_send![bitmap_rep, representationUsingType: 4 properties: png_props];
-            
+            let png_data: id =
+                msg_send![bitmap_rep, representationUsingType: 4 properties: png_props];
+
             if png_data.is_null() {
                 eprintln!("Failed to convert to PNG");
                 return None;
             }
-            
+
             // Get PNG data bytes
             let ns_data_len: usize = msg_send![png_data, length];
             let ns_data_bytes: *const u8 = msg_send![png_data, bytes];
-            
+
             if ns_data_bytes.is_null() || ns_data_len == 0 {
                 eprintln!("Failed to get PNG data bytes");
                 return None;
             }
-            
+
             let png_slice = std::slice::from_raw_parts(ns_data_bytes, ns_data_len);
-            
+
             // Encode to base64
             let base64_string = STANDARD.encode(png_slice);
-            
+
             // Log the base64 string
-            println!("✅ Screen captured - Base64 encoded PNG (length: {}):", base64_string.len());
-            
+            println!(
+                "✅ Screen captured - Base64 encoded PNG (length: {}):",
+                base64_string.len()
+            );
+
             Some(base64_string)
         })
     }

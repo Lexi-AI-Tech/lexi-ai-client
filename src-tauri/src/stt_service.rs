@@ -91,8 +91,7 @@ impl SttService {
 
         // Add base64 image if provided
         if let Some(image) = base64_image {
-            let image_part = multipart::Part::text(image)
-                .mime_str("text/plain")?;
+            let image_part = multipart::Part::text(image).mime_str("text/plain")?;
             form = form.part("base64_image", image_part);
             println!("🔍 DEBUG: Added base64_image to multipart form");
         }
