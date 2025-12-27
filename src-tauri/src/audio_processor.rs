@@ -95,7 +95,10 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Capture screen and encode as base64 (captured when hotkey is released)
         let base64_image = crate::cursor_context::capture_current_screen();
         if let Some(ref image) = base64_image {
-            println!("📸 Screen captured for transcription (length: {})", image.len());
+            println!(
+                "📸 Screen captured for transcription (length: {})",
+                image.len()
+            );
         } else {
             println!("⚠️  Failed to capture screen for transcription");
         }

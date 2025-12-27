@@ -115,7 +115,8 @@ pub fn start_listener(
             let recording_state_for_callback = recording_state_clone.clone();
 
             // Debouncing state: track last command and timestamp to prevent duplicate events
-            let last_command_state = Arc::new(Mutex::new((None::<RecordingCommand>, Instant::now())));
+            let last_command_state =
+                Arc::new(Mutex::new((None::<RecordingCommand>, Instant::now())));
             let last_command_state_for_callback = last_command_state.clone();
             const DEBOUNCE_THRESHOLD: Duration = Duration::from_millis(100);
 
@@ -159,9 +160,11 @@ pub fn start_listener(
                             if let Ok(mut state) = last_command_state_for_callback.lock() {
                                 let now = Instant::now();
                                 let (last_command, last_time) = *state;
-                                
+
                                 // Allow if it's a different command, or same command but enough time has passed
-                                if last_command != Some(command) || now.duration_since(last_time) > DEBOUNCE_THRESHOLD {
+                                if last_command != Some(command)
+                                    || now.duration_since(last_time) > DEBOUNCE_THRESHOLD
+                                {
                                     *state = (Some(command), now);
                                     true
                                 } else {
@@ -190,8 +193,10 @@ pub fn start_listener(
 
                         // Query cursor context
                         if let Some(context) = crate::cursor_context::get_cursor_context() {
-                            println!("Cursor context - App: {:?}, PID: {:?}, Text: {:?}", 
-                                context.app_name, context.pid, context.selected_text);
+                            println!(
+                                "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
+                                context.app_name, context.pid, context.selected_text
+                            );
                         }
 
                         println!(
