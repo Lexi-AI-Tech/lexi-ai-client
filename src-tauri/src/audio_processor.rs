@@ -90,18 +90,23 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
         // TODO: Get enhance_transcription and transcribe_with_cursor_context from app config state
         let enhance_transcription = false;
-        let transcribe_with_cursor_context = false;
+        let transcribe_with_cursor_context = true;
 
-        // Capture screen and encode as base64 (captured when hotkey is released)
-        let base64_image = crate::cursor_context::capture_current_screen();
-        if let Some(ref image) = base64_image {
-            println!(
-                "📸 Screen captured for transcription (length: {})",
-                image.len()
-            );
+        // Capture screen and encode as base64 only if transcribe_with_cursor_context is true
+        let base64_image = if transcribe_with_cursor_context {
+            let captured_image = crate::cursor_context::capture_current_screen();
+            if let Some(ref image) = captured_image {
+                println!(
+                    "📸 Screen captured for transcription (length: {})",
+                    image.len()
+                );
+            } else {
+                println!("⚠️  Failed to capture screen for transcription");
+            }
+            captured_image
         } else {
-            println!("⚠️  Failed to capture screen for transcription");
-        }
+            None
+        };
 
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
