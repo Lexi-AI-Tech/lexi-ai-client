@@ -111,7 +111,7 @@ pub fn main() {
     #[cfg(debug_assertions)]
     let devtools = tauri_plugin_devtools::init();
 
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             #[cfg(target_os = "macos")]

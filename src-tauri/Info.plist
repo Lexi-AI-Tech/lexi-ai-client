@@ -6,6 +6,8 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Lexi AI needs access to your microphone to record audio for speech-to-text transcription.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Lexi AI needs screen recording permission to capture screen context for enhanced transcription accuracy.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Lexi AI needs Apple Events permission to paste transcribed text at your cursor position.</string>
     <key>NSAccessibilityUsageDescription</key>
