@@ -70,8 +70,9 @@ use window::show_and_focus_main_window;
 
 use permissions::{
     check_accessibility_permission, check_input_monitoring_permission, check_microphone_permission,
-    request_accessibility_permission, request_input_monitoring_permission,
-    request_microphone_permission,
+    check_screen_recording_permission, request_accessibility_permission,
+    request_input_monitoring_permission, request_microphone_permission,
+    request_screen_recording_permission,
 };
 
 use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
@@ -149,9 +150,11 @@ pub fn main() {
             request_microphone_permission,
             request_input_monitoring_permission,
             request_accessibility_permission,
+            request_screen_recording_permission,
             check_microphone_permission,
             check_input_monitoring_permission,
             check_accessibility_permission,
+            check_screen_recording_permission,
             inject_text,
             show_pill_window,
             toggle_pill_window,

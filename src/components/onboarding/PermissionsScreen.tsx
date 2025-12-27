@@ -22,6 +22,10 @@ export const PermissionsScreen: React.FC = () => {
     granted: false,
     checking: false,
   });
+  const [screenRecording, setScreenRecording] = useState<PermissionState>({
+    granted: false,
+    checking: false,
+  });
 
   // Check permissions on mount
   useEffect(() => {
@@ -42,10 +46,14 @@ export const PermissionsScreen: React.FC = () => {
       const inputGranted = await invoke<boolean>(
         "check_input_monitoring_permission",
       );
+      const screenGranted = await invoke<boolean>(
+        "check_screen_recording_permission",
+      );
 
       setMicrophone((prev) => ({ ...prev, granted: micGranted }));
       setAccessibility((prev) => ({ ...prev, granted: accGranted }));
       setInputMonitoring((prev) => ({ ...prev, granted: inputGranted }));
+      setScreenRecording((prev) => ({ ...prev, granted: screenGranted }));
     } catch (error) {
       console.error("Failed to check permissions:", error);
     }
@@ -88,8 +96,23 @@ export const PermissionsScreen: React.FC = () => {
     }
   };
 
+  const requestScreenRecording = async () => {
+    setScreenRecording((prev) => ({ ...prev, checking: true }));
+    try {
+      await invoke<boolean>("request_screen_recording_permission");
+      setTimeout(checkPermissions, 1000);
+    } catch (error) {
+      console.error("Failed to request screen recording permission:", error);
+    } finally {
+      setScreenRecording((prev) => ({ ...prev, checking: false }));
+    }
+  };
+
   const allGranted =
-    microphone.granted && accessibility.granted && inputMonitoring.granted;
+    microphone.granted &&
+    accessibility.granted &&
+    inputMonitoring.granted &&
+    screenRecording.granted;
 
   return (
     <div className="flex flex-row h-full w-full bg-background">
@@ -215,6 +238,44 @@ export const PermissionsScreen: React.FC = () => {
                         {accessibility.checking ? "Requesting..." : "Allow"}
                       </button>
                       {accessibility.checking && (
+                        <div className="text-sm text-muted-foreground">
+                          Checking...
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+              <div
+                className={`border rounded-lg p-4 flex flex-col gap-2 bg-background border-border ${screenRecording.granted ? "border-green-500" : "border-2"}`}
+              >
+                <div
+                  className={`flex items-center gap-2 ${screenRecording.granted ? "" : "mb-2"}`}
+                >
+                  {screenRecording.granted && (
+                    <span className="text-green-500 text-xl">✓</span>
+                  )}
+                  <div className="font-medium text-base flex">
+                    {screenRecording.granted
+                      ? "Lexi AI can capture your screen."
+                      : "Allow Lexi AI to capture your screen."}
+                  </div>
+                </div>
+                {!screenRecording.granted && (
+                  <>
+                    <div className="text-sm text-muted-foreground mb-2">
+                      This lets Lexi AI capture screen context for enhanced
+                      transcription accuracy
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <button
+                        className="onboarding-button secondary w-24"
+                        onClick={requestScreenRecording}
+                        disabled={screenRecording.checking}
+                      >
+                        {screenRecording.checking ? "Requesting..." : "Allow"}
+                      </button>
+                      {screenRecording.checking && (
                         <div className="text-sm text-muted-foreground">
                           Checking...
                         </div>
