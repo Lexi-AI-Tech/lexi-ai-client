@@ -61,6 +61,7 @@ impl SttService {
     /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
     /// * `enhance_transcription` - Whether to enhance the transcription with AI
     /// * `transcribe_with_cursor_context` - Whether to use cursor context for transcription
+    /// * `base64_image` - Optional base64-encoded PNG screenshot to send with transcription
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
     ///
     /// # Returns
@@ -73,6 +74,7 @@ impl SttService {
         language: String,
         enhance_transcription: bool,
         transcribe_with_cursor_context: bool,
+        base64_image: Option<String>,
         cancel_rx: Option<oneshot::Receiver<()>>,
     ) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
@@ -85,7 +87,15 @@ impl SttService {
             .mime_str("audio/wav")?; // MIME type indicating WAV audio format
 
         // Build the multipart form with the audio file
-        let form = multipart::Form::new().part("audio_file", part); // Attach the audio file
+        let mut form = multipart::Form::new().part("audio_file", part); // Attach the audio file
+
+        // Add base64 image if provided
+        if let Some(image) = base64_image {
+            let image_part = multipart::Part::text(image)
+                .mime_str("text/plain")?;
+            form = form.part("base64_image", image_part);
+            println!("🔍 DEBUG: Added base64_image to multipart form");
+        }
 
         println!("🔍 DEBUG: Sending request to Lexi AI Server...");
 
