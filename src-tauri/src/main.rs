@@ -70,8 +70,9 @@ use window::show_and_focus_main_window;
 
 use permissions::{
     check_accessibility_permission, check_input_monitoring_permission, check_microphone_permission,
-    request_accessibility_permission, request_input_monitoring_permission,
-    request_microphone_permission,
+    check_screen_recording_permission, request_accessibility_permission,
+    request_input_monitoring_permission, request_microphone_permission,
+    request_screen_recording_permission,
 };
 
 use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
@@ -84,7 +85,7 @@ use commands::text::inject_text;
 use commands::window::open_devtools;
 
 /// Command to control recording state
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecordingCommand {
     Start,
     Stop,
@@ -111,7 +112,7 @@ pub fn main() {
     #[cfg(debug_assertions)]
     let devtools = tauri_plugin_devtools::init();
 
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             #[cfg(target_os = "macos")]
@@ -149,9 +150,11 @@ pub fn main() {
             request_microphone_permission,
             request_input_monitoring_permission,
             request_accessibility_permission,
+            request_screen_recording_permission,
             check_microphone_permission,
             check_input_monitoring_permission,
             check_accessibility_permission,
+            check_screen_recording_permission,
             inject_text,
             show_pill_window,
             toggle_pill_window,

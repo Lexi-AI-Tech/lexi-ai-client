@@ -26,6 +26,7 @@ use rdev::{listen, Event, EventType, Key};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::watch;
 
@@ -113,6 +114,12 @@ pub fn start_listener(
             let recording_tx_for_callback = recording_tx_clone.clone();
             let recording_state_for_callback = recording_state_clone.clone();
 
+            // Debouncing state: track last command and timestamp to prevent duplicate events
+            let last_command_state =
+                Arc::new(Mutex::new((None::<RecordingCommand>, Instant::now())));
+            let last_command_state_for_callback = last_command_state.clone();
+            const DEBOUNCE_THRESHOLD: Duration = Duration::from_millis(100);
+
             // Spawn the actual rdev listener thread
             let listener_thread = std::thread::spawn(move || {
                 let callback = move |event: Event| {
@@ -146,17 +153,34 @@ pub fn start_listener(
                     // Check if this is a Function key trigger (simplified - only Function key)
                     let is_trigger = is_trigger_key_event(&event.event_type);
 
-                    if let Some(cmd) = &is_trigger {
-                        let event_type_str = match &event.event_type {
-                            EventType::KeyPress(k) => format!("KeyPress({:?})", k),
-                            EventType::KeyRelease(k) => format!("KeyRelease({:?})", k),
-                            _ => "Other".to_string(),
-                        };
-                        println!("🎯 TRIGGER DETECTED: {} -> {:?}", event_type_str, cmd);
-                    }
-
                     // Check if this is a trigger key event
                     if let Some(command) = is_trigger {
+                        // Debounce: ignore duplicate events within the threshold
+                        let should_process = {
+                            if let Ok(mut state) = last_command_state_for_callback.lock() {
+                                let now = Instant::now();
+                                let (last_command, last_time) = *state;
+
+                                // Allow if it's a different command, or same command but enough time has passed
+                                if last_command != Some(command)
+                                    || now.duration_since(last_time) > DEBOUNCE_THRESHOLD
+                                {
+                                    *state = (Some(command), now);
+                                    true
+                                } else {
+                                    // Duplicate event within debounce window - ignore it
+                                    false
+                                }
+                            } else {
+                                true // If we can't lock, process anyway
+                            }
+                        };
+
+                        if !should_process {
+                            // Silently ignore duplicate event
+                            return;
+                        }
+
                         // Log the trigger
                         let trigger_type = match command {
                             RecordingCommand::Start => "PRESSED",
@@ -168,7 +192,12 @@ pub fn start_listener(
                         );
 
                         // Query cursor context
-                        crate::cursor_context::log_cursor_context();
+                        if let Some(context) = crate::cursor_context::get_cursor_context() {
+                            println!(
+                                "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
+                                context.app_name, context.pid, context.selected_text
+                            );
+                        }
 
                         println!(
                             "Hotkey {} - {} recording",
@@ -199,7 +228,7 @@ pub fn start_listener(
 
                     // Emit all keyboard events for debug
                     if let Some(event_string) = event_type_to_string(&event.event_type) {
-                        println!("Keyboard event: {:?}", event);
+                        // println!("Keyboard event: {:?}", event);
                         if let Err(e) = app_for_callback.emit("global-input", &event_string) {
                             eprintln!("Failed to emit event: {:?}", e);
                         }
