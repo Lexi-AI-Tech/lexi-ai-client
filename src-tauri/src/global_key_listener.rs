@@ -30,6 +30,80 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::watch;
 
+/// Tracks the actual state of the Function key to prevent spurious events
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KeyState {
+    Released,
+    Pressed,
+}
+
+/// Key state tracker to prevent duplicate/spurious events
+struct KeyStateTracker {
+    state: KeyState,
+    last_state_change: Instant,
+}
+
+impl KeyStateTracker {
+    fn new() -> Self {
+        Self {
+            state: KeyState::Released,
+            last_state_change: Instant::now(),
+        }
+    }
+
+    /// Returns Some(command) only if this is a valid state transition
+    /// Filters out duplicate events and ensures proper Start→Stop ordering
+    fn process_event(&mut self, event_type: &EventType) -> Option<RecordingCommand> {
+        const MIN_STATE_DURATION: Duration = Duration::from_millis(50);
+        
+        match event_type {
+            EventType::KeyPress(Key::Function) => {
+                // Only transition to Pressed if currently Released
+                if self.state == KeyState::Released {
+                    let elapsed = self.last_state_change.elapsed();
+                    if elapsed >= MIN_STATE_DURATION {
+                        self.state = KeyState::Pressed;
+                        self.last_state_change = Instant::now();
+                        println!("🔑 Key state: Released → Pressed (after {:?})", elapsed);
+                        return Some(RecordingCommand::Start);
+                    } else {
+                        println!("⚠️  Ignoring rapid KeyPress (only {:?} since last change)", elapsed);
+                    }
+                } else {
+                    // Already pressed - ignore duplicate KeyPress
+                    println!("⚠️  Ignoring duplicate KeyPress (key already pressed)");
+                }
+            }
+            EventType::KeyRelease(Key::Function) => {
+                // Only transition to Released if currently Pressed
+                if self.state == KeyState::Pressed {
+                    let elapsed = self.last_state_change.elapsed();
+                    if elapsed >= MIN_STATE_DURATION {
+                        self.state = KeyState::Released;
+                        self.last_state_change = Instant::now();
+                        println!("🔑 Key state: Pressed → Released (held for {:?})", elapsed);
+                        return Some(RecordingCommand::Stop);
+                    } else {
+                        println!("⚠️  Ignoring rapid KeyRelease (only {:?} since press)", elapsed);
+                    }
+                } else {
+                    // Already released - ignore duplicate KeyRelease
+                    println!("⚠️  Ignoring duplicate KeyRelease (key already released)");
+                }
+            }
+            _ => {}
+        }
+        None
+    }
+    
+    /// Reset state (e.g., when listener restarts)
+    fn reset(&mut self) {
+        self.state = KeyState::Released;
+        self.last_state_change = Instant::now();
+        println!("🔑 Key state tracker reset to Released");
+    }
+}
+
 /// Hotkey configuration (simplified to Function key only)
 /// Kept for compatibility with existing config system
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -70,14 +144,13 @@ fn key_to_string(key: &Key) -> String {
     }
 }
 
-/// Checks if the event is a Function key press/release
-/// Simplified to only support Function key - no modifiers, no other keys
-fn is_trigger_key_event(event_type: &EventType) -> Option<RecordingCommand> {
-    match event_type {
-        EventType::KeyPress(Key::Function) => Some(RecordingCommand::Start),
-        EventType::KeyRelease(Key::Function) => Some(RecordingCommand::Stop),
-        _ => None,
-    }
+/// Checks if the event is a Function key event (press or release)
+/// Returns true if it's a Function key event that should be processed by the state tracker
+fn is_function_key_event(event_type: &EventType) -> bool {
+    matches!(
+        event_type,
+        EventType::KeyPress(Key::Function) | EventType::KeyRelease(Key::Function)
+    )
 }
 
 /// Starts the global keyboard listener in a background thread with dynamic config support.
@@ -114,11 +187,9 @@ pub fn start_listener(
             let recording_tx_for_callback = recording_tx_clone.clone();
             let recording_state_for_callback = recording_state_clone.clone();
 
-            // Debouncing state: track last command and timestamp to prevent duplicate events
-            let last_command_state =
-                Arc::new(Mutex::new((None::<RecordingCommand>, Instant::now())));
-            let last_command_state_for_callback = last_command_state.clone();
-            const DEBOUNCE_THRESHOLD: Duration = Duration::from_millis(100);
+            // Key state tracker to prevent spurious/duplicate events
+            let key_state_tracker = Arc::new(Mutex::new(KeyStateTracker::new()));
+            let key_state_tracker_for_callback = key_state_tracker.clone();
 
             // Spawn the actual rdev listener thread
             let listener_thread = std::thread::spawn(move || {
@@ -150,79 +221,63 @@ pub fn start_listener(
                         }
                     }
 
-                    // Check if this is a Function key trigger (simplified - only Function key)
-                    let is_trigger = is_trigger_key_event(&event.event_type);
-
-                    // Check if this is a trigger key event
-                    if let Some(command) = is_trigger {
-                        // Debounce: ignore duplicate events within the threshold
-                        let should_process = {
-                            if let Ok(mut state) = last_command_state_for_callback.lock() {
-                                let now = Instant::now();
-                                let (last_command, last_time) = *state;
-
-                                // Allow if it's a different command, or same command but enough time has passed
-                                if last_command != Some(command)
-                                    || now.duration_since(last_time) > DEBOUNCE_THRESHOLD
-                                {
-                                    *state = (Some(command), now);
-                                    true
-                                } else {
-                                    // Duplicate event within debounce window - ignore it
-                                    false
-                                }
+                    // Check if this is a Function key event and process through state tracker
+                    if is_function_key_event(&event.event_type) {
+                        // Use state tracker to filter spurious/duplicate events
+                        let command = {
+                            if let Ok(mut tracker) = key_state_tracker_for_callback.lock() {
+                                tracker.process_event(&event.event_type)
                             } else {
-                                true // If we can't lock, process anyway
+                                eprintln!("❌ Failed to lock key state tracker");
+                                None
                             }
                         };
 
-                        if !should_process {
-                            // Silently ignore duplicate event
-                            return;
-                        }
-
-                        // Log the trigger
-                        let trigger_type = match command {
-                            RecordingCommand::Start => "PRESSED",
-                            RecordingCommand::Stop => "RELEASED",
-                        };
-                        println!(
-                            "=== HOTKEY TRIGGER: {} ({:?}) ===",
-                            trigger_type, current_config
-                        );
-
-                        // Query cursor context
-                        if let Some(context) = crate::cursor_context::get_cursor_context() {
+                        // Only process if state tracker approved the transition
+                        if let Some(command) = command {
+                            // Log the trigger
+                            let trigger_type = match command {
+                                RecordingCommand::Start => "PRESSED",
+                                RecordingCommand::Stop => "RELEASED",
+                            };
                             println!(
-                                "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
-                                context.app_name, context.pid, context.selected_text
+                                "=== HOTKEY TRIGGER: {} ({:?}) ===",
+                                trigger_type, current_config
                             );
-                        }
 
-                        println!(
-                            "Hotkey {} - {} recording",
-                            match command {
-                                RecordingCommand::Start => "pressed",
-                                RecordingCommand::Stop => "released",
-                            },
-                            match command {
-                                RecordingCommand::Start => "Starting",
-                                RecordingCommand::Stop => "Stopping",
+                            // Query cursor context
+                            if let Some(context) = crate::cursor_context::get_cursor_context() {
+                                println!(
+                                    "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
+                                    context.app_name, context.pid, context.selected_text
+                                );
                             }
-                        );
 
-                        // Send to recording
-                        if let Err(e) = recording_tx_for_callback.send(command) {
-                            eprintln!("Failed to send recording signal: {:?}", e);
-                        }
+                            println!(
+                                "Hotkey {} - {} recording",
+                                match command {
+                                    RecordingCommand::Start => "pressed",
+                                    RecordingCommand::Stop => "released",
+                                },
+                                match command {
+                                    RecordingCommand::Start => "Starting",
+                                    RecordingCommand::Stop => "Stopping",
+                                }
+                            );
 
-                        // Emit to frontend
-                        let event_name = match command {
-                            RecordingCommand::Start => "recording_started",
-                            RecordingCommand::Stop => "recording_stopped",
-                        };
-                        if let Err(e) = app_for_callback.emit(event_name, ()) {
-                            eprintln!("Failed to emit {} event: {:?}", event_name, e);
+                            // Send to recording
+                            if let Err(e) = recording_tx_for_callback.send(command) {
+                                eprintln!("Failed to send recording signal: {:?}", e);
+                            }
+
+                            // Emit to frontend
+                            let event_name = match command {
+                                RecordingCommand::Start => "recording_started",
+                                RecordingCommand::Stop => "recording_stopped",
+                            };
+                            if let Err(e) = app_for_callback.emit(event_name, ()) {
+                                eprintln!("Failed to emit {} event: {:?}", event_name, e);
+                            }
                         }
                     }
 
@@ -268,6 +323,12 @@ pub fn start_listener(
             // New config available: Shutdown old and loop to restart
             println!("🔄 Hotkey config changed, restarting listener...");
             shutdown.store(true, Ordering::Relaxed);
+            
+            // Reset the key state tracker to ensure clean state on restart
+            if let Ok(mut tracker) = key_state_tracker.lock() {
+                tracker.reset();
+            }
+            
             // Unpark the listener thread if blocked (rdev::listen is blocking, but AtomicBool check is polled)
             // Note: rdev doesn't have built-in shutdown; the flag + next event will exit loop implicitly
             let _ = listener_thread.join(); // Wait for clean shutdown
