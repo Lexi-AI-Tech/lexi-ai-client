@@ -90,7 +90,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
         // TODO: Get enhance_transcription and transcribe_with_cursor_context from app config state
         let enhance_transcription = false;
-        let transcribe_with_cursor_context = true;
+        let transcribe_with_cursor_context = false;
 
         // Get cursor context to extract focused app name
         let cursor_context = crate::cursor_context::get_cursor_context();
