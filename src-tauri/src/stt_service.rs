@@ -14,7 +14,7 @@
 //! ## Request/Response Format
 //!
 //! - **Request**: Multipart form data with WAV audio file
-//! - **Response**: JSON object with `{"text": "transcribed text here"}`
+//! - **Response**: Plain text string containing the transcribed text
 //!
 //! ## Features
 //!
@@ -26,6 +26,7 @@ use crate::config;
 use reqwest::multipart;
 use std::error::Error;
 use tokio::sync::oneshot;
+use tauri::{AppHandle, Emitter};
 
 /// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
 ///
@@ -50,7 +51,7 @@ impl SttService {
     /// This function:
     /// 1. Creates a multipart form request with the audio file
     /// 2. Sends the request to Lexi AI Server transcription endpoint
-    /// 3. Parses the JSON response to extract the transcribed text
+    /// 3. Returns the plain text response containing the transcribed text
     ///
     /// The request can be cancelled by aborting the tokio task, which will cause
     /// the HTTP request to be dropped and cancelled.
@@ -61,8 +62,10 @@ impl SttService {
     /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
     /// * `enhance_transcription` - Whether to enhance the transcription with AI
     /// * `transcribe_with_cursor_context` - Whether to use cursor context for transcription
+    /// * `focused_app` - Name of the currently focused application (required)
     /// * `base64_image` - Optional base64-encoded PNG screenshot to send with transcription
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
+    /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
     ///
     /// # Returns
     /// * `Ok(String)` - The transcribed text on success
@@ -74,8 +77,10 @@ impl SttService {
         language: String,
         enhance_transcription: bool,
         transcribe_with_cursor_context: bool,
+        focused_app: String,
         base64_image: Option<String>,
         cancel_rx: Option<oneshot::Receiver<()>>,
+        app_handle: Option<AppHandle>,
     ) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
@@ -96,19 +101,18 @@ impl SttService {
             println!("🔍 DEBUG: Added base64_image to multipart form");
         }
 
-        println!("🔍 DEBUG: Sending request to Lexi AI Server...");
-
         // Build the request
         // Get API base URL from configuration
         let api_base_url = config::api_base_url();
 
         // Build URL with required parameters
         let url = format!(
-            "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}",
+            "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}&focused_app={}",
             api_base_url,
             urlencoding::encode(&language),
             enhance_transcription,
-            transcribe_with_cursor_context
+            transcribe_with_cursor_context,
+            urlencoding::encode(&focused_app)
         );
         let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
 
@@ -120,7 +124,14 @@ impl SttService {
                 token.len()
             );
         } else {
-            println!("🔍 DEBUG: No auth token provided - request will likely fail with 401");
+            println!("🔍 DEBUG: No auth token provided - emitting login_required event");
+            // Emit login_required event to pill component if app_handle is available
+            if let Some(handle) = app_handle {
+                handle
+                    .emit("login_required", ())
+                    .unwrap_or_else(|e| eprintln!("Failed to emit login_required event: {}", e));
+            }
+            return Err("Authentication required. Please log in to continue.".into());
         }
 
         // Send the request with cancellation support
@@ -154,18 +165,10 @@ impl SttService {
             return Err(format!("Server Error ({}): {}", status, error_text).into());
         }
 
-        // Parse the JSON response
-        // The server returns a JSON object with a "text" field containing the transcription
-        let json: serde_json::Value = res.json().await?;
-        println!(
-            "🔍 DEBUG: Full server response: {}",
-            serde_json::to_string_pretty(&json).unwrap_or_default()
-        );
-
-        // Extract the transcribed text from the JSON response
-        // The response format is: { "text": "transcribed text here" }
-        let text = json["text"].as_str().unwrap_or("").to_string();
-        println!("🔍 DEBUG: Extracted text: {}", text);
+        // Parse the plain text response
+        // The server returns plain text containing the transcribed text
+        let text = res.text().await?;
+        println!("🔍 DEBUG: Server response text: {}", text);
 
         Ok(text)
     }
