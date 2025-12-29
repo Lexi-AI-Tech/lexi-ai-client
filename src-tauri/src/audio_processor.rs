@@ -129,6 +129,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 focused_app,
                 base64_image,
                 Some(cancel_rx),
+                Some(app_handle_for_task.clone()),
             )
             .await;
         let transcription_duration = transcription_start.elapsed();

@@ -26,6 +26,7 @@ use crate::config;
 use reqwest::multipart;
 use std::error::Error;
 use tokio::sync::oneshot;
+use tauri::{AppHandle, Emitter};
 
 /// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
 ///
@@ -64,6 +65,7 @@ impl SttService {
     /// * `focused_app` - Name of the currently focused application (required)
     /// * `base64_image` - Optional base64-encoded PNG screenshot to send with transcription
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
+    /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
     ///
     /// # Returns
     /// * `Ok(String)` - The transcribed text on success
@@ -78,6 +80,7 @@ impl SttService {
         focused_app: String,
         base64_image: Option<String>,
         cancel_rx: Option<oneshot::Receiver<()>>,
+        app_handle: Option<AppHandle>,
     ) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
@@ -97,8 +100,6 @@ impl SttService {
             form = form.part("base64_image", image_part);
             println!("🔍 DEBUG: Added base64_image to multipart form");
         }
-
-        println!("🔍 DEBUG: Sending request to Lexi AI Server...");
 
         // Build the request
         // Get API base URL from configuration
@@ -123,7 +124,14 @@ impl SttService {
                 token.len()
             );
         } else {
-            println!("🔍 DEBUG: No auth token provided - request will likely fail with 401");
+            println!("🔍 DEBUG: No auth token provided - emitting login_required event");
+            // Emit login_required event to pill component if app_handle is available
+            if let Some(handle) = app_handle {
+                handle
+                    .emit("login_required", ())
+                    .unwrap_or_else(|e| eprintln!("Failed to emit login_required event: {}", e));
+            }
+            return Err("Authentication required. Please log in to continue.".into());
         }
 
         // Send the request with cancellation support
