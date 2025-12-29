@@ -14,7 +14,7 @@
 //! ## Request/Response Format
 //!
 //! - **Request**: Multipart form data with WAV audio file
-//! - **Response**: JSON object with `{"text": "transcribed text here"}`
+//! - **Response**: Plain text string containing the transcribed text
 //!
 //! ## Features
 //!
@@ -50,7 +50,7 @@ impl SttService {
     /// This function:
     /// 1. Creates a multipart form request with the audio file
     /// 2. Sends the request to Lexi AI Server transcription endpoint
-    /// 3. Parses the JSON response to extract the transcribed text
+    /// 3. Returns the plain text response containing the transcribed text
     ///
     /// The request can be cancelled by aborting the tokio task, which will cause
     /// the HTTP request to be dropped and cancelled.
@@ -157,18 +157,10 @@ impl SttService {
             return Err(format!("Server Error ({}): {}", status, error_text).into());
         }
 
-        // Parse the JSON response
-        // The server returns a JSON object with a "text" field containing the transcription
-        let json: serde_json::Value = res.json().await?;
-        println!(
-            "🔍 DEBUG: Full server response: {}",
-            serde_json::to_string_pretty(&json).unwrap_or_default()
-        );
-
-        // Extract the transcribed text from the JSON response
-        // The response format is: { "text": "transcribed text here" }
-        let text = json["text"].as_str().unwrap_or("").to_string();
-        println!("🔍 DEBUG: Extracted text: {}", text);
+        // Parse the plain text response
+        // The server returns plain text containing the transcribed text
+        let text = res.text().await?;
+        println!("🔍 DEBUG: Server response text: {}", text);
 
         Ok(text)
     }
