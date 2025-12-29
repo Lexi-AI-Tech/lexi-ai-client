@@ -61,6 +61,7 @@ impl SttService {
     /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
     /// * `enhance_transcription` - Whether to enhance the transcription with AI
     /// * `transcribe_with_cursor_context` - Whether to use cursor context for transcription
+    /// * `focused_app` - Name of the currently focused application (required)
     /// * `base64_image` - Optional base64-encoded PNG screenshot to send with transcription
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
     ///
@@ -74,6 +75,7 @@ impl SttService {
         language: String,
         enhance_transcription: bool,
         transcribe_with_cursor_context: bool,
+        focused_app: String,
         base64_image: Option<String>,
         cancel_rx: Option<oneshot::Receiver<()>>,
     ) -> Result<String, Box<dyn Error + Send + Sync>> {
@@ -104,11 +106,12 @@ impl SttService {
 
         // Build URL with required parameters
         let url = format!(
-            "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}",
+            "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}&focused_app={}",
             api_base_url,
             urlencoding::encode(&language),
             enhance_transcription,
-            transcribe_with_cursor_context
+            transcribe_with_cursor_context,
+            urlencoding::encode(&focused_app)
         );
         let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
 

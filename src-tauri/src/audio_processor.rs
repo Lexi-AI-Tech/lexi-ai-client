@@ -92,6 +92,13 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         let enhance_transcription = false;
         let transcribe_with_cursor_context = true;
 
+        // Get cursor context to extract focused app name
+        let cursor_context = crate::cursor_context::get_cursor_context();
+        let focused_app = cursor_context
+            .and_then(|ctx| ctx.app_name)
+            .unwrap_or_else(|| "Unknown".to_string());
+        println!("📱 Focused app: {}", focused_app);
+
         // Capture screen and encode as base64 only if transcribe_with_cursor_context is true
         let base64_image = if transcribe_with_cursor_context {
             let captured_image = crate::cursor_context::capture_current_screen();
@@ -119,6 +126,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 language,
                 enhance_transcription,
                 transcribe_with_cursor_context,
+                focused_app,
                 base64_image,
                 Some(cancel_rx),
             )
