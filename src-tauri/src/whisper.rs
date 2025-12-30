@@ -73,7 +73,7 @@ fn resolve_whisper_paths(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> 
                 search_dirs.push(parent.to_path_buf());
             }
         }
-        
+
         // Only use current_dir in debug mode as a last resort
         if let Ok(cwd) = std::env::current_dir() {
             // Only add if it's not already in the list and looks like a development directory
@@ -97,12 +97,8 @@ fn resolve_whisper_paths(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> 
         }
     }
 
-    let whisper_bin = whisper_bin.ok_or_else(|| {
-        format!(
-            "whisper binary not found. Searched in: {:?}",
-            search_dirs
-        )
-    })?;
+    let whisper_bin = whisper_bin
+        .ok_or_else(|| format!("whisper binary not found. Searched in: {:?}", search_dirs))?;
 
     // Search for model
     let mut model: Option<PathBuf> = None;
@@ -114,12 +110,8 @@ fn resolve_whisper_paths(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> 
         }
     }
 
-    let model = model.ok_or_else(|| {
-        format!(
-            "whisper model not found. Searched in: {:?}",
-            search_dirs
-        )
-    })?;
+    let model =
+        model.ok_or_else(|| format!("whisper model not found. Searched in: {:?}", search_dirs))?;
 
     Ok((whisper_bin, model))
 }
@@ -137,32 +129,27 @@ fn resolve_whisper_paths(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> 
 pub fn preload_model(app: AppHandle) -> Result<(), String> {
     println!("🔍 Preloading Whisper model...");
     let (whisper_bin, model_path) = resolve_whisper_paths(&app)?;
-    
+
     // Verify both files exist and are accessible
     if !whisper_bin.exists() {
         return Err(format!("Whisper binary not found: {:?}", whisper_bin));
     }
-    
+
     if !model_path.exists() {
         return Err(format!("Whisper model not found: {:?}", model_path));
     }
-    
+
     // Get file sizes for logging
     let bin_size = std::fs::metadata(&whisper_bin)
         .map(|m| m.len())
         .unwrap_or(0);
-    let model_size = std::fs::metadata(&model_path)
-        .map(|m| m.len())
-        .unwrap_or(0);
-    
+    let model_size = std::fs::metadata(&model_path).map(|m| m.len()).unwrap_or(0);
+
     println!(
         "✅ Model preloaded - Binary: {:?} ({} bytes), Model: {:?} ({} bytes)",
-        whisper_bin,
-        bin_size,
-        model_path,
-        model_size
+        whisper_bin, bin_size, model_path, model_size
     );
-    
+
     Ok(())
 }
 
@@ -183,13 +170,22 @@ pub fn preload_model(app: AppHandle) -> Result<(), String> {
 /// # Returns
 /// * `Ok(String)` - The transcribed text
 /// * `Err(String)` - Error message if transcription fails
-pub fn transcribe_audio_data(app: AppHandle, audio_data: Vec<u8>, language: String) -> Result<String, String> {
-    println!("🎤 Starting local transcription (audio size: {} bytes)", audio_data.len());
+pub fn transcribe_audio_data(
+    app: AppHandle,
+    audio_data: Vec<u8>,
+    language: String,
+) -> Result<String, String> {
+    println!(
+        "🎤 Starting local transcription (audio size: {} bytes)",
+        audio_data.len()
+    );
 
     // Create a temporary file for the audio data
     let temp_dir = std::env::temp_dir();
     let temp_file = temp_dir.join(format!("lexi_audio_{}.wav", uuid::Uuid::new_v4()));
-    let temp_path = temp_file.to_str().ok_or_else(|| "Failed to create temp file path".to_string())?;
+    let temp_path = temp_file
+        .to_str()
+        .ok_or_else(|| "Failed to create temp file path".to_string())?;
 
     // Write audio data to temporary file
     std::fs::write(&temp_file, audio_data)
@@ -202,7 +198,10 @@ pub fn transcribe_audio_data(app: AppHandle, audio_data: Vec<u8>, language: Stri
 
     // Clean up temporary file
     if let Err(e) = std::fs::remove_file(&temp_file) {
-        eprintln!("⚠️  Warning: Failed to remove temp file {:?}: {}", temp_file, e);
+        eprintln!(
+            "⚠️  Warning: Failed to remove temp file {:?}: {}",
+            temp_file, e
+        );
     } else {
         println!("🧹 Cleaned up temp file: {:?}", temp_file);
     }
@@ -225,7 +224,11 @@ pub fn transcribe_audio_data(app: AppHandle, audio_data: Vec<u8>, language: Stri
 /// # Returns
 /// * `Ok(String)` - The transcribed text
 /// * `Err(String)` - Error message if transcription fails
-pub fn transcribe_audio_file(app: AppHandle, audio_path: String, language: String) -> Result<String, String> {
+pub fn transcribe_audio_file(
+    app: AppHandle,
+    audio_path: String,
+    language: String,
+) -> Result<String, String> {
     println!("🎤 Starting local transcription for: {}", audio_path);
 
     // Resolve bundled paths
@@ -244,20 +247,20 @@ pub fn transcribe_audio_file(app: AppHandle, audio_path: String, language: Strin
     // Execute whisper.cpp
     let output = Command::new(&whisper_bin)
         .args([
-            "-m",
+            "-m", // Model file path - specifies which Whisper model to use for transcription
             model_path
                 .to_str()
                 .ok_or_else(|| "Model path contains invalid UTF-8".to_string())?,
-            "-f",
+            "-f", // Audio file path - the input audio file to transcribe
             &audio_path,
-            "--no-timestamps",
-            "--language",
+            "--no-timestamps", // Don't include timestamps in the output (plain text only)
+            "--language", // Language code - specifies the language of the audio (e.g., "en", "es", "fr")
             &language,
-            "--threads",
+            "--threads", // Number of CPU threads to use for processing (4 threads for parallel computation)
             "4",
-            "--beam-size",
+            "--beam-size", // Beam search size - number of candidates to keep at each step (1 = greedy search, faster)
             "1",
-            "--best-of",
+            "--best-of", // Number of candidates to sample from (1 = deterministic, faster but potentially less accurate)
             "1",
         ])
         .output()
@@ -295,4 +298,3 @@ pub fn transcribe_audio_file(app: AppHandle, audio_path: String, language: Strin
     println!("✅ Transcription successful: {} characters", text.len());
     Ok(text)
 }
-

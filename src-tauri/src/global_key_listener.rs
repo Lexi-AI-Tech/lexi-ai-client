@@ -55,7 +55,7 @@ impl KeyStateTracker {
     /// Filters out duplicate events and ensures proper Start→Stop ordering
     fn process_event(&mut self, event_type: &EventType) -> Option<RecordingCommand> {
         const MIN_STATE_DURATION: Duration = Duration::from_millis(50);
-        
+
         match event_type {
             EventType::KeyPress(Key::Function) => {
                 // Only transition to Pressed if currently Released
@@ -67,7 +67,10 @@ impl KeyStateTracker {
                         println!("🔑 Key state: Released → Pressed (after {:?})", elapsed);
                         return Some(RecordingCommand::Start);
                     } else {
-                        println!("⚠️  Ignoring rapid KeyPress (only {:?} since last change)", elapsed);
+                        println!(
+                            "⚠️  Ignoring rapid KeyPress (only {:?} since last change)",
+                            elapsed
+                        );
                     }
                 } else {
                     // Already pressed - ignore duplicate KeyPress
@@ -84,7 +87,10 @@ impl KeyStateTracker {
                         println!("🔑 Key state: Pressed → Released (held for {:?})", elapsed);
                         return Some(RecordingCommand::Stop);
                     } else {
-                        println!("⚠️  Ignoring rapid KeyRelease (only {:?} since press)", elapsed);
+                        println!(
+                            "⚠️  Ignoring rapid KeyRelease (only {:?} since press)",
+                            elapsed
+                        );
                     }
                 } else {
                     // Already released - ignore duplicate KeyRelease
@@ -95,7 +101,7 @@ impl KeyStateTracker {
         }
         None
     }
-    
+
     /// Reset state (e.g., when listener restarts)
     fn reset(&mut self) {
         self.state = KeyState::Released;
@@ -315,12 +321,12 @@ pub fn start_listener(
             // New config available: Shutdown old and loop to restart
             println!("🔄 Hotkey config changed, restarting listener...");
             shutdown.store(true, Ordering::Relaxed);
-            
+
             // Reset the key state tracker to ensure clean state on restart
             if let Ok(mut tracker) = key_state_tracker.lock() {
                 tracker.reset();
             }
-            
+
             // Unpark the listener thread if blocked (rdev::listen is blocking, but AtomicBool check is polled)
             // Note: rdev doesn't have built-in shutdown; the flag + next event will exit loop implicitly
             let _ = listener_thread.join(); // Wait for clean shutdown

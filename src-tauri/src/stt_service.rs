@@ -26,8 +26,8 @@ use crate::config;
 use crate::whisper;
 use reqwest::multipart;
 use std::error::Error;
-use tokio::sync::oneshot;
 use tauri::{AppHandle, Emitter};
+use tokio::sync::oneshot;
 
 /// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
 ///
@@ -91,16 +91,15 @@ impl SttService {
         // Check if offline transcription is enabled
         if offline_transcription {
             println!("📦 Using offline transcription (local Whisper model)");
-            
+
             // Get app handle for whisper function
-            let app = app_handle.ok_or_else(|| {
-                "AppHandle required for offline transcription".to_string()
-            })?;
+            let app = app_handle
+                .ok_or_else(|| "AppHandle required for offline transcription".to_string())?;
 
             // Run the synchronous whisper function in a blocking task
             let app_clone = app.clone();
             let audio_data_clone = audio_data.clone();
-            
+
             // Check for cancellation before starting
             if let Some(cancel_rx) = cancel_rx {
                 // Use tokio::select to race between transcription and cancellation
@@ -173,9 +172,9 @@ impl SttService {
                 println!("🔍 DEBUG: No auth token provided - emitting login_required event");
                 // Emit login_required event to pill component if app_handle is available
                 if let Some(handle) = app_handle {
-                    handle
-                        .emit("login_required", ())
-                        .unwrap_or_else(|e| eprintln!("Failed to emit login_required event: {}", e));
+                    handle.emit("login_required", ()).unwrap_or_else(|e| {
+                        eprintln!("Failed to emit login_required event: {}", e)
+                    });
                 }
                 return Err("Authentication required. Please log in to continue.".into());
             }
