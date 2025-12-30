@@ -23,20 +23,23 @@ use tauri::AppHandle;
 /// Resolves the paths to the bundled whisper binary and model file
 ///
 /// Searches in multiple locations:
-/// 1. Resource directory (production bundle)
-/// 2. Executable directory (development)
-/// 3. Current working directory (development)
+/// 1. Tauri resource directory (production bundle)
+/// 2. Executable directory (production)
+/// 3. Development paths (only in debug mode, avoids file access permissions)
 ///
 /// # Arguments
-/// * `_app` - Tauri AppHandle (unused, kept for API consistency)
+/// * `app` - Tauri AppHandle for accessing resource paths
 ///
 /// # Returns
 /// * `Ok((PathBuf, PathBuf))` - Tuple of (whisper_bin_path, model_path)
 /// * `Err(String)` - Error message if paths cannot be resolved
-fn resolve_whisper_paths(_app: &AppHandle) -> Result<(PathBuf, PathBuf), String> {
+fn resolve_whisper_paths(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> {
     let mut search_dirs = Vec::new();
 
-    // Try to get resource directory (production)
+    // Note: We avoid using std::env::current_dir() in production to prevent
+    // macOS file access permission prompts. We only use it in debug mode.
+
+    // Try to get executable directory (production bundle)
     if let Ok(exe_path) = std::env::current_exe() {
         let mut dir_opt = exe_path.parent();
         while let Some(dir) = dir_opt {
@@ -58,10 +61,28 @@ fn resolve_whisper_paths(_app: &AppHandle) -> Result<(PathBuf, PathBuf), String>
         }
     }
 
-    // Add development paths
-    if let Ok(cwd) = std::env::current_dir() {
-        search_dirs.push(cwd.join("src-tauri"));
-        search_dirs.push(cwd);
+    // Only add development paths in debug mode to avoid file access permissions in production
+    #[cfg(debug_assertions)]
+    {
+        // Try to get the project root from CARGO_MANIFEST_DIR if available
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let manifest_path = PathBuf::from(manifest_dir);
+            search_dirs.push(manifest_path.clone());
+            // Also check parent directory (project root)
+            if let Some(parent) = manifest_path.parent() {
+                search_dirs.push(parent.to_path_buf());
+            }
+        }
+        
+        // Only use current_dir in debug mode as a last resort
+        if let Ok(cwd) = std::env::current_dir() {
+            // Only add if it's not already in the list and looks like a development directory
+            let cwd_str = cwd.to_string_lossy();
+            if cwd_str.contains("lexi-ai-client") || cwd_str.contains("src-tauri") {
+                search_dirs.push(cwd.join("src-tauri"));
+                search_dirs.push(cwd);
+            }
+        }
     }
 
     // Search for whisper binary
@@ -101,6 +122,48 @@ fn resolve_whisper_paths(_app: &AppHandle) -> Result<(PathBuf, PathBuf), String>
     })?;
 
     Ok((whisper_bin, model))
+}
+
+/// Preloads the Whisper model by verifying paths exist
+/// This helps reduce the first transcription latency by ensuring
+/// the model and binary are accessible before first use.
+///
+/// # Arguments
+/// * `app` - Tauri AppHandle for resolving bundled resources
+///
+/// # Returns
+/// * `Ok(())` - Paths verified successfully
+/// * `Err(String)` - Error message if paths cannot be resolved
+pub fn preload_model(app: AppHandle) -> Result<(), String> {
+    println!("🔍 Preloading Whisper model...");
+    let (whisper_bin, model_path) = resolve_whisper_paths(&app)?;
+    
+    // Verify both files exist and are accessible
+    if !whisper_bin.exists() {
+        return Err(format!("Whisper binary not found: {:?}", whisper_bin));
+    }
+    
+    if !model_path.exists() {
+        return Err(format!("Whisper model not found: {:?}", model_path));
+    }
+    
+    // Get file sizes for logging
+    let bin_size = std::fs::metadata(&whisper_bin)
+        .map(|m| m.len())
+        .unwrap_or(0);
+    let model_size = std::fs::metadata(&model_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+    
+    println!(
+        "✅ Model preloaded - Binary: {:?} ({} bytes), Model: {:?} ({} bytes)",
+        whisper_bin,
+        bin_size,
+        model_path,
+        model_size
+    );
+    
+    Ok(())
 }
 
 /// Transcribes audio data using whisper.cpp
