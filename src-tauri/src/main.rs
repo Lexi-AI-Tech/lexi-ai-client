@@ -58,6 +58,9 @@ mod recording_thread; // Recording thread management
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod whisper; // Local Whisper model integration for offline transcription
+
+use whisper::preload_model;
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use global_key_listener::HotkeyConfig;
@@ -180,6 +183,15 @@ pub fn main() {
             }
 
             let app_handle = app.handle();
+
+            // Preload Whisper model in background to reduce first transcription latency
+            let app_handle_for_preload = app_handle.clone();
+            std::thread::spawn(move || {
+                if let Err(e) = preload_model(app_handle_for_preload) {
+                    eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
+                    eprintln!("💡 First transcription may be slower");
+                }
+            });
 
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup

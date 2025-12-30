@@ -118,6 +118,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
         let stt_service = SttService::new();
+        let offline_transcription = true;
         let transcription_start = Instant::now();
         let transcription_result = stt_service
             .transcribe_audio(
@@ -130,6 +131,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 base64_image,
                 Some(cancel_rx),
                 Some(app_handle_for_task.clone()),
+                offline_transcription,
             )
             .await;
         let transcription_duration = transcription_start.elapsed();

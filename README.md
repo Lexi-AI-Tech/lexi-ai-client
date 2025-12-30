@@ -1,251 +1,108 @@
 # Lexi AI Client
 
-A macOS desktop app for speech-to-text transcription with global hotkey support. Record your voice anywhere on your Mac and have it transcribed and inserted into any text field.
+Speech-to-text overlay app for macOS built with Tauri and React.
 
-## Features
+## Setup
 
-- 🎤 **Voice Recording**: Hold a configurable hotkey to record audio (default: Function key)
-- 🤖 **AI Transcription**: Powered by Lexi AI Server (uses Groq's Whisper API internally)
-- ⌨️ **Auto Text Injection**: Automatically types the transcription into your active text field
-- 🌍 **Global Hotkey**: Works system-wide - configurable hotkey support (default: Function key)
-- 🔐 **Google OAuth**: Secure authentication with Google OAuth 2.0 (PKCE)
-- 🎯 **Pill Overlay**: Small transparent overlay window shows recording status
-- ⚙️ **Configurable Hotkeys**: Change your hotkey anytime via the settings UI
-- 🎯 **Lightweight**: Minimal UI, runs in the background
+### Prerequisites
 
-## Prerequisites
+- Node.js (v18 or higher)
+- Rust (latest stable)
+- macOS (for development)
 
-Before you begin, make sure you have:
+### Installation
 
-- **macOS 10.15+** (Catalina or later)
-- **Node.js 16+** - [Download here](https://nodejs.org/)
-- **Rust** - Install with: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- **Xcode Command Line Tools** - Install with: `xcode-select --install`
+1. **Clone the repository**:
 
-## Quick Start
+   ```bash
+   git clone <your-repo-url>
+   cd lexi-ai-client
+   ```
 
-### 1. Clone the Repository
+2. **Install dependencies**:
 
-```bash
-git clone <your-repo-url>
-cd lexi-ai-client
-```
+   ```bash
+   npm install
+   ```
 
-### 2. Install Dependencies
+3. **Download the Whisper model** (automatically done during dev/build, or manually):
 
-```bash
-npm install
-```
+   The model is automatically downloaded when you run `npm run dev` or `npm run build`. 
+   If you need to download it manually:
 
-### 3. Start Lexi AI Server
+   ```bash
+   npm run download-model
+   ```
 
-The client requires the Lexi AI Server to be running. The server handles:
+   Or download directly:
 
-- Speech-to-text transcription via Groq's Whisper API
-- Google OAuth authentication
-- User management and token storage
+   ```bash
+   cd src-tauri/models
+   curl -L -o ggml-small-q5_1.bin \
+     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin"
+   ```
 
-See the `lexi-ai-server` directory for server setup instructions.
+4. **Build the whisper binary** (if not already present):
+   ```bash
+   # See src-tauri/bin/README.md for instructions
+   ```
 
-**Default server URL**: `http://localhost:1230`
-
-### 4. Grant Permissions
-
-The app needs three macOS permissions:
-
-1. **Microphone Access** - To record audio
-   - System Settings → Privacy & Security → Microphone
-2. **Input Monitoring** - To detect global hotkeys
-   - System Settings → Privacy & Security → Input Monitoring
-3. **Accessibility Access** - To inject text and retrieve cursor context
-   - System Settings → Privacy & Security → Accessibility
-
-**To grant permissions:**
-
-1. Open **System Settings** → **Privacy & Security**
-2. Click the **lock icon** and enter your password
-3. Add your **Terminal** app (or the built Lexi AI app) to each required permission
-4. Enable the checkbox for each permission
-
-### 5. Run the App
+## Development
 
 ```bash
 npm run dev
 ```
 
-The app will open and run in the background.
+This will:
 
-## How to Use
+- Download the model if missing (via `predev` script)
+- Start the frontend dev server
+- Launch the Tauri app
 
-### Method 1: Global Hotkey (Recommended)
-
-1. **Press and hold** your configured hotkey (default: **Function (Fn)** key)
-2. **Speak** your message
-3. **Release** the hotkey
-4. The transcription will automatically be typed into your active text field
-5. A pill overlay window will appear during recording to show status
-
-### Method 2: UI Buttons
-
-1. Open the Lexi AI app window
-2. Click **"Start Recording"** button
-3. Speak your message
-4. Click **"Stop Recording"** button
-5. The transcription will appear in the app and be automatically injected
-
-### Changing Your Hotkey
-
-1. Open the Lexi AI app window
-2. Go to **Settings**
-3. Click on the hotkey input field
-4. Press your desired key combination
-5. The hotkey will be saved automatically
-
-## Building for Production
-
-To create a standalone macOS app:
+## Building
 
 ```bash
 npm run build
 ```
 
-The app will be created at:
+This will:
 
-- **App Bundle**: `src-tauri/target/release/bundle/macos/Lexi AI.app`
-- **DMG Installer**: `src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg`
+- Download the model if missing
+- Build the frontend
+- Build the Tauri app with bundled resources
 
-You can then move the `.app` to your Applications folder or distribute the `.dmg`.
+## Model Distribution
 
-### Run the Built App with Logs
+The Whisper model file (`ggml-small-q5_1.bin`, ~180MB) is not stored in Git due to size limitations.
 
-To run the built app from the command line and see logs:
+**For development**: The model is automatically downloaded when running `npm run dev` or `npm run build` via `scripts/download-model.sh`
 
-```bash
-"/Applications/Lexi AI.app/Contents/MacOS/lexi-ai"
-```
+**For production**: The model is bundled with the app via `tauri.conf.json` resources
 
-This is useful for debugging issues in the production build, as all debug output will appear in the terminal.
+See `src-tauri/models/MODEL_DISTRIBUTION_STRATEGIES.md` for detailed strategies on handling the model file.
 
 ## Project Structure
 
 ```
 lexi-ai-client/
-├── src/                    # Frontend (React + TypeScript)
-│   ├── App.tsx            # Main UI component
-│   ├── components/        # React components (settings, hotkey input, etc.)
-│   └── index.css          # Styles
-├── src-tauri/             # Backend (Rust + Tauri)
-│   ├── src/
-│   │   ├── main.rs              # Main app logic & Tauri commands
-│   │   ├── audio_recorder.rs    # Audio recording (cpal)
-│   │   ├── stt_service.rs       # Lexi AI Server API client
-│   │   ├── text_injector.rs     # Text injection (clipboard + paste)
-│   │   ├── global_key_listener.rs  # Global hotkey monitoring (rdev)
-│   │   ├── permissions.rs       # macOS permission handling
-│   │   ├── pill.rs              # Pill overlay window management
-│   │   ├── cursor_context.rs    # Cursor context retrieval (macOS Accessibility)
-│   │   ├── google_oauth.rs      # Google OAuth 2.0 with PKCE
-│   │   └── config.rs            # Application configuration
-│   ├── Cargo.toml         # Rust dependencies
+├── src/                    # React frontend
+├── src-tauri/             # Rust backend
+│   ├── src/               # Rust source code
+│   ├── models/            # Whisper model (not in Git)
+│   ├── bin/               # Whisper binary
 │   └── tauri.conf.json    # Tauri configuration
-└── package.json           # Node.js dependencies
+└── scripts/               # Build scripts
+    └── download-model.sh  # Model download script
 ```
 
-## Troubleshooting
+## Features
 
-### "This app does not have Accessibility Permissions"
-
-**Solution**: Grant Accessibility permissions (see step 4 above)
-
-### Hotkey Not Working
-
-**Possible causes:**
-
-- Input Monitoring permission not granted
-- Another app is using the same hotkey
-- Try restarting the app after granting permissions
-- Check that the hotkey is configured correctly in Settings
-
-### Microphone Not Recording
-
-**Solution**:
-
-1. Check System Settings → Privacy & Security → Microphone
-2. Ensure the app (or Terminal) has microphone access
-3. Make sure no other app is using the microphone
-4. Check terminal output for error messages
-
-### Transcription Fails or Returns 401 Error
-
-**Possible causes:**
-
-- Lexi AI Server is not running (should be at `http://localhost:1230`)
-- Not logged in (authenticate via Google OAuth in the app)
-- Server API key not configured (check server configuration)
-- Check terminal output for detailed error messages
-
-### Input Monitoring Permission Not Working
-
-**Solution**:
-
-1. System Settings → Privacy & Security → Input Monitoring
-2. Add Terminal (for dev) or Lexi AI app (for production)
-3. Restart the app completely after granting permission
-4. On some macOS versions, you may need to restart your Mac
-
-### Pill Window Not Appearing
-
-**Solution**:
-
-1. Check that the app has Accessibility permission
-2. Try toggling the pill window via the UI
-3. Check terminal output for window creation errors
-
-## Development
-
-### Run in Development Mode
-
-```bash
-npm run dev
-```
-
-### View Logs
-
-All debug output appears in the terminal where you ran `npm run dev`. Look for:
-
-- `Starting recording...` - When recording starts
-- `Stopping recording...` - When recording stops
-- `🔍 DEBUG: Audio data size: XXX bytes` - Audio capture info
-- `🔍 DEBUG: Full API response: {...}` - API response
-
-### Modify the Default Hotkey
-
-The default hotkey is set in `src-tauri/src/main.rs`:
-
-```rust
-let initial_config = HotkeyConfig {
-    hotkey: "Fn".to_string(),
-};
-```
-
-You can change this to any key or key combination (e.g., "Ctrl+Shift+P", "Cmd+K", "Option").
-Note: Users can also change the hotkey via the Settings UI without modifying code.
-
-## Tech Stack
-
-- **Frontend**: React + TypeScript + Vite
-- **Backend**: Rust + Tauri
-- **Audio**: cpal (cross-platform audio library)
-- **Hotkeys**: rdev (global keyboard event monitoring)
-- **Text Injection**: arboard (clipboard) + AppleScript/enigo (keystroke simulation)
-- **Speech-to-Text**: Lexi AI Server (uses Groq Whisper API internally)
-- **Authentication**: Google OAuth 2.0 with PKCE
-- **Accessibility**: macOS Accessibility API (AXUIElement) for cursor context
+- 🎤 Local speech-to-text using Whisper.cpp
+- ⌨️ Global hotkey support
+- 📝 Automatic text injection
+- 🔐 Google OAuth authentication
+- 🎨 Modern React UI
 
 ## License
 
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+[Your License Here]
