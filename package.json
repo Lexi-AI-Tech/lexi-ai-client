@@ -13,8 +13,9 @@
     "preview": "vite preview",
     "format": "cd src-tauri && cargo fmt && cd .. && npx prettier --write .",
     "download-model": "bash scripts/download-model.sh",
-    "predev": "npm run download-model",
-    "prebuild": "npm run download-model"
+    "setup": "bash scripts/setup.sh",
+    "predev": "npm run setup",
+    "prebuild": "npm run setup"
   },
   "dependencies": {
     "@choochmeque/tauri-plugin-google-auth-api": "^0.1.2",
