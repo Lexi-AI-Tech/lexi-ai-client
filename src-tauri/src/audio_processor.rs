@@ -88,9 +88,10 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         };
         println!("🌐 Using language: {}", language);
 
-        // TODO: Get enhance_transcription and transcribe_with_cursor_context from app config state
+        // TODO: Get enhance_transcription, transcribe_with_cursor_context, offline_transcription from app config state
         let enhance_transcription = false;
         let transcribe_with_cursor_context = false;
+        let offline_transcription = true;
 
         // Get cursor context to extract focused app name
         let cursor_context = crate::cursor_context::get_cursor_context();
@@ -118,7 +119,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
         let stt_service = SttService::new();
-        let offline_transcription = true;
+        
         let transcription_start = Instant::now();
         let transcription_result = stt_service
             .transcribe_audio(
