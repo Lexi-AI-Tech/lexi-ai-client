@@ -25,13 +25,16 @@ Speech-to-text overlay app for macOS built with Tauri and React.
    npm install
    ```
 
-3. **Download the Whisper model** (automatically done during build, or manually):
+3. **Download the Whisper model** (automatically done during dev/build, or manually):
+
+   The model is automatically downloaded when you run `npm run dev` or `npm run build`. 
+   If you need to download it manually:
 
    ```bash
    npm run download-model
    ```
 
-   Or manually:
+   Or download directly:
 
    ```bash
    cd src-tauri/models
@@ -52,7 +55,7 @@ npm run dev
 
 This will:
 
-- Download the model if missing (via `prebuild` script)
+- Download the model if missing (via `predev` script)
 - Start the frontend dev server
 - Launch the Tauri app
 
@@ -72,7 +75,7 @@ This will:
 
 The Whisper model file (`ggml-small-q5_1.bin`, ~180MB) is not stored in Git due to size limitations.
 
-**For development**: The model is automatically downloaded during build via `scripts/download-model.sh`
+**For development**: The model is automatically downloaded when running `npm run dev` or `npm run build` via `scripts/download-model.sh`
 
 **For production**: The model is bundled with the app via `tauri.conf.json` resources
 

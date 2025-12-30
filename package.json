@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "format": "cd src-tauri && cargo fmt && cd .. && npx prettier --write .",
     "download-model": "bash scripts/download-model.sh",
+    "predev": "npm run download-model",
     "prebuild": "npm run download-model"
   },
   "dependencies": {

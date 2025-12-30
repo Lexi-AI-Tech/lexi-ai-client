@@ -202,9 +202,9 @@ If accuracy is insufficient:
 
 Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's recommended file size limits, here are several strategies to handle it:
 
-## Strategy 1: Download During Build (✅ Currently Implemented)
+## Strategy 1: Download During Build & Dev (✅ Currently Implemented)
 
-**Best for**: Automated builds, CI/CD pipelines, GitHub Actions
+**Best for**: Automated builds, CI/CD pipelines, GitHub Actions, local development
 
 ### Implementation
 
@@ -217,7 +217,8 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
 
 2. **Download script** (`scripts/download-model.sh`):
    - Automatically downloads the model if missing
-   - Runs before build via `npm run prebuild`
+   - Runs automatically before `npm run dev` via `predev` script
+   - Runs automatically before `npm run build` via `prebuild` script
    - Integrated into `tauri.conf.json` build process
 
 3. **Usage**:
@@ -226,8 +227,11 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
    # Manual download
    npm run download-model
 
+   # Automatic (during development)
+   npm run dev  # Model is downloaded automatically if missing
+
    # Automatic (during build)
-   npm run build
+   npm run build  # Model is downloaded automatically if missing
    ```
 
 **Pros**:
