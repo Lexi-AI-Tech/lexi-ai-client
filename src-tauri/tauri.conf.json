@@ -19,10 +19,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "bin/whisper",
-      "models/ggml-small-q5_1.bin"
-    ],
+    "resources": ["bin/whisper", "models/ggml-small-q5_1.bin"],
     "macOS": {
       "entitlements": "entitlements.plist",
       "exceptionDomain": "",

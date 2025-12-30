@@ -13,22 +13,26 @@ Speech-to-text overlay app for macOS built with Tauri and React.
 ### Installation
 
 1. **Clone the repository**:
+
    ```bash
    git clone <your-repo-url>
    cd lexi-ai-client
    ```
 
 2. **Install dependencies**:
+
    ```bash
    npm install
    ```
 
 3. **Download the Whisper model** (automatically done during build, or manually):
+
    ```bash
    npm run download-model
    ```
-   
+
    Or manually:
+
    ```bash
    cd src-tauri/models
    curl -L -o ggml-small-q5_1.bin \
@@ -47,6 +51,7 @@ npm run dev
 ```
 
 This will:
+
 - Download the model if missing (via `prebuild` script)
 - Start the frontend dev server
 - Launch the Tauri app
@@ -58,13 +63,14 @@ npm run build
 ```
 
 This will:
+
 - Download the model if missing
 - Build the frontend
 - Build the Tauri app with bundled resources
 
 ## Model Distribution
 
-The Whisper model file (`ggml-small-q5_1.bin`, ~180MB) is not stored in Git due to size limitations. 
+The Whisper model file (`ggml-small-q5_1.bin`, ~180MB) is not stored in Git due to size limitations.
 
 **For development**: The model is automatically downloaded during build via `scripts/download-model.sh`
 

@@ -13,23 +13,28 @@ This directory should contain the compiled `whisper.cpp` binary.
 ## Setup Instructions
 
 1. Clone whisper.cpp:
+
    ```bash
    git clone https://github.com/ggerganov/whisper.cpp
    cd whisper.cpp
    ```
 
 2. Build the binary:
+
    ```bash
    make
    ```
+
    This will create the binary in `build/bin/whisper-cli`
 
 3. Copy the binary:
+
    ```bash
    cp build/bin/whisper-cli ../lexi-ai-client/src-tauri/bin/whisper
    ```
 
 4. Make it executable (if needed):
+
    ```bash
    chmod +x ../lexi-ai-client/src-tauri/bin/whisper
    ```
@@ -42,17 +47,15 @@ This directory should contain the compiled `whisper.cpp` binary.
 
 ## Platform-Specific Notes
 
-- **macOS**: 
+- **macOS**:
   - The binary should be built for your target architecture (x86_64 or arm64)
   - For Apple Silicon (M1/M2/M3): The default build should work and produce an arm64 binary
   - For Intel Macs: May need to specify architecture or use Rosetta 2
   - The built binary will be `build/bin/whisper-cli` (Mach-O 64-bit executable)
-  
-- **Linux**: 
+- **Linux**:
   - Build normally with `make`
   - Binary will be in `build/bin/whisper-cli`
-  
-- **Windows**: 
+- **Windows**:
   - Build with appropriate toolchain (Visual Studio, MinGW, etc.)
   - Binary will be `build/bin/whisper-cli.exe`
   - Rename to `whisper.exe` when copying to this directory
@@ -69,4 +72,3 @@ This directory should contain the compiled `whisper.cpp` binary.
 - **"cmake: No such file or directory"**: Install CMake first (`brew install cmake` on macOS)
 - **"main: No such file or directory"**: The binary is in `build/bin/whisper-cli`, not `main` in the root
 - **Binary not found**: Make sure you've run `make` successfully and check `build/bin/` directory
-

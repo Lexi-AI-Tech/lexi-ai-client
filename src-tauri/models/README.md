@@ -28,6 +28,7 @@ This multilingual model supports automatic language detection. The code uses `--
 The code expects: `ggml-small-q5_1.bin`
 
 If you need to use a different model, update the path in `src/whisper.rs`:
+
 ```rust
 .join("models").join("ggml-small-q5_1.bin")
 ```
@@ -51,6 +52,7 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
 ### Implementation
 
 1. **Model is in `.gitignore`**:
+
    ```gitignore
    src-tauri/models/*.bin
    !src-tauri/models/README.md
@@ -62,20 +64,23 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
    - Integrated into `tauri.conf.json` build process
 
 3. **Usage**:
+
    ```bash
    # Manual download
    npm run download-model
-   
+
    # Automatic (during build)
    npm run build
    ```
 
-**Pros**: 
+**Pros**:
+
 - ✅ No large files in Git
 - ✅ Works in CI/CD
 - ✅ Automatic for new developers
 
-**Cons**: 
+**Cons**:
+
 - Requires internet during build
 - Slower first build
 
@@ -88,54 +93,56 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
 ### Implementation
 
 1. **Add model download function to Rust** (`src/whisper.rs`):
+
    ```rust
    use std::fs;
    use std::path::PathBuf;
    use tauri::AppHandle;
-   
+
    const MODEL_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin";
    const MODEL_NAME: &str = "ggml-small-q5_1.bin";
-   
+
    async fn download_model_if_needed(app: &AppHandle) -> Result<PathBuf, String> {
        let model_path = get_model_path(app)?;
-       
+
        if model_path.exists() {
            return Ok(model_path);
        }
-       
+
        println!("📥 Model not found, downloading...");
-       
+
        // Create models directory
        if let Some(parent) = model_path.parent() {
            fs::create_dir_all(parent)
                .map_err(|e| format!("Failed to create models directory: {}", e))?;
        }
-       
+
        // Download model
        let response = reqwest::get(MODEL_URL).await
            .map_err(|e| format!("Failed to download model: {}", e))?;
-       
+
        let bytes = response.bytes().await
            .map_err(|e| format!("Failed to read model data: {}", e))?;
-       
+
        fs::write(&model_path, bytes)
            .map_err(|e| format!("Failed to save model: {}", e))?;
-       
+
        println!("✅ Model downloaded successfully");
        Ok(model_path)
    }
-   
+
    fn get_model_path(app: &AppHandle) -> Result<PathBuf, String> {
        // Use app data directory
        let app_data_dir = app.path()
            .app_data_dir()
            .map_err(|e| format!("Failed to get app data directory: {}", e))?;
-       
+
        Ok(app_data_dir.join("models").join(MODEL_NAME))
    }
    ```
 
 2. **Update `resolve_whisper_paths`** to check app data directory first:
+
    ```rust
    fn resolve_whisper_paths(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> {
        // First check app data directory (for downloaded models)
@@ -147,7 +154,7 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
                return Ok((whisper_bin, model_path));
            }
        }
-       
+
        // Fall back to bundled resources
        // ... existing code ...
    }
@@ -162,12 +169,14 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
    }
    ```
 
-**Pros**: 
+**Pros**:
+
 - Small initial app size
 - User can choose when to download
 - Works offline after first download
 
-**Cons**: 
+**Cons**:
+
 - Requires internet on first use
 - More complex implementation
 - Need to handle download progress/errors
@@ -181,11 +190,13 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
 ### Implementation
 
 1. **Install Git LFS**:
+
    ```bash
    git lfs install
    ```
 
 2. **Track model files**:
+
    ```bash
    git lfs track "src-tauri/models/*.bin"
    git add .gitattributes
@@ -197,12 +208,14 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
    git commit -m "Add Whisper model via Git LFS"
    ```
 
-**Pros**: 
+**Pros**:
+
 - Version control for model
 - Works with existing Git workflow
 - Automatic for team members
 
-**Cons**: 
+**Cons**:
+
 - Requires Git LFS setup
 - GitHub LFS has bandwidth limits (1GB/month free)
 - Larger repo size
@@ -218,11 +231,12 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
 1. **Host model on CDN/object storage** (e.g., AWS S3, Cloudflare R2, GitHub Releases)
 
 2. **Create download script**:
+
    ```bash
    #!/bin/bash
    MODEL_URL="https://your-cdn.com/models/ggml-small-q5_1.bin"
    MODEL_FILE="src-tauri/models/ggml-small-q5_1.bin"
-   
+
    if [ ! -f "$MODEL_FILE" ]; then
        curl -L -o "$MODEL_FILE" "$MODEL_URL"
    fi
@@ -230,12 +244,14 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
 
 3. **Use in CI/CD or local builds**
 
-**Pros**: 
+**Pros**:
+
 - Fast downloads from CDN
 - Can update model without new release
 - No Git repo bloat
 
-**Cons**: 
+**Cons**:
+
 - Requires hosting setup
 - Additional cost for bandwidth
 - Dependency on external service
@@ -249,6 +265,7 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
 ### Implementation
 
 1. **Add to `.gitignore`**:
+
    ```
    src-tauri/models/*.bin
    ```
@@ -264,12 +281,14 @@ Since the Whisper model file (`ggml-small-q5_1.bin`) is ~180MB and exceeds Git's
      "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin"
    ```
 
-**Pros**: 
+**Pros**:
+
 - Simple
 - No extra dependencies
 - Works offline
 
-**Cons**: 
+**Cons**:
+
 - Manual setup for new developers
 - Model not in version control
 - Each developer needs to download
@@ -285,6 +304,7 @@ Combine build-time download for CI/CD with runtime download as fallback:
 3. **Model stored in app data directory** (user-writable location)
 
 This gives you:
+
 - ✅ Automatic setup in CI/CD
 - ✅ Works for developers without manual steps
 - ✅ Graceful fallback if build script fails
