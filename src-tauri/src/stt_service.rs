@@ -23,6 +23,7 @@
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
 use crate::config;
+use crate::whisper;
 use reqwest::multipart;
 use std::error::Error;
 use tokio::sync::oneshot;
@@ -66,6 +67,7 @@ impl SttService {
     /// * `base64_image` - Optional base64-encoded PNG screenshot to send with transcription
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
     /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
+    /// * `offline_transcription` - Whether to use local Whisper model instead of server API
     ///
     /// # Returns
     /// * `Ok(String)` - The transcribed text on success
@@ -81,95 +83,140 @@ impl SttService {
         base64_image: Option<String>,
         cancel_rx: Option<oneshot::Receiver<()>>,
         app_handle: Option<AppHandle>,
+        offline_transcription: bool,
     ) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
 
-        // Create a multipart form part for the audio file
-        // The server expects the audio file to be sent as a multipart form field
-        let part = multipart::Part::bytes(audio_data)
-            .file_name("audio.wav") // Filename hint for the server
-            .mime_str("audio/wav")?; // MIME type indicating WAV audio format
+        // Check if offline transcription is enabled
+        if offline_transcription {
+            println!("📦 Using offline transcription (local Whisper model)");
+            
+            // Get app handle for whisper function
+            let app = app_handle.ok_or_else(|| {
+                "AppHandle required for offline transcription".to_string()
+            })?;
 
-        // Build the multipart form with the audio file
-        let mut form = multipart::Form::new().part("audio_file", part); // Attach the audio file
-
-        // Add base64 image if provided
-        if let Some(image) = base64_image {
-            let image_part = multipart::Part::text(image).mime_str("text/plain")?;
-            form = form.part("base64_image", image_part);
-            println!("🔍 DEBUG: Added base64_image to multipart form");
-        }
-
-        // Build the request
-        // Get API base URL from configuration
-        let api_base_url = config::api_base_url();
-
-        // Build URL with required parameters
-        let url = format!(
-            "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}&focused_app={}",
-            api_base_url,
-            urlencoding::encode(&language),
-            enhance_transcription,
-            transcribe_with_cursor_context,
-            urlencoding::encode(&focused_app)
-        );
-        let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
-
-        // Add authorization header if token is provided
-        if let Some(token) = &auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
-            println!(
-                "🔍 DEBUG: Added Authorization header (token length: {})",
-                token.len()
-            );
-        } else {
-            println!("🔍 DEBUG: No auth token provided - emitting login_required event");
-            // Emit login_required event to pill component if app_handle is available
-            if let Some(handle) = app_handle {
-                handle
-                    .emit("login_required", ())
-                    .unwrap_or_else(|e| eprintln!("Failed to emit login_required event: {}", e));
-            }
-            return Err("Authentication required. Please log in to continue.".into());
-        }
-
-        // Send the request with cancellation support
-        // Use tokio::select! to race between the request and cancellation signal
-        let res = if let Some(cancel_rx) = cancel_rx {
-            tokio::select! {
-                result = request.send() => {
-                    match result {
-                        Ok(res) => res,
-                        Err(e) => return Err(Box::new(e)),
+            // Run the synchronous whisper function in a blocking task
+            let app_clone = app.clone();
+            let audio_data_clone = audio_data.clone();
+            
+            // Check for cancellation before starting
+            if let Some(cancel_rx) = cancel_rx {
+                // Use tokio::select to race between transcription and cancellation
+                tokio::select! {
+                    result = tokio::task::spawn_blocking(move || {
+                        whisper::transcribe_audio_data(app_clone, audio_data_clone, language)
+                    }) => {
+                        match result {
+                            Ok(Ok(text)) => Ok(text),
+                            Ok(Err(e)) => Err(e.into()),
+                            Err(e) => Err(format!("Transcription task failed: {}", e).into()),
+                        }
+                    }
+                    _ = cancel_rx => {
+                        println!("🛑 Offline transcription cancelled");
+                        Err("Request cancelled".into())
                     }
                 }
-                _ = cancel_rx => {
-                    println!("🛑 HTTP request cancelled via cancellation signal");
-                    return Err("Request cancelled".into());
-                }
+            } else {
+                // No cancellation support, just run the blocking task
+                tokio::task::spawn_blocking(move || {
+                    whisper::transcribe_audio_data(app, audio_data, language)
+                })
+                .await
+                .map_err(|e| format!("Transcription task failed: {}", e))?
+                .map_err(|e| e.into())
             }
         } else {
-            // No cancellation support, just send normally
-            request.send().await?
-        };
+            // Continue with server API transcription
 
-        let status = res.status();
-        println!("🔍 DEBUG: Response status: {}", status);
+            // Create a multipart form part for the audio file
+            // The server expects the audio file to be sent as a multipart form field
+            let part = multipart::Part::bytes(audio_data)
+                .file_name("audio.wav") // Filename hint for the server
+                .mime_str("audio/wav")?; // MIME type indicating WAV audio format
 
-        // Check if the request was successful (status code 200-299)
-        if !status.is_success() {
-            // Read the error response body
-            let error_text = res.text().await?;
-            println!("🔍 DEBUG: Server Error response: {}", error_text);
-            return Err(format!("Server Error ({}): {}", status, error_text).into());
+            // Build the multipart form with the audio file
+            let mut form = multipart::Form::new().part("audio_file", part); // Attach the audio file
+
+            // Add base64 image if provided
+            if let Some(image) = base64_image {
+                let image_part = multipart::Part::text(image).mime_str("text/plain")?;
+                form = form.part("base64_image", image_part);
+                println!("🔍 DEBUG: Added base64_image to multipart form");
+            }
+
+            // Build the request
+            // Get API base URL from configuration
+            let api_base_url = config::api_base_url();
+
+            // Build URL with required parameters
+            let url = format!(
+                "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}&focused_app={}",
+                api_base_url,
+                urlencoding::encode(&language),
+                enhance_transcription,
+                transcribe_with_cursor_context,
+                urlencoding::encode(&focused_app)
+            );
+            let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
+
+            // Add authorization header if token is provided
+            if let Some(token) = &auth_token {
+                request = request.header("Authorization", format!("Bearer {}", token));
+                println!(
+                    "🔍 DEBUG: Added Authorization header (token length: {})",
+                    token.len()
+                );
+            } else {
+                println!("🔍 DEBUG: No auth token provided - emitting login_required event");
+                // Emit login_required event to pill component if app_handle is available
+                if let Some(handle) = app_handle {
+                    handle
+                        .emit("login_required", ())
+                        .unwrap_or_else(|e| eprintln!("Failed to emit login_required event: {}", e));
+                }
+                return Err("Authentication required. Please log in to continue.".into());
+            }
+
+            // Send the request with cancellation support
+            // Use tokio::select! to race between the request and cancellation signal
+            let res = if let Some(cancel_rx) = cancel_rx {
+                tokio::select! {
+                    result = request.send() => {
+                        match result {
+                            Ok(res) => res,
+                            Err(e) => return Err(Box::new(e)),
+                        }
+                    }
+                    _ = cancel_rx => {
+                        println!("🛑 HTTP request cancelled via cancellation signal");
+                        return Err("Request cancelled".into());
+                    }
+                }
+            } else {
+                // No cancellation support, just send normally
+                request.send().await?
+            };
+
+            let status = res.status();
+            println!("🔍 DEBUG: Response status: {}", status);
+
+            // Check if the request was successful (status code 200-299)
+            if !status.is_success() {
+                // Read the error response body
+                let error_text = res.text().await?;
+                println!("🔍 DEBUG: Server Error response: {}", error_text);
+                return Err(format!("Server Error ({}): {}", status, error_text).into());
+            }
+
+            // Parse the plain text response
+            // The server returns plain text containing the transcribed text
+            let text = res.text().await?;
+            println!("🔍 DEBUG: Server response text: {}", text);
+
+            Ok(text)
         }
-
-        // Parse the plain text response
-        // The server returns plain text containing the transcribed text
-        let text = res.text().await?;
-        println!("🔍 DEBUG: Server response text: {}", text);
-
-        Ok(text)
     }
 }

@@ -58,6 +58,7 @@ mod recording_thread; // Recording thread management
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod whisper; // Local Whisper model integration for offline transcription
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use global_key_listener::HotkeyConfig;
