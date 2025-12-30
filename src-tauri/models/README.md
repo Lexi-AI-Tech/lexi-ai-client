@@ -38,6 +38,163 @@ If you need to use a different model, update the path in `src/whisper.rs`:
 - **English-only**: `ggml-small.en-q5_1.bin` (~181 MB, better accuracy for English)
 - **Base multilingual**: `ggml-base-q5_1.bin` (~142 MB, faster, less accurate)
 - **Tiny multilingual**: `ggml-tiny-q5_1.bin` (~75 MB, fastest, least accurate)
+- **Large-v3-Turbo**: `ggml-large-v3-turbo-q5_0.bin` (~547 MB, highest accuracy, ~20% slower than small)
+
+---
+
+# Extending Support for Other Models
+
+This guide explains how to replace the current model with a different Whisper model (e.g., switching from small to large-v3-turbo for higher accuracy).
+
+## Quick Reference: Model Comparison
+
+| Model                 | Size    | Speed       | Accuracy              | Use Case                                  |
+| --------------------- | ------- | ----------- | --------------------- | ----------------------------------------- |
+| `tiny-q5_1`           | ~75 MB  | Fastest     | Lowest                | Quick demos, low-resource devices         |
+| `base-q5_1`           | ~142 MB | Fast        | Low-Medium            | Faster transcription, acceptable accuracy |
+| `small-q5_1`          | ~181 MB | Medium      | Medium                | **Current default** - Good balance        |
+| `small.en-q5_1`       | ~181 MB | Medium      | Medium (English only) | English-only, slightly better than small  |
+| `large-v3-turbo-q5_0` | ~547 MB | Medium-Slow | Highest               | Maximum accuracy, technical terms         |
+
+## How to Replace the Model
+
+To replace the current model with a different one (e.g., large-v3-turbo):
+
+### Step 1: Download the New Model
+
+```bash
+cd src-tauri/models
+curl -L -o ggml-large-v3-turbo-q5_0.bin \
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
+```
+
+### Step 2: Update `src/whisper.rs`
+
+Find the model search code (around line 103-114) and change the model filename:
+
+```rust
+// Search for model
+let mut model: Option<PathBuf> = None;
+for dir in &search_dirs {
+    let candidate = dir.join("models").join("ggml-large-v3-turbo-q5_0.bin"); // Changed here
+    if candidate.exists() {
+        model = Some(candidate);
+        break;
+    }
+}
+```
+
+### Step 3: Update `tauri.conf.json`
+
+Update the resources array to include the new model:
+
+```json
+{
+  "bundle": {
+    "resources": [
+      "bin/whisper",
+      "models/ggml-large-v3-turbo-q5_0.bin" // Changed here
+    ]
+  }
+}
+```
+
+### Step 4: Update Download Script (Optional)
+
+If you want the build script to download the new model, update `scripts/download-model.sh`:
+
+```bash
+MODEL_FILE="$MODEL_DIR/ggml-large-v3-turbo-q5_0.bin"
+MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
+```
+
+### Step 5: Update Documentation
+
+Update this README to reflect the new model being used.
+
+---
+
+## Example: Replacing Small with Large-v3-Turbo
+
+The `large-v3-turbo-q5_0` model offers the highest accuracy while being optimized for speed. Here's how to replace the small model with it:
+
+### Why Large-v3-Turbo?
+
+- **Highest accuracy**: Best for technical terms, accents, noisy audio
+- **Multilingual**: Supports 99 languages
+- **Speed**: Only ~20% slower than small model (much faster than standard large)
+- **Size**: ~547 MB (reasonable for desktop apps)
+
+### Quick Replacement Steps
+
+Follow the steps in "How to Replace the Model" above, using these specific values:
+
+- **Model filename**: `ggml-large-v3-turbo-q5_0.bin`
+- **Model URL**: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin`
+
+### Performance Considerations
+
+- **Memory**: Large-v3-Turbo uses ~4-6 GB RAM (vs ~2-3 GB for small)
+- **Speed**: ~12-18 seconds for 1 minute of audio (vs ~10-15 seconds for small)
+- **Accuracy**: Significantly better, especially for:
+  - Technical/specialized vocabulary
+  - Accented speech
+  - Noisy environments
+  - Multiple languages
+
+---
+
+## Model URLs Reference
+
+All models are available from Hugging Face:
+
+```
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{MODEL_NAME}
+```
+
+Common model names:
+
+- `ggml-tiny-q5_1.bin` - Tiny multilingual
+- `ggml-base-q5_1.bin` - Base multilingual
+- `ggml-small-q5_1.bin` - Small multilingual (current)
+- `ggml-small.en-q5_1.bin` - Small English-only
+- `ggml-large-v3-turbo-q5_0.bin` - Large-v3-Turbo (highest accuracy)
+- `ggml-large-v3-q5_0.bin` - Large-v3 (slower than turbo)
+
+---
+
+## Troubleshooting
+
+### Model Not Found Error
+
+If you get "whisper model not found":
+
+1. Verify the model file exists in `src-tauri/models/`
+2. Check the filename matches exactly (case-sensitive)
+3. Ensure the model is included in `tauri.conf.json` resources
+4. For production builds, verify the model is bundled correctly
+
+### Model Too Large for Bundle
+
+If the model makes the app bundle too large:
+
+- Consider using runtime download (see Strategy 2 in Model Distribution)
+- Use a smaller model (base or tiny)
+- Compress the model further (though whisper.cpp models are already quantized)
+
+### Performance Issues
+
+If transcription is too slow:
+
+- Switch to a smaller model (base or tiny)
+- Reduce `--threads` count (though this may slow things down)
+- Ensure you're using quantized models (q5_0 or q5_1)
+
+If accuracy is insufficient:
+
+- Switch to a larger model (large-v3-turbo)
+- Use English-only model if applicable (`small.en-q5_1`)
+- Check audio quality (16 kHz, mono, 16-bit PCM recommended)
 
 ---
 

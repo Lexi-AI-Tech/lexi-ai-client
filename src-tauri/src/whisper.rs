@@ -15,6 +15,10 @@
 //! The following resources must be bundled in tauri.conf.json:
 //! - `bin/whisper` - The whisper.cpp binary
 //! - `models/ggml-small-q5_1.bin` - The quantized multilingual model file
+//!
+//! ## Extending to Other Models
+//!
+//! To use a different Whisper model, see `src-tauri/models/README.md` for detailed instructions.
 
 use std::path::PathBuf;
 use std::process::Command;
