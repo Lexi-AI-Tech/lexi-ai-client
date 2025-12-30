@@ -5,7 +5,7 @@
   "identifier": "com.lexi.ai",
   "build": {
     "beforeDevCommand": "npm run dev:frontend",
-    "beforeBuildCommand": "npm run build:frontend",
+    "beforeBuildCommand": "npm run download-model && npm run build:frontend",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
