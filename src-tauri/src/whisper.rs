@@ -31,13 +31,10 @@ use tauri::AppHandle;
 /// 2. Executable directory (production)
 /// 3. Development paths (only in debug mode, avoids file access permissions)
 ///
-/// # Arguments
-/// * `app` - Tauri AppHandle for accessing resource paths
-///
 /// # Returns
 /// * `Ok((PathBuf, PathBuf))` - Tuple of (whisper_bin_path, model_path)
 /// * `Err(String)` - Error message if paths cannot be resolved
-fn resolve_whisper_paths(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> {
+fn resolve_whisper_paths() -> Result<(PathBuf, PathBuf), String> {
     let mut search_dirs = Vec::new();
 
     // Note: We avoid using std::env::current_dir() in production to prevent
@@ -132,7 +129,7 @@ fn resolve_whisper_paths(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> 
 /// * `Err(String)` - Error message if paths cannot be resolved
 pub fn preload_model(app: AppHandle) -> Result<(), String> {
     println!("🔍 Preloading Whisper model...");
-    let (whisper_bin, model_path) = resolve_whisper_paths(&app)?;
+    let (whisper_bin, model_path) = resolve_whisper_paths()?;
 
     // Verify both files exist and are accessible
     if !whisper_bin.exists() {
@@ -236,7 +233,7 @@ pub fn transcribe_audio_file(
     println!("🎤 Starting local transcription for: {}", audio_path);
 
     // Resolve bundled paths
-    let (whisper_bin, model_path) = resolve_whisper_paths(&app)?;
+    let (whisper_bin, model_path) = resolve_whisper_paths()?;
 
     println!(
         "📦 Using whisper binary: {:?}, model: {:?}",
