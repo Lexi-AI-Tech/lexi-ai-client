@@ -7,6 +7,7 @@
 //! 4. Injecting the transcribed text into the active application using TextInjector
 //! 5. Emitting events to the frontend to update UI state
 
+use crate::actions::{check_action_trigger, perform_action};
 use crate::commands::auth::get_auth_token;
 use crate::commands::config::get_language;
 use crate::shortcuts::check_command;
@@ -105,6 +106,8 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             // shortcuts commands
             "linkedin".to_string(),
             "google".to_string(),
+            // action trigger
+            "hey lexi".to_string(),
         ];
 
         // Get cursor context and print app name and selected text
@@ -177,16 +180,38 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
                 // Only inject text if transcription is not empty
                 if !transcription.trim().is_empty() {
-                    // Check if transcription matches a command and replace if found
-                    let text_to_inject =
-                        check_command(&transcription).unwrap_or_else(|| transcription.clone());
+                    // Check if transcription starts with action trigger (e.g., "Hey Lexi")
+                    let (text_to_inject, is_action) =
+                        if let Some(action_command) = check_action_trigger(&transcription) {
+                            // Action trigger detected - perform action and use its result
+                            println!(
+                                "🎯 Action trigger detected: '{}' -> performing action: '{}'",
+                                transcription.trim(),
+                                action_command
+                            );
+                            let result = perform_action(&action_command);
+                            (result, true)
+                        } else {
+                            // No action trigger - check if transcription matches a shortcut command
+                            let result = check_command(&transcription)
+                                .unwrap_or_else(|| transcription.clone());
+                            (result, false)
+                        };
 
                     if text_to_inject != transcription {
-                        println!(
-                            "🔧 Command detected: '{}' -> '{}'",
-                            transcription.trim(),
-                            text_to_inject
-                        );
+                        if is_action {
+                            println!(
+                                "🎯 Action performed: '{}' -> '{}'",
+                                transcription.trim(),
+                                text_to_inject
+                            );
+                        } else {
+                            println!(
+                                "🔧 Command detected: '{}' -> '{}'",
+                                transcription.trim(),
+                                text_to_inject
+                            );
+                        }
                     }
 
                     let injector = TextInjector::new();
