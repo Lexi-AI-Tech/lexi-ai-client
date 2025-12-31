@@ -7,7 +7,7 @@
 //!
 //! - **Cursor Position Detection**: Gets the current mouse cursor coordinates using Core Graphics
 //! - **Element Identification**: Uses Accessibility API to identify the UI element at cursor position
-//! - **Hierarchy Traversal**: Traverses up the accessibility tree to find input fields and application details
+//! - **Application Identification**: Traverses up the accessibility tree to find the application at cursor position
 //! - **Text Extraction**: Extracts selected text using clipboard copy method (Cmd+C/Ctrl+C)
 //! - **Screen Capture**: Captures the entire screen and returns it as a base64-encoded PNG string
 //!
@@ -15,10 +15,7 @@
 //!
 //! - Uses **Core Graphics** (`CGEventGetLocation()`) to get cursor coordinates
 //! - Uses **Accessibility API** (`AXUIElementCopyElementAtPosition()`) to get element at cursor
-//! - Traverses accessibility hierarchy to find:
-//!   - Input fields (AXTextField, AXTextArea, etc.)
-//!   - Parent windows
-//!   - Parent applications
+//! - Traverses accessibility hierarchy to find the application PID
 //! - Extracts selected text by simulating copy command via `keyboard_simulator` module
 //!   (Cmd+C on macOS, Ctrl+C on Windows/Linux) and reading from clipboard
 //! - Uses **Core Graphics** (`CGWindowListCreateImage()`) to capture screen
@@ -129,11 +126,9 @@ extern "C" {
 /// This function:
 /// 1. Gets the current cursor position using `CGEventGetLocation()`
 /// 2. Uses `AXUIElementCopyElementAtPosition()` to get the UI element at that position
-/// 3. Traverses up the accessibility hierarchy to find:
-///    - Input fields (text fields, text areas, etc.)
-///    - Parent windows
-///    - Parent applications
-/// 4. Extracts selected text and application details
+/// 3. Traverses up the accessibility hierarchy to find the application PID
+/// 4. Extracts selected text using clipboard copy method
+/// 5. Gets application name from PID
 ///
 /// Returns a CursorContext with selected text, app name, and PID, or None if retrieval fails.
 /// Requires Accessibility permission on macOS.
@@ -161,11 +156,7 @@ pub fn get_cursor_context() -> Option<CursorContext> {
                 y: screen_height - mouse_location.y,
             };
 
-            // Get the system-wide accessibility element (root)
-            // We need to get the element at the cursor position
-            // First, we'll try to get the element at the position using the system element
-
-            // Create a system-wide element (PID 0 is the system)
+            // Create a system-wide accessibility element
             let system_element = create_system_element();
             if system_element.is_null() {
                 return None;
@@ -185,11 +176,10 @@ pub fn get_cursor_context() -> Option<CursorContext> {
                 return None;
             }
 
-            // Traverse up the hierarchy to find application (we don't need input field anymore)
+            // Traverse up the hierarchy to find application PID
             let app_pid = find_app_pid(element_at_cursor);
 
             // Extract selected text using clipboard copy method
-            // This works across all applications including Chrome
             let selected_text = get_selected_text_via_clipboard();
 
             // Get application name from PID
@@ -226,12 +216,9 @@ unsafe fn create_system_element() -> AXUIElementRef {
 }
 
 /// Traverse up the accessibility hierarchy to find application PID
-/// We only need the app PID now since we use clipboard method for text selection
 #[cfg(target_os = "macos")]
 unsafe fn find_app_pid(element: AXUIElementRef) -> Option<i32> {
-    let mut app_pid: Option<i32> = None;
     let mut current_element = element;
-    let mut visited_elements = Vec::new();
 
     // Traverse up the hierarchy (max 20 levels to avoid infinite loops)
     for _ in 0..20 {
@@ -240,14 +227,11 @@ unsafe fn find_app_pid(element: AXUIElementRef) -> Option<i32> {
         }
 
         // Try to get PID (application level)
-        if app_pid.is_none() {
-            let mut pid: i32 = 0;
-            let ax_error = AXUIElementGetPid(current_element, &mut pid);
-            if ax_error == K_AX_ERROR_SUCCESS && pid != 0 {
-                app_pid = Some(pid);
-                // Found the application, we can stop here
-                break;
-            }
+        let mut pid: i32 = 0;
+        let ax_error = AXUIElementGetPid(current_element, &mut pid);
+        if ax_error == K_AX_ERROR_SUCCESS && pid != 0 {
+            // Found the application PID
+            return Some(pid);
         }
 
         // Get parent element using AXParent attribute
@@ -257,38 +241,24 @@ unsafe fn find_app_pid(element: AXUIElementRef) -> Option<i32> {
             AXUIElementCopyAttributeValue(current_element, parent_attr, &mut parent_value);
         CFRelease(parent_attr);
 
-        let parent = if ax_error == K_AX_ERROR_SUCCESS && !parent_value.is_null() {
-            // parent_value is an AXUIElementRef
-            parent_value as AXUIElementRef
-        } else {
-            std::ptr::null_mut()
-        };
-
-        // Release previous element if we're moving up
-        if current_element != element {
-            if !visited_elements.contains(&current_element) {
-                CFRelease(current_element);
-            }
-        }
-
-        if ax_error != K_AX_ERROR_SUCCESS || parent.is_null() {
+        if ax_error != K_AX_ERROR_SUCCESS || parent_value.is_null() {
             break;
         }
 
-        visited_elements.push(current_element);
-        current_element = parent;
+        // Release current element if it's not the original element
+        if current_element != element {
+            CFRelease(current_element);
+        }
+
+        // Move to parent
+        current_element = parent_value as AXUIElementRef;
     }
 
-    // Cleanup any remaining elements we traversed
-    for elem in visited_elements {
-        CFRelease(elem);
-    }
-
-    app_pid
+    None
 }
 
 /// Get selected text by simulating copy command (Cmd+C on macOS, Ctrl+C elsewhere)
-/// 
+///
 /// This function:
 /// 1. Saves the current clipboard content
 /// 2. Simulates copy command via `keyboard_simulator` module (Cmd+C on macOS, Ctrl+C on Windows/Linux)
@@ -296,10 +266,10 @@ unsafe fn find_app_pid(element: AXUIElementRef) -> Option<i32> {
 /// 4. Retrieves the copied text from clipboard
 /// 5. Restores the original clipboard content
 /// 6. Returns the selected text
-/// 
+///
 /// This approach works across all applications including Chrome, browsers, and text editors.
 /// Keyboard simulation is handled by the `keyboard_simulator` module for cross-platform support.
-/// 
+///
 /// # Returns
 /// * `Some(String)` - The selected text if any was copied
 /// * `None` - If no text was selected or an error occurred
