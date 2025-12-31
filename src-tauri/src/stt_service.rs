@@ -68,6 +68,7 @@ impl SttService {
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
     /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
     /// * `offline_transcription` - Whether to use local Whisper model instead of server API
+    /// * `vocabulary` - Optional vocabulary array to use as initial prompt for offline transcription
     ///
     /// # Returns
     /// * `Ok(String)` - The transcribed text on success
@@ -84,6 +85,7 @@ impl SttService {
         cancel_rx: Option<oneshot::Receiver<()>>,
         app_handle: Option<AppHandle>,
         offline_transcription: bool,
+        vocabulary: Vec<String>,
     ) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
@@ -96,16 +98,25 @@ impl SttService {
             let app = app_handle
                 .ok_or_else(|| "AppHandle required for offline transcription".to_string())?;
 
+            // Prepare vocabulary option
+            let vocabulary_option = if !vocabulary.is_empty() {
+                Some(vocabulary.clone())
+            } else {
+                None
+            };
+
             // Run the synchronous whisper function in a blocking task
             let app_clone = app.clone();
             let audio_data_clone = audio_data.clone();
+            let language_clone = language.clone();
+            let vocabulary_clone = vocabulary_option;
 
             // Check for cancellation before starting
             if let Some(cancel_rx) = cancel_rx {
                 // Use tokio::select to race between transcription and cancellation
                 tokio::select! {
                     result = tokio::task::spawn_blocking(move || {
-                        whisper::transcribe_audio_data(app_clone, audio_data_clone, language)
+                        whisper::transcribe_audio_data(app_clone, audio_data_clone, language_clone, vocabulary_clone)
                     }) => {
                         match result {
                             Ok(Ok(text)) => Ok(text),
@@ -120,8 +131,13 @@ impl SttService {
                 }
             } else {
                 // No cancellation support, just run the blocking task
+                let vocabulary_for_blocking = if !vocabulary.is_empty() {
+                    Some(vocabulary)
+                } else {
+                    None
+                };
                 tokio::task::spawn_blocking(move || {
-                    whisper::transcribe_audio_data(app, audio_data, language)
+                    whisper::transcribe_audio_data(app, audio_data, language, vocabulary_for_blocking)
                 })
                 .await
                 .map_err(|e| format!("Transcription task failed: {}", e))?
