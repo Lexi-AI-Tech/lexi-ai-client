@@ -22,7 +22,6 @@
 
 use std::path::PathBuf;
 use std::process::Command;
-use tauri::AppHandle;
 use uuid::Uuid;
 
 /// Resolves the paths to the bundled whisper binary and model file
@@ -122,13 +121,10 @@ pub fn resolve_whisper_paths() -> Result<(PathBuf, PathBuf), String> {
 /// This helps reduce the first transcription latency by ensuring
 /// the model and binary are accessible before first use.
 ///
-/// # Arguments
-/// * `app` - Tauri AppHandle for resolving bundled resources
-///
 /// # Returns
 /// * `Ok(())` - Paths verified successfully
 /// * `Err(String)` - Error message if paths cannot be resolved
-pub fn preload_model(app: AppHandle) -> Result<(), String> {
+pub fn preload_model() -> Result<(), String> {
     println!("🔍 Preloading Whisper model...");
     let (whisper_bin, model_path) = resolve_whisper_paths()?;
 
@@ -165,7 +161,6 @@ pub fn preload_model(app: AppHandle) -> Result<(), String> {
 /// 5. Cleans up the temporary file
 ///
 /// # Arguments
-/// * `app` - Tauri AppHandle for resolving bundled resources
 /// * `audio_data` - WAV audio data as bytes (must be 16 kHz, mono, 16-bit PCM for best results)
 /// * `language` - Language code to use for transcription (e.g., "en", "es", "fr", "de")
 /// * `vocabulary` - Optional vocabulary array to use as initial prompt for better transcription accuracy
@@ -174,7 +169,6 @@ pub fn preload_model(app: AppHandle) -> Result<(), String> {
 /// * `Ok(String)` - The transcribed text
 /// * `Err(String)` - Error message if transcription fails
 pub fn transcribe_audio_data(
-    app: AppHandle,
     audio_data: Vec<u8>,
     language: String,
     vocabulary: Option<Vec<String>>,
@@ -198,7 +192,7 @@ pub fn transcribe_audio_data(
     println!("📝 Wrote audio to temp file: {:?}", temp_file);
 
     // Ensure cleanup happens even if transcription fails
-    let result = transcribe_audio_file(app, temp_path.to_string(), language, vocabulary);
+    let result = transcribe_audio_file(temp_path.to_string(), language, vocabulary);
 
     // Clean up temporary file
     if let Err(e) = std::fs::remove_file(&temp_file) {
@@ -221,7 +215,6 @@ pub fn transcribe_audio_data(
 /// 3. Parses and returns the transcribed text
 ///
 /// # Arguments
-/// * `app` - Tauri AppHandle for resolving bundled resources
 /// * `audio_path` - Absolute path to the audio file (must be WAV format: 16 kHz, mono, 16-bit PCM)
 /// * `language` - Language code to use for transcription (e.g., "en", "es", "fr", "de")
 /// * `vocabulary` - Optional vocabulary array to use as initial prompt for better transcription accuracy
@@ -230,7 +223,6 @@ pub fn transcribe_audio_data(
 /// * `Ok(String)` - The transcribed text
 /// * `Err(String)` - Error message if transcription fails
 pub fn transcribe_audio_file(
-    app: AppHandle,
     audio_path: String,
     language: String,
     vocabulary: Option<Vec<String>>,

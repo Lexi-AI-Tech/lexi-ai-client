@@ -94,10 +94,6 @@ impl SttService {
         if offline_transcription {
             println!("📦 Using offline transcription (local Whisper model)");
 
-            // Get app handle for whisper function
-            let app = app_handle
-                .ok_or_else(|| "AppHandle required for offline transcription".to_string())?;
-
             // Prepare vocabulary option
             let vocabulary_option = if !vocabulary.is_empty() {
                 Some(vocabulary.clone())
@@ -106,7 +102,6 @@ impl SttService {
             };
 
             // Run the synchronous whisper function in a blocking task
-            let app_clone = app.clone();
             let audio_data_clone = audio_data.clone();
             let language_clone = language.clone();
             let vocabulary_clone = vocabulary_option;
@@ -116,7 +111,7 @@ impl SttService {
                 // Use tokio::select to race between transcription and cancellation
                 tokio::select! {
                     result = tokio::task::spawn_blocking(move || {
-                        whisper::transcribe_audio_data(app_clone, audio_data_clone, language_clone, vocabulary_clone)
+                        whisper::transcribe_audio_data(audio_data_clone, language_clone, vocabulary_clone)
                     }) => {
                         match result {
                             Ok(Ok(text)) => Ok(text),
@@ -137,12 +132,7 @@ impl SttService {
                     None
                 };
                 tokio::task::spawn_blocking(move || {
-                    whisper::transcribe_audio_data(
-                        app,
-                        audio_data,
-                        language,
-                        vocabulary_for_blocking,
-                    )
+                    whisper::transcribe_audio_data(audio_data, language, vocabulary_for_blocking)
                 })
                 .await
                 .map_err(|e| format!("Transcription task failed: {}", e))?
