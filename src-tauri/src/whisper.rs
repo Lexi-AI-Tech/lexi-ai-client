@@ -268,6 +268,8 @@ pub fn transcribe_audio_file(
         "1".to_string(),
         "--best-of".to_string(), // Number of candidates to sample from (1 = deterministic, faster but potentially less accurate)
         "1".to_string(),
+        "--temperature".to_string(), // Sampling temperature (0 = deterministic, no randomness)
+        "0".to_string(),
     ];
 
     // Add prompt if vocabulary is provided
