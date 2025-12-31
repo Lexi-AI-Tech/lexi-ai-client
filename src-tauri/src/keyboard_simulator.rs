@@ -169,4 +169,3 @@ fn paste_with_enigo() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     Ok(())
 }
-

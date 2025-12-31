@@ -287,7 +287,7 @@ unsafe fn find_app_pid(element: AXUIElementRef) -> Option<i32> {
 }
 
 /// Get selected text by simulating copy command (Cmd+C on macOS, Ctrl+C elsewhere)
-/// 
+///
 /// This function:
 /// 1. Saves the current clipboard content
 /// 2. Simulates Cmd+C (macOS) or Ctrl+C (Windows/Linux) to copy selected text
@@ -295,9 +295,9 @@ unsafe fn find_app_pid(element: AXUIElementRef) -> Option<i32> {
 /// 4. Retrieves the copied text from clipboard
 /// 5. Restores the original clipboard content
 /// 6. Returns the selected text
-/// 
+///
 /// This approach works across all applications including Chrome, browsers, and text editors.
-/// 
+///
 /// # Returns
 /// * `Some(String)` - The selected text if any was copied
 /// * `None` - If no text was selected or an error occurred
@@ -389,7 +389,6 @@ fn get_app_name_from_pid(pid: i32) -> Option<String> {
         })
     }
 }
-
 
 // ============================================================================
 // Helper Functions for CoreFoundation/NSString Conversion
