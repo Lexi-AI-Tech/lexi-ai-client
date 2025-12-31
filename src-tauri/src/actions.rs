@@ -18,7 +18,7 @@ use crate::cursor_context::CursorContext;
 use crate::state::AuthTokenState;
 use reqwest::multipart;
 use std::error::Error;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Hardcoded action trigger phrase (case-insensitive)
 const ACTION_TRIGGER: &str = "hey lexi";
@@ -198,6 +198,11 @@ pub async fn perform_action(
 ) -> String {
     println!("🎯 Performing action: '{}'", action_command);
 
+    // Notify frontend that action processing has started
+    app_handle
+        .emit("processing_start", ())
+        .unwrap_or_default();
+
     // Get app name from cursor context
     let app_name = cursor_context
         .and_then(|ctx| ctx.app_name.clone())
@@ -229,11 +234,15 @@ pub async fn perform_action(
 
     if auth_token.is_none() {
         eprintln!("⚠️  Warning: No authentication token available. Action will fail.");
+        // Notify frontend that action processing has completed (with error)
+        app_handle
+            .emit("action_error", "Authentication required. Please log in.")
+            .unwrap_or_default();
         return "Action failed: Authentication required. Please log in.".to_string();
     }
 
     // Send action request to server
-    match send_action_request(
+    let result = match send_action_request(
         action_command,
         &app_name,
         selected_text,
@@ -244,13 +253,24 @@ pub async fn perform_action(
     {
         Ok(result) => {
             println!("✅ Action completed successfully");
+            // Notify frontend that action processing has completed successfully
+            app_handle
+                .emit("action_success", &result)
+                .unwrap_or_default();
             result
         }
         Err(e) => {
+            let error_msg = format!("Action failed: {}", e);
             eprintln!("❌ Action failed: {}", e);
-            format!("Action failed: {}", e)
+            // Notify frontend that action processing has completed (with error)
+            app_handle
+                .emit("action_error", error_msg.as_str())
+                .unwrap_or_default();
+            error_msg
         }
-    }
+    };
+
+    result
 }
 
 /// Sends an action request to the Lexi AI Server
