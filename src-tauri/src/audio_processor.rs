@@ -189,7 +189,12 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                                 transcription.trim(),
                                 action_command
                             );
-                            let result = perform_action(&action_command);
+                            let result = perform_action(
+                                &action_command,
+                                &app_handle_for_task,
+                                cursor_context.as_ref(),
+                            )
+                            .await;
                             (result, true)
                         } else {
                             // No action trigger - check if transcription matches a shortcut command

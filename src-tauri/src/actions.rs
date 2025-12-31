@@ -12,6 +12,14 @@
 //! - **Text Injection**: The result from `perform_action` is injected instead of the
 //!   original transcription
 
+use crate::commands::auth::get_auth_token;
+use crate::config;
+use crate::cursor_context::CursorContext;
+use crate::state::AuthTokenState;
+use reqwest::multipart;
+use std::error::Error;
+use tauri::{AppHandle, Manager};
+
 /// Hardcoded action trigger phrase (case-insensitive)
 const ACTION_TRIGGER: &str = "hey lexi";
 
@@ -31,7 +39,7 @@ const ACTION_TRIGGER: &str = "hey lexi";
 fn normalize_text(text: &str) -> String {
     let mut normalized = String::new();
     let mut prev_was_alphanumeric = false;
-    
+
     for ch in text.chars() {
         if ch.is_alphanumeric() {
             normalized.push(ch.to_lowercase().next().unwrap_or(ch));
@@ -43,7 +51,7 @@ fn normalize_text(text: &str) -> String {
         }
         // Skip punctuation and whitespace (except we add space when needed)
     }
-    
+
     normalized.trim().to_string()
 }
 
@@ -61,26 +69,26 @@ fn normalize_text(text: &str) -> String {
 fn find_lexi_end_position(text: &str) -> Option<usize> {
     let lowercased = text.to_lowercase();
     let lexi_chars: Vec<char> = "lexi".chars().collect();
-    
+
     // Collect all alphanumeric characters with their original positions
     let alphanumeric_positions: Vec<(usize, char)> = lowercased
         .char_indices()
         .filter(|(_, ch)| ch.is_alphanumeric())
         .collect();
-    
+
     // Search for "lexi" in the alphanumeric sequence
     for window in alphanumeric_positions.windows(lexi_chars.len()) {
         let matches = window
             .iter()
             .zip(lexi_chars.iter())
             .all(|((_, ch), &expected)| *ch == expected);
-        
+
         if matches {
             // Found "lexi", get the position after the last character
             let last_char_pos = window.last().unwrap().0;
             let last_char = window.last().unwrap().1;
             let mut end_pos = last_char_pos + last_char.len_utf8();
-            
+
             // Skip any punctuation/whitespace after "lexi" in the original text
             let remaining = &text[end_pos..];
             for (offset, ch) in remaining.char_indices() {
@@ -89,11 +97,11 @@ fn find_lexi_end_position(text: &str) -> Option<usize> {
                     break;
                 }
             }
-            
+
             return Some(end_pos);
         }
     }
-    
+
     None
 }
 
@@ -127,10 +135,10 @@ fn find_lexi_end_position(text: &str) -> Option<usize> {
 /// ```
 pub fn check_action_trigger(transcription: &str) -> Option<String> {
     let trimmed = transcription.trim();
-    
+
     // Normalize the text to handle STT errors (punctuation, spacing, etc.)
     let normalized = normalize_text(trimmed);
-    
+
     // Check if normalized text starts with the trigger
     if normalized.starts_with(ACTION_TRIGGER) {
         // Find where "lexi" ends in the original text to extract the command properly
@@ -150,7 +158,7 @@ pub fn check_action_trigger(transcription: &str) -> Option<String> {
                         target_count += 1;
                     }
                 }
-                
+
                 for (pos, ch) in trimmed.char_indices() {
                     if ch.is_alphanumeric() {
                         alnum_count += 1;
@@ -169,23 +177,144 @@ pub fn check_action_trigger(transcription: &str) -> Option<String> {
 
 /// Performs an action based on the action command and returns the result text.
 ///
-/// This function processes the action command and returns text that should be
-/// injected instead of the original transcription.
+/// This function:
+/// 1. Gets the current app name from the provided cursor context
+/// 2. Captures a fresh screenshot of the current screen
+/// 3. Sends the action command, app name, and screenshot to the server
+/// 4. Returns the result text to inject
 ///
 /// # Arguments
 /// * `action_command` - The action command extracted from the transcription
 ///                      (e.g., "summarise this text", "do something")
+/// * `app_handle` - Tauri AppHandle for accessing state and making API calls
+/// * `cursor_context` - Optional cursor context (contains app name and selected text)
 ///
 /// # Returns
-/// * `String` - The text result to inject (currently hardcoded to "action performed successfully")
-///
-/// # TODO
-/// - Implement actual action processing based on the command
-/// - Support different action types (summarise, translate, etc.)
-/// - Use selected text from cursor context when available
-pub fn perform_action(action_command: &str) -> String {
-    // TODO: Implement actual action processing
-    // For now, just return a success message
+/// * `String` - The text result to inject from the server, or a fallback message on error
+pub async fn perform_action(
+    action_command: &str,
+    app_handle: &AppHandle,
+    cursor_context: Option<&CursorContext>,
+) -> String {
     println!("🎯 Performing action: '{}'", action_command);
-    "action performed successfully".to_string()
+
+    // Get app name from cursor context
+    let app_name = cursor_context
+        .and_then(|ctx| ctx.app_name.clone())
+        .unwrap_or_else(|| "Unknown".to_string());
+    println!("📱 Current app: {}", app_name);
+
+    // Get selected text from cursor context
+    let selected_text = cursor_context.and_then(|ctx| ctx.selected_text.clone());
+    if let Some(ref text) = selected_text {
+        println!("📝 Selected text: {}", text);
+    } else {
+        println!("📝 No text selected");
+    }
+
+    // Capture screenshot for action
+    let base64_image = crate::cursor_context::capture_current_screen();
+    if let Some(ref image) = base64_image {
+        println!("📸 Screen captured for action (length: {})", image.len());
+    } else {
+        println!("⚠️  Failed to capture screen for action");
+    }
+
+    // Get authentication token from state
+    let auth_token = if let Some(state) = app_handle.try_state::<AuthTokenState>() {
+        get_auth_token(&state)
+    } else {
+        None
+    };
+
+    if auth_token.is_none() {
+        eprintln!("⚠️  Warning: No authentication token available. Action will fail.");
+        return "Action failed: Authentication required. Please log in.".to_string();
+    }
+
+    // Send action request to server
+    match send_action_request(
+        action_command,
+        &app_name,
+        selected_text,
+        base64_image,
+        auth_token,
+    )
+    .await
+    {
+        Ok(result) => {
+            println!("✅ Action completed successfully");
+            result
+        }
+        Err(e) => {
+            eprintln!("❌ Action failed: {}", e);
+            format!("Action failed: {}", e)
+        }
+    }
+}
+
+/// Sends an action request to the Lexi AI Server
+///
+/// # Arguments
+/// * `action_command` - The action command to execute
+/// * `app_name` - Name of the currently focused application
+/// * `selected_text` - Optional selected text that the action can operate on
+/// * `base64_image` - Optional base64-encoded PNG screenshot
+/// * `auth_token` - Authentication token for the request
+///
+/// # Returns
+/// * `Ok(String)` - The result text from the server
+/// * `Err(Box<dyn Error>)` - An error if the API call fails
+async fn send_action_request(
+    action_command: &str,
+    app_name: &str,
+    selected_text: Option<String>,
+    base64_image: Option<String>,
+    auth_token: Option<String>,
+) -> Result<String, Box<dyn Error>> {
+    let client = reqwest::Client::new();
+    let api_base_url = config::api_base_url();
+
+    // Build multipart form
+    let mut form = multipart::Form::new()
+        .text("action_command", action_command.to_string())
+        .text("app_name", app_name.to_string());
+
+    // Add selected text if provided
+    if let Some(text) = selected_text {
+        form = form.text("selected_text", text);
+    }
+
+    // Add base64 image if provided
+    if let Some(image) = base64_image {
+        let image_part = multipart::Part::text(image).mime_str("text/plain")?;
+        form = form.part("base64_image", image_part);
+    }
+
+    // Build the request
+    let url = format!("{}/api/actions/perform", api_base_url);
+    let mut request = client.post(&url).multipart(form);
+
+    // Add authorization header if token is provided
+    if let Some(token) = &auth_token {
+        request = request.header("Authorization", format!("Bearer {}", token));
+    } else {
+        return Err("Authentication required".into());
+    }
+
+    // Send the request
+    let res = request.send().await?;
+    let status = res.status();
+
+    if !status.is_success() {
+        let error_text = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Server error ({}): {}", status, error_text).into());
+    }
+
+    // Read response as text
+    let result_text = res.text().await?;
+    Ok(result_text)
 }
