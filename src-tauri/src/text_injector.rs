@@ -8,7 +8,7 @@
 //!
 //! The injection method uses a two-step process:
 //! 1. **Clipboard**: Copy the text to the system clipboard using `arboard`
-//! 2. **Paste Keystroke**: Simulate the paste keyboard shortcut
+//! 2. **Paste Keystroke**: Simulate the paste keyboard shortcut via `keyboard_simulator` module
 //!    - macOS: Cmd+V (via AppleScript)
 //!    - Windows/Linux: Ctrl+V (via `enigo`)
 //!
@@ -20,12 +20,13 @@
 //! ## Dependencies
 //!
 //! - **arboard**: Cross-platform clipboard management (macOS, Windows, Linux/X11)
-//! - **AppleScript** (macOS): Keyboard event simulation via `osascript`
-//! - **enigo** (Windows/Linux): Cross-platform keyboard event simulation
+//! - **keyboard_simulator**: Common module for cross-platform keyboard simulation
+//!   - Uses AppleScript (macOS) for keyboard event simulation
+//!   - Uses enigo (Windows/Linux) for cross-platform keyboard event simulation
 //!
 //! ## Permissions Required
 //!
-//! - **Accessibility** (macOS): Required for AppleScript keyboard simulation
+//! - **Accessibility** (macOS): Required for keyboard simulation via AppleScript
 
 use arboard::Clipboard;
 use std::error::Error;
@@ -36,14 +37,15 @@ use std::time::Duration;
 ///
 /// This implementation uses:
 /// 1. `arboard` to set the system clipboard (cross-platform: macOS, Windows, Linux/X11)
-/// 2. AppleScript on macOS to simulate the paste keystroke (Cmd+V)
-/// 3. `enigo` on Windows/Linux to simulate the paste keystroke (Ctrl+V)
+/// 2. `keyboard_simulator` module to simulate the paste keystroke
+///    - macOS: Cmd+V (via AppleScript)
+///    - Windows/Linux: Ctrl+V (via enigo)
 ///
 /// This approach works across all applications and inserts text at the
 /// current cursor position, making it ideal for voice-to-text workflows.
 ///
 /// # Permissions
-/// - **macOS**: Requires **Accessibility** access for AppleScript keyboard simulation
+/// - **macOS**: Requires **Accessibility** access for keyboard simulation
 /// - **Windows**: Usually works without extra permissions
 /// - **Linux**: Needs X11 (enigo's Wayland support is experimental)
 pub struct TextInjector;
@@ -86,8 +88,8 @@ impl TextInjector {
         // Small delay to ensure clipboard is ready
         thread::sleep(Duration::from_millis(50));
 
-        // Step 2: Simulate paste keystroke
-        // AppleScript on macOS, enigo on Windows/Linux
+        // Step 2: Simulate paste keystroke via keyboard_simulator module
+        // Handles platform-specific implementation (AppleScript on macOS, enigo on Windows/Linux)
         crate::keyboard_simulator::simulate_paste()?;
 
         // Brief delay to ensure paste processes (some apps need a moment)

@@ -19,7 +19,8 @@
 //!   - Input fields (AXTextField, AXTextArea, etc.)
 //!   - Parent windows
 //!   - Parent applications
-//! - Extracts selected text by simulating Cmd+C (macOS) or Ctrl+C (Windows/Linux) and reading from clipboard
+//! - Extracts selected text by simulating copy command via `keyboard_simulator` module
+//!   (Cmd+C on macOS, Ctrl+C on Windows/Linux) and reading from clipboard
 //! - Uses **Core Graphics** (`CGWindowListCreateImage()`) to capture screen
 //! - Encodes screenshots as base64-encoded PNG strings
 //!
@@ -287,17 +288,18 @@ unsafe fn find_app_pid(element: AXUIElementRef) -> Option<i32> {
 }
 
 /// Get selected text by simulating copy command (Cmd+C on macOS, Ctrl+C elsewhere)
-///
+/// 
 /// This function:
 /// 1. Saves the current clipboard content
-/// 2. Simulates Cmd+C (macOS) or Ctrl+C (Windows/Linux) to copy selected text
+/// 2. Simulates copy command via `keyboard_simulator` module (Cmd+C on macOS, Ctrl+C on Windows/Linux)
 /// 3. Waits briefly for the copy operation to complete
 /// 4. Retrieves the copied text from clipboard
 /// 5. Restores the original clipboard content
 /// 6. Returns the selected text
-///
+/// 
 /// This approach works across all applications including Chrome, browsers, and text editors.
-///
+/// Keyboard simulation is handled by the `keyboard_simulator` module for cross-platform support.
+/// 
 /// # Returns
 /// * `Some(String)` - The selected text if any was copied
 /// * `None` - If no text was selected or an error occurred
@@ -319,7 +321,8 @@ pub fn get_selected_text_via_clipboard() -> Option<String> {
         return None;
     }
 
-    // Step 3: Simulate copy command (Cmd+C on macOS, Ctrl+C elsewhere)
+    // Step 3: Simulate copy command via keyboard_simulator module
+    // Handles platform-specific implementation (Cmd+C on macOS, Ctrl+C on Windows/Linux)
     let copy_result = crate::keyboard_simulator::simulate_copy();
 
     if let Err(e) = copy_result {

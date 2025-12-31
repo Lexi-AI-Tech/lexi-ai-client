@@ -15,7 +15,7 @@
 //! 3. **Speech-to-Text Transcription**: Sends audio to Lexi AI Server API endpoint
 //!    (server handles Groq's Whisper API integration internally)
 //! 4. **Text Injection**: Injects transcribed text into the currently active application
-//!    using clipboard + paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere)
+//!    using clipboard + paste keystroke via keyboard_simulator module (Cmd+V on macOS, Ctrl+V elsewhere)
 //! 5. **Pill Overlay Window**: Manages a small transparent overlay window that displays
 //!    recording status and floats above all windows
 //! 6. **Google OAuth Authentication**: Handles user authentication via Google OAuth 2.0
