@@ -12,8 +12,36 @@ use crate::commands::config::get_language;
 use crate::state::{AuthTokenState, LanguageState, TranscriptionTaskState};
 use crate::stt_service::SttService;
 use crate::text_injector::TextInjector;
+use std::collections::HashMap;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
+
+/// Returns a HashMap of voice commands and their corresponding replacement values.
+///
+/// This uses a HashMap for O(1) lookup performance when checking if a transcription
+/// matches a command. Commands are case-insensitive.
+fn get_commands() -> HashMap<String, String> {
+    let mut commands = HashMap::new();
+    // TODO: Remove these hardcoded commands and get them from app config state
+    commands.insert(
+        "linkedin".to_string(),
+        "https://www.linkedin.com/in/ranjeet-baraik-b803231a0/".to_string(),
+    );
+    commands.insert("google".to_string(), "www.google.com".to_string());
+    commands
+}
+
+/// Checks if the transcription matches any command and returns the replacement value.
+///
+/// Returns Some(replacement) if a command match is found, None otherwise.
+/// Matching is case-insensitive and trims whitespace.
+fn check_command(transcription: &str) -> Option<String> {
+    let commands = get_commands();
+    let trimmed = transcription.trim();
+    let lowercased = trimmed.to_lowercase();
+
+    commands.get(&lowercased).cloned()
+}
 
 /// Processes recorded audio data by transcribing it and injecting the result.
 ///
@@ -93,6 +121,16 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         let transcribe_with_cursor_context = false;
         let offline_transcription = true;
 
+        // Hardcoded vocabulary array for offline transcription
+        // TODO: Get vocabulary from app config state
+        // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript.
+        // Do more experiment on how we can use this trick to manipulate the model behavior.
+        let vocabulary = vec![
+            "Lexi".to_string(),
+            "anadi".to_string(),
+            "Ranjeet Baraik".to_string(),
+        ];
+
         // Get cursor context to extract focused app name
         let cursor_context = crate::cursor_context::get_cursor_context();
         let focused_app = cursor_context
@@ -119,7 +157,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
         let stt_service = SttService::new();
-        
+
         let transcription_start = Instant::now();
         let transcription_result = stt_service
             .transcribe_audio(
@@ -133,6 +171,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 Some(cancel_rx),
                 Some(app_handle_for_task.clone()),
                 offline_transcription,
+                vocabulary,
             )
             .await;
         let transcription_duration = transcription_start.elapsed();
@@ -154,8 +193,20 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
                 // Only inject text if transcription is not empty
                 if !transcription.trim().is_empty() {
+                    // Check if transcription matches a command and replace if found
+                    let text_to_inject =
+                        check_command(&transcription).unwrap_or_else(|| transcription.clone());
+
+                    if text_to_inject != transcription {
+                        println!(
+                            "🔧 Command detected: '{}' -> '{}'",
+                            transcription.trim(),
+                            text_to_inject
+                        );
+                    }
+
                     let injector = TextInjector::new();
-                    match injector.inject_text(&transcription) {
+                    match injector.inject_text(&text_to_inject) {
                         Ok(_) => {
                             // Successfully injected text into active application
                             app_handle_for_task

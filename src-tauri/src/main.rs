@@ -185,9 +185,8 @@ pub fn main() {
             let app_handle = app.handle();
 
             // Preload Whisper model in background to reduce first transcription latency
-            let app_handle_for_preload = app_handle.clone();
             std::thread::spawn(move || {
-                if let Err(e) = preload_model(app_handle_for_preload) {
+                if let Err(e) = preload_model() {
                     eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
                     eprintln!("💡 First transcription may be slower");
                 }

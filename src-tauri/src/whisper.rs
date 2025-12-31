@@ -22,7 +22,7 @@
 
 use std::path::PathBuf;
 use std::process::Command;
-use tauri::AppHandle;
+use uuid::Uuid;
 
 /// Resolves the paths to the bundled whisper binary and model file
 ///
@@ -34,7 +34,7 @@ use tauri::AppHandle;
 /// # Returns
 /// * `Ok((PathBuf, PathBuf))` - Tuple of (whisper_bin_path, model_path)
 /// * `Err(String)` - Error message if paths cannot be resolved
-fn resolve_whisper_paths() -> Result<(PathBuf, PathBuf), String> {
+pub fn resolve_whisper_paths() -> Result<(PathBuf, PathBuf), String> {
     let mut search_dirs = Vec::new();
 
     // Note: We avoid using std::env::current_dir() in production to prevent
@@ -121,13 +121,10 @@ fn resolve_whisper_paths() -> Result<(PathBuf, PathBuf), String> {
 /// This helps reduce the first transcription latency by ensuring
 /// the model and binary are accessible before first use.
 ///
-/// # Arguments
-/// * `app` - Tauri AppHandle for resolving bundled resources
-///
 /// # Returns
 /// * `Ok(())` - Paths verified successfully
 /// * `Err(String)` - Error message if paths cannot be resolved
-pub fn preload_model(app: AppHandle) -> Result<(), String> {
+pub fn preload_model() -> Result<(), String> {
     println!("🔍 Preloading Whisper model...");
     let (whisper_bin, model_path) = resolve_whisper_paths()?;
 
@@ -164,17 +161,17 @@ pub fn preload_model(app: AppHandle) -> Result<(), String> {
 /// 5. Cleans up the temporary file
 ///
 /// # Arguments
-/// * `app` - Tauri AppHandle for resolving bundled resources
 /// * `audio_data` - WAV audio data as bytes (must be 16 kHz, mono, 16-bit PCM for best results)
 /// * `language` - Language code to use for transcription (e.g., "en", "es", "fr", "de")
+/// * `vocabulary` - Optional vocabulary array to use as initial prompt for better transcription accuracy
 ///
 /// # Returns
 /// * `Ok(String)` - The transcribed text
 /// * `Err(String)` - Error message if transcription fails
 pub fn transcribe_audio_data(
-    app: AppHandle,
     audio_data: Vec<u8>,
     language: String,
+    vocabulary: Option<Vec<String>>,
 ) -> Result<String, String> {
     println!(
         "🎤 Starting local transcription (audio size: {} bytes)",
@@ -183,7 +180,7 @@ pub fn transcribe_audio_data(
 
     // Create a temporary file for the audio data
     let temp_dir = std::env::temp_dir();
-    let temp_file = temp_dir.join(format!("lexi_audio_{}.wav", uuid::Uuid::new_v4()));
+    let temp_file = temp_dir.join(format!("lexi_audio_{}.wav", Uuid::new_v4()));
     let temp_path = temp_file
         .to_str()
         .ok_or_else(|| "Failed to create temp file path".to_string())?;
@@ -195,7 +192,7 @@ pub fn transcribe_audio_data(
     println!("📝 Wrote audio to temp file: {:?}", temp_file);
 
     // Ensure cleanup happens even if transcription fails
-    let result = transcribe_audio_file(app, temp_path.to_string(), language);
+    let result = transcribe_audio_file(temp_path.to_string(), language, vocabulary);
 
     // Clean up temporary file
     if let Err(e) = std::fs::remove_file(&temp_file) {
@@ -218,17 +215,17 @@ pub fn transcribe_audio_data(
 /// 3. Parses and returns the transcribed text
 ///
 /// # Arguments
-/// * `app` - Tauri AppHandle for resolving bundled resources
 /// * `audio_path` - Absolute path to the audio file (must be WAV format: 16 kHz, mono, 16-bit PCM)
 /// * `language` - Language code to use for transcription (e.g., "en", "es", "fr", "de")
+/// * `vocabulary` - Optional vocabulary array to use as initial prompt for better transcription accuracy
 ///
 /// # Returns
 /// * `Ok(String)` - The transcribed text
 /// * `Err(String)` - Error message if transcription fails
 pub fn transcribe_audio_file(
-    app: AppHandle,
     audio_path: String,
     language: String,
+    vocabulary: Option<Vec<String>>,
 ) -> Result<String, String> {
     println!("🎤 Starting local transcription for: {}", audio_path);
 
@@ -245,25 +242,41 @@ pub fn transcribe_audio_file(
         return Err(format!("Audio file not found: {}", audio_path));
     }
 
+    // Build command arguments
+    let mut args = vec![
+        "-m".to_string(), // Model file path - specifies which Whisper model to use for transcription
+        model_path
+            .to_str()
+            .ok_or_else(|| "Model path contains invalid UTF-8".to_string())?
+            .to_string(),
+        "-f".to_string(), // Audio file path - the input audio file to transcribe
+        audio_path,
+        "--no-timestamps".to_string(), // Don't include timestamps in the output (plain text only)
+        "--language".to_string(), // Language code - specifies the language of the audio (e.g., "en", "es", "fr")
+        language,
+        "--threads".to_string(), // Number of CPU threads to use for processing (4 threads for parallel computation)
+        "4".to_string(),
+        "--beam-size".to_string(), // Beam search size - number of candidates to keep at each step (1 = greedy search, faster)
+        "1".to_string(),
+        "--best-of".to_string(), // Number of candidates to sample from (1 = deterministic, faster but potentially less accurate)
+        "1".to_string(),
+        "--temperature".to_string(), // Sampling temperature (0 = deterministic, no randomness)
+        "0".to_string(),
+    ];
+
+    // Add prompt if vocabulary is provided
+    if let Some(vocab) = vocabulary {
+        if !vocab.is_empty() {
+            let prompt = vocab.join(", ");
+            args.push("--prompt".to_string());
+            args.push(prompt);
+            println!("📝 Using prompt for vocabulary");
+        }
+    }
+
     // Execute whisper.cpp
     let output = Command::new(&whisper_bin)
-        .args([
-            "-m", // Model file path - specifies which Whisper model to use for transcription
-            model_path
-                .to_str()
-                .ok_or_else(|| "Model path contains invalid UTF-8".to_string())?,
-            "-f", // Audio file path - the input audio file to transcribe
-            &audio_path,
-            "--no-timestamps", // Don't include timestamps in the output (plain text only)
-            "--language", // Language code - specifies the language of the audio (e.g., "en", "es", "fr")
-            &language,
-            "--threads", // Number of CPU threads to use for processing (4 threads for parallel computation)
-            "4",
-            "--beam-size", // Beam search size - number of candidates to keep at each step (1 = greedy search, faster)
-            "1",
-            "--best-of", // Number of candidates to sample from (1 = deterministic, faster but potentially less accurate)
-            "1",
-        ])
+        .args(&args)
         .output()
         .map_err(|e| format!("Failed to execute whisper binary: {}", e))?;
 
