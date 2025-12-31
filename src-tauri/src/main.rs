@@ -55,6 +55,7 @@ mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key f
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
+mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke

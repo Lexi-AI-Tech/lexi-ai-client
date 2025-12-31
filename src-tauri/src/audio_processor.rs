@@ -9,39 +9,12 @@
 
 use crate::commands::auth::get_auth_token;
 use crate::commands::config::get_language;
+use crate::shortcuts::check_command;
 use crate::state::{AuthTokenState, LanguageState, TranscriptionTaskState};
 use crate::stt_service::SttService;
 use crate::text_injector::TextInjector;
-use std::collections::HashMap;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
-
-/// Returns a HashMap of voice commands and their corresponding replacement values.
-///
-/// This uses a HashMap for O(1) lookup performance when checking if a transcription
-/// matches a command. Commands are case-insensitive.
-fn get_commands() -> HashMap<String, String> {
-    let mut commands = HashMap::new();
-    // TODO: Remove these hardcoded commands and get them from app config state
-    commands.insert(
-        "linkedin".to_string(),
-        "https://www.linkedin.com/in/ranjeet-baraik-b803231a0/".to_string(),
-    );
-    commands.insert("google".to_string(), "www.google.com".to_string());
-    commands
-}
-
-/// Checks if the transcription matches any command and returns the replacement value.
-///
-/// Returns Some(replacement) if a command match is found, None otherwise.
-/// Matching is case-insensitive and trims whitespace.
-fn check_command(transcription: &str) -> Option<String> {
-    let commands = get_commands();
-    let trimmed = transcription.trim();
-    let lowercased = trimmed.to_lowercase();
-
-    commands.get(&lowercased).cloned()
-}
 
 /// Processes recorded audio data by transcribing it and injecting the result.
 ///
@@ -129,6 +102,9 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             "Lexi".to_string(),
             "anadi".to_string(),
             "Ranjeet Baraik".to_string(),
+            // shortcuts commands
+            "linkedin".to_string(),
+            "google".to_string(),
         ];
 
         // Get cursor context to extract focused app name
