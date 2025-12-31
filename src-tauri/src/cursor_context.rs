@@ -8,7 +8,7 @@
 //! - **Cursor Position Detection**: Gets the current mouse cursor coordinates using Core Graphics
 //! - **Element Identification**: Uses Accessibility API to identify the UI element at cursor position
 //! - **Hierarchy Traversal**: Traverses up the accessibility tree to find input fields and application details
-//! - **Text Extraction**: Extracts selected text and text content from input fields
+//! - **Text Extraction**: Extracts selected text using clipboard copy method (Cmd+C/Ctrl+C)
 //! - **Screen Capture**: Captures the entire screen and returns it as a base64-encoded PNG string
 //!
 //! ## Implementation Details
@@ -19,7 +19,7 @@
 //!   - Input fields (AXTextField, AXTextArea, etc.)
 //!   - Parent windows
 //!   - Parent applications
-//! - Extracts text via `AXSelectedText` and `AXValue` attributes
+//! - Extracts selected text by simulating Cmd+C (macOS) or Ctrl+C (Windows/Linux) and reading from clipboard
 //! - Uses **Core Graphics** (`CGWindowListCreateImage()`) to capture screen
 //! - Encodes screenshots as base64-encoded PNG strings
 //!
@@ -43,6 +43,15 @@
 use objc::{msg_send, sel, sel_impl};
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
+
+use arboard::Clipboard;
+use std::error::Error;
+use std::process::Command;
+use std::thread;
+use std::time::Duration;
+
+#[cfg(not(target_os = "macos"))]
+use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
 // ============================================================================
 // Public Types
@@ -180,15 +189,12 @@ pub fn get_cursor_context() -> Option<CursorContext> {
                 return None;
             }
 
-            // Traverse up the hierarchy to find input field and application
-            let (input_element, app_pid) = find_input_field_and_app(element_at_cursor);
+            // Traverse up the hierarchy to find application (we don't need input field anymore)
+            let app_pid = find_app_pid(element_at_cursor);
 
-            // Extract text from the input element
-            let selected_text = if !input_element.is_null() {
-                extract_text_from_element(input_element)
-            } else {
-                None
-            };
+            // Extract selected text using clipboard copy method
+            // This works across all applications including Chrome
+            let selected_text = get_selected_text_via_clipboard();
 
             // Get application name from PID
             let app_name = if let Some(pid) = app_pid {
@@ -199,9 +205,6 @@ pub fn get_cursor_context() -> Option<CursorContext> {
 
             // Cleanup
             CFRelease(element_at_cursor);
-            if !input_element.is_null() && input_element != element_at_cursor {
-                CFRelease(input_element);
-            }
             CFRelease(system_element);
 
             Some(CursorContext {
@@ -226,10 +229,10 @@ unsafe fn create_system_element() -> AXUIElementRef {
     AXUIElementCreateSystemWide()
 }
 
-/// Traverse up the accessibility hierarchy to find input field and application
+/// Traverse up the accessibility hierarchy to find application PID
+/// We only need the app PID now since we use clipboard method for text selection
 #[cfg(target_os = "macos")]
-unsafe fn find_input_field_and_app(element: AXUIElementRef) -> (AXUIElementRef, Option<i32>) {
-    let mut input_element: AXUIElementRef = std::ptr::null_mut();
+unsafe fn find_app_pid(element: AXUIElementRef) -> Option<i32> {
     let mut app_pid: Option<i32> = None;
     let mut current_element = element;
     let mut visited_elements = Vec::new();
@@ -238,17 +241,6 @@ unsafe fn find_input_field_and_app(element: AXUIElementRef) -> (AXUIElementRef, 
     for _ in 0..20 {
         if current_element.is_null() {
             break;
-        }
-
-        // Check if this is an input field
-        if input_element.is_null() {
-            let role = get_element_attribute(current_element, "AXRole");
-            if let Some(role) = role {
-                if is_input_field_role(&role) {
-                    input_element = current_element;
-                    // Don't release this element yet, we'll use it
-                }
-            }
         }
 
         // Try to get PID (application level)
@@ -276,8 +268,8 @@ unsafe fn find_input_field_and_app(element: AXUIElementRef) -> (AXUIElementRef, 
             std::ptr::null_mut()
         };
 
-        // Release previous element if we're moving up (except if it's the input_element)
-        if current_element != element && current_element != input_element {
+        // Release previous element if we're moving up
+        if current_element != element {
             if !visited_elements.contains(&current_element) {
                 CFRelease(current_element);
             }
@@ -291,80 +283,131 @@ unsafe fn find_input_field_and_app(element: AXUIElementRef) -> (AXUIElementRef, 
         current_element = parent;
     }
 
-    // Cleanup any remaining elements we traversed (except input_element)
+    // Cleanup any remaining elements we traversed
     for elem in visited_elements {
-        if elem != input_element {
-            CFRelease(elem);
-        }
+        CFRelease(elem);
     }
 
-    (input_element, app_pid)
+    app_pid
 }
 
-/// Check if a role represents an input field
-#[cfg(target_os = "macos")]
-fn is_input_field_role(role: &str) -> bool {
-    matches!(
-        role,
-        "AXTextField"
-            | "AXTextArea"
-            | "AXStaticText"
-            | "AXEditableText"
-            | "AXSearchField"
-            | "AXSecureTextField"
-    )
-}
-
-/// Extract text from an element (selected text or value)
-#[cfg(target_os = "macos")]
-unsafe fn extract_text_from_element(element: AXUIElementRef) -> Option<String> {
-    // Try to get selected text first
-    let selected_text_attr = create_cf_string("AXSelectedText");
-    let mut selected_text_value: CFTypeRef = std::ptr::null_mut();
-
-    let ax_error =
-        AXUIElementCopyAttributeValue(element, selected_text_attr, &mut selected_text_value);
-
-    let selected_text = if ax_error == K_AX_ERROR_SUCCESS && !selected_text_value.is_null() {
-        let text = cf_string_to_string(selected_text_value);
-        CFRelease(selected_text_value);
-        if !text.is_empty() {
-            Some(text)
-        } else {
-            None
+/// Get selected text by simulating copy command (Cmd+C on macOS, Ctrl+C elsewhere)
+/// 
+/// This function:
+/// 1. Saves the current clipboard content
+/// 2. Simulates Cmd+C (macOS) or Ctrl+C (Windows/Linux) to copy selected text
+/// 3. Waits briefly for the copy operation to complete
+/// 4. Retrieves the copied text from clipboard
+/// 5. Restores the original clipboard content
+/// 6. Returns the selected text
+/// 
+/// This approach works across all applications including Chrome, browsers, and text editors.
+/// 
+/// # Returns
+/// * `Some(String)` - The selected text if any was copied
+/// * `None` - If no text was selected or an error occurred
+pub fn get_selected_text_via_clipboard() -> Option<String> {
+    let mut clipboard = match Clipboard::new() {
+        Ok(clip) => clip,
+        Err(e) => {
+            eprintln!("Failed to initialize clipboard: {}", e);
+            return None;
         }
-    } else {
-        None
     };
 
-    CFRelease(selected_text_attr);
+    // Step 1: Save current clipboard content
+    let original_clipboard = clipboard.get_text().unwrap_or_default();
 
-    // If we have selected text, return it
-    if selected_text.is_some() {
-        return selected_text;
+    // Step 2: Clear clipboard to ensure we get fresh data
+    if let Err(e) = clipboard.clear() {
+        eprintln!("Failed to clear clipboard: {}", e);
+        return None;
     }
 
-    // Otherwise, try to get the value attribute
-    let value_attr = create_cf_string("AXValue");
-    let mut value: CFTypeRef = std::ptr::null_mut();
-
-    let ax_error = AXUIElementCopyAttributeValue(element, value_attr, &mut value);
-
-    let value_text = if ax_error == K_AX_ERROR_SUCCESS && !value.is_null() {
-        let text = cf_string_to_string(value);
-        CFRelease(value);
-        if !text.is_empty() {
-            Some(text)
-        } else {
-            None
+    // Step 3: Simulate copy command (Cmd+C on macOS, Ctrl+C elsewhere)
+    let copy_result = {
+        #[cfg(target_os = "macos")]
+        {
+            copy_with_applescript()
         }
-    } else {
-        None
+        #[cfg(not(target_os = "macos"))]
+        {
+            copy_with_enigo()
+        }
     };
 
-    CFRelease(value_attr);
+    if let Err(e) = copy_result {
+        eprintln!("Failed to simulate copy command: {}", e);
+        // Restore clipboard before returning
+        let _ = clipboard.set_text(original_clipboard);
+        return None;
+    }
 
-    value_text
+    // Step 4: Wait for copy operation to complete
+    thread::sleep(Duration::from_millis(50));
+
+    // Step 5: Get the copied text from clipboard
+    let selected_text = clipboard.get_text().unwrap_or_default();
+
+    // Step 6: Restore original clipboard content
+    let _ = clipboard.set_text(original_clipboard);
+
+    // Return the selected text (empty string means no selection)
+    if selected_text.is_empty() {
+        None
+    } else {
+        Some(selected_text)
+    }
+}
+
+/// Simulate Cmd+C using AppleScript on macOS
+#[cfg(target_os = "macos")]
+fn copy_with_applescript() -> Result<(), Box<dyn Error + Send + Sync>> {
+    let applescript = r#"
+        tell application "System Events"
+            keystroke "c" using {command down}
+        end tell
+    "#;
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(applescript)
+        .output()
+        .map_err(|e| format!("Failed to run AppleScript: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format!("AppleScript failed: {}", error).into())
+    }
+}
+
+/// Simulate Ctrl+C using enigo on Windows/Linux
+#[cfg(not(target_os = "macos"))]
+fn copy_with_enigo() -> Result<(), Box<dyn Error + Send + Sync>> {
+    let settings = Settings::default();
+    let mut enigo =
+        Enigo::new(&settings).map_err(|e| format!("Failed to initialize enigo: {:?}", e))?;
+
+    // Press Control key
+    enigo
+        .key(Key::Control, Direction::Press)
+        .map_err(|e| format!("Failed to press Control key: {:?}", e))?;
+    thread::sleep(Duration::from_millis(20));
+    
+    // Press C key
+    enigo
+        .key(Key::Unicode('c'), Direction::Click)
+        .map_err(|e| format!("Failed to click C key: {:?}", e))?;
+    thread::sleep(Duration::from_millis(20));
+    
+    // Release Control key
+    enigo
+        .key(Key::Control, Direction::Release)
+        .map_err(|e| format!("Failed to release Control key: {:?}", e))?;
+
+    Ok(())
 }
 
 /// Get application name from PID
@@ -411,24 +454,6 @@ fn get_app_name_from_pid(pid: i32) -> Option<String> {
     }
 }
 
-/// Get an element attribute value
-#[cfg(target_os = "macos")]
-unsafe fn get_element_attribute(element: AXUIElementRef, attribute: &str) -> Option<String> {
-    let attr_cf = create_cf_string(attribute);
-    let mut value: CFTypeRef = std::ptr::null_mut();
-
-    let ax_error = AXUIElementCopyAttributeValue(element, attr_cf, &mut value);
-
-    CFRelease(attr_cf);
-
-    if ax_error == K_AX_ERROR_SUCCESS && !value.is_null() {
-        let result = cf_string_to_string(value);
-        CFRelease(value);
-        Some(result)
-    } else {
-        None
-    }
-}
 
 // ============================================================================
 // Helper Functions for CoreFoundation/NSString Conversion
