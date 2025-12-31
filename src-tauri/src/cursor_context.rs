@@ -50,6 +50,7 @@ use std::ffi::c_void;
 
 /// Result of cursor context query
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CursorContext {
     pub selected_text: Option<String>,
     pub app_name: Option<String>,
