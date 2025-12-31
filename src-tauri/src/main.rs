@@ -15,7 +15,7 @@
 //! 3. **Speech-to-Text Transcription**: Sends audio to Lexi AI Server API endpoint
 //!    (server handles Groq's Whisper API integration internally)
 //! 4. **Text Injection**: Injects transcribed text into the currently active application
-//!    using clipboard + paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere)
+//!    using clipboard + paste keystroke via keyboard_simulator module (Cmd+V on macOS, Ctrl+V elsewhere)
 //! 5. **Pill Overlay Window**: Manages a small transparent overlay window that displays
 //!    recording status and floats above all windows
 //! 6. **Google OAuth Authentication**: Handles user authentication via Google OAuth 2.0
@@ -45,6 +45,7 @@ use tauri::{Emitter, Manager, RunEvent};
 use tokio::sync::watch;
 
 // Module declarations for core functionality
+mod actions; // Voice actions triggered by action trigger phrase (e.g., "Hey Lexi")
 mod audio_processor; // Audio processing and transcription orchestration
 mod audio_recorder; // Audio capture from default microphone using cpal, converts to WAV format
 mod commands;
@@ -52,9 +53,11 @@ mod config; // Application configuration (API base URL, OAuth redirect URI)
 mod cursor_context; // Cursor context retrieval using macOS Accessibility API (AXUIElement)
 mod global_key_listener; // Global keyboard event monitoring via rdev with configurable hotkey support
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
+mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
+mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke

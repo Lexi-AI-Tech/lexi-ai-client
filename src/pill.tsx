@@ -81,6 +81,22 @@ const Pill: React.FC = () => {
           await window.setSize(new LogicalSize(40, 6.6));
         });
 
+        // Listen for action success
+        const unlistenActionSuccess = await listen("action_success", async () => {
+          setStatus("idle");
+          // Resize window to thin rectangular size
+          const window = getCurrentWindow();
+          await window.setSize(new LogicalSize(40, 6.6));
+        });
+
+        // Listen for action error
+        const unlistenActionError = await listen("action_error", async () => {
+          setStatus("idle");
+          // Resize window to thin rectangular size
+          const window = getCurrentWindow();
+          await window.setSize(new LogicalSize(40, 6.6));
+        });
+
         // Cleanup function
         return () => {
           unlistenStarted();
@@ -88,6 +104,8 @@ const Pill: React.FC = () => {
           unlistenProcessing();
           unlistenSuccess();
           unlistenError();
+          unlistenActionSuccess();
+          unlistenActionError();
         };
       } catch (error) {
         console.error("Failed to set up event listeners:", error);
