@@ -137,7 +137,12 @@ impl SttService {
                     None
                 };
                 tokio::task::spawn_blocking(move || {
-                    whisper::transcribe_audio_data(app, audio_data, language, vocabulary_for_blocking)
+                    whisper::transcribe_audio_data(
+                        app,
+                        audio_data,
+                        language,
+                        vocabulary_for_blocking,
+                    )
                 })
                 .await
                 .map_err(|e| format!("Transcription task failed: {}", e))?

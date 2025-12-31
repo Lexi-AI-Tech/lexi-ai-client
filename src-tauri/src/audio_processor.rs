@@ -95,7 +95,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
         // Hardcoded vocabulary array for offline transcription
         // TODO: Get vocabulary from app config state
-        // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript. 
+        // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript.
         // Do more experiment on how we can use this trick to manipulate the model behavior.
         let vocabulary = vec![
             "Lexi".to_string(),
@@ -129,7 +129,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
         let stt_service = SttService::new();
-        
+
         let transcription_start = Instant::now();
         let transcription_result = stt_service
             .transcribe_audio(
