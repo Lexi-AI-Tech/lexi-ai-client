@@ -29,12 +29,8 @@
 
 use arboard::Clipboard;
 use std::error::Error;
-use std::process::Command;
 use std::thread;
 use std::time::Duration;
-
-#[cfg(not(target_os = "macos"))]
-use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
 /// TextInjector provides cross-platform functionality to inject text into the active application
 ///
@@ -92,65 +88,10 @@ impl TextInjector {
 
         // Step 2: Simulate paste keystroke
         // AppleScript on macOS, enigo on Windows/Linux
-        #[cfg(target_os = "macos")]
-        {
-            self.paste_with_applescript()?;
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            self.paste_with_enigo()?;
-        }
+        crate::keyboard_simulator::simulate_paste()?;
 
         // Brief delay to ensure paste processes (some apps need a moment)
         thread::sleep(Duration::from_millis(50));
-
-        Ok(())
-    }
-
-    /// Paste using AppleScript on macOS
-    /// Simulates Cmd+V keystroke
-    #[cfg(target_os = "macos")]
-    fn paste_with_applescript(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let applescript = r#"
-            tell application "System Events"
-                keystroke "v" using {command down}
-            end tell
-        "#;
-
-        let output = Command::new("osascript")
-            .arg("-e")
-            .arg(applescript)
-            .output()
-            .map_err(|e| format!("Failed to run AppleScript: {}", e))?;
-
-        if output.status.success() {
-            Ok(())
-        } else {
-            let error = String::from_utf8_lossy(&output.stderr);
-            Err(format!("AppleScript failed: {}", error).into())
-        }
-    }
-
-    /// Paste using enigo on Windows/Linux
-    /// Simulates Ctrl+V keystroke
-    #[cfg(not(target_os = "macos"))]
-    fn paste_with_enigo(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let settings = Settings::default();
-        let mut enigo =
-            Enigo::new(&settings).map_err(|e| format!("Failed to initialize enigo: {:?}", e))?;
-
-        // Windows/Linux: Use Control key
-        enigo
-            .key(Key::Control, Direction::Press)
-            .map_err(|e| format!("Failed to press Control key: {:?}", e))?;
-        thread::sleep(Duration::from_millis(20));
-        enigo
-            .key(Key::Unicode('v'), Direction::Click)
-            .map_err(|e| format!("Failed to click V key: {:?}", e))?;
-        thread::sleep(Duration::from_millis(20));
-        enigo
-            .key(Key::Control, Direction::Release)
-            .map_err(|e| format!("Failed to release Control key: {:?}", e))?;
 
         Ok(())
     }
