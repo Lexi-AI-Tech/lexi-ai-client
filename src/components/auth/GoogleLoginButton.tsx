@@ -112,7 +112,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     };
   }, [setAuthData, setError, setLoading, onSuccess, onError, checkStoredAuth]);
 
-  // Poll localStorage when loading (for when opened externally)
+  // Poll auth store when loading (auth store loads from secure storage)
   useEffect(() => {
     if (!loading) {
       // Stop polling when not loading
@@ -123,7 +123,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       return;
     }
 
-    console.log("Starting to poll localStorage, loading:", loading);
+    console.log("Starting to poll auth store, loading:", loading);
 
     // Check immediately
     if (checkStoredAuth()) {
@@ -139,7 +139,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     // Poll every 200ms (more frequent) until we find tokens
     console.log("Starting polling interval");
     pollIntervalRef.current = setInterval(() => {
-      console.log("Polling localStorage...");
+      console.log("Polling auth store...");
       if (checkStoredAuth()) {
         console.log("Auth found via polling, stopping");
         if (pollIntervalRef.current) {
@@ -208,7 +208,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       console.log("Waiting for OAuth callback...");
 
-      // Poll backend for OAuth completion (instead of localStorage)
+      // Poll backend for OAuth completion
       // This works across different browser contexts
       // Use ref to track polling state across async operations
       oauthPollingRef.current.isPolling = true;

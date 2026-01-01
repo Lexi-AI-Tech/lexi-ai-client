@@ -2,11 +2,18 @@
  * Secure Storage Utility
  *
  * Provides secure storage for authentication tokens using OS keychain
- * via Tauri commands. This is much more secure than localStorage or Tauri Store.
+ * via Tauri commands from commands/auth.rs. This is much more secure than localStorage or Tauri Store.
+ *
+ * All functions in this module call Tauri commands:
+ * - store_auth_data: Stores auth data in secure storage
+ * - get_auth_data: Retrieves auth data from secure storage
+ * - clear_auth_data: Clears auth data from secure storage
+ * - has_auth_data: Checks if auth data exists in secure storage
  *
  * On macOS: Uses Keychain
  * On Windows: Uses Credential Manager
  * On Linux: Uses Secret Service
+ * In dev mode: Uses Tauri Store (to avoid keychain prompts)
  */
 
 import { invoke } from "@tauri-apps/api/core";
