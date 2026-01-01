@@ -58,6 +58,7 @@ mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortc
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
+mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
@@ -83,11 +84,14 @@ use permissions::{
 };
 
 use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
-use commands::config::set_language;
+use commands::config::{disable_autostart, enable_autostart, is_autostart_enabled, set_language};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
+use commands::secure_storage::{
+    clear_auth_data_secure, get_auth_data_secure, has_auth_data_secure, store_auth_data_secure,
+};
 use commands::text::inject_text;
 use commands::window::open_devtools;
 
@@ -122,6 +126,10 @@ pub fn main() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None::<Vec<&str>>,
+        ))
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             #[cfg(target_os = "macos")]
             {
@@ -142,9 +150,7 @@ pub fn main() {
 
     // Add CrabNebula DevTools plugin (only in debug builds)
     #[cfg(debug_assertions)]
-    {
-        builder = builder.plugin(devtools);
-    }
+    let builder = builder.plugin(devtools);
 
     builder
         .manage(OAuthState::default())
@@ -171,10 +177,17 @@ pub fn main() {
             get_pkce_verifier,
             set_auth_token,
             set_language,
+            enable_autostart,
+            disable_autostart,
+            is_autostart_enabled,
             update_hotkey,
             get_current_hotkey,
             start_hotkey_recording,
-            stop_hotkey_recording
+            stop_hotkey_recording,
+            store_auth_data_secure,
+            get_auth_data_secure,
+            clear_auth_data_secure,
+            has_auth_data_secure
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS

@@ -4,12 +4,14 @@
  * Handles all HTTP requests to the backend server with authentication support.
  */
 
+import { authStore } from "../store/authStore";
+
 // Use localhost in development, production URL in production builds
 // Can be overridden with VITE_API_BASE_URL environment variable
 const API_BASE_URL =
-  (import.meta.env.MODE === "development"
+  import.meta.env.MODE === "development"
     ? "http://localhost:1230"
-    : "https://lexi-ai-server.onrender.com");
+    : "https://lexi-ai-server.onrender.com";
 
 export interface ApiResponse<T = any> {
   success?: boolean;
@@ -31,18 +33,12 @@ export interface AuthResponse {
   expires_in?: number;
 }
 
-import { getStorageItemSync } from "./persistentStorage";
-
 /**
- * Get the current access token from persistent storage
+ * Get the current access token from auth store
  */
 function getAccessToken(): string | null {
   try {
-    const stored = getStorageItemSync("lexi-auth");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return parsed.tokens?.access_token || null;
-    }
+    return authStore.tokens?.access_token || null;
   } catch (e) {
     console.error("Failed to get access token:", e);
   }
@@ -50,15 +46,11 @@ function getAccessToken(): string | null {
 }
 
 /**
- * Get the refresh token from persistent storage
+ * Get the refresh token from auth store
  */
 function getRefreshToken(): string | null {
   try {
-    const stored = getStorageItemSync("lexi-auth");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return parsed.tokens?.refresh_token || null;
-    }
+    return authStore.tokens?.refresh_token || null;
   } catch (e) {
     console.error("Failed to get refresh token:", e);
   }
@@ -98,24 +90,23 @@ async function refreshAccessToken(): Promise<string | null> {
     const data: ApiResponse<AuthResponse> = await response.json();
 
     if (data.access_token) {
-      // Update stored tokens
+      // Update tokens in auth store
       try {
-        const { getStorageItem, setStorageItem } =
-          await import("./persistentStorage");
-        const stored = await getStorageItem("lexi-auth");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          parsed.tokens = {
-            ...parsed.tokens,
-            access_token: data.access_token,
-            refresh_token: data.refresh_token || parsed.tokens.refresh_token,
-            expires_in: data.expires_in,
-            expires_at: data.expires_in
-              ? Date.now() + data.expires_in * 1000
-              : parsed.tokens.expires_at,
-          };
-          // Use async storage for persistence
-          await setStorageItem("lexi-auth", JSON.stringify(parsed));
+        const { authStore } = await import("../store/authStore");
+        if (authStore.tokens && authStore.user) {
+          authStore.setAuthData(
+            {
+              ...authStore.tokens,
+              access_token: data.access_token,
+              refresh_token:
+                data.refresh_token || authStore.tokens.refresh_token,
+              expires_in: data.expires_in,
+              expires_at: data.expires_in
+                ? Date.now() + data.expires_in * 1000
+                : authStore.tokens.expires_at,
+            },
+            authStore.user,
+          );
         }
       } catch (e) {
         console.error("Failed to update tokens:", e);
@@ -138,7 +129,16 @@ export async function authenticatedFetch(
   url: string,
   options: RequestInit = {},
 ): Promise<Response> {
-  const token = getAccessToken();
+  // Proactively refresh token if it's expiring soon
+  try {
+    const { authStore } = await import("../store/authStore");
+    await authStore.refreshTokenIfNeeded();
+  } catch (e) {
+    // Ignore errors in proactive refresh, will handle on 401
+    console.debug("Proactive refresh check failed:", e);
+  }
+
+  let token = getAccessToken();
 
   // Add authorization header if token exists
   const headers = new Headers(options.headers);
@@ -153,6 +153,7 @@ export async function authenticatedFetch(
 
   // If unauthorized, try to refresh token and retry once
   if (response.status === 401 && token) {
+    console.log("🔄 Received 401, attempting token refresh...");
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers.set("Authorization", `Bearer ${newToken}`);
@@ -162,8 +163,8 @@ export async function authenticatedFetch(
       });
     } else {
       // Refresh failed, clear auth
-      const { removeStorageItem } = await import("./persistentStorage");
-      await removeStorageItem("lexi-auth");
+      const { authStore } = await import("../store/authStore");
+      authStore.clearAuth();
       // Dispatch event to notify app of auth failure
       window.dispatchEvent(new CustomEvent("auth-expired"));
     }

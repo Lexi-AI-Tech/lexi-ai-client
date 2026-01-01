@@ -1,0 +1,99 @@
+/**
+ * Secure Storage Utility
+ *
+ * Provides secure storage for authentication tokens using OS keychain
+ * via Tauri commands. This is much more secure than localStorage or Tauri Store.
+ *
+ * On macOS: Uses Keychain
+ * On Windows: Uses Credential Manager
+ * On Linux: Uses Secret Service
+ */
+
+import { invoke } from "@tauri-apps/api/core";
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token?: string;
+  expires_at?: number;
+  expires_in?: number;
+}
+
+export interface AuthUser {
+  email: string;
+  name: string;
+  picture?: string;
+}
+
+export interface AuthData {
+  access_token: string;
+  refresh_token?: string;
+  expires_at?: number;
+  expires_in?: number;
+  user?: AuthUser;
+}
+
+/**
+ * Store authentication data securely in OS keychain
+ */
+export async function storeAuthDataSecure(data: AuthData): Promise<void> {
+  try {
+    await invoke("store_auth_data_secure", {
+      data: {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token || null,
+        expires_at: data.expires_at || null,
+        expires_in: data.expires_in || null,
+        user: data.user
+          ? {
+              email: data.user.email,
+              name: data.user.name,
+              picture: data.user.picture || null,
+            }
+          : null,
+      },
+    });
+    console.log("✅ Auth data stored securely in OS keychain");
+  } catch (error) {
+    console.error("Failed to store auth data securely:", error);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve authentication data from OS keychain
+ */
+export async function getAuthDataSecure(): Promise<AuthData | null> {
+  try {
+    const data = await invoke<AuthData | null>("get_auth_data_secure");
+    return data;
+  } catch (error) {
+    console.error("Failed to retrieve auth data securely:", error);
+    return null;
+  }
+}
+
+/**
+ * Clear all authentication data from OS keychain
+ */
+export async function clearAuthDataSecure(): Promise<void> {
+  try {
+    await invoke("clear_auth_data_secure");
+    console.log("✅ Auth data cleared from OS keychain");
+  } catch (error) {
+    console.error("Failed to clear auth data securely:", error);
+    throw error;
+  }
+}
+
+/**
+ * Check if authentication data exists in keychain
+ */
+export async function hasAuthDataSecure(): Promise<boolean> {
+  try {
+    const hasData = await invoke<boolean>("has_auth_data_secure");
+    return hasData;
+  } catch (error) {
+    console.error("Failed to check auth data:", error);
+    return false;
+  }
+}

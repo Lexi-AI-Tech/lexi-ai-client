@@ -3,15 +3,14 @@
  *
  * Manages authentication state for Lexi AI.
  * Stores user info, tokens, and authentication status.
- * Uses persistent storage (Tauri Store in production, localStorage as fallback).
+ * Uses OS keychain for secure storage (macOS Keychain, Windows Credential Manager, Linux Secret Service).
  */
 
 import {
-  getStorageItem,
-  setStorageItem,
-  removeStorageItem,
-  getStorageItemSync,
-} from "../lib/persistentStorage";
+  storeAuthDataSecure,
+  getAuthDataSecure,
+  clearAuthDataSecure,
+} from "../lib/secureStorage";
 
 export interface AuthUser {
   email: string;
@@ -32,10 +31,12 @@ export interface AuthState {
   tokens: AuthTokens | null;
   isLoading: boolean;
   error: string | null;
+  isInitialized: boolean;
   setAuthData: (tokens: AuthTokens, user: AuthUser) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  refreshTokenIfNeeded: () => Promise<boolean>; // Returns true if refreshed, false otherwise
 }
 
 // Store state
@@ -46,75 +47,113 @@ let isLoading: boolean = false;
 let error: string | null = null;
 let storageInitialized: boolean = false;
 
-// Load from persistent storage on initialization
+// Load from secure storage (OS keychain)
 const loadFromStorage = async () => {
   try {
-    // First try sync localStorage for immediate access (fallback)
-    const storedSync = getStorageItemSync("lexi-auth");
-    if (storedSync) {
-      try {
-        const parsed = JSON.parse(storedSync);
-        isAuthenticated = parsed.isAuthenticated || false;
-        user = parsed.user || null;
-        tokens = parsed.tokens || null;
+    const secureData = await getAuthDataSecure();
+    if (secureData) {
+      console.log("✅ Loaded auth data from secure storage (OS keychain)");
+      isAuthenticated = true;
+      user = secureData.user || null;
+      tokens = {
+        access_token: secureData.access_token,
+        refresh_token: secureData.refresh_token,
+        expires_at: secureData.expires_at,
+        expires_in: secureData.expires_in,
+      };
 
-        // Check if tokens are expired
-        if (tokens?.expires_at && tokens.expires_at < Date.now()) {
-          // Tokens expired, clear auth
+      // Check if tokens are expired and try to refresh
+      if (tokens?.expires_at && tokens.expires_at < Date.now()) {
+        if (tokens?.refresh_token) {
+          console.log("🔄 Access token expired, attempting to refresh...");
+          try {
+            const { getDeviceInfo } = await import("../lib/deviceInfo");
+            const device = getDeviceInfo();
+            const API_BASE_URL =
+              import.meta.env.MODE === "development"
+                ? "http://localhost:1230"
+                : "https://lexi-ai-server.onrender.com";
+
+            const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                refresh_token: tokens.refresh_token,
+                device_name: device.device_name,
+                device_type: device.device_type,
+              }),
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              const refreshData = data.data || data;
+
+              if (refreshData.access_token) {
+                tokens = {
+                  ...tokens,
+                  access_token: refreshData.access_token,
+                  refresh_token:
+                    refreshData.refresh_token || tokens.refresh_token,
+                  expires_in: refreshData.expires_in,
+                  expires_at: refreshData.expires_in
+                    ? Date.now() + refreshData.expires_in * 1000
+                    : tokens.expires_at,
+                };
+                isAuthenticated = true;
+                await saveToStorage();
+                console.log("✅ Token refreshed successfully");
+              }
+            } else {
+              throw new Error(`Token refresh failed: ${response.status}`);
+            }
+          } catch (refreshError) {
+            console.error("❌ Token refresh failed:", refreshError);
+            isAuthenticated = false;
+            user = null;
+            tokens = null;
+            await saveToStorage();
+          }
+        } else {
+          console.log("⚠️ Access token expired and no refresh token available");
           isAuthenticated = false;
           user = null;
           tokens = null;
           await saveToStorage();
-        } else {
-          storageInitialized = true;
-          notifyListeners();
         }
-      } catch (e) {
-        console.error("Failed to parse stored auth data:", e);
       }
-    }
 
-    // Then try async persistent storage (Tauri Store)
-    const stored = await getStorageItem("lexi-auth");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        isAuthenticated = parsed.isAuthenticated || false;
-        user = parsed.user || null;
-        tokens = parsed.tokens || null;
-
-        // Check if tokens are expired
-        if (tokens?.expires_at && tokens.expires_at < Date.now()) {
-          // Tokens expired, clear auth
-          isAuthenticated = false;
-          user = null;
-          tokens = null;
-          await saveToStorage();
-        } else {
-          storageInitialized = true;
-          notifyListeners();
-        }
-      } catch (e) {
-        console.error("Failed to parse stored auth data:", e);
-      }
+      storageInitialized = true;
+      notifyListeners();
+      return;
     }
   } catch (e) {
-    console.error("Failed to load auth state:", e);
+    console.error("Failed to load auth state from secure storage:", e);
   }
+
+  // No auth data found - mark as initialized
   storageInitialized = true;
+  notifyListeners();
 };
 
-// Save to persistent storage
+// Save to secure storage (OS keychain)
 const saveToStorage = async () => {
   try {
-    const data = JSON.stringify({
-      isAuthenticated,
-      user,
-      tokens,
-    });
-    await setStorageItem("lexi-auth", data);
+    if (tokens?.access_token && user) {
+      await storeAuthDataSecure({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: tokens.expires_at,
+        expires_in: tokens.expires_in,
+        user: user,
+      });
+    } else if (!isAuthenticated) {
+      // Clear secure storage if not authenticated
+      await clearAuthDataSecure();
+    }
   } catch (e) {
-    console.error("Failed to save auth state:", e);
+    console.error("Failed to save auth state to secure storage:", e);
   }
 };
 
@@ -144,6 +183,9 @@ export const authStore: AuthState = {
   get error() {
     return error;
   },
+  get isInitialized() {
+    return storageInitialized;
+  },
   setAuthData: (newTokens: AuthTokens, newUser: AuthUser) => {
     tokens = newTokens;
     user = newUser;
@@ -155,7 +197,7 @@ export const authStore: AuthState = {
       tokens.expires_at = Date.now() + tokens.expires_in * 1000;
     }
 
-    // Save to storage (async, but don't block)
+    // Save to secure storage (async, but don't block)
     saveToStorage().catch((err) => {
       console.error("Failed to save auth data:", err);
     });
@@ -166,9 +208,9 @@ export const authStore: AuthState = {
     user = null;
     tokens = null;
     error = null;
-    // Remove from storage (async, but don't block)
-    removeStorageItem("lexi-auth").catch((err) => {
-      console.error("Failed to clear auth data:", err);
+    // Remove from secure storage (async, but don't block)
+    clearAuthDataSecure().catch((err) => {
+      console.error("Failed to clear auth data from secure storage:", err);
     });
     notifyListeners();
   },
@@ -179,6 +221,72 @@ export const authStore: AuthState = {
   setError: (err: string | null) => {
     error = err;
     notifyListeners();
+  },
+  refreshTokenIfNeeded: async () => {
+    // Check if token is expired or expiring soon (within 5 minutes)
+    if (!tokens?.expires_at || !tokens?.refresh_token) {
+      return false;
+    }
+
+    const bufferTime = 5 * 60 * 1000; // 5 minutes
+    const isExpiringSoon = tokens.expires_at < Date.now() + bufferTime;
+
+    if (!isExpiringSoon) {
+      return false; // Token is still valid
+    }
+
+    // Token is expired or expiring soon, refresh it
+    console.log("🔄 Token expiring soon, refreshing proactively...");
+    try {
+      const { getDeviceInfo } = await import("../lib/deviceInfo");
+      const device = getDeviceInfo();
+      const API_BASE_URL =
+        import.meta.env.MODE === "development"
+          ? "http://localhost:1230"
+          : "https://lexi-ai-server.onrender.com";
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          refresh_token: tokens.refresh_token,
+          device_name: device.device_name,
+          device_type: device.device_type,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const refreshData = data.data || data;
+
+        if (refreshData.access_token) {
+          tokens = {
+            ...tokens,
+            access_token: refreshData.access_token,
+            refresh_token: refreshData.refresh_token || tokens.refresh_token,
+            expires_in: refreshData.expires_in,
+            expires_at: refreshData.expires_in
+              ? Date.now() + refreshData.expires_in * 1000
+              : tokens.expires_at,
+          };
+          isAuthenticated = true;
+          await saveToStorage();
+          notifyListeners();
+          console.log("✅ Token refreshed proactively");
+          return true;
+        }
+      } else {
+        throw new Error(`Token refresh failed: ${response.status}`);
+      }
+    } catch (refreshError) {
+      console.error("❌ Proactive token refresh failed:", refreshError);
+      // Don't clear auth on proactive refresh failure - let it fail on actual API call
+      return false;
+    }
+
+    return false;
   },
 };
 

@@ -29,7 +29,7 @@ const SUPPORTED_LANGUAGES = [
 ];
 
 export const SettingsPage: React.FC = () => {
-  const { tokens } = useAuthStore();
+  const { tokens, isInitialized } = useAuthStore();
   const [currentLanguage, setCurrentLanguage] = useState<string>("en");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
   const [systemType, setSystemType] = useState<"mac" | "windows">("mac");
@@ -37,10 +37,19 @@ export const SettingsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [autostartEnabled, setAutostartEnabled] = useState<boolean>(false);
+  const [isCheckingAutostart, setIsCheckingAutostart] = useState(true);
+  const [isTogglingAutostart, setIsTogglingAutostart] = useState(false);
 
   // Load current config from DB on mount and when auth token changes
   useEffect(() => {
     const loadConfig = async () => {
+      // Wait for auth store to initialize
+      if (!isInitialized) {
+        setIsLoading(true);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
 
@@ -62,30 +71,75 @@ export const SettingsPage: React.FC = () => {
               await invoke("set_language", { language: config.language });
             }
           } catch (dbErr: any) {
-            console.warn(
-              "Failed to load config from DB, using defaults:",
-              dbErr,
-            );
-            if (
-              dbErr?.message?.includes("401") ||
-              dbErr?.message?.includes("Unauthorized")
+            // Check if it's a network error
+            const errorMessage = dbErr?.message || String(dbErr);
+            const isNetworkError =
+              dbErr?.name === "TypeError" ||
+              dbErr?.name === "NetworkError" ||
+              errorMessage.includes("Failed to fetch") ||
+              errorMessage.includes("NetworkError") ||
+              errorMessage.includes("network") ||
+              errorMessage.includes("ECONNREFUSED") ||
+              errorMessage.includes("Load failed");
+
+            if (isNetworkError) {
+              // Network errors are temporary, don't show error
+              console.debug("Network error while loading config:", dbErr);
+            } else if (
+              errorMessage.includes("401") ||
+              errorMessage.includes("Unauthorized")
             ) {
               setError("Please log in to save your configuration");
+            } else {
+              console.warn(
+                "Failed to load config from DB, using defaults:",
+                dbErr,
+              );
             }
           }
         } else {
           console.log("User not authenticated, using default config");
         }
       } catch (err: any) {
-        console.error("Failed to load config:", err);
-        setError(err?.message || "Failed to load configuration");
+        // Check if it's a network error
+        const errorMessage = err?.message || String(err);
+        const isNetworkError =
+          err?.name === "TypeError" ||
+          err?.name === "NetworkError" ||
+          errorMessage.includes("Failed to fetch") ||
+          errorMessage.includes("NetworkError") ||
+          errorMessage.includes("network") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("Load failed");
+
+        if (!isNetworkError) {
+          console.error("Failed to load config:", err);
+          setError(errorMessage || "Failed to load configuration");
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     loadConfig();
-  }, [tokens?.access_token]);
+  }, [tokens?.access_token, isInitialized]);
+
+  // Load autostart status on mount
+  useEffect(() => {
+    const checkAutostart = async () => {
+      setIsCheckingAutostart(true);
+      try {
+        const enabled = await invoke<boolean>("is_autostart_enabled");
+        setAutostartEnabled(enabled);
+      } catch (err: any) {
+        console.error("Failed to check autostart status:", err);
+      } finally {
+        setIsCheckingAutostart(false);
+      }
+    };
+
+    checkAutostart();
+  }, []);
 
   const handleSaveLanguage = async () => {
     const languageChanged = selectedLanguage !== currentLanguage;
@@ -153,6 +207,27 @@ export const SettingsPage: React.FC = () => {
   };
 
   const isLanguageChanged = selectedLanguage !== currentLanguage;
+
+  const handleToggleAutostart = async () => {
+    setIsTogglingAutostart(true);
+    setError(null);
+    try {
+      if (autostartEnabled) {
+        await invoke("disable_autostart");
+        setAutostartEnabled(false);
+        console.log("✅ Auto-startup disabled");
+      } else {
+        await invoke("enable_autostart");
+        setAutostartEnabled(true);
+        console.log("✅ Auto-startup enabled");
+      }
+    } catch (err: any) {
+      console.error("Failed to toggle autostart:", err);
+      setError(err?.message || "Failed to update auto-startup setting");
+    } finally {
+      setIsTogglingAutostart(false);
+    }
+  };
 
   return (
     <div className="settings-page">
@@ -303,6 +378,89 @@ export const SettingsPage: React.FC = () => {
               Language saved successfully!
             </div>
           )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: "32px" }}>
+        <h3
+          style={{
+            margin: 0,
+            marginBottom: "16px",
+            fontSize: "18px",
+            fontWeight: 500,
+            color: "#ffffff",
+          }}
+        >
+          General
+        </h3>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px",
+              backgroundColor: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: "6px",
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "#ffffff",
+                  marginBottom: "4px",
+                  fontWeight: 500,
+                }}
+              >
+                Start on System Startup
+              </div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "rgba(255, 255, 255, 0.6)",
+                }}
+              >
+                Automatically launch Lexi AI when your computer starts
+              </div>
+            </div>
+            <button
+              onClick={handleToggleAutostart}
+              disabled={isCheckingAutostart || isTogglingAutostart}
+              style={{
+                width: "44px",
+                height: "24px",
+                borderRadius: "12px",
+                border: "none",
+                backgroundColor: autostartEnabled
+                  ? "rgba(52, 199, 89, 1)"
+                  : "rgba(255, 255, 255, 0.2)",
+                cursor:
+                  isCheckingAutostart || isTogglingAutostart
+                    ? "not-allowed"
+                    : "pointer",
+                position: "relative",
+                transition: "background-color 0.2s",
+                opacity: isCheckingAutostart || isTogglingAutostart ? 0.5 : 1,
+              }}
+            >
+              <div
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%",
+                  backgroundColor: "#ffffff",
+                  position: "absolute",
+                  top: "2px",
+                  left: autostartEnabled ? "22px" : "2px",
+                  transition: "left 0.2s",
+                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
+                }}
+              />
+            </button>
+          </div>
         </div>
       </div>
     </div>
