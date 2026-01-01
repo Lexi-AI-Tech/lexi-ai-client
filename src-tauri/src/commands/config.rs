@@ -3,7 +3,8 @@
 //! This module provides Tauri commands for managing configuration state.
 
 use crate::state::LanguageState;
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_autostart::ManagerExt;
 
 /// Set the transcription language from frontend
 ///
@@ -30,4 +31,42 @@ pub fn get_language(state: &State<LanguageState>) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Enable auto-startup on system startup
+///
+/// This command enables the application to automatically start when the system boots.
+#[tauri::command]
+pub async fn enable_autostart(app: AppHandle) -> Result<(), String> {
+    let autolaunch = app.autolaunch();
+    autolaunch
+        .enable()
+        .map_err(|e| format!("Failed to enable autostart: {}", e))?;
+    println!("✅ Auto-startup enabled");
+    Ok(())
+}
+
+/// Disable auto-startup on system startup
+///
+/// This command disables the automatic startup of the application.
+#[tauri::command]
+pub async fn disable_autostart(app: AppHandle) -> Result<(), String> {
+    let autolaunch = app.autolaunch();
+    autolaunch
+        .disable()
+        .map_err(|e| format!("Failed to disable autostart: {}", e))?;
+    println!("❌ Auto-startup disabled");
+    Ok(())
+}
+
+/// Check if auto-startup is enabled
+///
+/// # Returns
+/// * `bool` - true if auto-startup is enabled, false otherwise
+#[tauri::command]
+pub async fn is_autostart_enabled(app: AppHandle) -> Result<bool, String> {
+    let autolaunch = app.autolaunch();
+    autolaunch
+        .is_enabled()
+        .map_err(|e| format!("Failed to check autostart status: {}", e))
 }

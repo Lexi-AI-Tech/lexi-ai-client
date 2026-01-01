@@ -83,7 +83,9 @@ use permissions::{
 };
 
 use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
-use commands::config::set_language;
+use commands::config::{
+    disable_autostart, enable_autostart, is_autostart_enabled, set_language,
+};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
@@ -122,6 +124,10 @@ pub fn main() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None::<Vec<&str>>,
+        ))
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             #[cfg(target_os = "macos")]
             {
@@ -171,6 +177,9 @@ pub fn main() {
             get_pkce_verifier,
             set_auth_token,
             set_language,
+            enable_autostart,
+            disable_autostart,
+            is_autostart_enabled,
             update_hotkey,
             get_current_hotkey,
             start_hotkey_recording,
