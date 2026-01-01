@@ -71,7 +71,7 @@ mod window; // Window management utilities (show, focus, activate) // Tauri comm
 use global_key_listener::HotkeyConfig;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
-use state::{AuthTokenState, HotkeyRecordingState, HotkeyWatchState, TranscriptionTaskState};
+use state::{HotkeyRecordingState, HotkeyWatchState, TranscriptionTaskState};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -155,7 +155,6 @@ pub fn main() {
 
     builder
         .manage(OAuthState::default())
-        .manage(AuthTokenState::default())
         .manage(TranscriptionTaskState {
             task_handle: Mutex::new(None),
             cancel_tx: Mutex::new(None),
