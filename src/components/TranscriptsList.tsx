@@ -32,13 +32,10 @@ export const TranscriptsList: React.FC = () => {
 
   // Fetch transcripts function
   const fetchTranscripts = useCallback(async () => {
-    // Wait for auth store to initialize before attempting to fetch
-    if (!authStore.isInitialized) {
-      return;
-    }
-
-    if (!authStore.isAuthenticated) {
-      // Clear transcripts when not authenticated (expected state, not an error)
+    // This function should only be called when we're ready to fetch
+    // (initialized, authenticated, and tokens loaded)
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      // Should not happen if called correctly, but handle gracefully
       setTranscripts([]);
       setError(null);
       setLoading(false);
@@ -90,29 +87,37 @@ export const TranscriptsList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [authStore.isAuthenticated, authStore.isInitialized, page]);
+  }, [authStore.isAuthenticated, authStore.isInitialized, authStore.tokens?.access_token, page]);
 
   // Fetch transcripts when authenticated and page changes
   useEffect(() => {
-    // Wait for auth store to initialize
+    // Step 1: Wait for auth store to initialize
     if (!authStore.isInitialized) {
       setLoading(true);
-      setError(null); // Clear any previous errors while initializing
-      return;
+      setError(null);
+      return; // Show loading while waiting for initialization
     }
 
-    // Clear error when auth state changes
+    // Step 2: If authenticated, wait for tokens to be loaded
+    if (authStore.isAuthenticated && !authStore.tokens?.access_token) {
+      setLoading(true);
+      setError(null);
+      return; // Show loading while waiting for tokens
+    }
+
+    // Step 3: Now we know the auth state - either authenticated with tokens, or not authenticated
     setError(null);
 
-    if (authStore.isAuthenticated) {
+    if (authStore.isAuthenticated && authStore.tokens?.access_token) {
+      // Ready to fetch - user is authenticated and tokens are loaded
       fetchTranscripts();
     } else {
-      // Clear transcripts when not authenticated
+      // Not authenticated - clear and show login prompt
       setTranscripts([]);
       setError(null);
       setLoading(false);
     }
-  }, [authStore.isAuthenticated, authStore.isInitialized, page, fetchTranscripts]);
+  }, [authStore.isAuthenticated, authStore.isInitialized, authStore.tokens?.access_token, page, fetchTranscripts]);
 
   const handleDelete = async (transcriptId: number) => {
     if (!confirm("Are you sure you want to delete this transcript?")) {
@@ -179,9 +184,26 @@ export const TranscriptsList: React.FC = () => {
     }
   };
 
-  // Wait for auth store to initialize before showing login prompt
-  // Show login prompt if not authenticated (but only after initialization)
-  if (authStore.isInitialized && !authStore.isAuthenticated) {
+  // Show loading while waiting for auth to initialize or tokens to load
+  if (!authStore.isInitialized || (authStore.isAuthenticated && !authStore.tokens?.access_token)) {
+    return (
+      <div className="settings">
+        <h3>Transcripts</h3>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "24px",
+            color: "rgba(255, 255, 255, 0.6)",
+          }}
+        >
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated (only after we've confirmed auth state)
+  if (!authStore.isAuthenticated) {
     return (
       <div className="settings">
         <h3>Transcripts</h3>
