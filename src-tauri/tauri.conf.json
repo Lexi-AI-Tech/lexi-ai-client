@@ -52,7 +52,12 @@
         "visible": true
       }
     ],
-    "macOSPrivateApi": true
+    "macOSPrivateApi": true,
+    "withGlobalTauri": false
   },
-  "plugins": {}
+  "plugins": {
+    "deep-link": {
+      "schemes": ["lexi-ai", "lexi"]
+    }
+  }
 }

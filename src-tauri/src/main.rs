@@ -42,6 +42,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, RunEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
 // Module declarations for core functionality
@@ -119,6 +120,7 @@ pub fn main() {
     let devtools = tauri_plugin_devtools::init();
 
     let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             #[cfg(target_os = "macos")]
@@ -186,6 +188,22 @@ pub fn main() {
             }
 
             let app_handle = app.handle();
+
+            // Handle deep links
+            // Check if app was started via deep link
+            if let Ok(Some(start_urls)) = app.deep_link().get_current() {
+                println!("🔗 App started via deep link: {:?}", start_urls);
+                // Show and focus the main window when opened via deep link
+                show_and_focus_main_window(&app_handle);
+            }
+
+            // Listen for deep links when app is already running
+            let app_handle_clone = app_handle.clone();
+            app.deep_link().on_open_url(move |event| {
+                println!("🔗 Deep link received: {:?}", event.urls());
+                // Show and focus the main window when deep link is received
+                show_and_focus_main_window(&app_handle_clone);
+            });
 
             // Preload Whisper model in background to reduce first transcription latency
             std::thread::spawn(move || {

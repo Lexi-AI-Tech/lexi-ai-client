@@ -199,9 +199,7 @@ pub async fn perform_action(
     println!("🎯 Performing action: '{}'", action_command);
 
     // Notify frontend that action processing has started
-    app_handle
-        .emit("processing_start", ())
-        .unwrap_or_default();
+    app_handle.emit("processing_start", ()).unwrap_or_default();
 
     // Get app name from cursor context
     let app_name = cursor_context

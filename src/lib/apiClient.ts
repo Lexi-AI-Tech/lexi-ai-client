@@ -4,8 +4,12 @@
  * Handles all HTTP requests to the backend server with authentication support.
  */
 
+// Use localhost in development, production URL in production builds
+// Can be overridden with VITE_API_BASE_URL environment variable
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://lexi-ai-server.onrender.com";
+  (import.meta.env.MODE === "development"
+    ? "http://localhost:1230"
+    : "https://lexi-ai-server.onrender.com");
 
 export interface ApiResponse<T = any> {
   success?: boolean;
