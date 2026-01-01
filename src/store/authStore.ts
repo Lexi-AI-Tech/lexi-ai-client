@@ -32,6 +32,7 @@ export interface AuthState {
   tokens: AuthTokens | null;
   isLoading: boolean;
   error: string | null;
+  isInitialized: boolean;
   setAuthData: (tokens: AuthTokens, user: AuthUser) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
@@ -65,6 +66,8 @@ const loadFromStorage = async () => {
           user = null;
           tokens = null;
           await saveToStorage();
+          storageInitialized = true;
+          notifyListeners();
         } else {
           storageInitialized = true;
           notifyListeners();
@@ -90,6 +93,8 @@ const loadFromStorage = async () => {
           user = null;
           tokens = null;
           await saveToStorage();
+          storageInitialized = true;
+          notifyListeners();
         } else {
           storageInitialized = true;
           notifyListeners();
@@ -101,7 +106,11 @@ const loadFromStorage = async () => {
   } catch (e) {
     console.error("Failed to load auth state:", e);
   }
-  storageInitialized = true;
+  // Always mark as initialized, even if no stored data was found
+  if (!storageInitialized) {
+    storageInitialized = true;
+    notifyListeners();
+  }
 };
 
 // Save to persistent storage
@@ -143,6 +152,9 @@ export const authStore: AuthState = {
   },
   get error() {
     return error;
+  },
+  get isInitialized() {
+    return storageInitialized;
   },
   setAuthData: (newTokens: AuthTokens, newUser: AuthUser) => {
     tokens = newTokens;

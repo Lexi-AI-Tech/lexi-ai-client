@@ -25,9 +25,23 @@ export const TranscriptsList: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  // Clear error on mount to prevent stale error messages
+  useEffect(() => {
+    setError(null);
+  }, []);
+
   // Fetch transcripts function
   const fetchTranscripts = useCallback(async () => {
+    // Wait for auth store to initialize before attempting to fetch
+    if (!authStore.isInitialized) {
+      return;
+    }
+
     if (!authStore.isAuthenticated) {
+      // Clear transcripts when not authenticated (expected state, not an error)
+      setTranscripts([]);
+      setError(null);
+      setLoading(false);
       return;
     }
 
@@ -44,22 +58,61 @@ export const TranscriptsList: React.FC = () => {
       setTotal(response.total);
     } catch (err: any) {
       console.error("Failed to fetch transcripts:", err);
-      setError(err.message || "Failed to load transcripts");
+      
+      // Check error type
+      const errorMessage = err.message || "Failed to load transcripts";
+      const isAuthError = errorMessage.includes("401") || 
+                         errorMessage.includes("403") ||
+                         errorMessage.includes("Unauthorized");
+      
+      // Check for network errors (server unreachable, no internet, etc.)
+      const isNetworkError = err.name === "TypeError" ||
+                            err.name === "NetworkError" ||
+                            errorMessage.includes("Failed to fetch") ||
+                            errorMessage.includes("NetworkError") ||
+                            errorMessage.includes("network") ||
+                            errorMessage.includes("ECONNREFUSED");
+      
+      if (isAuthError) {
+        // Auth error - clear transcripts and let the login prompt show
+        setTranscripts([]);
+        setError(null);
+      } else if (isNetworkError) {
+        // Network error - don't show error on initial load, just log it
+        // User can retry manually if needed
+        console.warn("Network error while fetching transcripts:", err);
+        setTranscripts([]);
+        setError(null); // Don't show network errors as they're often temporary
+      } else {
+        // Other API errors - show error message
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
-  }, [authStore.isAuthenticated, page]);
+  }, [authStore.isAuthenticated, authStore.isInitialized, page]);
 
   // Fetch transcripts when authenticated and page changes
   useEffect(() => {
+    // Wait for auth store to initialize
+    if (!authStore.isInitialized) {
+      setLoading(true);
+      setError(null); // Clear any previous errors while initializing
+      return;
+    }
+
+    // Clear error when auth state changes
+    setError(null);
+
     if (authStore.isAuthenticated) {
       fetchTranscripts();
     } else {
       // Clear transcripts when not authenticated
       setTranscripts([]);
       setError(null);
+      setLoading(false);
     }
-  }, [authStore.isAuthenticated, page, fetchTranscripts]);
+  }, [authStore.isAuthenticated, authStore.isInitialized, page, fetchTranscripts]);
 
   const handleDelete = async (transcriptId: number) => {
     if (!confirm("Are you sure you want to delete this transcript?")) {
@@ -126,8 +179,9 @@ export const TranscriptsList: React.FC = () => {
     }
   };
 
-  // Show login prompt if not authenticated
-  if (!authStore.isAuthenticated) {
+  // Wait for auth store to initialize before showing login prompt
+  // Show login prompt if not authenticated (but only after initialization)
+  if (authStore.isInitialized && !authStore.isAuthenticated) {
     return (
       <div className="settings">
         <h3>Transcripts</h3>

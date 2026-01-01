@@ -18,7 +18,7 @@ type Page = "transcripts" | "settings";
 function App() {
   // Check if onboarding is completed
   const { isCompleted } = useOnboardingStore();
-  const { tokens } = useAuthStore();
+  const { tokens, isInitialized } = useAuthStore();
   const [currentPage, setCurrentPage] = useState<Page>("transcripts");
 
   // Sync auth token to Rust backend whenever it changes
@@ -39,6 +39,11 @@ function App() {
   // Load and sync config from DB on mount
   useEffect(() => {
     const loadAndSyncConfig = async () => {
+      // Wait for auth store to initialize
+      if (!isInitialized) {
+        return;
+      }
+
       if (!tokens?.access_token) {
         return; // Wait for auth
       }
@@ -67,13 +72,29 @@ function App() {
         }
 
         console.log("✅ Config synced to Rust backend:", config);
-      } catch (error) {
-        console.warn("Failed to load config from DB (using defaults):", error);
+      } catch (error: any) {
+        // Check if it's a network error (server not ready, no internet, etc.)
+        const errorMessage = error?.message || String(error);
+        const isNetworkError = error?.name === "TypeError" ||
+                              error?.name === "NetworkError" ||
+                              errorMessage.includes("Failed to fetch") ||
+                              errorMessage.includes("NetworkError") ||
+                              errorMessage.includes("network") ||
+                              errorMessage.includes("ECONNREFUSED") ||
+                              errorMessage.includes("Load failed");
+
+        // Don't show warnings for network errors on startup (they're often temporary)
+        if (isNetworkError) {
+          console.debug("Network error while loading config (will retry on next auth):", error);
+        } else {
+          // Only warn for actual API errors
+          console.warn("Failed to load config from DB (using defaults):", error);
+        }
       }
     };
 
     loadAndSyncConfig();
-  }, [tokens?.access_token]);
+  }, [tokens?.access_token, isInitialized]);
 
   // If onboarding is not completed, show onboarding flow
   if (!isCompleted) {

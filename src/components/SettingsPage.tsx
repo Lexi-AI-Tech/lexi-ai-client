@@ -29,7 +29,7 @@ const SUPPORTED_LANGUAGES = [
 ];
 
 export const SettingsPage: React.FC = () => {
-  const { tokens } = useAuthStore();
+  const { tokens, isInitialized } = useAuthStore();
   const [currentLanguage, setCurrentLanguage] = useState<string>("en");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
   const [systemType, setSystemType] = useState<"mac" | "windows">("mac");
@@ -44,6 +44,12 @@ export const SettingsPage: React.FC = () => {
   // Load current config from DB on mount and when auth token changes
   useEffect(() => {
     const loadConfig = async () => {
+      // Wait for auth store to initialize
+      if (!isInitialized) {
+        setIsLoading(true);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
 
@@ -65,30 +71,56 @@ export const SettingsPage: React.FC = () => {
               await invoke("set_language", { language: config.language });
             }
           } catch (dbErr: any) {
-            console.warn(
-              "Failed to load config from DB, using defaults:",
-              dbErr,
-            );
-            if (
-              dbErr?.message?.includes("401") ||
-              dbErr?.message?.includes("Unauthorized")
+            // Check if it's a network error
+            const errorMessage = dbErr?.message || String(dbErr);
+            const isNetworkError = dbErr?.name === "TypeError" ||
+                                  dbErr?.name === "NetworkError" ||
+                                  errorMessage.includes("Failed to fetch") ||
+                                  errorMessage.includes("NetworkError") ||
+                                  errorMessage.includes("network") ||
+                                  errorMessage.includes("ECONNREFUSED") ||
+                                  errorMessage.includes("Load failed");
+
+            if (isNetworkError) {
+              // Network errors are temporary, don't show error
+              console.debug("Network error while loading config:", dbErr);
+            } else if (
+              errorMessage.includes("401") ||
+              errorMessage.includes("Unauthorized")
             ) {
               setError("Please log in to save your configuration");
+            } else {
+              console.warn(
+                "Failed to load config from DB, using defaults:",
+                dbErr,
+              );
             }
           }
         } else {
           console.log("User not authenticated, using default config");
         }
       } catch (err: any) {
-        console.error("Failed to load config:", err);
-        setError(err?.message || "Failed to load configuration");
+        // Check if it's a network error
+        const errorMessage = err?.message || String(err);
+        const isNetworkError = err?.name === "TypeError" ||
+                              err?.name === "NetworkError" ||
+                              errorMessage.includes("Failed to fetch") ||
+                              errorMessage.includes("NetworkError") ||
+                              errorMessage.includes("network") ||
+                              errorMessage.includes("ECONNREFUSED") ||
+                              errorMessage.includes("Load failed");
+
+        if (!isNetworkError) {
+          console.error("Failed to load config:", err);
+          setError(errorMessage || "Failed to load configuration");
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     loadConfig();
-  }, [tokens?.access_token]);
+  }, [tokens?.access_token, isInitialized]);
 
   // Load autostart status on mount
   useEffect(() => {
