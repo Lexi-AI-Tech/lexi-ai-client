@@ -107,9 +107,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     // Listen for postMessage (when opened from web)
     window.addEventListener("message", handleMessage);
 
-    // Note: We no longer listen for storage events since auth is stored in OS keychain
-    // The auth store will handle loading from secure storage on initialization
-
     return () => {
       window.removeEventListener("message", handleMessage);
     };
@@ -347,30 +344,14 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       // Logout from backend first (revokes all sessions)
       await backendLogout();
 
-      // Clear Rust backend auth token
-      try {
-        await invoke("set_auth_token", { token: null });
-        console.log("✅ Auth token cleared from Rust backend");
-      } catch (error) {
-        console.warn("Failed to clear Rust backend token:", error);
-        // Continue with logout even if this fails
-      }
-
       // Clear local auth state
       clearAuth();
 
       console.log("✅ Logout successful");
     } catch (error) {
       console.error("Logout Failed:", error);
-      // Still clear local auth even if logout fails
-      clearAuth();
 
-      // Still try to clear Rust backend token
-      try {
-        await invoke("set_auth_token", { token: null });
-      } catch (rustError) {
-        console.warn("Failed to clear Rust backend token:", rustError);
-      }
+      clearAuth();
     } finally {
       setLocalLoading(false);
       setLoading(false);

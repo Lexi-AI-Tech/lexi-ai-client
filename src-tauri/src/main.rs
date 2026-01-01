@@ -86,8 +86,8 @@ use commands::app_config::{
     is_autostart_enabled, set_config_value, set_language, update_app_config,
 };
 use commands::auth::{
-    clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, set_auth_token,
-    start_google_login, store_auth_data,
+    clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, start_google_login,
+    store_auth_data,
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
@@ -174,7 +174,6 @@ pub fn main() {
             open_devtools,
             start_google_login,
             get_pkce_verifier,
-            set_auth_token,
             set_language,
             get_language,
             enable_autostart,

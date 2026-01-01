@@ -12,7 +12,7 @@
 //! - **Text Injection**: The result from `perform_action` is injected instead of the
 //!   original transcription
 
-use crate::commands::auth::get_auth_token_internal;
+use crate::commands::auth::get_auth_token;
 use crate::config;
 use crate::cursor_context::CursorContext;
 use reqwest::multipart;
@@ -222,8 +222,8 @@ pub async fn perform_action(
         println!("⚠️  Failed to capture screen for action");
     }
 
-    // Get authentication token from secure storage (OS keychain or Tauri Store)
-    let auth_token = get_auth_token_internal(&app_handle);
+    // Get authentication token from secure storage
+    let auth_token = get_auth_token(&app_handle);
 
     if auth_token.is_none() {
         eprintln!("⚠️  Warning: No authentication token available. Action will fail.");

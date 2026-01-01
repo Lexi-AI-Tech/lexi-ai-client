@@ -20,7 +20,10 @@ use tauri::AppHandle;
 // Authentication Data Types
 // ============================================================================
 
-/// Request structure for storing authentication data
+/// Request structure for storing authentication data (frontend interface)
+///
+/// This is the public-facing type used in Tauri commands. It's converted to
+/// `AuthData` internally for storage operations.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthDataRequest {
     pub access_token: String,
@@ -30,12 +33,57 @@ pub struct AuthDataRequest {
     pub user: Option<UserDataRequest>,
 }
 
-/// User data structure for authentication
+/// User data structure for authentication (frontend interface)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserDataRequest {
     pub email: String,
     pub name: String,
     pub picture: Option<String>,
+}
+
+// Conversion implementations for cleaner code
+impl From<AuthDataRequest> for AuthData {
+    fn from(request: AuthDataRequest) -> Self {
+        Self {
+            access_token: request.access_token,
+            refresh_token: request.refresh_token,
+            expires_at: request.expires_at,
+            expires_in: request.expires_in,
+            user: request.user.map(Into::into),
+        }
+    }
+}
+
+impl From<AuthData> for AuthDataRequest {
+    fn from(data: AuthData) -> Self {
+        Self {
+            access_token: data.access_token,
+            refresh_token: data.refresh_token,
+            expires_at: data.expires_at,
+            expires_in: data.expires_in,
+            user: data.user.map(Into::into),
+        }
+    }
+}
+
+impl From<UserDataRequest> for UserData {
+    fn from(request: UserDataRequest) -> Self {
+        Self {
+            email: request.email,
+            name: request.name,
+            picture: request.picture,
+        }
+    }
+}
+
+impl From<UserData> for UserDataRequest {
+    fn from(data: UserData) -> Self {
+        Self {
+            email: data.email,
+            name: data.name,
+            picture: data.picture,
+        }
+    }
 }
 
 // ============================================================================
@@ -52,18 +100,7 @@ pub struct UserDataRequest {
 /// * `data` - Authentication data including tokens and user information
 #[tauri::command]
 pub async fn store_auth_data(app: AppHandle, data: AuthDataRequest) -> Result<(), String> {
-    let auth_data = AuthData {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_at: data.expires_at,
-        expires_in: data.expires_in,
-        user: data.user.map(|u| UserData {
-            email: u.email,
-            name: u.name,
-            picture: u.picture,
-        }),
-    };
-
+    let auth_data: AuthData = data.into();
     secure_storage::store_auth_data(&app, &auth_data)?;
     Ok(())
 }
@@ -78,20 +115,7 @@ pub async fn store_auth_data(app: AppHandle, data: AuthDataRequest) -> Result<()
 /// * `Option<AuthDataRequest>` - Authentication data if found, None otherwise
 #[tauri::command]
 pub async fn get_auth_data(app: AppHandle) -> Result<Option<AuthDataRequest>, String> {
-    match secure_storage::get_auth_data(&app)? {
-        Some(data) => Ok(Some(AuthDataRequest {
-            access_token: data.access_token,
-            refresh_token: data.refresh_token,
-            expires_at: data.expires_at,
-            expires_in: data.expires_in,
-            user: data.user.map(|u| UserDataRequest {
-                email: u.email,
-                name: u.name,
-                picture: u.picture,
-            }),
-        })),
-        None => Ok(None),
-    }
+    Ok(secure_storage::get_auth_data(&app)?.map(Into::into))
 }
 
 /// Clear all authentication data
@@ -119,21 +143,21 @@ pub async fn has_auth_data(app: AppHandle) -> Result<bool, String> {
 }
 
 // ============================================================================
-// Internal Functions (Rust Code Only)
+// Internal Helper Functions
 // ============================================================================
 
-/// Get the current authentication token (internal function)
+/// Get the current authentication token (helper for internal Rust code)
 ///
-/// Reads directly from secure storage (OS keychain in production, Tauri Store in dev).
-/// This is the internal function used by Rust code. For frontend access, use the
-/// `get_auth_data` Tauri command instead.
+/// Convenience function that reads from secure storage and returns just the access token.
+/// For full auth data, use `get_auth_data()` instead. This is used internally by Rust code
+/// that only needs the token for API requests.
 ///
 /// # Arguments
 /// * `app` - The Tauri AppHandle to access secure storage
 ///
 /// # Returns
 /// * `Option<String>` - The current access token if available, None otherwise
-pub fn get_auth_token_internal(app: &AppHandle) -> Option<String> {
+pub fn get_auth_token(app: &AppHandle) -> Option<String> {
     // Read directly from secure storage (no in-memory cache)
     match secure_storage::get_auth_data(app) {
         Ok(Some(auth_data)) => Some(auth_data.access_token),
@@ -143,24 +167,6 @@ pub fn get_auth_token_internal(app: &AppHandle) -> Option<String> {
             None
         }
     }
-}
-
-// ============================================================================
-// Legacy Commands (Backward Compatibility)
-// ============================================================================
-
-/// Set the authentication token from frontend
-///
-/// This command is kept for backward compatibility but is now a no-op.
-/// The frontend should use `store_auth_data` to persist tokens.
-/// Tokens are read directly from secure storage when needed.
-///
-/// # Arguments
-/// * `token` - Optional access token (ignored, kept for API compatibility)
-#[tauri::command]
-pub fn set_auth_token(_token: Option<String>) {
-    // No-op: Tokens are now stored via store_auth_data and read directly from keychain
-    println!("🔐 set_auth_token called (no-op - tokens are read directly from secure storage)");
 }
 
 // ============================================================================

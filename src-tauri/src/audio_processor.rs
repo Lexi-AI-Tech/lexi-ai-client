@@ -10,7 +10,7 @@
 
 use crate::actions::{check_action_trigger, perform_action};
 use crate::commands::app_config::get_language_internal;
-use crate::commands::auth::get_auth_token_internal;
+use crate::commands::auth::get_auth_token;
 use crate::shortcuts::check_command;
 use crate::state::TranscriptionTaskState;
 use crate::stt_service::SttService;
@@ -64,8 +64,8 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .emit("processing_start", ())
             .unwrap_or_default();
 
-        // Get authentication token from secure storage (OS keychain or Tauri Store)
-        let auth_token = get_auth_token_internal(&app_handle_for_task);
+        // Get authentication token from secure storage
+        let auth_token = get_auth_token(&app_handle_for_task);
 
         if auth_token.is_none() {
             eprintln!(
