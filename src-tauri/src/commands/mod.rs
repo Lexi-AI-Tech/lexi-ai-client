@@ -3,6 +3,7 @@
 //! This module organizes all Tauri commands (invokable functions from the frontend)
 //! into logical groups for better code organization.
 
+pub mod app_config;
 pub mod auth;
 pub mod config;
 pub mod hotkey;

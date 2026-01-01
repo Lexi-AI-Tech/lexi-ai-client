@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
-import { getAppConfig, updateAppConfig } from "../lib/apiClient";
-import { useAuthStore } from "../store/authStore";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = [
@@ -29,10 +27,8 @@ const SUPPORTED_LANGUAGES = [
 ];
 
 export const SettingsPage: React.FC = () => {
-  const { tokens, isInitialized } = useAuthStore();
-  const [currentLanguage, setCurrentLanguage] = useState<string>("en");
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
-  const [systemType, setSystemType] = useState<"mac" | "windows">("mac");
+  const [currentLanguage, setCurrentLanguage] = useState<string>("auto");
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("auto");
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,88 +37,28 @@ export const SettingsPage: React.FC = () => {
   const [isCheckingAutostart, setIsCheckingAutostart] = useState(true);
   const [isTogglingAutostart, setIsTogglingAutostart] = useState(false);
 
-  // Load current config from DB on mount and when auth token changes
+  // Load current language from Tauri Store on mount
   useEffect(() => {
-    const loadConfig = async () => {
-      // Wait for auth store to initialize
-      if (!isInitialized) {
-        setIsLoading(true);
-        return;
-      }
-
+    const loadLanguage = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Detect system type
-        const { getDeviceInfo } = await import("../lib/deviceInfo");
-        const deviceInfo = getDeviceInfo();
-        const detectedSystemType = deviceInfo.system_type || "mac";
-        setSystemType(detectedSystemType);
-
-        // Load from DB only if user is authenticated
-        if (tokens?.access_token) {
-          try {
-            const config = await getAppConfig(detectedSystemType);
-            if (config.language) {
-              setCurrentLanguage(config.language);
-              setSelectedLanguage(config.language);
-              // Update Rust backend with DB language
-              await invoke("set_language", { language: config.language });
-            }
-          } catch (dbErr: any) {
-            // Check if it's a network error
-            const errorMessage = dbErr?.message || String(dbErr);
-            const isNetworkError =
-              dbErr?.name === "TypeError" ||
-              dbErr?.name === "NetworkError" ||
-              errorMessage.includes("Failed to fetch") ||
-              errorMessage.includes("NetworkError") ||
-              errorMessage.includes("network") ||
-              errorMessage.includes("ECONNREFUSED") ||
-              errorMessage.includes("Load failed");
-
-            if (isNetworkError) {
-              // Network errors are temporary, don't show error
-              console.debug("Network error while loading config:", dbErr);
-            } else if (
-              errorMessage.includes("401") ||
-              errorMessage.includes("Unauthorized")
-            ) {
-              setError("Please log in to save your configuration");
-            } else {
-              console.warn(
-                "Failed to load config from DB, using defaults:",
-                dbErr,
-              );
-            }
-          }
-        } else {
-          console.log("User not authenticated, using default config");
+        const language = await invoke<string | null>("get_language");
+        if (language) {
+          setCurrentLanguage(language);
+          setSelectedLanguage(language);
         }
       } catch (err: any) {
-        // Check if it's a network error
-        const errorMessage = err?.message || String(err);
-        const isNetworkError =
-          err?.name === "TypeError" ||
-          err?.name === "NetworkError" ||
-          errorMessage.includes("Failed to fetch") ||
-          errorMessage.includes("NetworkError") ||
-          errorMessage.includes("network") ||
-          errorMessage.includes("ECONNREFUSED") ||
-          errorMessage.includes("Load failed");
-
-        if (!isNetworkError) {
-          console.error("Failed to load config:", err);
-          setError(errorMessage || "Failed to load configuration");
-        }
+        console.error("Failed to load language:", err);
+        setError(err?.message || "Failed to load language setting");
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadConfig();
-  }, [tokens?.access_token, isInitialized]);
+    loadLanguage();
+  }, []);
 
   // Load autostart status on mount
   useEffect(() => {
@@ -153,47 +89,12 @@ export const SettingsPage: React.FC = () => {
     setSuccess(false);
 
     try {
-      // Update Rust backend if language changed (works even without auth)
-      if (languageChanged) {
-        await invoke("set_language", { language: selectedLanguage });
-      }
-
-      // Save to DB only if user is authenticated
-      if (tokens?.access_token) {
-        const updateData: {
-          system_type: string;
-          language: string;
-        } = {
-          system_type: systemType,
-          language: selectedLanguage,
-        };
-
-        await updateAppConfig(updateData);
-
-        // Reload config from DB to get the latest values
-        try {
-          const updatedConfig = await getAppConfig(systemType);
-          if (updatedConfig.language) {
-            setCurrentLanguage(updatedConfig.language);
-            setSelectedLanguage(updatedConfig.language);
-          }
-        } catch (reloadErr) {
-          console.warn("Failed to reload config after update:", reloadErr);
-          // Still update local state even if reload fails
-          if (languageChanged) {
-            setCurrentLanguage(selectedLanguage);
-          }
-        }
-      } else {
-        // If not authenticated, just update local state
-        console.log(
-          "User not authenticated, saving only to local Rust backend",
-        );
-        if (languageChanged) {
-          setCurrentLanguage(selectedLanguage);
-        }
-      }
-
+      // Save to Tauri Store (persists locally, no auth required)
+      await invoke("set_language", { language: selectedLanguage });
+      
+      // Update local state
+      setCurrentLanguage(selectedLanguage);
+      
       setSuccess(true);
       setIsUpdating(false);
 
@@ -271,22 +172,6 @@ export const SettingsPage: React.FC = () => {
           Transcription
         </h3>
 
-        {!tokens?.access_token && (
-          <div
-            className="permission-message"
-            style={{
-              background: "rgba(255, 193, 7, 0.1)",
-              borderColor: "rgba(255, 193, 7, 0.2)",
-              color: "rgba(255, 193, 7, 0.9)",
-              fontSize: "11px",
-              padding: "8px",
-              marginBottom: "12px",
-            }}
-          >
-            Please log in to save your configuration to the cloud. Changes will
-            only be saved locally until you log in.
-          </div>
-        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           <div>

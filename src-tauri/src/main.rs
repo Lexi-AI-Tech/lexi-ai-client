@@ -83,8 +83,9 @@ use permissions::{
     request_screen_recording_permission,
 };
 
+use commands::app_config::{get_app_config, get_config_value, set_config_value, update_app_config};
 use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
-use commands::config::{disable_autostart, enable_autostart, is_autostart_enabled, set_language};
+use commands::config::{disable_autostart, enable_autostart, get_language, is_autostart_enabled, set_language};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
@@ -177,6 +178,7 @@ pub fn main() {
             get_pkce_verifier,
             set_auth_token,
             set_language,
+            get_language,
             enable_autostart,
             disable_autostart,
             is_autostart_enabled,
@@ -187,7 +189,11 @@ pub fn main() {
             store_auth_data_secure,
             get_auth_data_secure,
             clear_auth_data_secure,
-            has_auth_data_secure
+            has_auth_data_secure,
+            get_app_config,
+            update_app_config,
+            get_config_value,
+            set_config_value
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
@@ -216,6 +222,20 @@ pub fn main() {
                 println!("🔗 Deep link received: {:?}", event.urls());
                 // Show and focus the main window when deep link is received
                 show_and_focus_main_window(&app_handle_clone);
+            });
+
+            // Load app config from Tauri Store and sync to in-memory state
+            let app_handle_for_config = app_handle.clone();
+            let language_state = app_handle.state::<LanguageState>();
+            std::thread::spawn(move || {
+                if let Ok(config) = get_app_config(app_handle_for_config.clone()) {
+                    if let Some(lang) = config.language {
+                        if let Ok(mut language_guard) = language_state.language.lock() {
+                            *language_guard = Some(lang.clone());
+                            println!("✅ Loaded language from Tauri Store: {:?}", lang);
+                        }
+                    }
+                }
             });
 
             // Preload Whisper model in background to reduce first transcription latency

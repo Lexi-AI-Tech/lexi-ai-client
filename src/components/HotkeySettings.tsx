@@ -9,8 +9,6 @@ import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { HotkeyInput, HotkeyConfig } from "./HotkeyInput";
-import { getAppConfig, updateAppConfig } from "../lib/apiClient";
-import { useAuthStore } from "../store/authStore";
 
 const DEFAULT_HOTKEY: HotkeyConfig = {
   hotkey: "Fn",
@@ -41,7 +39,6 @@ const SUPPORTED_LANGUAGES = [
 ];
 
 export const HotkeySettings: React.FC = () => {
-  const { tokens } = useAuthStore();
   const [currentHotkey, setCurrentHotkey] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
   const [selectedHotkey, setSelectedHotkey] =
@@ -54,7 +51,7 @@ export const HotkeySettings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Load current config from DB on mount and when auth token changes
+  // Load current config on mount
   useEffect(() => {
     const loadConfig = async () => {
       setIsLoading(true);
@@ -67,7 +64,7 @@ export const HotkeySettings: React.FC = () => {
         const detectedSystemType = deviceInfo.system_type || "mac";
         setSystemType(detectedSystemType);
 
-        // Always load from Rust backend first (for hotkey)
+        // Load hotkey from Rust backend
         try {
           const hotkeyJson = await invoke<string>("get_current_hotkey");
           const hotkey: HotkeyConfig = JSON.parse(hotkeyJson);
@@ -77,38 +74,15 @@ export const HotkeySettings: React.FC = () => {
           console.warn("Failed to load hotkey from Rust backend:", rustErr);
         }
 
-        // Load from DB only if user is authenticated
-        if (tokens?.access_token) {
-          try {
-            const config = await getAppConfig(detectedSystemType);
-            if (config.hotkey) {
-              const dbHotkey: HotkeyConfig = { hotkey: config.hotkey };
-              setCurrentHotkey(dbHotkey);
-              setSelectedHotkey(dbHotkey);
-              // Update Rust backend with DB hotkey
-              await invoke("update_hotkey", {
-                configJson: JSON.stringify(dbHotkey),
-              });
-            }
-            if (config.language) {
-              setCurrentLanguage(config.language);
-              setSelectedLanguage(config.language);
-            }
-          } catch (dbErr: any) {
-            console.warn(
-              "Failed to load config from DB, using defaults:",
-              dbErr,
-            );
-            // If DB fails, we'll use the Rust backend values as defaults
-            if (
-              dbErr?.message?.includes("401") ||
-              dbErr?.message?.includes("Unauthorized")
-            ) {
-              setError("Please log in to save your configuration");
-            }
+        // Load language from Tauri Store
+        try {
+          const language = await invoke<string | null>("get_language");
+          if (language) {
+            setCurrentLanguage(language);
+            setSelectedLanguage(language);
           }
-        } else {
-          console.log("User not authenticated, using default config");
+        } catch (langErr) {
+          console.warn("Failed to load language from Tauri Store:", langErr);
         }
       } catch (err: any) {
         console.error("Failed to load config:", err);
@@ -119,7 +93,7 @@ export const HotkeySettings: React.FC = () => {
     };
 
     loadConfig();
-  }, [tokens?.access_token]);
+  }, []);
 
   // Listen for hotkey updates from backend
   useEffect(() => {
@@ -175,60 +149,15 @@ export const HotkeySettings: React.FC = () => {
         await invoke("update_hotkey", { configJson });
       }
 
-      // Update Rust backend if language changed (works even without auth)
+      // Update Rust backend if language changed (saves to Tauri Store)
       if (languageChanged) {
         await invoke("set_language", { language: selectedLanguage });
+        setCurrentLanguage(selectedLanguage);
       }
 
-      // Save to DB only if user is authenticated
-      if (tokens?.access_token) {
-        // Save to DB (both hotkey and language) with system type
-        // Always send both values to ensure consistency
-        const updateData: {
-          system_type: string;
-          hotkey: string;
-          language: string;
-        } = {
-          system_type: systemType,
-          hotkey: selectedHotkey.hotkey,
-          language: selectedLanguage,
-        };
-
-        await updateAppConfig(updateData);
-
-        // Reload config from DB to get the latest values
-        try {
-          const updatedConfig = await getAppConfig(systemType);
-          if (updatedConfig.hotkey) {
-            const dbHotkey: HotkeyConfig = { hotkey: updatedConfig.hotkey };
-            setCurrentHotkey(dbHotkey);
-            setSelectedHotkey(dbHotkey);
-          }
-          if (updatedConfig.language) {
-            setCurrentLanguage(updatedConfig.language);
-            setSelectedLanguage(updatedConfig.language);
-          }
-        } catch (reloadErr) {
-          console.warn("Failed to reload config after update:", reloadErr);
-          // Still update local state even if reload fails
-          if (hotkeyChanged) {
-            setCurrentHotkey(selectedHotkey);
-          }
-          if (languageChanged) {
-            setCurrentLanguage(selectedLanguage);
-          }
-        }
-      } else {
-        // If not authenticated, just update local state
-        console.log(
-          "User not authenticated, saving only to local Rust backend",
-        );
-        if (hotkeyChanged) {
-          setCurrentHotkey(selectedHotkey);
-        }
-        if (languageChanged) {
-          setCurrentLanguage(selectedLanguage);
-        }
+      // Update local state for hotkey (hotkey is already saved via update_hotkey command)
+      if (hotkeyChanged) {
+        setCurrentHotkey(selectedHotkey);
       }
 
       setSuccess(true);
@@ -266,22 +195,6 @@ export const HotkeySettings: React.FC = () => {
     <div className="settings">
       <h3>Hotkey Settings</h3>
 
-      {!tokens?.access_token && (
-        <div
-          className="permission-message"
-          style={{
-            background: "rgba(255, 193, 7, 0.1)",
-            borderColor: "rgba(255, 193, 7, 0.2)",
-            color: "rgba(255, 193, 7, 0.9)",
-            fontSize: "11px",
-            padding: "8px",
-            marginBottom: "12px",
-          }}
-        >
-          Please log in to save your configuration to the cloud. Changes will
-          only be saved locally until you log in.
-        </div>
-      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         <div>

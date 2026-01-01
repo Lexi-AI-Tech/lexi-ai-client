@@ -12,14 +12,13 @@ import { useAuthStore } from "./store/authStore";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { SettingsPage } from "./components/SettingsPage";
 import { Sidebar } from "./components/Sidebar";
-import { waitForNetwork, waitForStartupDelay } from "./lib/networkUtils";
 
 type Page = "transcripts" | "settings";
 
 function App() {
   // Check if onboarding is completed
   const { isCompleted } = useOnboardingStore();
-  const { tokens, isInitialized } = useAuthStore();
+  const { tokens } = useAuthStore();
   const [currentPage, setCurrentPage] = useState<Page>("transcripts");
 
   // Sync auth token to Rust backend whenever it changes
@@ -37,90 +36,8 @@ function App() {
     syncAuthToken();
   }, [tokens?.access_token]);
 
-  // Load and sync config from DB on mount
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadAndSyncConfig = async () => {
-      // Wait for auth store to initialize
-      if (!isInitialized) {
-        return;
-      }
-
-      if (!tokens?.access_token) {
-        return; // Wait for auth
-      }
-
-      // Wait for network to be available (especially important on auto-startup)
-      await waitForStartupDelay(2000);
-      if (cancelled) return;
-
-      const isOnline = await waitForNetwork(3, 1000);
-      if (cancelled) return;
-
-      if (!isOnline) {
-        console.debug("Network not available, skipping config load");
-        return;
-      }
-
-      try {
-        const { getAppConfig } = await import("./lib/apiClient");
-        const { getDeviceInfo } = await import("./lib/deviceInfo");
-
-        // Detect system type
-        const deviceInfo = getDeviceInfo();
-        const systemType = deviceInfo.system_type || "mac";
-
-        const config = await getAppConfig(systemType);
-
-        // Sync hotkey to Rust backend
-        if (config.hotkey) {
-          const hotkeyConfig = { hotkey: config.hotkey };
-          await invoke("update_hotkey", {
-            configJson: JSON.stringify(hotkeyConfig),
-          });
-        }
-
-        // Sync language to Rust backend
-        if (config.language) {
-          await invoke("set_language", { language: config.language });
-        }
-
-        console.log("✅ Config synced to Rust backend:", config);
-      } catch (error: any) {
-        // Check if it's a network error (server not ready, no internet, etc.)
-        const errorMessage = error?.message || String(error);
-        const isNetworkError =
-          error?.name === "TypeError" ||
-          error?.name === "NetworkError" ||
-          errorMessage.includes("Failed to fetch") ||
-          errorMessage.includes("NetworkError") ||
-          errorMessage.includes("network") ||
-          errorMessage.includes("ECONNREFUSED") ||
-          errorMessage.includes("Load failed");
-
-        // Don't show warnings for network errors on startup (they're often temporary)
-        if (isNetworkError) {
-          console.debug(
-            "Network error while loading config (will retry on next auth):",
-            error,
-          );
-        } else {
-          // Only warn for actual API errors
-          console.warn(
-            "Failed to load config from DB (using defaults):",
-            error,
-          );
-        }
-      }
-    };
-
-    loadAndSyncConfig();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [tokens?.access_token, isInitialized]);
+  // Note: Language config is now loaded from Tauri Store on app startup in Rust
+  // Hotkey config is managed separately via the hotkey commands
 
   // If onboarding is not completed, show onboarding flow
   if (!isCompleted) {
