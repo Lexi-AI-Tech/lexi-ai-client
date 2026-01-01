@@ -92,7 +92,6 @@ async function refreshAccessToken(): Promise<string | null> {
     if (data.access_token) {
       // Update tokens in auth store
       try {
-        const { authStore } = await import("../store/authStore");
         if (authStore.tokens && authStore.user) {
           authStore.setAuthData(
             {
@@ -131,7 +130,6 @@ export async function authenticatedFetch(
 ): Promise<Response> {
   // Proactively refresh token if it's expiring soon
   try {
-    const { authStore } = await import("../store/authStore");
     await authStore.refreshTokenIfNeeded();
   } catch (e) {
     // Ignore errors in proactive refresh, will handle on 401
@@ -163,7 +161,6 @@ export async function authenticatedFetch(
       });
     } else {
       // Refresh failed, clear auth
-      const { authStore } = await import("../store/authStore");
       authStore.clearAuth();
       // Dispatch event to notify app of auth failure
       window.dispatchEvent(new CustomEvent("auth-expired"));
