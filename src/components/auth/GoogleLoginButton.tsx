@@ -32,7 +32,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   // Check auth store for tokens (auth store loads from secure storage)
   const checkStoredAuth = React.useCallback(() => {
     try {
-
       // Wait for auth store to initialize
       if (!authStore.isInitialized) {
         return false;
