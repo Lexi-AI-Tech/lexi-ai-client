@@ -74,6 +74,12 @@ const loadFromStorage = async () => {
         }
       } catch (e) {
         console.error("Failed to parse stored auth data:", e);
+        // Clear potentially corrupted data
+        try {
+          localStorage.removeItem("lexi-auth");
+        } catch (clearErr) {
+          // Ignore clear errors
+        }
       }
     }
 
@@ -82,9 +88,14 @@ const loadFromStorage = async () => {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        isAuthenticated = parsed.isAuthenticated || false;
-        user = parsed.user || null;
-        tokens = parsed.tokens || null;
+        // Validate parsed data structure
+        if (parsed && typeof parsed === "object") {
+          isAuthenticated = parsed.isAuthenticated || false;
+          user = parsed.user || null;
+          tokens = parsed.tokens || null;
+        } else {
+          throw new Error("Invalid auth data structure");
+        }
 
         // Check if tokens are expired
         if (tokens?.expires_at && tokens.expires_at < Date.now()) {
@@ -101,6 +112,12 @@ const loadFromStorage = async () => {
         }
       } catch (e) {
         console.error("Failed to parse stored auth data:", e);
+        // Clear potentially corrupted data
+        try {
+          await removeStorageItem("lexi-auth");
+        } catch (clearErr) {
+          // Ignore clear errors
+        }
       }
     }
   } catch (e) {

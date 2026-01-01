@@ -14,6 +14,7 @@ import {
   type PaginatedTranscriptsResponse,
 } from "../lib/apiClient";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();
