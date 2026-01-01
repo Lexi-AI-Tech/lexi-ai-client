@@ -1,10 +1,12 @@
 //! Secure Storage Commands
 //!
-//! Provides Tauri commands for securely storing and retrieving authentication tokens
-//! using OS keychain/credential manager instead of plaintext storage.
+//! Provides Tauri commands for securely storing and retrieving authentication tokens.
+//! In dev mode: Uses Tauri Store (to avoid keychain prompts)
+//! In production: Uses OS keychain/credential manager
 
 use crate::secure_storage::{self, AuthData, UserData};
 use serde::{Deserialize, Serialize};
+use tauri::AppHandle;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthDataRequest {
@@ -22,12 +24,12 @@ pub struct UserDataRequest {
     pub picture: Option<String>,
 }
 
-/// Store authentication data securely in OS keychain
+/// Store authentication data securely
 ///
-/// This command stores JWT tokens in the OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
-/// which provides encryption at rest and OS-level access control.
+/// In dev mode: Uses Tauri Store (to avoid keychain prompts)
+/// In production: Uses OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
 #[tauri::command]
-pub async fn store_auth_data_secure(data: AuthDataRequest) -> Result<(), String> {
+pub async fn store_auth_data_secure(app: AppHandle, data: AuthDataRequest) -> Result<(), String> {
     let auth_data = AuthData {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
@@ -40,17 +42,17 @@ pub async fn store_auth_data_secure(data: AuthDataRequest) -> Result<(), String>
         }),
     };
 
-    secure_storage::store_auth_data(&auth_data)?;
-    println!("✅ Auth data stored securely in OS keychain");
+    secure_storage::store_auth_data(&app, &auth_data)?;
     Ok(())
 }
 
-/// Retrieve authentication data from OS keychain
+/// Retrieve authentication data
 ///
-/// Returns the stored authentication tokens and user data from secure storage.
+/// In dev mode: Uses Tauri Store
+/// In production: Uses OS keychain
 #[tauri::command]
-pub async fn get_auth_data_secure() -> Result<Option<AuthDataRequest>, String> {
-    match secure_storage::get_auth_data()? {
+pub async fn get_auth_data_secure(app: AppHandle) -> Result<Option<AuthDataRequest>, String> {
+    match secure_storage::get_auth_data(&app)? {
         Some(data) => Ok(Some(AuthDataRequest {
             access_token: data.access_token,
             refresh_token: data.refresh_token,
@@ -66,20 +68,21 @@ pub async fn get_auth_data_secure() -> Result<Option<AuthDataRequest>, String> {
     }
 }
 
-/// Clear all authentication data from OS keychain
+/// Clear all authentication data
 ///
-/// Removes all stored tokens and user data from secure storage.
+/// In dev mode: Uses Tauri Store
+/// In production: Uses OS keychain
 #[tauri::command]
-pub async fn clear_auth_data_secure() -> Result<(), String> {
-    secure_storage::clear_auth_data()?;
-    println!("✅ Auth data cleared from OS keychain");
+pub async fn clear_auth_data_secure(app: AppHandle) -> Result<(), String> {
+    secure_storage::clear_auth_data(&app)?;
     Ok(())
 }
 
-/// Check if authentication data exists in keychain
+/// Check if authentication data exists
 ///
-/// Returns true if auth data is stored, false otherwise.
+/// In dev mode: Uses Tauri Store
+/// In production: Uses OS keychain
 #[tauri::command]
-pub async fn has_auth_data_secure() -> Result<bool, String> {
-    secure_storage::has_auth_data()
+pub async fn has_auth_data_secure(app: AppHandle) -> Result<bool, String> {
+    secure_storage::has_auth_data(&app)
 }
