@@ -1,13 +1,16 @@
 //! App Configuration Storage
 //!
 //! This module provides Tauri commands for managing application configuration
-//! using Tauri Store for local persistence. App config includes:
+//! using Tauri Store for local persistence. All configuration is stored directly
+//! in persistent storage with no in-memory caching.
+//!
+//! App config includes:
 //! - Language preference
 //! - Hotkey settings
 //! - Other device-specific settings
 //!
 //! Unlike auth tokens, app config is stored locally and doesn't require
-//! authentication or network access.
+//! authentication or network access. All reads and writes go directly to Tauri Store.
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -35,13 +38,19 @@ impl Default for AppConfig {
 }
 
 /// Get the app configuration from Tauri Store
+///
+/// Reads directly from persistent storage (Tauri Store). Returns default values
+/// if no configuration has been saved yet.
+///
+/// # Returns
+/// * `AppConfig` - The current app configuration or defaults if not found
 #[tauri::command]
 pub fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     let store = app
         .store(STORE_FILE)
         .map_err(|e| format!("Failed to open store: {}", e))?;
 
-    // Try to load config from store
+    // Try to load config from persistent storage
     if let Some(config_value) = store.get("config") {
         match serde_json::from_value::<AppConfig>(config_value.clone()) {
             Ok(config) => {
@@ -54,12 +63,21 @@ pub fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
         }
     }
 
-    // Return defaults if no config found
+    // Return defaults if no config found in persistent storage
     println!("📝 Using default app config");
     Ok(AppConfig::default())
 }
 
 /// Update the app configuration in Tauri Store
+///
+/// Writes directly to persistent storage (Tauri Store). This immediately persists
+/// the configuration with no in-memory caching.
+///
+/// # Arguments
+/// * `config` - The complete app configuration to save
+///
+/// # Returns
+/// * `AppConfig` - The saved configuration
 #[tauri::command]
 pub fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
     let store = app
@@ -69,6 +87,7 @@ pub fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig,
     let config_json =
         serde_json::to_value(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
 
+    // Write directly to persistent storage
     store.set("config", config_json);
     store
         .save()
@@ -78,7 +97,16 @@ pub fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig,
     Ok(config)
 }
 
-/// Get a specific config value
+/// Get a specific config value from Tauri Store
+///
+/// Reads directly from persistent storage. Returns None if the key doesn't exist
+/// or if the config hasn't been initialized yet.
+///
+/// # Arguments
+/// * `key` - The configuration key to retrieve (e.g., "language", "hotkey")
+///
+/// # Returns
+/// * `Option<serde_json::Value>` - The config value if found, None otherwise
 #[tauri::command]
 pub fn get_config_value(app: AppHandle, key: String) -> Result<Option<serde_json::Value>, String> {
     let store = app
@@ -106,14 +134,25 @@ pub fn get_config_value(app: AppHandle, key: String) -> Result<Option<serde_json
     }
 }
 
-/// Set a specific config value
+/// Set a specific config value in Tauri Store
+///
+/// Updates a single configuration value by loading the current config from persistent
+/// storage, updating the specified field, and saving it back. This ensures all
+/// configuration is always persisted immediately.
+///
+/// # Arguments
+/// * `key` - The configuration key to update (e.g., "language", "hotkey")
+/// * `value` - The new value to set
+///
+/// # Returns
+/// * `Result<(), String>` - Ok if successful, error message otherwise
 #[tauri::command]
 pub fn set_config_value(
     app: AppHandle,
     key: String,
     value: serde_json::Value,
 ) -> Result<(), String> {
-    // Load current config
+    // Load current config from persistent storage
     let mut config = get_app_config(app.clone())?;
 
     // Update the specific field
@@ -133,7 +172,7 @@ pub fn set_config_value(
         _ => return Err(format!("Unknown config key: {}", key)),
     }
 
-    // Save updated config
+    // Save updated config back to persistent storage
     update_app_config(app, config)?;
     Ok(())
 }

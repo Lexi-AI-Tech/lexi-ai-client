@@ -2,10 +2,11 @@
 //!
 //! This module handles processing recorded audio data by:
 //! 1. Aborting any ongoing transcription task
-//! 2. Getting the authentication token from AuthTokenState
-//! 3. Sending the WAV audio data to Lexi AI Server API for transcription
-//! 4. Injecting the transcribed text into the active application using TextInjector
-//! 5. Emitting events to the frontend to update UI state
+//! 2. Getting the authentication token from AuthTokenState (in-memory state)
+//! 3. Getting the language preference from Tauri Store (persistent storage)
+//! 4. Sending the WAV audio data to Lexi AI Server API for transcription
+//! 5. Injecting the transcribed text into the active application using TextInjector
+//! 6. Emitting events to the frontend to update UI state
 
 use crate::actions::{check_action_trigger, perform_action};
 use crate::commands::auth::get_auth_token;
@@ -82,7 +83,8 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             );
         }
 
-        // Get language from Tauri Store, default to "auto" if not set
+        // Get language from Tauri Store (persistent storage, no in-memory cache)
+        // Default to "auto" if not set or if read fails
         let language = get_language_internal(&app_handle_for_task)
             .unwrap_or_else(|_| None)
             .unwrap_or_else(|| "auto".to_string());

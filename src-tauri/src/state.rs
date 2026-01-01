@@ -2,6 +2,10 @@
 //!
 //! This module defines all application state structures that are managed by Tauri.
 //! These states are shared across the application and can be accessed via Tauri's state management.
+//!
+//! Note: Application configuration (like language preference) is NOT stored here.
+//! Configuration is stored directly in Tauri Store (persistent storage) via the
+//! `app_config` module. Only runtime state that needs to be in-memory is stored here.
 
 use crate::global_key_listener::HotkeyConfig;
 use std::sync::Mutex;

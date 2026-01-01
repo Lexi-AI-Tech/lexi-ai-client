@@ -1,6 +1,8 @@
 //! Configuration Commands
 //!
-//! This module provides Tauri commands for managing configuration state.
+//! This module provides Tauri commands for managing application configuration.
+//! Configuration values are stored directly in Tauri Store (persistent local storage)
+//! with no in-memory caching. All reads and writes go directly to persistent storage.
 
 use crate::commands::app_config;
 use tauri::AppHandle;
@@ -24,12 +26,16 @@ pub fn set_language(app: AppHandle, language: Option<String>) -> Result<(), Stri
 
 /// Get the current transcription language (internal function)
 ///
-/// Reads directly from Tauri Store.
+/// Reads directly from Tauri Store. This is the internal function used by Rust code.
+/// For frontend access, use the `get_language` Tauri command instead.
+///
+/// # Arguments
+/// * `app` - The Tauri AppHandle to access the store
 ///
 /// # Returns
 /// * `Option<String>` - The current language code if available, None otherwise
 pub fn get_language_internal(app: &AppHandle) -> Result<Option<String>, String> {
-    // Read directly from Tauri Store
+    // Read directly from Tauri Store (no in-memory cache)
     if let Ok(Some(language_value)) =
         app_config::get_config_value(app.clone(), "language".to_string())
     {
@@ -44,7 +50,7 @@ pub fn get_language_internal(app: &AppHandle) -> Result<Option<String>, String> 
 
 /// Get the current transcription language (Tauri command)
 ///
-/// Reads directly from Tauri Store.
+/// Reads directly from Tauri Store. This is the Tauri command wrapper for frontend access.
 ///
 /// # Returns
 /// * `Option<String>` - The current language code if available, None otherwise
