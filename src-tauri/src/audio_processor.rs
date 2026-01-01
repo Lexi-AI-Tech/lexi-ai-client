@@ -81,7 +81,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             );
         }
 
-        // Get language from Tauri Store (persistent storage, no in-memory cache)
+        // Get language from Tauri Store
         // Default to "auto" if not set or if read fails
         let language = get_language_internal(&app_handle_for_task)
             .unwrap_or_else(|_| None)

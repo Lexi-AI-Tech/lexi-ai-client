@@ -6,7 +6,7 @@
 //! ## Configuration Storage (Tauri Store)
 //! - App configuration persistence (language, hotkey, transcription settings)
 //! - Direct read/write operations to persistent storage
-//! - No in-memory caching - all operations go directly to Tauri Store
+//! - All operations go directly to Tauri Store
 //!
 //! ## Language Configuration
 //! - Set/get transcription language preference
@@ -101,8 +101,7 @@ pub fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
 
 /// Update the app configuration in Tauri Store
 ///
-/// Writes directly to persistent storage (Tauri Store). This immediately persists
-/// the configuration with no in-memory caching.
+/// Writes directly to persistent storage (Tauri Store).
 ///
 /// # Arguments
 /// * `config` - The complete app configuration to save
@@ -254,7 +253,7 @@ pub fn set_language(app: AppHandle, language: Option<String>) -> Result<(), Stri
 /// # Returns
 /// * `Option<String>` - The current language code if available, None otherwise
 pub fn get_language_internal(app: &AppHandle) -> Result<Option<String>, String> {
-    // Read directly from Tauri Store (no in-memory cache)
+    // Read directly from Tauri Store
     if let Ok(Some(language_value)) = get_config_value(app.clone(), "language".to_string()) {
         if let Some(lang) = language_value.as_str() {
             return Ok(Some(lang.to_string()));

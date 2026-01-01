@@ -5,7 +5,7 @@
 //!
 //! ## Authentication Storage
 //! - Store/retrieve authentication data from secure storage (OS keychain or Tauri Store)
-//! - All auth data is stored securely and read directly when needed (no in-memory caching)
+//! - All auth data is stored securely and read directly when needed
 //!
 //! ## OAuth Flow
 //! - Google OAuth 2.0 authentication with PKCE
@@ -158,7 +158,7 @@ pub async fn has_auth_data(app: AppHandle) -> Result<bool, String> {
 /// # Returns
 /// * `Option<String>` - The current access token if available, None otherwise
 pub fn get_auth_token(app: &AppHandle) -> Option<String> {
-    // Read directly from secure storage (no in-memory cache)
+    // Read directly from secure storage
     match secure_storage::get_auth_data(app) {
         Ok(Some(auth_data)) => Some(auth_data.access_token),
         Ok(None) => None,
