@@ -37,7 +37,7 @@ export interface AuthData {
  */
 export async function storeAuthDataSecure(data: AuthData): Promise<void> {
   try {
-    await invoke("store_auth_data_secure", {
+    await invoke("store_auth_data", {
       data: {
         access_token: data.access_token,
         refresh_token: data.refresh_token || null,
@@ -64,7 +64,7 @@ export async function storeAuthDataSecure(data: AuthData): Promise<void> {
  */
 export async function getAuthDataSecure(): Promise<AuthData | null> {
   try {
-    const data = await invoke<AuthData | null>("get_auth_data_secure");
+    const data = await invoke<AuthData | null>("get_auth_data");
     return data;
   } catch (error) {
     console.error("Failed to retrieve auth data securely:", error);
@@ -77,7 +77,7 @@ export async function getAuthDataSecure(): Promise<AuthData | null> {
  */
 export async function clearAuthDataSecure(): Promise<void> {
   try {
-    await invoke("clear_auth_data_secure");
+    await invoke("clear_auth_data");
     console.log("✅ Auth data cleared from OS keychain");
   } catch (error) {
     console.error("Failed to clear auth data securely:", error);
@@ -90,7 +90,7 @@ export async function clearAuthDataSecure(): Promise<void> {
  */
 export async function hasAuthDataSecure(): Promise<boolean> {
   try {
-    const hasData = await invoke<boolean>("has_auth_data_secure");
+    const hasData = await invoke<boolean>("has_auth_data");
     return hasData;
   } catch (error) {
     console.error("Failed to check auth data:", error);
