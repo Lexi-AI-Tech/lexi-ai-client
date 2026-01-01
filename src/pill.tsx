@@ -82,12 +82,15 @@ const Pill: React.FC = () => {
         });
 
         // Listen for action success
-        const unlistenActionSuccess = await listen("action_success", async () => {
-          setStatus("idle");
-          // Resize window to thin rectangular size
-          const window = getCurrentWindow();
-          await window.setSize(new LogicalSize(40, 6.6));
-        });
+        const unlistenActionSuccess = await listen(
+          "action_success",
+          async () => {
+            setStatus("idle");
+            // Resize window to thin rectangular size
+            const window = getCurrentWindow();
+            await window.setSize(new LogicalSize(40, 6.6));
+          },
+        );
 
         // Listen for action error
         const unlistenActionError = await listen("action_error", async () => {
