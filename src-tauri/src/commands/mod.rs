@@ -5,7 +5,6 @@
 
 pub mod app_config;
 pub mod auth;
-pub mod config;
 pub mod hotkey;
 pub mod pill;
 pub mod secure_storage;

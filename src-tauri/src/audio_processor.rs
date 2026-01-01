@@ -9,8 +9,8 @@
 //! 6. Emitting events to the frontend to update UI state
 
 use crate::actions::{check_action_trigger, perform_action};
+use crate::commands::app_config::get_language_internal;
 use crate::commands::auth::get_auth_token;
-use crate::commands::config::get_language_internal;
 use crate::shortcuts::check_command;
 use crate::state::{AuthTokenState, TranscriptionTaskState};
 use crate::stt_service::SttService;

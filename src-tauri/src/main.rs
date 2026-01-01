@@ -81,11 +81,11 @@ use permissions::{
     request_screen_recording_permission,
 };
 
-use commands::app_config::{get_app_config, get_config_value, set_config_value, update_app_config};
-use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
-use commands::config::{
-    disable_autostart, enable_autostart, get_language, is_autostart_enabled, set_language,
+use commands::app_config::{
+    disable_autostart, enable_autostart, get_app_config, get_config_value, get_language,
+    is_autostart_enabled, set_config_value, set_language, update_app_config,
 };
+use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };

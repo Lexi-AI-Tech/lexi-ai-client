@@ -1,19 +1,20 @@
 //! App Configuration Storage
 //!
-//! This module provides Tauri commands for managing application configuration
-//! using Tauri Store for local persistence. All configuration is stored directly
-//! in persistent storage with no in-memory caching.
+//! This module provides Tauri commands for managing application configuration.
+//! Configuration values are stored directly in Tauri Store (persistent local storage)
+//! with no in-memory caching. All reads and writes go directly to persistent storage.
 //!
-//! App config includes:
-//! - Language preference
-//! - Hotkey settings
-//! - Other device-specific settings
+//! This module handles:
+//! - App configuration storage (language, hotkey, etc.) in Tauri Store
+//! - Language preference commands
+//! - Auto-startup configuration (OS-level settings)
 //!
 //! Unlike auth tokens, app config is stored locally and doesn't require
-//! authentication or network access. All reads and writes go directly to Tauri Store.
+//! authentication or network access.
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
 const STORE_FILE: &str = ".app-config.dat";
@@ -175,4 +176,99 @@ pub fn set_config_value(
     // Save updated config back to persistent storage
     update_app_config(app, config)?;
     Ok(())
+}
+
+// ============================================================================
+// Language Configuration Commands
+// ============================================================================
+
+/// Set the transcription language from frontend
+///
+/// This command persists the language preference to Tauri Store.
+/// The frontend should call this whenever the language preference changes.
+///
+/// # Arguments
+/// * `language` - Optional language code from frontend (e.g., "en", "es", "auto")
+#[tauri::command]
+pub fn set_language(app: AppHandle, language: Option<String>) -> Result<(), String> {
+    // Persist to Tauri Store
+    set_config_value(app, "language".to_string(), serde_json::json!(language))?;
+    println!("💾 Language saved to Tauri Store: {:?}", language);
+
+    Ok(())
+}
+
+/// Get the current transcription language (internal function)
+///
+/// Reads directly from Tauri Store. This is the internal function used by Rust code.
+/// For frontend access, use the `get_language` Tauri command instead.
+///
+/// # Arguments
+/// * `app` - The Tauri AppHandle to access the store
+///
+/// # Returns
+/// * `Option<String>` - The current language code if available, None otherwise
+pub fn get_language_internal(app: &AppHandle) -> Result<Option<String>, String> {
+    // Read directly from Tauri Store (no in-memory cache)
+    if let Ok(Some(language_value)) = get_config_value(app.clone(), "language".to_string()) {
+        if let Some(lang) = language_value.as_str() {
+            return Ok(Some(lang.to_string()));
+        }
+    }
+
+    // Return None if not found (defaults will be handled by callers)
+    Ok(None)
+}
+
+/// Get the current transcription language (Tauri command)
+///
+/// Reads directly from Tauri Store. This is the Tauri command wrapper for frontend access.
+///
+/// # Returns
+/// * `Option<String>` - The current language code if available, None otherwise
+#[tauri::command]
+pub fn get_language(app: AppHandle) -> Result<Option<String>, String> {
+    get_language_internal(&app)
+}
+
+// ============================================================================
+// Auto-startup Configuration Commands
+// ============================================================================
+
+/// Enable auto-startup on system startup
+///
+/// This command enables the application to automatically start when the system boots.
+#[tauri::command]
+pub async fn enable_autostart(app: AppHandle) -> Result<(), String> {
+    let autolaunch = app.autolaunch();
+    autolaunch
+        .enable()
+        .map_err(|e| format!("Failed to enable autostart: {}", e))?;
+    println!("✅ Auto-startup enabled");
+    Ok(())
+}
+
+/// Disable auto-startup on system startup
+///
+/// This command disables the automatic startup of the application.
+#[tauri::command]
+pub async fn disable_autostart(app: AppHandle) -> Result<(), String> {
+    let autolaunch = app.autolaunch();
+    autolaunch
+        .disable()
+        .map_err(|e| format!("Failed to disable autostart: {}", e))?;
+    println!("❌ Auto-startup disabled");
+    Ok(())
+}
+
+/// Check if auto-startup is enabled
+///
+/// # Returns
+/// * `bool` - true if auto-startup is enabled, false otherwise
+#[tauri::command]
+pub async fn is_autostart_enabled(app: AppHandle) -> Result<bool, String> {
+    let autolaunch = app.autolaunch();
+    autolaunch
+        .is_enabled()
+        .map_err(|e| format!("Failed to check autostart status: {}", e))
 }
