@@ -107,15 +107,12 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     // Listen for postMessage (when opened from web)
     window.addEventListener("message", handleMessage);
 
-    // Note: We no longer listen for storage events since auth is stored in OS keychain
-    // The auth store will handle loading from secure storage on initialization
-
     return () => {
       window.removeEventListener("message", handleMessage);
     };
   }, [setAuthData, setError, setLoading, onSuccess, onError, checkStoredAuth]);
 
-  // Poll localStorage when loading (for when opened externally)
+  // Poll auth store when loading (auth store loads from secure storage)
   useEffect(() => {
     if (!loading) {
       // Stop polling when not loading
@@ -126,7 +123,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       return;
     }
 
-    console.log("Starting to poll localStorage, loading:", loading);
+    console.log("Starting to poll auth store, loading:", loading);
 
     // Check immediately
     if (checkStoredAuth()) {
@@ -142,7 +139,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     // Poll every 200ms (more frequent) until we find tokens
     console.log("Starting polling interval");
     pollIntervalRef.current = setInterval(() => {
-      console.log("Polling localStorage...");
+      console.log("Polling auth store...");
       if (checkStoredAuth()) {
         console.log("Auth found via polling, stopping");
         if (pollIntervalRef.current) {
@@ -211,7 +208,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       console.log("Waiting for OAuth callback...");
 
-      // Poll backend for OAuth completion (instead of localStorage)
+      // Poll backend for OAuth completion
       // This works across different browser contexts
       // Use ref to track polling state across async operations
       oauthPollingRef.current.isPolling = true;
@@ -347,30 +344,14 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       // Logout from backend first (revokes all sessions)
       await backendLogout();
 
-      // Clear Rust backend auth token
-      try {
-        await invoke("set_auth_token", { token: null });
-        console.log("✅ Auth token cleared from Rust backend");
-      } catch (error) {
-        console.warn("Failed to clear Rust backend token:", error);
-        // Continue with logout even if this fails
-      }
-
       // Clear local auth state
       clearAuth();
 
       console.log("✅ Logout successful");
     } catch (error) {
       console.error("Logout Failed:", error);
-      // Still clear local auth even if logout fails
-      clearAuth();
 
-      // Still try to clear Rust backend token
-      try {
-        await invoke("set_auth_token", { token: null });
-      } catch (rustError) {
-        console.warn("Failed to clear Rust backend token:", rustError);
-      }
+      clearAuth();
     } finally {
       setLocalLoading(false);
       setLoading(false);

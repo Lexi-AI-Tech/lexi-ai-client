@@ -71,9 +71,7 @@ mod window; // Window management utilities (show, focus, activate) // Tauri comm
 use global_key_listener::HotkeyConfig;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
-use state::{
-    AuthTokenState, HotkeyRecordingState, HotkeyWatchState, LanguageState, TranscriptionTaskState,
-};
+use state::{HotkeyRecordingState, HotkeyWatchState, TranscriptionTaskState};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -83,15 +81,18 @@ use permissions::{
     request_screen_recording_permission,
 };
 
-use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
-use commands::config::{disable_autostart, enable_autostart, is_autostart_enabled, set_language};
+use commands::app_config::{
+    disable_autostart, enable_autostart, get_app_config, get_config_value, get_language,
+    is_autostart_enabled, set_config_value, set_language, update_app_config,
+};
+use commands::auth::{
+    clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, start_google_login,
+    store_auth_data,
+};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
-use commands::secure_storage::{
-    clear_auth_data_secure, get_auth_data_secure, has_auth_data_secure, store_auth_data_secure,
-};
 use commands::text::inject_text;
 use commands::window::open_devtools;
 
@@ -154,8 +155,6 @@ pub fn main() {
 
     builder
         .manage(OAuthState::default())
-        .manage(AuthTokenState::default())
-        .manage(LanguageState::default())
         .manage(TranscriptionTaskState {
             task_handle: Mutex::new(None),
             cancel_tx: Mutex::new(None),
@@ -175,8 +174,8 @@ pub fn main() {
             open_devtools,
             start_google_login,
             get_pkce_verifier,
-            set_auth_token,
             set_language,
+            get_language,
             enable_autostart,
             disable_autostart,
             is_autostart_enabled,
@@ -184,10 +183,14 @@ pub fn main() {
             get_current_hotkey,
             start_hotkey_recording,
             stop_hotkey_recording,
-            store_auth_data_secure,
-            get_auth_data_secure,
-            clear_auth_data_secure,
-            has_auth_data_secure
+            store_auth_data,
+            get_auth_data,
+            clear_auth_data,
+            has_auth_data,
+            get_app_config,
+            update_app_config,
+            get_config_value,
+            set_config_value
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS

@@ -15,7 +15,6 @@
 use crate::commands::auth::get_auth_token;
 use crate::config;
 use crate::cursor_context::CursorContext;
-use crate::state::AuthTokenState;
 use reqwest::multipart;
 use std::error::Error;
 use tauri::{AppHandle, Emitter, Manager};
@@ -223,12 +222,8 @@ pub async fn perform_action(
         println!("⚠️  Failed to capture screen for action");
     }
 
-    // Get authentication token from state
-    let auth_token = if let Some(state) = app_handle.try_state::<AuthTokenState>() {
-        get_auth_token(&state)
-    } else {
-        None
-    };
+    // Get authentication token from secure storage
+    let auth_token = get_auth_token(&app_handle);
 
     if auth_token.is_none() {
         eprintln!("⚠️  Warning: No authentication token available. Action will fail.");

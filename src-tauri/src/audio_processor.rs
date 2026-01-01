@@ -2,16 +2,17 @@
 //!
 //! This module handles processing recorded audio data by:
 //! 1. Aborting any ongoing transcription task
-//! 2. Getting the authentication token from AuthTokenState
-//! 3. Sending the WAV audio data to Lexi AI Server API for transcription
-//! 4. Injecting the transcribed text into the active application using TextInjector
-//! 5. Emitting events to the frontend to update UI state
+//! 2. Getting the authentication token from secure storage (OS keychain or Tauri Store)
+//! 3. Getting the language preference from Tauri Store (persistent storage)
+//! 4. Sending the WAV audio data to Lexi AI Server API for transcription
+//! 5. Injecting the transcribed text into the active application using TextInjector
+//! 6. Emitting events to the frontend to update UI state
 
 use crate::actions::{check_action_trigger, perform_action};
+use crate::commands::app_config::get_language_internal;
 use crate::commands::auth::get_auth_token;
-use crate::commands::config::get_language;
 use crate::shortcuts::check_command;
-use crate::state::{AuthTokenState, LanguageState, TranscriptionTaskState};
+use crate::state::TranscriptionTaskState;
 use crate::stt_service::SttService;
 use crate::text_injector::TextInjector;
 use std::time::Instant;
@@ -63,18 +64,16 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .emit("processing_start", ())
             .unwrap_or_default();
 
-        // Get authentication token from state
-        let auth_token = if let Some(state) = app_handle_for_task.try_state::<AuthTokenState>() {
-            get_auth_token(&state)
-        } else {
-            None
-        };
+        // Get authentication token from secure storage
+        let auth_token = get_auth_token(&app_handle_for_task);
 
         if auth_token.is_none() {
             eprintln!(
                 "⚠️  Warning: No authentication token available. Transcription will fail with 401."
             );
-            eprintln!("💡 Tip: Make sure you're logged in and the frontend has synced the token using set_auth_token");
+            eprintln!(
+                "💡 Tip: Make sure you're logged in and the token is stored in secure storage"
+            );
         } else {
             println!(
                 "✅ Auth token available (length: {})",
@@ -82,12 +81,11 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             );
         }
 
-        // Get language from state, default to "auto" if not set
-        let language = if let Some(state) = app_handle_for_task.try_state::<LanguageState>() {
-            get_language(&state).unwrap_or_else(|| "auto".to_string())
-        } else {
-            "auto".to_string()
-        };
+        // Get language from Tauri Store
+        // Default to "auto" if not set or if read fails
+        let language = get_language_internal(&app_handle_for_task)
+            .unwrap_or_else(|_| None)
+            .unwrap_or_else(|| "auto".to_string());
         println!("🌐 Using language: {}", language);
 
         // TODO: Get enhance_transcription, transcribe_with_cursor_context, offline_transcription from app config state
