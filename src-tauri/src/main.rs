@@ -71,9 +71,7 @@ mod window; // Window management utilities (show, focus, activate) // Tauri comm
 use global_key_listener::HotkeyConfig;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
-use state::{
-    AuthTokenState, HotkeyRecordingState, HotkeyWatchState, TranscriptionTaskState,
-};
+use state::{AuthTokenState, HotkeyRecordingState, HotkeyWatchState, TranscriptionTaskState};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -85,7 +83,9 @@ use permissions::{
 
 use commands::app_config::{get_app_config, get_config_value, set_config_value, update_app_config};
 use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
-use commands::config::{disable_autostart, enable_autostart, get_language, is_autostart_enabled, set_language};
+use commands::config::{
+    disable_autostart, enable_autostart, get_language, is_autostart_enabled, set_language,
+};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };

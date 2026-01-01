@@ -14,10 +14,7 @@ use tauri_plugin_autostart::ManagerExt;
 /// # Arguments
 /// * `language` - Optional language code from frontend (e.g., "en", "es", "auto")
 #[tauri::command]
-pub fn set_language(
-    app: AppHandle,
-    language: Option<String>,
-) -> Result<(), String> {
+pub fn set_language(app: AppHandle, language: Option<String>) -> Result<(), String> {
     // Persist to Tauri Store
     app_config::set_config_value(app, "language".to_string(), serde_json::json!(language))?;
     println!("💾 Language saved to Tauri Store: {:?}", language);
@@ -33,7 +30,9 @@ pub fn set_language(
 /// * `Option<String>` - The current language code if available, None otherwise
 pub fn get_language_internal(app: &AppHandle) -> Result<Option<String>, String> {
     // Read directly from Tauri Store
-    if let Ok(Some(language_value)) = app_config::get_config_value(app.clone(), "language".to_string()) {
+    if let Ok(Some(language_value)) =
+        app_config::get_config_value(app.clone(), "language".to_string())
+    {
         if let Some(lang) = language_value.as_str() {
             return Ok(Some(lang.to_string()));
         }

@@ -61,16 +61,13 @@ pub fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
 
 /// Update the app configuration in Tauri Store
 #[tauri::command]
-pub fn update_app_config(
-    app: AppHandle,
-    config: AppConfig,
-) -> Result<AppConfig, String> {
+pub fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
     let store = app
         .store(STORE_FILE)
         .map_err(|e| format!("Failed to open store: {}", e))?;
 
-    let config_json = serde_json::to_value(&config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    let config_json =
+        serde_json::to_value(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
 
     store.set("config", config_json);
     store
@@ -93,8 +90,12 @@ pub fn get_config_value(app: AppHandle, key: String) -> Result<Option<serde_json
             match key.as_str() {
                 "language" => Ok(config.language.map(|v| serde_json::json!(v))),
                 "hotkey" => Ok(config.hotkey.map(|v| serde_json::json!(v))),
-                "enhance_transcription" => Ok(config.enhance_transcription.map(|v| serde_json::json!(v))),
-                "transcribe_with_cursor_context" => Ok(config.transcribe_with_cursor_context.map(|v| serde_json::json!(v))),
+                "enhance_transcription" => {
+                    Ok(config.enhance_transcription.map(|v| serde_json::json!(v)))
+                }
+                "transcribe_with_cursor_context" => Ok(config
+                    .transcribe_with_cursor_context
+                    .map(|v| serde_json::json!(v))),
                 _ => Err(format!("Unknown config key: {}", key)),
             }
         } else {
@@ -136,4 +137,3 @@ pub fn set_config_value(
     update_app_config(app, config)?;
     Ok(())
 }
-

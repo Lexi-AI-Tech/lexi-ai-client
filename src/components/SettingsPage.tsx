@@ -91,10 +91,10 @@ export const SettingsPage: React.FC = () => {
     try {
       // Save to Tauri Store (persists locally, no auth required)
       await invoke("set_language", { language: selectedLanguage });
-      
+
       // Update local state
       setCurrentLanguage(selectedLanguage);
-      
+
       setSuccess(true);
       setIsUpdating(false);
 
@@ -171,7 +171,6 @@ export const SettingsPage: React.FC = () => {
         >
           Transcription
         </h3>
-
 
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           <div>

@@ -195,7 +195,6 @@ export const HotkeySettings: React.FC = () => {
     <div className="settings">
       <h3>Hotkey Settings</h3>
 
-
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         <div>
           <div
