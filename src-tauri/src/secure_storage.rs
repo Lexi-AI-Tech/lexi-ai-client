@@ -70,7 +70,9 @@ pub fn store_auth_data(app: &AppHandle, data: &AuthData) -> Result<(), String> {
             store.set(EXPIRES_IN_KEY, serde_json::json!(expires_in));
         }
 
-        store.save().map_err(|e| format!("Failed to save store: {}", e))?;
+        store
+            .save()
+            .map_err(|e| format!("Failed to save store: {}", e))?;
         println!("✅ Auth data stored in Tauri Store (dev mode)");
         return Ok(());
     }
@@ -136,7 +138,8 @@ pub fn get_auth_data(app: &AppHandle) -> Result<Option<AuthData>, String> {
             .map_err(|e| format!("Failed to open store: {}", e))?;
 
         let access_token = match store.get(ACCESS_TOKEN_KEY) {
-            Some(val) => val.as_str()
+            Some(val) => val
+                .as_str()
                 .ok_or_else(|| "Access token is not a string".to_string())?
                 .to_string(),
             None => return Ok(None), // No stored data
@@ -150,13 +153,9 @@ pub fn get_auth_data(app: &AppHandle) -> Result<Option<AuthData>, String> {
             .get(USER_DATA_KEY)
             .and_then(|v| serde_json::from_value::<UserData>(v.clone()).ok());
 
-        let expires_at = store
-            .get(EXPIRES_AT_KEY)
-            .and_then(|v| v.as_u64());
+        let expires_at = store.get(EXPIRES_AT_KEY).and_then(|v| v.as_u64());
 
-        let expires_in = store
-            .get(EXPIRES_IN_KEY)
-            .and_then(|v| v.as_u64());
+        let expires_in = store.get(EXPIRES_IN_KEY).and_then(|v| v.as_u64());
 
         Ok(Some(AuthData {
             access_token,
@@ -228,7 +227,9 @@ pub fn clear_auth_data(app: &AppHandle) -> Result<(), String> {
         store.delete(EXPIRES_AT_KEY);
         store.delete(EXPIRES_IN_KEY);
 
-        store.save().map_err(|e| format!("Failed to save store: {}", e))?;
+        store
+            .save()
+            .map_err(|e| format!("Failed to save store: {}", e))?;
         println!("✅ Auth data cleared from Tauri Store (dev mode)");
         Ok(())
     }
