@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 import {
-  refreshJWTToken,
   logout as backendLogout,
   checkOAuthStatus,
 } from "../../lib/apiClient";
@@ -24,7 +23,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     setAuthData,
     user,
     isAuthenticated,
-    tokens,
   } = useAuthStore();
   const [loading, setLocalLoading] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -410,39 +408,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     }
   };
 
-  const handleRefresh = async () => {
-    try {
-      setLoading(true);
-
-      // Get refresh token from store
-      if (!tokens?.refresh_token) {
-        throw new Error("No refresh token available");
-      }
-
-      // Refresh backend JWT token
-      const refreshed = await refreshJWTToken(tokens.refresh_token);
-      console.log("Token Refreshed:", refreshed);
-
-      if (refreshed.access_token && user) {
-        const authTokens = {
-          access_token: refreshed.access_token,
-          refresh_token: refreshed.refresh_token || tokens.refresh_token,
-          expires_in: refreshed.expires_in,
-          expires_at: refreshed.expires_in
-            ? Date.now() + refreshed.expires_in * 1000
-            : undefined,
-        };
-
-        setAuthData(authTokens, user);
-      }
-    } catch (error: any) {
-      console.error("Refresh Failed:", error);
-      setError(error?.message || "Failed to refresh token");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   if (isAuthenticated && user) {
     return (
       <div className="auth-user-info">
@@ -460,13 +425,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           </div>
         </div>
         <div className="auth-actions">
-          <button
-            onClick={handleRefresh}
-            className="auth-button secondary"
-            disabled={loading}
-          >
-            Refresh Token
-          </button>
           <button onClick={handleLogout} className="auth-button secondary">
             Sign Out
           </button>
