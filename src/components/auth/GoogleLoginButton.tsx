@@ -425,8 +425,19 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           </div>
         </div>
         <div className="auth-actions">
-          <button onClick={handleLogout} className="auth-button secondary">
-            Sign Out
+          <button
+            onClick={handleLogout}
+            disabled={loading}
+            className="auth-button secondary"
+          >
+            {loading ? (
+              <>
+                <span className="auth-spinner">⏳</span>
+                Signing out...
+              </>
+            ) : (
+              "Sign Out"
+            )}
           </button>
         </div>
       </div>
