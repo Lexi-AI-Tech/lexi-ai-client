@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { useAuthStore } from "../../store/authStore";
+import { useAuthStore, authStore } from "../../store/authStore";
 import { logout as backendLogout, checkOAuthStatus } from "../../lib/apiClient";
 import "./auth.css";
 
@@ -29,56 +29,36 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     interval: NodeJS.Timeout | null;
   }>({ isPolling: false, interval: null });
 
-  // Check persistent storage for tokens (in case callback page stored them)
+  // Check auth store for tokens (auth store loads from secure storage)
   const checkStoredAuth = React.useCallback(() => {
     try {
-      // Use sync version for immediate checks (falls back to localStorage)
-      // The authStore will handle async Tauri Store loading on initialization
-      const { getStorageItemSync } = require("../lib/persistentStorage");
-      const stored = getStorageItemSync("lexi-auth");
-      console.log(
-        "Checking persistent storage for auth:",
-        stored ? "found" : "not found",
-      );
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        console.log("Parsed auth data:", {
-          hasTokens: !!parsed.tokens,
-          hasUser: !!parsed.user,
-          tokenKeys: parsed.tokens ? Object.keys(parsed.tokens) : [],
-          userKeys: parsed.user ? Object.keys(parsed.user) : [],
-        });
 
-        // Handle both formats: { tokens, user } and { isAuthenticated, tokens, user }
-        const tokens = parsed.tokens || parsed;
-        const user = parsed.user;
+      // Wait for auth store to initialize
+      if (!authStore.isInitialized) {
+        return false;
+      }
 
-        if (tokens?.access_token && user) {
-          console.log("✅ Found stored auth in persistent storage, using it");
-          // Found stored auth, use it
-          setAuthData(tokens, user);
-          setLoading(false);
-          setLocalLoading(false);
+      if (
+        authStore.isAuthenticated &&
+        authStore.tokens?.access_token &&
+        authStore.user
+      ) {
+        console.log("✅ Found stored auth in auth store, using it");
+        // Found stored auth, use it
+        setAuthData(authStore.tokens, authStore.user);
+        setLoading(false);
+        setLocalLoading(false);
 
-          // Clear timeout if it exists
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
-
-          // Note: We don't remove the stored auth here since authStore manages it
-          // The authStore will persist it properly using Tauri Store
-
-          if (onSuccess) {
-            onSuccess(user);
-          }
-          return true;
-        } else {
-          console.log("❌ Stored auth missing required fields:", {
-            hasAccessToken: !!tokens?.access_token,
-            hasUser: !!user,
-          });
+        // Clear timeout if it exists
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
         }
+
+        if (onSuccess) {
+          onSuccess(authStore.user);
+        }
+        return true;
       }
     } catch (e) {
       console.error("Error checking stored auth:", e);
@@ -128,18 +108,11 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     // Listen for postMessage (when opened from web)
     window.addEventListener("message", handleMessage);
 
-    // Listen for storage events (when callback page stores in localStorage)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "lexi-auth" && e.newValue) {
-        console.log("Storage event detected for lexi-auth");
-        checkStoredAuth();
-      }
-    };
-    window.addEventListener("storage", handleStorageChange);
+    // Note: We no longer listen for storage events since auth is stored in OS keychain
+    // The auth store will handle loading from secure storage on initialization
 
     return () => {
       window.removeEventListener("message", handleMessage);
-      window.removeEventListener("storage", handleStorageChange);
     };
   }, [setAuthData, setError, setLoading, onSuccess, onError, checkStoredAuth]);
 

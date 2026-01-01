@@ -44,4 +44,5 @@ objc = "0.2"
 rdev = { git = "https://github.com/fufesou/rdev" }  # Fork fixes macOS issues
 arboard = "3.4"  # Cross-platform clipboard
 enigo = "0.6.1"    # Cross-platform input simulation
-uuid = { version = "1.0", features = ["v4"] }  # UUID generation for temporary files
+uuid = { version = "1.0", features = ["v4"] }
+keyring = "2.3"  # OS keychain/credential manager for secure token storage

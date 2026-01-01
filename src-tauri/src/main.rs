@@ -58,6 +58,7 @@ mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortc
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
+mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
@@ -88,6 +89,9 @@ use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
+use commands::secure_storage::{
+    clear_auth_data_secure, get_auth_data_secure, has_auth_data_secure, store_auth_data_secure,
+};
 use commands::text::inject_text;
 use commands::window::open_devtools;
 
@@ -146,9 +150,7 @@ pub fn main() {
 
     // Add CrabNebula DevTools plugin (only in debug builds)
     #[cfg(debug_assertions)]
-    {
-        builder = builder.plugin(devtools);
-    }
+    let builder = builder.plugin(devtools);
 
     builder
         .manage(OAuthState::default())
@@ -181,7 +183,11 @@ pub fn main() {
             update_hotkey,
             get_current_hotkey,
             start_hotkey_recording,
-            stop_hotkey_recording
+            stop_hotkey_recording,
+            store_auth_data_secure,
+            get_auth_data_secure,
+            clear_auth_data_secure,
+            has_auth_data_secure
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS

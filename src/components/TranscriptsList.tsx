@@ -15,9 +15,11 @@ import {
 } from "../lib/apiClient";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();
+  const networkStatus = useNetworkStatus();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,32 +101,63 @@ export const TranscriptsList: React.FC = () => {
 
   // Fetch transcripts when authenticated and page changes
   useEffect(() => {
-    // Step 1: Wait for auth store to initialize
-    if (!authStore.isInitialized) {
-      setLoading(true);
-      setError(null);
-      return; // Show loading while waiting for initialization
-    }
+    let cancelled = false;
 
-    // Step 2: If authenticated, wait for tokens to be loaded
-    if (authStore.isAuthenticated && !authStore.tokens?.access_token) {
-      setLoading(true);
-      setError(null);
-      return; // Show loading while waiting for tokens
-    }
+    const loadTranscripts = async () => {
+      // Step 1: Wait for auth store to initialize
+      if (!authStore.isInitialized) {
+        setLoading(true);
+        setError(null);
+        return; // Show loading while waiting for initialization
+      }
 
-    // Step 3: Now we know the auth state - either authenticated with tokens, or not authenticated
-    setError(null);
+      // Step 2: If authenticated, wait for tokens to be loaded
+      if (authStore.isAuthenticated && !authStore.tokens?.access_token) {
+        setLoading(true);
+        setError(null);
+        return; // Show loading while waiting for tokens
+      }
 
-    if (authStore.isAuthenticated && authStore.tokens?.access_token) {
-      // Ready to fetch - user is authenticated and tokens are loaded
-      fetchTranscripts();
-    } else {
-      // Not authenticated - clear and show login prompt
-      setTranscripts([]);
+      // Step 3: Now we know the auth state - either authenticated with tokens, or not authenticated
       setError(null);
-      setLoading(false);
-    }
+
+      if (authStore.isAuthenticated && authStore.tokens?.access_token) {
+        // Ready to fetch - user is authenticated and tokens are loaded
+        // Wait for network to be available (especially important on auto-startup)
+        setLoading(true);
+
+        // Give network time to connect on startup
+        await waitForStartupDelay(2000);
+        if (cancelled) return;
+
+        // Check network connectivity before making API call
+        const isOnline = await waitForNetwork(3, 1000);
+        if (cancelled) return;
+
+        if (isOnline) {
+          fetchTranscripts();
+        } else {
+          // Network not available - set loading to false so UI can show network message
+          console.debug("Network not available, skipping transcript fetch");
+          setTranscripts([]);
+          setError(null);
+          setLoading(false);
+          // Trigger network status check to update UI
+          networkStatus.retry();
+        }
+      } else {
+        // Not authenticated - clear and show login prompt
+        setTranscripts([]);
+        setError(null);
+        setLoading(false);
+      }
+    };
+
+    loadTranscripts();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     authStore.isAuthenticated,
     authStore.isInitialized,
@@ -287,6 +320,55 @@ export const TranscriptsList: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Show network offline message if not online */}
+      {!networkStatus.isOnline && authStore.isAuthenticated && (
+        <div
+          className="permission-message"
+          style={{
+            background: "rgba(255, 193, 7, 0.1)",
+            borderColor: "rgba(255, 193, 7, 0.2)",
+            color: "rgba(255, 193, 7, 0.9)",
+            marginBottom: "16px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  marginBottom: "4px",
+                }}
+              >
+                Internet Connection Required
+              </div>
+              <div style={{ fontSize: "11px", opacity: 0.8 }}>
+                Please check your internet connection to load transcripts.
+              </div>
+            </div>
+            <button
+              className="transcript-btn"
+              onClick={networkStatus.retry}
+              disabled={networkStatus.isChecking}
+              style={{
+                fontSize: "11px",
+                padding: "6px 12px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {networkStatus.isChecking ? "Checking..." : "Retry"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && transcripts.length === 0 && (
         <div

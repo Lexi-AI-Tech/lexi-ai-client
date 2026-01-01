@@ -12,6 +12,7 @@ import { useAuthStore } from "./store/authStore";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { SettingsPage } from "./components/SettingsPage";
 import { Sidebar } from "./components/Sidebar";
+import { waitForNetwork, waitForStartupDelay } from "./lib/networkUtils";
 
 type Page = "transcripts" | "settings";
 
@@ -38,6 +39,8 @@ function App() {
 
   // Load and sync config from DB on mount
   useEffect(() => {
+    let cancelled = false;
+
     const loadAndSyncConfig = async () => {
       // Wait for auth store to initialize
       if (!isInitialized) {
@@ -46,6 +49,18 @@ function App() {
 
       if (!tokens?.access_token) {
         return; // Wait for auth
+      }
+
+      // Wait for network to be available (especially important on auto-startup)
+      await waitForStartupDelay(2000);
+      if (cancelled) return;
+
+      const isOnline = await waitForNetwork(3, 1000);
+      if (cancelled) return;
+
+      if (!isOnline) {
+        console.debug("Network not available, skipping config load");
+        return;
       }
 
       try {
@@ -101,6 +116,10 @@ function App() {
     };
 
     loadAndSyncConfig();
+
+    return () => {
+      cancelled = true;
+    };
   }, [tokens?.access_token, isInitialized]);
 
   // If onboarding is not completed, show onboarding flow
