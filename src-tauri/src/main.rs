@@ -83,9 +83,7 @@ use permissions::{
 };
 
 use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
-use commands::config::{
-    disable_autostart, enable_autostart, is_autostart_enabled, set_language,
-};
+use commands::config::{disable_autostart, enable_autostart, is_autostart_enabled, set_language};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };

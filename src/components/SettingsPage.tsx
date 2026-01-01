@@ -409,8 +409,7 @@ export const SettingsPage: React.FC = () => {
                     : "pointer",
                 position: "relative",
                 transition: "background-color 0.2s",
-                opacity:
-                  isCheckingAutostart || isTogglingAutostart ? 0.5 : 1,
+                opacity: isCheckingAutostart || isTogglingAutostart ? 0.5 : 1,
               }}
             >
               <div

@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import {
-  logout as backendLogout,
-  checkOAuthStatus,
-} from "../../lib/apiClient";
+import { logout as backendLogout, checkOAuthStatus } from "../../lib/apiClient";
 import "./auth.css";
 
 interface GoogleLoginButtonProps {
