@@ -73,13 +73,14 @@ export const SettingsPage: React.FC = () => {
           } catch (dbErr: any) {
             // Check if it's a network error
             const errorMessage = dbErr?.message || String(dbErr);
-            const isNetworkError = dbErr?.name === "TypeError" ||
-                                  dbErr?.name === "NetworkError" ||
-                                  errorMessage.includes("Failed to fetch") ||
-                                  errorMessage.includes("NetworkError") ||
-                                  errorMessage.includes("network") ||
-                                  errorMessage.includes("ECONNREFUSED") ||
-                                  errorMessage.includes("Load failed");
+            const isNetworkError =
+              dbErr?.name === "TypeError" ||
+              dbErr?.name === "NetworkError" ||
+              errorMessage.includes("Failed to fetch") ||
+              errorMessage.includes("NetworkError") ||
+              errorMessage.includes("network") ||
+              errorMessage.includes("ECONNREFUSED") ||
+              errorMessage.includes("Load failed");
 
             if (isNetworkError) {
               // Network errors are temporary, don't show error
@@ -102,13 +103,14 @@ export const SettingsPage: React.FC = () => {
       } catch (err: any) {
         // Check if it's a network error
         const errorMessage = err?.message || String(err);
-        const isNetworkError = err?.name === "TypeError" ||
-                              err?.name === "NetworkError" ||
-                              errorMessage.includes("Failed to fetch") ||
-                              errorMessage.includes("NetworkError") ||
-                              errorMessage.includes("network") ||
-                              errorMessage.includes("ECONNREFUSED") ||
-                              errorMessage.includes("Load failed");
+        const isNetworkError =
+          err?.name === "TypeError" ||
+          err?.name === "NetworkError" ||
+          errorMessage.includes("Failed to fetch") ||
+          errorMessage.includes("NetworkError") ||
+          errorMessage.includes("network") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("Load failed");
 
         if (!isNetworkError) {
           console.error("Failed to load config:", err);

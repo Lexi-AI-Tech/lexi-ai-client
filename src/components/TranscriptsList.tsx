@@ -55,21 +55,23 @@ export const TranscriptsList: React.FC = () => {
       setTotal(response.total);
     } catch (err: any) {
       console.error("Failed to fetch transcripts:", err);
-      
+
       // Check error type
       const errorMessage = err.message || "Failed to load transcripts";
-      const isAuthError = errorMessage.includes("401") || 
-                         errorMessage.includes("403") ||
-                         errorMessage.includes("Unauthorized");
-      
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized");
+
       // Check for network errors (server unreachable, no internet, etc.)
-      const isNetworkError = err.name === "TypeError" ||
-                            err.name === "NetworkError" ||
-                            errorMessage.includes("Failed to fetch") ||
-                            errorMessage.includes("NetworkError") ||
-                            errorMessage.includes("network") ||
-                            errorMessage.includes("ECONNREFUSED");
-      
+      const isNetworkError =
+        err.name === "TypeError" ||
+        err.name === "NetworkError" ||
+        errorMessage.includes("Failed to fetch") ||
+        errorMessage.includes("NetworkError") ||
+        errorMessage.includes("network") ||
+        errorMessage.includes("ECONNREFUSED");
+
       if (isAuthError) {
         // Auth error - clear transcripts and let the login prompt show
         setTranscripts([]);
@@ -87,7 +89,12 @@ export const TranscriptsList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [authStore.isAuthenticated, authStore.isInitialized, authStore.tokens?.access_token, page]);
+  }, [
+    authStore.isAuthenticated,
+    authStore.isInitialized,
+    authStore.tokens?.access_token,
+    page,
+  ]);
 
   // Fetch transcripts when authenticated and page changes
   useEffect(() => {
@@ -117,7 +124,13 @@ export const TranscriptsList: React.FC = () => {
       setError(null);
       setLoading(false);
     }
-  }, [authStore.isAuthenticated, authStore.isInitialized, authStore.tokens?.access_token, page, fetchTranscripts]);
+  }, [
+    authStore.isAuthenticated,
+    authStore.isInitialized,
+    authStore.tokens?.access_token,
+    page,
+    fetchTranscripts,
+  ]);
 
   const handleDelete = async (transcriptId: number) => {
     if (!confirm("Are you sure you want to delete this transcript?")) {
@@ -185,7 +198,10 @@ export const TranscriptsList: React.FC = () => {
   };
 
   // Show loading while waiting for auth to initialize or tokens to load
-  if (!authStore.isInitialized || (authStore.isAuthenticated && !authStore.tokens?.access_token)) {
+  if (
+    !authStore.isInitialized ||
+    (authStore.isAuthenticated && !authStore.tokens?.access_token)
+  ) {
     return (
       <div className="settings">
         <h3>Transcripts</h3>

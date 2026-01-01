@@ -75,20 +75,27 @@ function App() {
       } catch (error: any) {
         // Check if it's a network error (server not ready, no internet, etc.)
         const errorMessage = error?.message || String(error);
-        const isNetworkError = error?.name === "TypeError" ||
-                              error?.name === "NetworkError" ||
-                              errorMessage.includes("Failed to fetch") ||
-                              errorMessage.includes("NetworkError") ||
-                              errorMessage.includes("network") ||
-                              errorMessage.includes("ECONNREFUSED") ||
-                              errorMessage.includes("Load failed");
+        const isNetworkError =
+          error?.name === "TypeError" ||
+          error?.name === "NetworkError" ||
+          errorMessage.includes("Failed to fetch") ||
+          errorMessage.includes("NetworkError") ||
+          errorMessage.includes("network") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("Load failed");
 
         // Don't show warnings for network errors on startup (they're often temporary)
         if (isNetworkError) {
-          console.debug("Network error while loading config (will retry on next auth):", error);
+          console.debug(
+            "Network error while loading config (will retry on next auth):",
+            error,
+          );
         } else {
           // Only warn for actual API errors
-          console.warn("Failed to load config from DB (using defaults):", error);
+          console.warn(
+            "Failed to load config from DB (using defaults):",
+            error,
+          );
         }
       }
     };
