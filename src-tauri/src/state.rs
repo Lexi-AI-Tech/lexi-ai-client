@@ -17,16 +17,6 @@ pub struct AuthTokenState {
     pub token: Mutex<Option<String>>,
 }
 
-/// Language state for storing the current transcription language
-///
-/// This state is updated by the frontend whenever the language preference changes.
-/// The language is used for speech-to-text transcription requests.
-#[derive(Default)]
-pub struct LanguageState {
-    /// The current transcription language, if available (defaults to "auto" if not set)
-    pub language: Mutex<Option<String>>,
-}
-
 /// Transcription task state for managing abort handles
 ///
 /// This allows canceling ongoing transcriptions when a new one starts.

@@ -72,7 +72,7 @@ use global_key_listener::HotkeyConfig;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
 use state::{
-    AuthTokenState, HotkeyRecordingState, HotkeyWatchState, LanguageState, TranscriptionTaskState,
+    AuthTokenState, HotkeyRecordingState, HotkeyWatchState, TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
 
@@ -156,7 +156,6 @@ pub fn main() {
     builder
         .manage(OAuthState::default())
         .manage(AuthTokenState::default())
-        .manage(LanguageState::default())
         .manage(TranscriptionTaskState {
             task_handle: Mutex::new(None),
             cancel_tx: Mutex::new(None),
@@ -222,20 +221,6 @@ pub fn main() {
                 println!("🔗 Deep link received: {:?}", event.urls());
                 // Show and focus the main window when deep link is received
                 show_and_focus_main_window(&app_handle_clone);
-            });
-
-            // Load app config from Tauri Store and sync to in-memory state
-            let app_handle_for_config = app_handle.clone();
-            let language_state = app_handle.state::<LanguageState>();
-            std::thread::spawn(move || {
-                if let Ok(config) = get_app_config(app_handle_for_config.clone()) {
-                    if let Some(lang) = config.language {
-                        if let Ok(mut language_guard) = language_state.language.lock() {
-                            *language_guard = Some(lang.clone());
-                            println!("✅ Loaded language from Tauri Store: {:?}", lang);
-                        }
-                    }
-                }
             });
 
             // Preload Whisper model in background to reduce first transcription latency

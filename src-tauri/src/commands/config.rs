@@ -3,61 +3,55 @@
 //! This module provides Tauri commands for managing configuration state.
 
 use crate::commands::app_config;
-use crate::state::LanguageState;
-use tauri::{AppHandle, Manager, State};
+use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 
 /// Set the transcription language from frontend
 ///
-/// This command allows the frontend to update the language preference stored in Rust state
-/// and persists it to Tauri Store. The frontend should call this whenever the language preference changes.
+/// This command persists the language preference to Tauri Store.
+/// The frontend should call this whenever the language preference changes.
 ///
 /// # Arguments
 /// * `language` - Optional language code from frontend (e.g., "en", "es", "auto")
 #[tauri::command]
 pub fn set_language(
     app: AppHandle,
-    state: State<LanguageState>,
     language: Option<String>,
 ) -> Result<(), String> {
-    // Update in-memory state
-    if let Ok(mut language_guard) = state.language.lock() {
-        *language_guard = language.clone();
-        println!("🌐 Language updated in memory to: {:?}", language);
-    }
-
     // Persist to Tauri Store
     app_config::set_config_value(app, "language".to_string(), serde_json::json!(language))?;
-    println!("💾 Language saved to Tauri Store");
+    println!("💾 Language saved to Tauri Store: {:?}", language);
 
     Ok(())
 }
 
-/// Get the current transcription language
+/// Get the current transcription language (internal function)
 ///
-/// First tries to load from Tauri Store, then falls back to in-memory state.
+/// Reads directly from Tauri Store.
 ///
 /// # Returns
 /// * `Option<String>` - The current language code if available, None otherwise
-#[tauri::command]
-pub fn get_language(app: AppHandle, state: State<LanguageState>) -> Result<Option<String>, String> {
-    // Try to load from Tauri Store first
-    if let Ok(Some(language_value)) = app_config::get_config_value(app, "language".to_string()) {
+pub fn get_language_internal(app: &AppHandle) -> Result<Option<String>, String> {
+    // Read directly from Tauri Store
+    if let Ok(Some(language_value)) = app_config::get_config_value(app.clone(), "language".to_string()) {
         if let Some(lang) = language_value.as_str() {
-            // Update in-memory state to match
-            if let Ok(mut language_guard) = state.language.lock() {
-                *language_guard = Some(lang.to_string());
-            }
             return Ok(Some(lang.to_string()));
         }
     }
 
-    // Fall back to in-memory state
-    if let Ok(language_guard) = state.language.lock() {
-        Ok(language_guard.clone())
-    } else {
-        Ok(None)
-    }
+    // Return None if not found (defaults will be handled by callers)
+    Ok(None)
+}
+
+/// Get the current transcription language (Tauri command)
+///
+/// Reads directly from Tauri Store.
+///
+/// # Returns
+/// * `Option<String>` - The current language code if available, None otherwise
+#[tauri::command]
+pub fn get_language(app: AppHandle) -> Result<Option<String>, String> {
+    get_language_internal(&app)
 }
 
 /// Enable auto-startup on system startup
