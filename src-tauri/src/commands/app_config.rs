@@ -46,48 +46,6 @@ pub struct AppConfig {
     pub vocabulary: Option<Vec<VocabularyItem>>,
 }
 
-impl Default for AppConfig {
-    /// Returns default configuration values
-    ///
-    /// These defaults are used when no configuration has been saved yet or when
-    /// deserialization fails. All values are wrapped in `Some()` to indicate they
-    /// are explicitly set defaults.
-    fn default() -> Self {
-        Self {
-            languages: Some(vec!["auto".to_string()]),
-            transcription_hotkeys: Some(vec!["Fn".to_string()]),
-            enhance_transcription: Some(false),
-            transcribe_with_cursor_context: Some(false),
-            launch_on_system_startup: Some(true),
-            vocabulary: Some(vec![
-                VocabularyItem {
-                    value: "Lexi".to_string(),
-                    is_system_generated: true,
-                },
-                VocabularyItem {
-                    value: "anadi".to_string(),
-                    is_system_generated: true,
-                },
-                VocabularyItem {
-                    value: "Ranjeet Baraik".to_string(),
-                    is_system_generated: true,
-                },
-                VocabularyItem {
-                    value: "linkedin".to_string(),
-                    is_system_generated: true,
-                },
-                VocabularyItem {
-                    value: "google".to_string(),
-                    is_system_generated: true,
-                },
-                VocabularyItem {
-                    value: "hey lexi".to_string(),
-                    is_system_generated: true,
-                },
-            ]),
-        }
-    }
-}
 
 // ============================================================================
 // App Configuration Storage Commands
@@ -100,10 +58,11 @@ impl Default for AppConfig {
 /// Get the complete app configuration from Tauri Store
 ///
 /// Reads directly from persistent storage (Tauri Store) and syncs autostart status
-/// from OS-level settings. Returns default values if no configuration has been saved yet.
+/// from OS-level settings. Returns empty config if no configuration has been saved yet.
+/// The server will provide default values when needed.
 ///
 /// # Returns
-/// * `AppConfig` - The current app configuration or defaults if not found
+/// * `AppConfig` - The current app configuration or empty config if not found
 #[tauri::command]
 pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     let store = app
@@ -117,13 +76,27 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
                 config
             }
             Err(e) => {
-                println!("⚠️  Failed to deserialize config, using defaults: {}", e);
-                AppConfig::default()
+                println!("⚠️  Failed to deserialize config, returning empty config: {}", e);
+                AppConfig {
+                    languages: None,
+                    transcription_hotkeys: None,
+                    enhance_transcription: None,
+                    transcribe_with_cursor_context: None,
+                    launch_on_system_startup: None,
+                    vocabulary: None,
+                }
             }
         }
     } else {
-        println!("📝 Using default app config");
-        AppConfig::default()
+        println!("📝 No config found in Tauri Store, returning empty config");
+        AppConfig {
+            languages: None,
+            transcription_hotkeys: None,
+            enhance_transcription: None,
+            transcribe_with_cursor_context: None,
+            launch_on_system_startup: None,
+            vocabulary: None,
+        }
     };
 
     // Sync launch_on_system_startup with actual OS autostart status
