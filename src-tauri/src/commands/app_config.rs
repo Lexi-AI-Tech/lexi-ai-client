@@ -120,20 +120,20 @@ async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> 
         })?;
 
     let status = response.status();
-    let json_value: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|_| "Received invalid response from server. Please try again.".to_string())?;
-
+    
     if !status.is_success() {
+        let json_value: serde_json::Value = response
+            .json()
+            .await
+            .unwrap_or_else(|_| serde_json::json!({}));
         let error_msg = extract_error_message(&json_value, status);
         return Err(format!("Unable to load settings: {}", error_msg));
     }
 
-    let server_response: ServerAppConfigResponse =
-        parse_server_response(json_value).map_err(|_| {
-            "Received invalid settings format from server. Please try again.".to_string()
-        })?;
+    let server_response: ServerAppConfigResponse = response
+        .json()
+        .await
+        .map_err(|_| "Received invalid settings format from server. Please try again.".to_string())?;
 
     let config = server_response_to_app_config(server_response);
     save_config_to_store(app, &config)?;
@@ -244,16 +244,6 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         launch_on_system_startup: Some(response.launch_on_system_startup),
         vocabulary: Some(response.vocabulary),
     }
-}
-
-/// Parse server response (handles both wrapped and unwrapped formats)
-fn parse_server_response(json_value: serde_json::Value) -> Result<ServerAppConfigResponse, String> {
-    if let Some(data_field) = json_value.get("data") {
-        serde_json::from_value(data_field.clone())
-    } else {
-        serde_json::from_value(json_value)
-    }
-    .map_err(|_| "Invalid response format".to_string())
 }
 
 /// Extract user-friendly error message from server response
