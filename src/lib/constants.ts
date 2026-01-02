@@ -68,7 +68,7 @@ export function isValidSystemType(type: string): boolean {
  * Language display names mapping
  */
 export const LANGUAGE_NAMES: Record<LanguageCode, string> = {
-  [LanguageCode.AUTO]: "Auto (Detect Language)",
+  [LanguageCode.AUTO]: "Auto Detect Language",
   [LanguageCode.EN]: "English",
   [LanguageCode.ES]: "Spanish",
   [LanguageCode.FR]: "French",
