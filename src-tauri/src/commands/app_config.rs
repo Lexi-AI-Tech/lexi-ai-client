@@ -2,19 +2,22 @@
 //!
 //! This module provides unified commands for managing application configuration.
 //! All configuration is stored in Tauri Store and synced with OS-level settings (autostart).
+//! Configuration changes are also synced with the cloud API when authenticated.
 //!
 //! ## Unified Commands
 //! - `get_app_config` - Get complete app configuration
-//! - `update_app_config` - Update app configuration (automatically syncs autostart)
+//! - `update_app_config` - Update app configuration (automatically syncs autostart and cloud)
 //!
-//! Unlike auth tokens, app config is stored locally and doesn't require
-//! authentication or network access. All configuration is device-specific and
-//! persists across application restarts.
+//! Configuration is stored locally in Tauri Store and synced with the cloud API when
+//! the user is authenticated. This ensures settings persist across devices.
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
+
+use crate::commands::auth::get_auth_token;
+use crate::config;
 
 const STORE_FILE: &str = ".app-config.dat";
 
@@ -115,10 +118,14 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     Ok(config)
 }
 
-/// Update the app configuration in Tauri Store
+/// Update the app configuration in Tauri Store and sync with cloud API
+///
+/// This function performs two operations:
+/// 1. Updates the local Tauri Store with the new configuration
+/// 2. Syncs the configuration with the cloud API (if authenticated)
 ///
 /// Writes directly to persistent storage (Tauri Store) and syncs autostart setting
-/// with OS-level configuration.
+/// with OS-level configuration. Also attempts to sync with cloud API.
 ///
 /// # Arguments
 /// * `config` - The complete app configuration to save (partial updates supported via Option fields)
@@ -128,7 +135,7 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
 #[tauri::command]
 pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
     // Load current config to merge partial updates
-    let mut current_config = get_app_config(app.clone())?;
+    let mut current_config = get_app_config(app.clone()).await?;
 
     // Merge provided config with current config (only update provided fields)
     if config.languages.is_some() {
@@ -145,6 +152,9 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
     }
     if config.launch_on_system_startup.is_some() {
         current_config.launch_on_system_startup = config.launch_on_system_startup;
+    }
+    if config.vocabulary.is_some() {
+        current_config.vocabulary = config.vocabulary;
     }
 
     // Sync autostart with OS if launch_on_system_startup was updated
@@ -164,7 +174,7 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
         }
     }
 
-    // Save to Tauri Store
+    // 1. Save to Tauri Store (local storage)
     let store = app
         .store(STORE_FILE)
         .map_err(|e| format!("Failed to open store: {}", e))?;
@@ -178,5 +188,109 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
         .map_err(|e| format!("Failed to save store: {}", e))?;
 
     println!("✅ App config saved to Tauri Store");
+
+    // 2. Sync with cloud API (if authenticated)
+    sync_config_to_cloud(&app, &current_config).await;
+
     Ok(current_config)
+}
+
+/// Sync app configuration to cloud API
+///
+/// Attempts to update the user's app configuration on the server.
+/// This is a best-effort operation - failures are logged but don't prevent
+/// the local update from succeeding.
+///
+/// # Arguments
+/// * `app` - The Tauri AppHandle
+/// * `config` - The configuration to sync
+async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
+    // Get authentication token
+    let auth_token = match get_auth_token(app) {
+        Some(token) => token,
+        None => {
+            println!("⚠️  No auth token available, skipping cloud sync");
+            return;
+        }
+    };
+
+    // Build the API request payload
+    // Only include fields that are Some (not None) for partial updates
+    let mut request_body = serde_json::Map::new();
+
+    if let Some(ref languages) = config.languages {
+        request_body.insert(
+            "languages".to_string(),
+            serde_json::to_value(languages).unwrap(),
+        );
+    }
+    if let Some(ref transcription_hotkeys) = config.transcription_hotkeys {
+        request_body.insert(
+            "transcription_hotkeys".to_string(),
+            serde_json::to_value(transcription_hotkeys).unwrap(),
+        );
+    }
+    if let Some(enhance_transcription) = config.enhance_transcription {
+        request_body.insert(
+            "enhance_transcription".to_string(),
+            serde_json::to_value(enhance_transcription).unwrap(),
+        );
+    }
+    if let Some(transcribe_with_cursor_context) = config.transcribe_with_cursor_context {
+        request_body.insert(
+            "transcribe_with_cursor_context".to_string(),
+            serde_json::to_value(transcribe_with_cursor_context).unwrap(),
+        );
+    }
+    if let Some(launch_on_system_startup) = config.launch_on_system_startup {
+        request_body.insert(
+            "launch_on_system_startup".to_string(),
+            serde_json::to_value(launch_on_system_startup).unwrap(),
+        );
+    }
+    if let Some(ref vocabulary) = config.vocabulary {
+        request_body.insert(
+            "vocabulary".to_string(),
+            serde_json::to_value(vocabulary).unwrap(),
+        );
+    }
+
+    // Add system_type (default to "mac" for now)
+    request_body.insert(
+        "system_type".to_string(),
+        serde_json::Value::String("mac".to_string()),
+    );
+
+    // Make API request
+    let client = reqwest::Client::new();
+    let api_base_url = config::api_base_url();
+    let url = format!("{}/api/users/me/config", api_base_url);
+
+    match client
+        .put(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .header("Content-Type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+    {
+        Ok(response) => {
+            let status = response.status();
+            if status.is_success() {
+                println!("✅ App config synced to cloud successfully");
+            } else {
+                let error_text = response
+                    .text()
+                    .await
+                    .unwrap_or_else(|_| "Unknown error".to_string());
+                eprintln!(
+                    "⚠️  Failed to sync app config to cloud ({}): {}",
+                    status, error_text
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("⚠️  Failed to sync app config to cloud: {}", e);
+        }
+    }
 }

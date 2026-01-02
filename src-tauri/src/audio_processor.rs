@@ -82,9 +82,17 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         }
 
         // Get app config for transcription settings
-        let app_config = get_app_config(app_handle_for_task.clone())
-            .await
-            .unwrap_or_default();
+        let app_config = match get_app_config(app_handle_for_task.clone()).await {
+            Ok(config) => config,
+            Err(e) => {
+                let error_msg = format!("Failed to load app config: {}", e);
+                eprintln!("❌ {}", error_msg);
+                app_handle_for_task
+                    .emit("error", error_msg.as_str())
+                    .unwrap_or_default();
+                return;
+            }
+        };
 
         // Get first language from languages array
         // Default to "auto" if not set
@@ -99,7 +107,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         let transcribe_with_cursor_context =
             app_config.transcribe_with_cursor_context.unwrap_or(false);
 
-        // TODO: Decode what to do with offline_transcription
+        // TODO: Decide what to do with offline_transcription
         // offline_transcription is not in app config, keep as hardcoded for now
         let offline_transcription = true;
 
