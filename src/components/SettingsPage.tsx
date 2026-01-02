@@ -17,24 +17,22 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
 }));
 
 export const SettingsPage: React.FC = () => {
-  const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
-    LanguageCode.AUTO,
-  );
+  const [config, setConfig] = useState<TauriAppConfig | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
     LanguageCode.AUTO,
   );
-  const [autostartEnabled, setAutostartEnabled] = useState<boolean>(false);
-  const [enhanceTranscription, setEnhanceTranscription] = useState<boolean>(false);
-  const [transcribeWithCursorContext, setTranscribeWithCursorContext] = useState<boolean>(false);
-  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>([]);
-  const [vocabulary, setVocabulary] = useState<Array<{value: string; is_system_generated: boolean; hidden: boolean}>>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [isTogglingAutostart, setIsTogglingAutostart] = useState(false);
-  const [isTogglingEnhance, setIsTogglingEnhance] = useState(false);
-  const [isTogglingCursorContext, setIsTogglingCursorContext] = useState(false);
+
+  // Derived values from config
+  const currentLanguage = config?.languages?.[0] as LanguageCode || LanguageCode.AUTO;
+  const autostartEnabled = config?.launch_on_system_startup ?? false;
+  const enhanceTranscription = config?.enhance_transcription ?? false;
+  const transcribeWithCursorContext = config?.transcribe_with_cursor_context ?? false;
+  const transcriptionHotkeys = config?.transcription_hotkeys ?? [];
+  const vocabulary = config?.vocabulary ?? [];
 
   // Load app config on mount
   useEffect(() => {
@@ -43,49 +41,15 @@ export const SettingsPage: React.FC = () => {
       setError(null);
 
       try {
-        const config = await invoke<TauriAppConfig>("get_app_config");
+        const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
+        setConfig(loadedConfig);
 
-        // Set language
-        if (config.languages && config.languages.length > 0) {
-          const firstLanguage = config.languages[0] as LanguageCode;
+        // Set selected language for the dropdown
+        if (loadedConfig.languages && loadedConfig.languages.length > 0) {
+          const firstLanguage = loadedConfig.languages[0] as LanguageCode;
           if (Object.values(LanguageCode).includes(firstLanguage)) {
-            setCurrentLanguage(firstLanguage);
             setSelectedLanguage(firstLanguage);
           }
-        }
-
-        // Set autostart
-        if (
-          config.launch_on_system_startup !== null &&
-          config.launch_on_system_startup !== undefined
-        ) {
-          setAutostartEnabled(config.launch_on_system_startup);
-        }
-
-        // Set enhance transcription
-        if (
-          config.enhance_transcription !== null &&
-          config.enhance_transcription !== undefined
-        ) {
-          setEnhanceTranscription(config.enhance_transcription);
-        }
-
-        // Set transcribe with cursor context
-        if (
-          config.transcribe_with_cursor_context !== null &&
-          config.transcribe_with_cursor_context !== undefined
-        ) {
-          setTranscribeWithCursorContext(config.transcribe_with_cursor_context);
-        }
-
-        // Set transcription hotkeys
-        if (config.transcription_hotkeys) {
-          setTranscriptionHotkeys(config.transcription_hotkeys);
-        }
-
-        // Set vocabulary
-        if (config.vocabulary) {
-          setVocabulary(config.vocabulary);
         }
       } catch (err: any) {
         console.error("Failed to load app config:", err);
@@ -97,6 +61,22 @@ export const SettingsPage: React.FC = () => {
 
     loadConfig();
   }, []);
+
+  // Generic update function for app config
+  const updateConfig = async (updates: Partial<TauriAppConfig>) => {
+    setError(null);
+    try {
+      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
+        config: updates,
+      });
+      setConfig(updatedConfig);
+      return updatedConfig;
+    } catch (err: any) {
+      console.error("Failed to update config:", err);
+      setError(err?.message || "Failed to update setting");
+      throw err;
+    }
+  };
 
   const handleSaveLanguage = async () => {
     const languageChanged = selectedLanguage !== currentLanguage;
@@ -110,27 +90,12 @@ export const SettingsPage: React.FC = () => {
     setSuccess(false);
 
     try {
-      // Update app config with new language
-      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
-        config: {
-          languages: [selectedLanguage],
-        },
-      });
-
-      // Update local state
-      if (updatedConfig.languages && updatedConfig.languages.length > 0) {
-        const firstLanguage = updatedConfig.languages[0] as LanguageCode;
-        setCurrentLanguage(firstLanguage);
-      }
-
+      await updateConfig({ languages: [selectedLanguage] });
       setSuccess(true);
-      setIsUpdating(false);
-
-      // Clear success message after 2 seconds
       setTimeout(() => setSuccess(false), 2000);
     } catch (err: any) {
-      console.error("Failed to update language:", err);
-      setError(err?.message || "Failed to update language");
+      // Error already set by updateConfig
+    } finally {
       setIsUpdating(false);
     }
   };
@@ -138,87 +103,37 @@ export const SettingsPage: React.FC = () => {
   const isLanguageChanged = selectedLanguage !== currentLanguage;
 
   const handleToggleAutostart = async () => {
-    setIsTogglingAutostart(true);
-    setError(null);
     try {
-      const newValue = !autostartEnabled;
-
-      // Update app config with new autostart value
-      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
-        config: {
-          launch_on_system_startup: newValue,
-        },
+      const updatedConfig = await updateConfig({
+        launch_on_system_startup: !autostartEnabled,
       });
-
-      // Update local state
-      if (
-        updatedConfig.launch_on_system_startup !== null &&
-        updatedConfig.launch_on_system_startup !== undefined
-      ) {
-        setAutostartEnabled(updatedConfig.launch_on_system_startup);
-        console.log(
-          updatedConfig.launch_on_system_startup
-            ? "✅ Auto-startup enabled"
-            : "❌ Auto-startup disabled",
-        );
-      }
+      console.log(
+        updatedConfig.launch_on_system_startup
+          ? "✅ Auto-startup enabled"
+          : "❌ Auto-startup disabled",
+      );
     } catch (err: any) {
-      console.error("Failed to toggle autostart:", err);
-      setError(err?.message || "Failed to update auto-startup setting");
-    } finally {
-      setIsTogglingAutostart(false);
+      // Error already set by updateConfig
     }
   };
 
   const handleToggleEnhanceTranscription = async () => {
-    setIsTogglingEnhance(true);
-    setError(null);
     try {
-      const newValue = !enhanceTranscription;
-
-      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
-        config: {
-          enhance_transcription: newValue,
-        },
+      await updateConfig({
+        enhance_transcription: !enhanceTranscription,
       });
-
-      if (
-        updatedConfig.enhance_transcription !== null &&
-        updatedConfig.enhance_transcription !== undefined
-      ) {
-        setEnhanceTranscription(updatedConfig.enhance_transcription);
-      }
     } catch (err: any) {
-      console.error("Failed to toggle enhance transcription:", err);
-      setError(err?.message || "Failed to update enhance transcription setting");
-    } finally {
-      setIsTogglingEnhance(false);
+      // Error already set by updateConfig
     }
   };
 
   const handleToggleCursorContext = async () => {
-    setIsTogglingCursorContext(true);
-    setError(null);
     try {
-      const newValue = !transcribeWithCursorContext;
-
-      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
-        config: {
-          transcribe_with_cursor_context: newValue,
-        },
+      await updateConfig({
+        transcribe_with_cursor_context: !transcribeWithCursorContext,
       });
-
-      if (
-        updatedConfig.transcribe_with_cursor_context !== null &&
-        updatedConfig.transcribe_with_cursor_context !== undefined
-      ) {
-        setTranscribeWithCursorContext(updatedConfig.transcribe_with_cursor_context);
-      }
     } catch (err: any) {
-      console.error("Failed to toggle cursor context:", err);
-      setError(err?.message || "Failed to update cursor context setting");
-    } finally {
-      setIsTogglingCursorContext(false);
+      // Error already set by updateConfig
     }
   };
 
@@ -384,7 +299,7 @@ export const SettingsPage: React.FC = () => {
             <ToggleSwitch
               enabled={enhanceTranscription}
               onToggle={handleToggleEnhanceTranscription}
-              disabled={isTogglingEnhance || isLoading}
+              disabled={isLoading}
             />
           </div>
 
@@ -422,7 +337,7 @@ export const SettingsPage: React.FC = () => {
             <ToggleSwitch
               enabled={transcribeWithCursorContext}
               onToggle={handleToggleCursorContext}
-              disabled={isTogglingCursorContext || isLoading}
+              disabled={isLoading}
             />
           </div>
 
@@ -556,7 +471,7 @@ export const SettingsPage: React.FC = () => {
             <ToggleSwitch
               enabled={autostartEnabled}
               onToggle={handleToggleAutostart}
-              disabled={isTogglingAutostart || isLoading}
+              disabled={isLoading}
             />
           </div>
         </div>
