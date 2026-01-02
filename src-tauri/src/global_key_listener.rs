@@ -251,6 +251,14 @@ pub fn start_listener(
                                 trigger_type, current_config
                             );
 
+                            // Query cursor context
+                            if let Some(context) = crate::cursor_context::get_cursor_context() {
+                                println!(
+                                    "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
+                                    context.app_name, context.pid, context.selected_text
+                                );
+                            }
+
                             println!(
                                 "Hotkey {} - {} recording",
                                 match command {
