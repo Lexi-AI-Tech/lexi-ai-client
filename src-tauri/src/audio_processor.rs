@@ -81,20 +81,34 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             );
         }
 
-        // Get first language from app config
-        // Default to "auto" if not set or if read fails
-        let language = get_app_config(app_handle_for_task.clone())
+        // Get app config for transcription settings
+        let app_config = get_app_config(app_handle_for_task.clone())
             .await
-            .ok()
-            .and_then(|config| config.languages)
+            .unwrap_or_default();
+
+        // Get first language from languages array
+        // Default to "auto" if not set
+        let language = app_config
+            .languages
             .and_then(|langs| langs.first().cloned())
             .unwrap_or_else(|| "auto".to_string());
         println!("🌐 Using language: {}", language);
 
-        // TODO: Get enhance_transcription, transcribe_with_cursor_context, offline_transcription from app config state
-        let enhance_transcription = false;
-        let transcribe_with_cursor_context = false;
+        // Get transcription settings from app config
+        let enhance_transcription = app_config
+            .enhance_transcription
+            .unwrap_or(false);
+        let transcribe_with_cursor_context = app_config
+            .transcribe_with_cursor_context
+            .unwrap_or(false);
+        
+        // offline_transcription is not in app config, keep as hardcoded for now
         let offline_transcription = true;
+        
+        println!(
+            "⚙️  Transcription settings: enhance={}, cursor_context={}, offline={}",
+            enhance_transcription, transcribe_with_cursor_context, offline_transcription
+        );
 
         // Hardcoded vocabulary array for offline transcription
         // TODO: Get vocabulary from app config state
