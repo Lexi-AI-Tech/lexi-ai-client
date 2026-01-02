@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { useAuthStore, authStore } from "../../store/authStore";
-import { logout as backendLogout, checkOAuthStatus } from "../../lib/apiClient";
-import "./auth.css";
 
-interface GoogleLoginButtonProps {
-  onSuccess?: (user: any) => void;
-  onError?: (error: string) => void;
-}
+import {
+  checkOAuthStatus,
+  logout as backendLogout,
+  storePkceVerifier,
+} from "../../lib/apiClient";
+import { useAuthStore, authStore } from "../../store/authStore";
+import type { GoogleLoginButtonProps } from "../../types";
+
+import "./auth.css";
 
 export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onSuccess,
@@ -194,7 +196,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       // Store verifier on backend (Redis) so callback page can retrieve it
       // This works even when callback opens in external browser
       try {
-        const { storePkceVerifier } = await import("../../lib/apiClient");
         await storePkceVerifier(pkceData.state, pkceData.verifier);
         console.log("Stored PKCE verifier on backend (Redis):", {
           state: pkceData.state,

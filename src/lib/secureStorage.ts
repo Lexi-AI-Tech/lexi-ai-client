@@ -18,26 +18,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-export interface AuthTokens {
-  access_token: string;
-  refresh_token?: string;
-  expires_at?: number;
-  expires_in?: number;
-}
-
-export interface AuthUser {
-  email: string;
-  name: string;
-  picture?: string;
-}
-
-export interface AuthData {
-  access_token: string;
-  refresh_token?: string;
-  expires_at?: number;
-  expires_in?: number;
-  user?: AuthUser;
-}
+import type { AuthData } from "../types";
 
 /**
  * Store authentication data securely in OS keychain

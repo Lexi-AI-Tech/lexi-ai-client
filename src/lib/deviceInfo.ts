@@ -2,16 +2,14 @@
  * Device information utilities for authentication
  */
 
-export interface DeviceInfo {
-  device_name: string;
-  device_type: string;
-  system_type: "mac" | "windows"; // Operating system type
-}
+import { invoke } from "@tauri-apps/api/core";
+
+import type { DeviceInfo } from "../types";
 
 /**
  * Get device information for the current platform
  */
-export function getDeviceInfo(): DeviceInfo {
+export async function getDeviceInfo(): Promise<DeviceInfo> {
   const userAgent = navigator.userAgent.toLowerCase();
 
   // Determine device type
@@ -40,20 +38,19 @@ export function getDeviceInfo(): DeviceInfo {
 
   // Try to get more specific device name if available
   // For Tauri apps, we might be able to get system info
-  if (window.__TAURI__) {
+  if (typeof window !== "undefined" && (window as any).__TAURI__) {
     // Tauri-specific device detection could go here
     deviceName = "Tauri App";
   }
 
-  // Detect system type (mac or windows)
-  let systemType: "mac" | "windows" = "mac";
-  if (/windows/i.test(userAgent)) {
-    systemType = "windows";
-  } else if (/macintosh|mac os x/i.test(userAgent)) {
-    systemType = "mac";
-  } else {
-    // Default to mac for other systems (Linux, etc.)
-    systemType = "mac";
+  // Detect system type using Rust utility
+  const systemType = await invoke<string>("get_system_type");
+  if (
+    systemType !== "mac" &&
+    systemType !== "windows" &&
+    systemType !== "unknown"
+  ) {
+    throw new Error(`Invalid system type returned from Rust: ${systemType}`);
   }
 
   return {

@@ -6,38 +6,13 @@
  * Uses OS keychain for secure storage (macOS Keychain, Windows Credential Manager, Linux Secret Service).
  */
 
+import { getDeviceInfo } from "../lib/deviceInfo";
 import {
   storeAuthDataSecure,
   getAuthDataSecure,
   clearAuthDataSecure,
 } from "../lib/secureStorage";
-
-export interface AuthUser {
-  email: string;
-  name: string;
-  picture?: string;
-}
-
-export interface AuthTokens {
-  access_token: string; // Backend JWT access token
-  refresh_token?: string; // Backend JWT refresh token
-  expires_in?: number;
-  expires_at?: number;
-}
-
-export interface AuthState {
-  isAuthenticated: boolean;
-  user: AuthUser | null;
-  tokens: AuthTokens | null;
-  isLoading: boolean;
-  error: string | null;
-  isInitialized: boolean;
-  setAuthData: (tokens: AuthTokens, user: AuthUser) => void;
-  clearAuth: () => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
-  refreshTokenIfNeeded: () => Promise<boolean>; // Returns true if refreshed, false otherwise
-}
+import type { AuthUser, AuthTokens, AuthState } from "../types";
 
 // Store state
 let isAuthenticated: boolean = false;
@@ -67,8 +42,7 @@ const loadFromStorage = async () => {
         if (tokens?.refresh_token) {
           console.log("🔄 Access token expired, attempting to refresh...");
           try {
-            const { getDeviceInfo } = await import("../lib/deviceInfo");
-            const device = getDeviceInfo();
+            const device = await getDeviceInfo();
             const API_BASE_URL =
               import.meta.env.MODE === "development"
                 ? "http://localhost:1230"
@@ -238,8 +212,7 @@ export const authStore: AuthState = {
     // Token is expired or expiring soon, refresh it
     console.log("🔄 Token expiring soon, refreshing proactively...");
     try {
-      const { getDeviceInfo } = await import("../lib/deviceInfo");
-      const device = getDeviceInfo();
+      const device = await getDeviceInfo();
       const API_BASE_URL =
         import.meta.env.MODE === "development"
           ? "http://localhost:1230"

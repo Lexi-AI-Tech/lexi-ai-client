@@ -9,7 +9,7 @@
 //! 6. Emitting events to the frontend to update UI state
 
 use crate::actions::{check_action_trigger, perform_action};
-use crate::commands::app_config::get_language_internal;
+use crate::commands::app_config::get_app_config;
 use crate::commands::auth::get_auth_token;
 use crate::shortcuts::check_command;
 use crate::state::TranscriptionTaskState;
@@ -81,32 +81,50 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             );
         }
 
-        // Get language from Tauri Store
-        // Default to "auto" if not set or if read fails
-        let language = get_language_internal(&app_handle_for_task)
-            .unwrap_or_else(|_| None)
+        // Get app config for transcription settings
+        let app_config = match get_app_config(app_handle_for_task.clone()).await {
+            Ok(config) => config,
+            Err(e) => {
+                let error_msg = format!("Failed to load app config: {}", e);
+                eprintln!("❌ {}", error_msg);
+                app_handle_for_task
+                    .emit("error", error_msg.as_str())
+                    .unwrap_or_default();
+                return;
+            }
+        };
+
+        // Get first language from languages array
+        // Default to "auto" if not set
+        let language = app_config
+            .languages
+            .and_then(|langs| langs.first().cloned())
             .unwrap_or_else(|| "auto".to_string());
         println!("🌐 Using language: {}", language);
 
-        // TODO: Get enhance_transcription, transcribe_with_cursor_context, offline_transcription from app config state
-        let enhance_transcription = false;
-        let transcribe_with_cursor_context = false;
+        // Get transcription settings from app config
+        let enhance_transcription = app_config.enhance_transcription.unwrap_or(false);
+        let transcribe_with_cursor_context =
+            app_config.transcribe_with_cursor_context.unwrap_or(false);
+
+        // TODO: Decide what to do with offline_transcription
+        // offline_transcription is not in app config, keep as hardcoded for now
         let offline_transcription = true;
 
-        // Hardcoded vocabulary array for offline transcription
-        // TODO: Get vocabulary from app config state
         // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript.
         // Do more experiment on how we can use this trick to manipulate the model behavior.
-        let vocabulary = vec![
-            "Lexi".to_string(),
-            "anadi".to_string(),
-            "Ranjeet Baraik".to_string(),
-            // shortcuts commands
-            "linkedin".to_string(),
-            "google".to_string(),
-            // action trigger
-            "hey lexi".to_string(),
-        ];
+        // Get vocabulary from app config
+        let vocabulary: Vec<String> = app_config
+            .vocabulary
+            .unwrap_or_default()
+            .into_iter()
+            .map(|item| item.value)
+            .collect();
+
+        println!(
+            "⚙️  Transcription settings: enhance={}, cursor_context={}, offline={}, vocabulary_size={}",
+            enhance_transcription, transcribe_with_cursor_context, offline_transcription, vocabulary.len()
+        );
 
         // Get cursor context and print app name and selected text
         let cursor_context = crate::cursor_context::get_cursor_context();

@@ -4,7 +4,17 @@
  * Handles all HTTP requests to the backend server with authentication support.
  */
 
+import { getDeviceInfo } from "./deviceInfo";
+import { SystemType } from "./constants";
 import { authStore } from "../store/authStore";
+import type {
+  ApiResponse,
+  AuthResponse,
+  Transcript,
+  PaginatedTranscriptsResponse,
+  AppConfig,
+  AppConfigUpdateRequest,
+} from "../types";
 
 // Use localhost in development, production URL in production builds
 // Can be overridden with VITE_API_BASE_URL environment variable
@@ -12,26 +22,6 @@ const API_BASE_URL =
   import.meta.env.MODE === "development"
     ? "http://localhost:1230"
     : "https://lexi-ai-server.onrender.com";
-
-export interface ApiResponse<T = any> {
-  success?: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-  [key: string]: any;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
-  user: {
-    email: string;
-    name: string;
-    picture?: string;
-    id?: string;
-  };
-  expires_in?: number;
-}
 
 /**
  * Get the current access token from auth store
@@ -67,9 +57,7 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   try {
-    // Import device info utility
-    const { getDeviceInfo } = await import("./deviceInfo");
-    const device = getDeviceInfo();
+    const device = await getDeviceInfo();
 
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: "POST",
@@ -222,9 +210,7 @@ export async function exchangeGoogleAuthCode(
   redirectUri?: string,
   deviceInfo?: { device_name?: string; device_type?: string },
 ): Promise<AuthResponse> {
-  // Import device info utility
-  const { getDeviceInfo } = await import("./deviceInfo");
-  const device = deviceInfo || getDeviceInfo();
+  const device = deviceInfo || (await getDeviceInfo());
 
   // Ensure code_verifier is always sent if provided (required for PKCE)
   const requestBody: any = {
@@ -349,9 +335,7 @@ export async function refreshJWTToken(
   refreshToken: string,
   deviceInfo?: { device_name?: string; device_type?: string },
 ): Promise<AuthResponse> {
-  // Import device info utility
-  const { getDeviceInfo } = await import("./deviceInfo");
-  const device = deviceInfo || getDeviceInfo();
+  const device = deviceInfo || (await getDeviceInfo());
 
   const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
     method: "POST",
@@ -524,36 +508,7 @@ export async function checkOAuthStatus(state: string): Promise<{
   return data;
 }
 
-/**
- * Transcript types
- */
-export interface Transcript {
-  id: number;
-  user_id: number;
-  original_text: string | null;
-  original_text_word_count: number;
-  original_text_character_count: number;
-  is_enhanced: boolean;
-  enhanced_text: string | null;
-  enhanced_text_word_count: number | null;
-  enhanced_text_character_count: number | null;
-  audio_file_url: string | null;
-  audio_file_size: number | null;
-  provider: string | null;
-  asr_model: string | null;
-  status: string;
-  error_message: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PaginatedTranscriptsResponse {
-  transcripts: Transcript[];
-  total: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-}
+// Transcript types are imported from ../types
 
 /**
  * Get paginated list of transcripts
@@ -647,30 +602,13 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
   }
 }
 
-/**
- * App config types
- */
-export interface AppConfig {
-  system_type: string;
-  hotkey: string;
-  language: string;
-  enhance_transcription: boolean;
-  transcribe_with_cursor_context: boolean;
-}
-
-export interface AppConfigUpdateRequest {
-  system_type?: string; // 'mac' or 'windows'
-  hotkey?: string;
-  language?: string;
-  enhance_transcription?: boolean;
-  transcribe_with_cursor_context?: boolean;
-}
+// App config types are imported from ../types
 
 /**
  * Get current user's application configuration
  */
 export async function getAppConfig(
-  systemType: "mac" | "windows" = "mac",
+  systemType: SystemType = SystemType.MAC,
 ): Promise<AppConfig> {
   const params = new URLSearchParams({ system_type: systemType });
   const response = await authenticatedFetch(

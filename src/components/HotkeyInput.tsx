@@ -5,13 +5,11 @@
  * Users can press any key combination and it will be displayed and captured.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-export interface HotkeyConfig {
-  hotkey: string; // Human-readable format like "Ctrl+Shift+P"
-}
+import type { HotkeyConfig, HotkeyInputProps } from "../types";
 
 // Helper to build hotkey string from key and modifiers
 function buildHotkeyString(
@@ -54,12 +52,6 @@ function buildHotkeyString(
   parts.push(keyDisplay);
 
   return parts.join("+");
-}
-
-interface HotkeyInputProps {
-  value: HotkeyConfig;
-  onChange: (config: HotkeyConfig) => void;
-  disabled?: boolean;
 }
 
 // Map browser key names to rdev Key enum format

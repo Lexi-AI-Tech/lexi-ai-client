@@ -8,4 +8,5 @@ pub mod auth;
 pub mod hotkey;
 pub mod pill;
 pub mod text;
+pub mod utils;
 pub mod window;

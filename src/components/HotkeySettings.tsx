@@ -5,47 +5,44 @@
  * Supports any key combination including modifiers (Cmd, Shift, Alt, Ctrl).
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { HotkeyInput, HotkeyConfig } from "./HotkeyInput";
+
+import { getDeviceInfo } from "../lib/deviceInfo";
+import {
+  LanguageCode,
+  getAllLanguageCodes,
+  getLanguageName,
+} from "../lib/constants";
+import type { HotkeyConfig, TauriAppConfig } from "../types";
+
+import { HotkeyInput } from "./HotkeyInput";
 
 const DEFAULT_HOTKEY: HotkeyConfig = {
   hotkey: "Fn",
 };
 
 // Supported languages for transcription
-const SUPPORTED_LANGUAGES = [
-  { value: "auto", label: "Auto (Detect Language)" },
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "it", label: "Italian" },
-  { value: "pt", label: "Portuguese" },
-  { value: "ru", label: "Russian" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-  { value: "zh", label: "Chinese" },
-  { value: "ar", label: "Arabic" },
-  { value: "hi", label: "Hindi" },
-  { value: "nl", label: "Dutch" },
-  { value: "pl", label: "Polish" },
-  { value: "tr", label: "Turkish" },
-  { value: "sv", label: "Swedish" },
-  { value: "da", label: "Danish" },
-  { value: "no", label: "Norwegian" },
-  { value: "fi", label: "Finnish" },
-];
+const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
+  value: code,
+  label: getLanguageName(code),
+}));
 
 export const HotkeySettings: React.FC = () => {
   const [currentHotkey, setCurrentHotkey] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
   const [selectedHotkey, setSelectedHotkey] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
-  const [currentLanguage, setCurrentLanguage] = useState<string>("en");
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
-  const [systemType, setSystemType] = useState<"mac" | "windows">("mac");
+  const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
+    LanguageCode.EN,
+  );
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
+    LanguageCode.EN,
+  );
+  const [systemType, setSystemType] = useState<"mac" | "windows" | "unknown">(
+    "unknown",
+  );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,9 +56,8 @@ export const HotkeySettings: React.FC = () => {
 
       try {
         // Detect system type
-        const { getDeviceInfo } = await import("../lib/deviceInfo");
-        const deviceInfo = getDeviceInfo();
-        const detectedSystemType = deviceInfo.system_type || "mac";
+        const deviceInfo = await getDeviceInfo();
+        const detectedSystemType = deviceInfo.system_type;
         setSystemType(detectedSystemType);
 
         // Load hotkey from Rust backend
@@ -74,15 +70,18 @@ export const HotkeySettings: React.FC = () => {
           console.warn("Failed to load hotkey from Rust backend:", rustErr);
         }
 
-        // Load language from Tauri Store
+        // Load language from app config
         try {
-          const language = await invoke<string | null>("get_language");
-          if (language) {
-            setCurrentLanguage(language);
-            setSelectedLanguage(language);
+          const config = await invoke<TauriAppConfig>("get_app_config");
+          if (config.languages && config.languages.length > 0) {
+            const firstLanguage = config.languages[0] as LanguageCode;
+            if (Object.values(LanguageCode).includes(firstLanguage)) {
+              setCurrentLanguage(firstLanguage);
+              setSelectedLanguage(firstLanguage);
+            }
           }
         } catch (langErr) {
-          console.warn("Failed to load language from Tauri Store:", langErr);
+          console.warn("Failed to load language from app config:", langErr);
         }
       } catch (err: any) {
         console.error("Failed to load config:", err);
@@ -149,9 +148,13 @@ export const HotkeySettings: React.FC = () => {
         await invoke("update_hotkey", { configJson });
       }
 
-      // Update Rust backend if language changed (saves to Tauri Store)
+      // Update app config if language changed
       if (languageChanged) {
-        await invoke("set_language", { language: selectedLanguage });
+        await invoke("update_app_config", {
+          config: {
+            languages: [selectedLanguage],
+          },
+        });
         setCurrentLanguage(selectedLanguage);
       }
 
@@ -251,7 +254,9 @@ export const HotkeySettings: React.FC = () => {
           </div>
           <select
             value={selectedLanguage}
-            onChange={(e) => setSelectedLanguage(e.target.value)}
+            onChange={(e) =>
+              setSelectedLanguage(e.target.value as LanguageCode)
+            }
             disabled={isUpdating}
             style={{
               width: "100%",
