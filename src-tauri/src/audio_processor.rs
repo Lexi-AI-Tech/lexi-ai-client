@@ -9,7 +9,7 @@
 //! 6. Emitting events to the frontend to update UI state
 
 use crate::actions::{check_action_trigger, perform_action};
-use crate::commands::app_config::get_language_internal;
+use crate::commands::app_config::get_app_config;
 use crate::commands::auth::get_auth_token;
 use crate::shortcuts::check_command;
 use crate::state::TranscriptionTaskState;
@@ -81,10 +81,12 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             );
         }
 
-        // Get first language from languages array in Tauri Store
+        // Get first language from app config
         // Default to "auto" if not set or if read fails
-        let language = get_language_internal(&app_handle_for_task)
-            .unwrap_or_else(|_| None)
+        let language = get_app_config(app_handle_for_task.clone())
+            .await
+            .ok()
+            .and_then(|config| config.languages)
             .and_then(|langs| langs.first().cloned())
             .unwrap_or_else(|| "auto".to_string());
         println!("🌐 Using language: {}", language);

@@ -169,29 +169,3 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
     println!("✅ App config saved to Tauri Store");
     Ok(current_config)
 }
-
-/// Get language from app config (internal helper for Rust code)
-///
-/// This is a convenience function for internal Rust code that needs to access
-/// the language setting synchronously. Frontend should use `get_app_config` instead.
-/// This function directly reads from Tauri Store without syncing autostart.
-///
-/// # Arguments
-/// * `app` - The Tauri AppHandle to access the store
-///
-/// # Returns
-/// * `Option<Vec<String>>` - The current language codes if available, None otherwise
-pub fn get_language_internal(app: &AppHandle) -> Result<Option<Vec<String>>, String> {
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|e| format!("Failed to open store: {}", e))?;
-
-    if let Some(config_value) = store.get("config") {
-        if let Ok(config) = serde_json::from_value::<AppConfig>(config_value.clone()) {
-            return Ok(config.languages);
-        }
-    }
-
-    // Return default if not found
-    Ok(Some(vec!["auto".to_string()]))
-}
