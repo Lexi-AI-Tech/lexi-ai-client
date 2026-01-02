@@ -17,7 +17,7 @@ use crate::config;
 use crate::cursor_context::CursorContext;
 use reqwest::multipart;
 use std::error::Error;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 /// Hardcoded action trigger phrase (case-insensitive)
 const ACTION_TRIGGER: &str = "hey lexi";
