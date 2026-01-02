@@ -44,32 +44,13 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
   }
 
   // Detect system type using Rust utility
-  let systemType: "mac" | "windows" = "mac";
-  if (typeof window !== "undefined" && (window as any).__TAURI__) {
-    try {
-      const rustSystemType = await invoke<string>("get_system_type");
-      if (rustSystemType === "mac" || rustSystemType === "windows") {
-        systemType = rustSystemType;
-      } else {
-        // Default to mac for unknown systems
-        systemType = "mac";
-      }
-    } catch (error) {
-      console.error("Failed to get system type from Rust:", error);
-      // Fallback to user agent detection
-      if (/windows/i.test(userAgent)) {
-        systemType = "windows";
-      } else {
-        systemType = "mac";
-      }
-    }
-  } else {
-    // Fallback to user agent detection if not in Tauri
-    if (/windows/i.test(userAgent)) {
-      systemType = "windows";
-    } else {
-      systemType = "mac";
-    }
+  const systemType = await invoke<string>("get_system_type");
+  if (
+    systemType !== "mac" &&
+    systemType !== "windows" &&
+    systemType !== "unknown"
+  ) {
+    throw new Error(`Invalid system type returned from Rust: ${systemType}`);
   }
 
   return {

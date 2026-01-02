@@ -157,7 +157,7 @@ export interface PaginatedTranscriptsResponse {
 export interface DeviceInfo {
   device_name: string;
   device_type: string;
-  system_type: "mac" | "windows";
+  system_type: "mac" | "windows" | "unknown";
 }
 
 // ============================================================================

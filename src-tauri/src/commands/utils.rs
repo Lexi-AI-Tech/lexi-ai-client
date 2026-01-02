@@ -17,4 +17,3 @@ use crate::utils;
 pub fn get_system_type() -> &'static str {
     utils::get_system_type()
 }
-
