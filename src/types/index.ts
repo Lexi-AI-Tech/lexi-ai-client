@@ -219,4 +219,3 @@ export interface PermissionState {
   granted: boolean;
   checking: boolean;
 }
-

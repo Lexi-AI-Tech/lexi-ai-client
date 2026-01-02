@@ -95,17 +95,14 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         println!("🌐 Using language: {}", language);
 
         // Get transcription settings from app config
-        let enhance_transcription = app_config
-            .enhance_transcription
-            .unwrap_or(false);
-        let transcribe_with_cursor_context = app_config
-            .transcribe_with_cursor_context
-            .unwrap_or(false);
-        
+        let enhance_transcription = app_config.enhance_transcription.unwrap_or(false);
+        let transcribe_with_cursor_context =
+            app_config.transcribe_with_cursor_context.unwrap_or(false);
+
         // TODO: Decode what to do with offline_transcription
         // offline_transcription is not in app config, keep as hardcoded for now
         let offline_transcription = true;
-        
+
         // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript.
         // Do more experiment on how we can use this trick to manipulate the model behavior.
         // Get vocabulary from app config
@@ -115,7 +112,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .into_iter()
             .map(|item| item.value)
             .collect();
-        
+
         println!(
             "⚙️  Transcription settings: enhance={}, cursor_context={}, offline={}, vocabulary_size={}",
             enhance_transcription, transcribe_with_cursor_context, offline_transcription, vocabulary.len()

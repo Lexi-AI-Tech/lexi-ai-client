@@ -46,7 +46,6 @@ pub struct AppConfig {
     pub vocabulary: Option<Vec<VocabularyItem>>,
 }
 
-
 // ============================================================================
 // App Configuration Storage Commands
 //
@@ -76,7 +75,10 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
                 config
             }
             Err(e) => {
-                println!("⚠️  Failed to deserialize config, returning empty config: {}", e);
+                println!(
+                    "⚠️  Failed to deserialize config, returning empty config: {}",
+                    e
+                );
                 AppConfig {
                     languages: None,
                     transcription_hotkeys: None,
