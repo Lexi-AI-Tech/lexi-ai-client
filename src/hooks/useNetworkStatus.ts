@@ -6,12 +6,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { checkNetworkConnectivity } from "../lib/networkUtils";
-
-export interface NetworkStatus {
-  isOnline: boolean;
-  isChecking: boolean;
-  retry: () => Promise<void>;
-}
+import type { NetworkStatus } from "../types";
 
 /**
  * Hook to monitor network connectivity status

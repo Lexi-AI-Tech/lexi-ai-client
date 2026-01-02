@@ -8,12 +8,13 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { HotkeyInput, HotkeyConfig } from "./HotkeyInput";
+import { HotkeyInput } from "./HotkeyInput";
 import {
   LanguageCode,
   getAllLanguageCodes,
   getLanguageName,
 } from "../lib/constants";
+import type { HotkeyConfig, TauriAppConfig } from "../types";
 
 const DEFAULT_HOTKEY: HotkeyConfig = {
   hotkey: "Fn",
@@ -67,9 +68,7 @@ export const HotkeySettings: React.FC = () => {
 
         // Load language from app config
         try {
-          const config = await invoke<{
-            languages?: string[] | null;
-          }>("get_app_config");
+          const config = await invoke<TauriAppConfig>("get_app_config");
           if (config.languages && config.languages.length > 0) {
             const firstLanguage = config.languages[0] as LanguageCode;
             if (Object.values(LanguageCode).includes(firstLanguage)) {

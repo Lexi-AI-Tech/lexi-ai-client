@@ -5,22 +5,7 @@
  * Stores the current step and completion status.
  */
 
-export type OnboardingStep =
-  | "welcome"
-  | "permissions"
-  | "fn-key-test"
-  | "microphone-test"
-  | "home";
-
-export interface OnboardingState {
-  currentStep: OnboardingStep;
-  isCompleted: boolean;
-  setStep: (step: OnboardingStep) => void;
-  nextStep: () => void;
-  previousStep: () => void;
-  completeOnboarding: () => void;
-  resetOnboarding: () => void;
-}
+import type { OnboardingStep, OnboardingState } from "../types";
 
 // Step order for navigation
 const STEP_ORDER: OnboardingStep[] = [

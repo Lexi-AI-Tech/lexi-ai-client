@@ -2,11 +2,7 @@
  * Device information utilities for authentication
  */
 
-export interface DeviceInfo {
-  device_name: string;
-  device_type: string;
-  system_type: "mac" | "windows"; // Operating system type
-}
+import type { DeviceInfo } from "../types";
 
 /**
  * Get device information for the current platform

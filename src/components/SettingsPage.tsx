@@ -6,29 +6,13 @@ import {
   getAllLanguageCodes,
   getLanguageName,
 } from "../lib/constants";
+import type { TauriAppConfig } from "../types";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
   value: code,
   label: getLanguageName(code),
 }));
-
-// Vocabulary item interface
-interface VocabularyItem {
-  value: string;
-  is_system_generated: boolean;
-  hidden: boolean;
-}
-
-// AppConfig interface matching Rust struct
-interface AppConfig {
-  languages?: string[] | null;
-  transcription_hotkeys?: string[] | null;
-  enhance_transcription?: boolean | null;
-  transcribe_with_cursor_context?: boolean | null;
-  launch_on_system_startup?: boolean | null;
-  vocabulary?: VocabularyItem[] | null;
-}
 
 export const SettingsPage: React.FC = () => {
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
@@ -51,7 +35,7 @@ export const SettingsPage: React.FC = () => {
       setError(null);
 
       try {
-        const config = await invoke<AppConfig>("get_app_config");
+        const config = await invoke<TauriAppConfig>("get_app_config");
 
         // Set language
         if (config.languages && config.languages.length > 0) {
@@ -93,7 +77,7 @@ export const SettingsPage: React.FC = () => {
 
     try {
       // Update app config with new language
-      const updatedConfig = await invoke<AppConfig>("update_app_config", {
+      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
         config: {
           languages: [selectedLanguage],
         },
@@ -126,7 +110,7 @@ export const SettingsPage: React.FC = () => {
       const newValue = !autostartEnabled;
 
       // Update app config with new autostart value
-      const updatedConfig = await invoke<AppConfig>("update_app_config", {
+      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
         config: {
           launch_on_system_startup: newValue,
         },

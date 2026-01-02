@@ -11,33 +11,7 @@ import {
   getAuthDataSecure,
   clearAuthDataSecure,
 } from "../lib/secureStorage";
-
-export interface AuthUser {
-  email: string;
-  name: string;
-  picture?: string;
-}
-
-export interface AuthTokens {
-  access_token: string; // Backend JWT access token
-  refresh_token?: string; // Backend JWT refresh token
-  expires_in?: number;
-  expires_at?: number;
-}
-
-export interface AuthState {
-  isAuthenticated: boolean;
-  user: AuthUser | null;
-  tokens: AuthTokens | null;
-  isLoading: boolean;
-  error: string | null;
-  isInitialized: boolean;
-  setAuthData: (tokens: AuthTokens, user: AuthUser) => void;
-  clearAuth: () => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
-  refreshTokenIfNeeded: () => Promise<boolean>; // Returns true if refreshed, false otherwise
-}
+import type { AuthUser, AuthTokens, AuthState } from "../types";
 
 // Store state
 let isAuthenticated: boolean = false;

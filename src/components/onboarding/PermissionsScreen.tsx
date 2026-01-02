@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useOnboardingStore } from "../../store/onboardingStore";
+import type { PermissionState } from "../../types";
 import "./onboarding.css";
-
-interface PermissionState {
-  granted: boolean;
-  checking: boolean;
-}
 
 export const PermissionsScreen: React.FC = () => {
   const { nextStep, previousStep } = useOnboardingStore();

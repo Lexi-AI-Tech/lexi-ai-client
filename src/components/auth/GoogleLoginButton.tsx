@@ -2,12 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore, authStore } from "../../store/authStore";
 import { logout as backendLogout, checkOAuthStatus } from "../../lib/apiClient";
+import type { GoogleLoginButtonProps } from "../../types";
 import "./auth.css";
-
-interface GoogleLoginButtonProps {
-  onSuccess?: (user: any) => void;
-  onError?: (error: string) => void;
-}
 
 export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onSuccess,

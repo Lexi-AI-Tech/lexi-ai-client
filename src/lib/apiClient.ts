@@ -5,33 +5,22 @@
  */
 
 import { authStore } from "../store/authStore";
-import { SystemType, LanguageCode } from "./constants";
+import { SystemType } from "./constants";
+import type {
+  ApiResponse,
+  AuthResponse,
+  Transcript,
+  PaginatedTranscriptsResponse,
+  AppConfig,
+  AppConfigUpdateRequest,
+} from "../types";
+
 // Use localhost in development, production URL in production builds
 // Can be overridden with VITE_API_BASE_URL environment variable
 const API_BASE_URL =
   import.meta.env.MODE === "development"
     ? "http://localhost:1230"
     : "https://lexi-ai-server.onrender.com";
-
-export interface ApiResponse<T = any> {
-  success?: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-  [key: string]: any;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
-  user: {
-    email: string;
-    name: string;
-    picture?: string;
-    id?: string;
-  };
-  expires_in?: number;
-}
 
 /**
  * Get the current access token from auth store
@@ -524,36 +513,7 @@ export async function checkOAuthStatus(state: string): Promise<{
   return data;
 }
 
-/**
- * Transcript types
- */
-export interface Transcript {
-  id: number;
-  user_id: number;
-  original_text: string | null;
-  original_text_word_count: number;
-  original_text_character_count: number;
-  is_enhanced: boolean;
-  enhanced_text: string | null;
-  enhanced_text_word_count: number | null;
-  enhanced_text_character_count: number | null;
-  audio_file_url: string | null;
-  audio_file_size: number | null;
-  provider: string | null;
-  asr_model: string | null;
-  status: string;
-  error_message: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PaginatedTranscriptsResponse {
-  transcripts: Transcript[];
-  total: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-}
+// Transcript types are imported from ../types
 
 /**
  * Get paginated list of transcripts
@@ -647,37 +607,7 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
   }
 }
 
-/**
- * Vocabulary item structure
- */
-export interface VocabularyItem {
-  value: string;
-  is_system_generated: boolean;
-  hidden: boolean;
-}
-
-/**
- * App config types
- */
-export interface AppConfig {
-  system_type: SystemType;
-  transcription_hotkeys: string[];
-  languages: LanguageCode[];
-  enhance_transcription: boolean;
-  transcribe_with_cursor_context: boolean;
-  launch_on_system_startup: boolean;
-  vocabulary?: VocabularyItem[] | null;
-}
-
-export interface AppConfigUpdateRequest {
-  system_type?: SystemType;
-  transcription_hotkeys?: string[];
-  languages?: LanguageCode[];
-  enhance_transcription?: boolean;
-  transcribe_with_cursor_context?: boolean;
-  launch_on_system_startup?: boolean;
-  vocabulary?: VocabularyItem[] | null;
-}
+// App config types are imported from ../types
 
 /**
  * Get current user's application configuration
