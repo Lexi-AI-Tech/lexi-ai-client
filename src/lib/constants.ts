@@ -96,4 +96,3 @@ export const LANGUAGE_NAMES: Record<LanguageCode, string> = {
 export function getLanguageName(code: string): string {
   return LANGUAGE_NAMES[code as LanguageCode] || code;
 }
-
