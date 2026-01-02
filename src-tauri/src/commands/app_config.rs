@@ -24,6 +24,7 @@ pub struct VocabularyItem {
     pub value: String,
     #[serde(rename = "isSystemGenerated")]
     pub is_system_generated: bool,
+    pub hidden: bool,
 }
 
 /// Application configuration structure

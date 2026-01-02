@@ -17,6 +17,7 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
 interface VocabularyItem {
   value: string;
   isSystemGenerated: boolean;
+  hidden: boolean;
 }
 
 // AppConfig interface matching Rust struct
