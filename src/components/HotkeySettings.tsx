@@ -31,10 +31,10 @@ export const HotkeySettings: React.FC = () => {
   const [selectedHotkey, setSelectedHotkey] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
-    LanguageCode.EN
+    LanguageCode.EN,
   );
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
-    LanguageCode.EN
+    LanguageCode.EN,
   );
   const [systemType, setSystemType] = useState<"mac" | "windows">("mac");
   const [isUpdating, setIsUpdating] = useState(false);
@@ -65,18 +65,20 @@ export const HotkeySettings: React.FC = () => {
           console.warn("Failed to load hotkey from Rust backend:", rustErr);
         }
 
-        // Load language from Tauri Store
+        // Load language from app config
         try {
-          const languages = await invoke<string[] | null>("get_language");
-          if (languages && languages.length > 0) {
-            const firstLanguage = languages[0] as LanguageCode;
+          const config = await invoke<{
+            languages?: string[] | null;
+          }>("get_app_config");
+          if (config.languages && config.languages.length > 0) {
+            const firstLanguage = config.languages[0] as LanguageCode;
             if (Object.values(LanguageCode).includes(firstLanguage)) {
               setCurrentLanguage(firstLanguage);
               setSelectedLanguage(firstLanguage);
             }
           }
         } catch (langErr) {
-          console.warn("Failed to load language from Tauri Store:", langErr);
+          console.warn("Failed to load language from app config:", langErr);
         }
       } catch (err: any) {
         console.error("Failed to load config:", err);
@@ -143,9 +145,13 @@ export const HotkeySettings: React.FC = () => {
         await invoke("update_hotkey", { configJson });
       }
 
-      // Update Rust backend if language changed (saves to Tauri Store)
+      // Update app config if language changed
       if (languageChanged) {
-        await invoke("set_language", { languages: [selectedLanguage] });
+        await invoke("update_app_config", {
+          config: {
+            languages: [selectedLanguage],
+          },
+        });
         setCurrentLanguage(selectedLanguage);
       }
 

@@ -81,10 +81,7 @@ use permissions::{
     request_screen_recording_permission,
 };
 
-use commands::app_config::{
-    disable_autostart, enable_autostart, get_app_config, get_config_value, get_language,
-    is_autostart_enabled, set_config_value, set_language, update_app_config,
-};
+use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
     clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, start_google_login,
     store_auth_data,
@@ -174,11 +171,6 @@ pub fn main() {
             open_devtools,
             start_google_login,
             get_pkce_verifier,
-            set_language,
-            get_language,
-            enable_autostart,
-            disable_autostart,
-            is_autostart_enabled,
             update_hotkey,
             get_current_hotkey,
             start_hotkey_recording,
@@ -188,9 +180,7 @@ pub fn main() {
             clear_auth_data,
             has_auth_data,
             get_app_config,
-            update_app_config,
-            get_config_value,
-            set_config_value
+            update_app_config
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS

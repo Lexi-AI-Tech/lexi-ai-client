@@ -13,62 +13,63 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
   label: getLanguageName(code),
 }));
 
+// AppConfig interface matching Rust struct
+interface AppConfig {
+  languages?: string[] | null;
+  transcription_hotkeys?: string[] | null;
+  enhance_transcription?: boolean | null;
+  transcribe_with_cursor_context?: boolean | null;
+  launch_on_system_startup?: boolean | null;
+}
+
 export const SettingsPage: React.FC = () => {
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
-    LanguageCode.AUTO
+    LanguageCode.AUTO,
   );
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
-    LanguageCode.AUTO
+    LanguageCode.AUTO,
   );
+  const [autostartEnabled, setAutostartEnabled] = useState<boolean>(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [autostartEnabled, setAutostartEnabled] = useState<boolean>(false);
-  const [isCheckingAutostart, setIsCheckingAutostart] = useState(true);
   const [isTogglingAutostart, setIsTogglingAutostart] = useState(false);
 
-  // Load current language from Tauri Store on mount
+  // Load app config on mount
   useEffect(() => {
-    const loadLanguage = async () => {
+    const loadConfig = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const languages = await invoke<string[] | null>("get_language");
-        if (languages && languages.length > 0) {
-          const firstLanguage = languages[0] as LanguageCode;
+        const config = await invoke<AppConfig>("get_app_config");
+
+        // Set language
+        if (config.languages && config.languages.length > 0) {
+          const firstLanguage = config.languages[0] as LanguageCode;
           if (Object.values(LanguageCode).includes(firstLanguage)) {
             setCurrentLanguage(firstLanguage);
             setSelectedLanguage(firstLanguage);
           }
         }
+
+        // Set autostart
+        if (
+          config.launch_on_system_startup !== null &&
+          config.launch_on_system_startup !== undefined
+        ) {
+          setAutostartEnabled(config.launch_on_system_startup);
+        }
       } catch (err: any) {
-        console.error("Failed to load language:", err);
-        setError(err?.message || "Failed to load language setting");
+        console.error("Failed to load app config:", err);
+        setError(err?.message || "Failed to load configuration");
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadLanguage();
-  }, []);
-
-  // Load autostart status on mount
-  useEffect(() => {
-    const checkAutostart = async () => {
-      setIsCheckingAutostart(true);
-      try {
-        const enabled = await invoke<boolean>("is_autostart_enabled");
-        setAutostartEnabled(enabled);
-      } catch (err: any) {
-        console.error("Failed to check autostart status:", err);
-      } finally {
-        setIsCheckingAutostart(false);
-      }
-    };
-
-    checkAutostart();
+    loadConfig();
   }, []);
 
   const handleSaveLanguage = async () => {
@@ -83,11 +84,18 @@ export const SettingsPage: React.FC = () => {
     setSuccess(false);
 
     try {
-      // Save to Tauri Store (persists locally, no auth required)
-      await invoke("set_language", { languages: [selectedLanguage] });
+      // Update app config with new language
+      const updatedConfig = await invoke<AppConfig>("update_app_config", {
+        config: {
+          languages: [selectedLanguage],
+        },
+      });
 
       // Update local state
-      setCurrentLanguage(selectedLanguage);
+      if (updatedConfig.languages && updatedConfig.languages.length > 0) {
+        const firstLanguage = updatedConfig.languages[0] as LanguageCode;
+        setCurrentLanguage(firstLanguage);
+      }
 
       setSuccess(true);
       setIsUpdating(false);
@@ -107,14 +115,26 @@ export const SettingsPage: React.FC = () => {
     setIsTogglingAutostart(true);
     setError(null);
     try {
-      if (autostartEnabled) {
-        await invoke("disable_autostart");
-        setAutostartEnabled(false);
-        console.log("✅ Auto-startup disabled");
-      } else {
-        await invoke("enable_autostart");
-        setAutostartEnabled(true);
-        console.log("✅ Auto-startup enabled");
+      const newValue = !autostartEnabled;
+
+      // Update app config with new autostart value
+      const updatedConfig = await invoke<AppConfig>("update_app_config", {
+        config: {
+          launch_on_system_startup: newValue,
+        },
+      });
+
+      // Update local state
+      if (
+        updatedConfig.launch_on_system_startup !== null &&
+        updatedConfig.launch_on_system_startup !== undefined
+      ) {
+        setAutostartEnabled(updatedConfig.launch_on_system_startup);
+        console.log(
+          updatedConfig.launch_on_system_startup
+            ? "✅ Auto-startup enabled"
+            : "❌ Auto-startup disabled",
+        );
       }
     } catch (err: any) {
       console.error("Failed to toggle autostart:", err);
@@ -308,7 +328,7 @@ export const SettingsPage: React.FC = () => {
             </div>
             <button
               onClick={handleToggleAutostart}
-              disabled={isCheckingAutostart || isTogglingAutostart}
+              disabled={isTogglingAutostart}
               style={{
                 width: "44px",
                 height: "24px",
@@ -317,13 +337,10 @@ export const SettingsPage: React.FC = () => {
                 backgroundColor: autostartEnabled
                   ? "rgba(52, 199, 89, 1)"
                   : "rgba(255, 255, 255, 0.2)",
-                cursor:
-                  isCheckingAutostart || isTogglingAutostart
-                    ? "not-allowed"
-                    : "pointer",
+                cursor: isTogglingAutostart ? "not-allowed" : "pointer",
                 position: "relative",
                 transition: "background-color 0.2s",
-                opacity: isCheckingAutostart || isTogglingAutostart ? 0.5 : 1,
+                opacity: isTogglingAutostart ? 0.5 : 1,
               }}
             >
               <div
