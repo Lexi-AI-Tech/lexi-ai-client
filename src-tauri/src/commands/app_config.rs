@@ -57,14 +57,25 @@ pub struct AppConfig {
 // and error handling for the persistent storage layer.
 // ============================================================================
 
-/// Get the complete app configuration from Tauri Store
+/// Server response structure for app config
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ServerAppConfigResponse {
+    system_type: String,
+    transcription_hotkeys: Vec<String>,
+    languages: Vec<String>,
+    enhance_transcription: bool,
+    transcribe_with_cursor_context: bool,
+    launch_on_system_startup: bool,
+    vocabulary: Vec<VocabularyItem>,
+}
+
+/// Get the complete app configuration from Tauri Store or server
 ///
-/// Reads directly from persistent storage (Tauri Store) and syncs autostart status
-/// from OS-level settings. Returns empty config if no configuration has been saved yet.
-/// The server will provide default values when needed.
+/// First tries to load from Tauri Store. If not found, fetches from server.
+/// Syncs autostart status from OS-level settings.
 ///
 /// # Returns
-/// * `AppConfig` - The current app configuration or empty config if not found
+/// * `AppConfig` - The current app configuration
 #[tauri::command]
 pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     let store = app
@@ -79,29 +90,16 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
             }
             Err(e) => {
                 println!(
-                    "⚠️  Failed to deserialize config, returning empty config: {}",
+                    "⚠️  Failed to deserialize config from store, fetching from server: {}",
                     e
                 );
-                AppConfig {
-                    languages: None,
-                    transcription_hotkeys: None,
-                    enhance_transcription: None,
-                    transcribe_with_cursor_context: None,
-                    launch_on_system_startup: None,
-                    vocabulary: None,
-                }
+                // Try to fetch from server
+                fetch_config_from_server(&app).await?
             }
         }
     } else {
-        println!("📝 No config found in Tauri Store, returning empty config");
-        AppConfig {
-            languages: None,
-            transcription_hotkeys: None,
-            enhance_transcription: None,
-            transcribe_with_cursor_context: None,
-            launch_on_system_startup: None,
-            vocabulary: None,
-        }
+        println!("📝 No config found in Tauri Store, fetching from server");
+        fetch_config_from_server(&app).await?
     };
 
     // Sync launch_on_system_startup with actual OS autostart status
@@ -118,14 +116,100 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     Ok(config)
 }
 
+/// Fetch app configuration from server
+///
+/// Fetches the configuration from the cloud API and saves it to Tauri Store.
+///
+/// # Arguments
+/// * `app` - The Tauri AppHandle
+///
+/// # Returns
+/// * `AppConfig` - The configuration from server
+async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> {
+    let auth_token = match get_auth_token(app) {
+        Some(token) => token,
+        None => {
+            return Err("Authentication required to fetch app config from server".to_string());
+        }
+    };
+
+    let client = reqwest::Client::new();
+    let api_base_url = config::api_base_url();
+    let url = format!("{}/api/users/me/config?system_type=mac", api_base_url);
+
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .header("Content-Type", "application/json")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch app config from server: {}", e))?;
+
+    let status = response.status();
+    
+    // Parse response - might be wrapped in {data: {...}} or direct
+    let json_value: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse server response: {}", e))?;
+
+    if !status.is_success() {
+        let error_text = json_value
+            .get("error")
+            .or_else(|| json_value.get("detail"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown error");
+        return Err(format!(
+            "Server error ({}): {}",
+            status, error_text
+        ));
+    }
+
+    // Check if response is wrapped in "data" field
+    let server_response: ServerAppConfigResponse = if let Some(data_field) = json_value.get("data") {
+        serde_json::from_value(data_field.clone())
+            .map_err(|e| format!("Failed to parse server response data: {}", e))?
+    } else {
+        serde_json::from_value(json_value)
+            .map_err(|e| format!("Failed to parse server response: {}", e))?
+    };
+
+    // Convert server response to local AppConfig format
+    let config = AppConfig {
+        languages: Some(server_response.languages),
+        transcription_hotkeys: Some(server_response.transcription_hotkeys),
+        enhance_transcription: Some(server_response.enhance_transcription),
+        transcribe_with_cursor_context: Some(server_response.transcribe_with_cursor_context),
+        launch_on_system_startup: Some(server_response.launch_on_system_startup),
+        vocabulary: Some(server_response.vocabulary),
+    };
+
+    // Save to Tauri Store for future use
+    let store = app
+        .store(STORE_FILE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    let config_json = serde_json::to_value(&config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    store.set("config", config_json);
+    store
+        .save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
+
+    println!("✅ Fetched and saved app config from server");
+
+    Ok(config)
+}
+
 /// Update the app configuration in Tauri Store and sync with cloud API
 ///
 /// This function performs two operations:
 /// 1. Updates the local Tauri Store with the new configuration
-/// 2. Syncs the configuration with the cloud API (if authenticated)
+/// 2. Syncs the configuration with the cloud API
 ///
 /// Writes directly to persistent storage (Tauri Store) and syncs autostart setting
-/// with OS-level configuration. Also attempts to sync with cloud API.
+/// with OS-level configuration. Also syncs with cloud API.
 ///
 /// # Arguments
 /// * `config` - The complete app configuration to save (partial updates supported via Option fields)
@@ -189,7 +273,7 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
 
     println!("✅ App config saved to Tauri Store");
 
-    // 2. Sync with cloud API (if authenticated)
+    // 2. Sync with cloud API
     sync_config_to_cloud(&app, &current_config).await;
 
     Ok(current_config)
