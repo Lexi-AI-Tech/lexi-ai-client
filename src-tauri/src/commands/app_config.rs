@@ -15,6 +15,7 @@ use tauri_plugin_store::StoreExt;
 
 use crate::commands::auth::get_auth_token;
 use crate::config;
+use crate::utils;
 
 const STORE_FILE: &str = ".app-config.dat";
 
@@ -106,8 +107,9 @@ async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> 
 
     let client = reqwest::Client::new();
     let url = format!(
-        "{}/api/users/me/config?system_type=mac",
-        config::api_base_url()
+        "{}/api/users/me/config?system_type={}",
+        config::api_base_url(),
+        utils::get_system_type()
     );
 
     let response = client
@@ -120,7 +122,7 @@ async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> 
         })?;
 
     let status = response.status();
-    
+
     if !status.is_success() {
         let json_value: serde_json::Value = response
             .json()
@@ -130,10 +132,9 @@ async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> 
         return Err(format!("Unable to load settings: {}", error_msg));
     }
 
-    let server_response: ServerAppConfigResponse = response
-        .json()
-        .await
-        .map_err(|_| "Received invalid settings format from server. Please try again.".to_string())?;
+    let server_response: ServerAppConfigResponse = response.json().await.map_err(|_| {
+        "Received invalid settings format from server. Please try again.".to_string()
+    })?;
 
     let config = server_response_to_app_config(server_response);
     save_config_to_store(app, &config)?;
@@ -307,7 +308,7 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
 
     body.insert(
         "system_type".to_string(),
-        serde_json::Value::String("mac".to_string()),
+        serde_json::Value::String(utils::get_system_type().to_string()),
     );
 
     body
