@@ -92,6 +92,35 @@ lexi-ai-client/
     └── download-model.sh  # Model download script
 ```
 
+## Troubleshooting
+
+### Clearing App Configuration
+
+If you need to reset the app configuration (e.g., to test with fresh defaults), you can delete the Tauri Store file:
+
+#### Using Finder (macOS)
+
+1. Open **Finder**
+2. Click on the **Go** menu in the menu bar
+3. Press and hold the **Option** (⌥) key
+4. Select **Library** (this option only appears when holding Option)
+5. Navigate to: `Application Support/com.lexi.ai/`
+6. Delete the file `.app-config.dat`
+
+Alternatively, you can delete the entire `com.lexi.ai` folder to clear all app data.
+
+#### Using Terminal
+
+```bash
+# Delete just the app config
+rm ~/Library/Application\ Support/com.lexi.ai/.app-config.dat
+
+# Or delete all app data
+rm -rf ~/Library/Application\ Support/com.lexi.ai/
+```
+
+After deleting the config file, restart the app and it will fetch fresh configuration from the server with default values.
+
 ## Features
 
 - 🎤 Local speech-to-text using Whisper.cpp
