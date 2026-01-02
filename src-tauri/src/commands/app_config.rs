@@ -173,8 +173,31 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
 // ============================================================================
 
 /// Sync autostart status from OS to config
+/// Sync launch_on_system_startup with actual OS autostart status
+/// If config says it should be enabled but OS has it disabled, enable it on OS
+/// If config says it should be disabled but OS has it enabled, disable it on OS
 fn sync_autostart_status(app: &AppHandle, config: &mut AppConfig) {
-    if let Ok(enabled) = app.autolaunch().is_enabled() {
+    let autolaunch = app.autolaunch();
+
+    // Get current OS autostart status
+    let os_enabled = autolaunch.is_enabled().unwrap_or(false);
+
+    // Get desired status from config (default to true if not set, matching database default)
+    let config_enabled = config.launch_on_system_startup.unwrap_or(true);
+
+    // If they don't match, sync OS to match config
+    if config_enabled != os_enabled {
+        if config_enabled {
+            let _ = autolaunch.enable();
+            println!("✅ Synced: Enabled autostart on OS (config was true)");
+        } else {
+            let _ = autolaunch.disable();
+            println!("❌ Synced: Disabled autostart on OS (config was false)");
+        }
+    }
+
+    // Update config with actual OS status (in case enable/disable failed)
+    if let Ok(enabled) = autolaunch.is_enabled() {
         config.launch_on_system_startup = Some(enabled);
     }
 }
