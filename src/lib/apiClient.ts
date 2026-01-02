@@ -652,7 +652,7 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
  */
 export interface VocabularyItem {
   value: string;
-  isSystemGenerated: boolean;
+  is_system_generated: boolean;
   hidden: boolean;
 }
 

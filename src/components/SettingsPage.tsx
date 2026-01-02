@@ -16,7 +16,7 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
 // Vocabulary item interface
 interface VocabularyItem {
   value: string;
-  isSystemGenerated: boolean;
+  is_system_generated: boolean;
   hidden: boolean;
 }
 
