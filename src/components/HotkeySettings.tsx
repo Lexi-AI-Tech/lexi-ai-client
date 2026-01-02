@@ -5,16 +5,19 @@
  * Supports any key combination including modifiers (Cmd, Shift, Alt, Ctrl).
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { HotkeyInput } from "./HotkeyInput";
+
+import { getDeviceInfo } from "../lib/deviceInfo";
 import {
   LanguageCode,
   getAllLanguageCodes,
   getLanguageName,
 } from "../lib/constants";
 import type { HotkeyConfig, TauriAppConfig } from "../types";
+
+import { HotkeyInput } from "./HotkeyInput";
 
 const DEFAULT_HOTKEY: HotkeyConfig = {
   hotkey: "Fn",
@@ -37,7 +40,9 @@ export const HotkeySettings: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
     LanguageCode.EN,
   );
-  const [systemType, setSystemType] = useState<"mac" | "windows">("mac");
+  const [systemType, setSystemType] = useState<"mac" | "windows" | "unknown">(
+    "unknown",
+  );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,9 +56,8 @@ export const HotkeySettings: React.FC = () => {
 
       try {
         // Detect system type
-        const { getDeviceInfo } = await import("../lib/deviceInfo");
         const deviceInfo = await getDeviceInfo();
-        const detectedSystemType = deviceInfo.system_type || "mac";
+        const detectedSystemType = deviceInfo.system_type;
         setSystemType(detectedSystemType);
 
         // Load hotkey from Rust backend

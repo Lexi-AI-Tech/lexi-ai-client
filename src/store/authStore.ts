@@ -6,6 +6,7 @@
  * Uses OS keychain for secure storage (macOS Keychain, Windows Credential Manager, Linux Secret Service).
  */
 
+import { getDeviceInfo } from "../lib/deviceInfo";
 import {
   storeAuthDataSecure,
   getAuthDataSecure,
@@ -41,7 +42,6 @@ const loadFromStorage = async () => {
         if (tokens?.refresh_token) {
           console.log("🔄 Access token expired, attempting to refresh...");
           try {
-            const { getDeviceInfo } = await import("../lib/deviceInfo");
             const device = await getDeviceInfo();
             const API_BASE_URL =
               import.meta.env.MODE === "development"
@@ -212,7 +212,6 @@ export const authStore: AuthState = {
     // Token is expired or expiring soon, refresh it
     console.log("🔄 Token expiring soon, refreshing proactively...");
     try {
-      const { getDeviceInfo } = await import("../lib/deviceInfo");
       const device = await getDeviceInfo();
       const API_BASE_URL =
         import.meta.env.MODE === "development"

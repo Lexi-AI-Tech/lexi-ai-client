@@ -5,6 +5,11 @@
  * Note: Auth data is now stored in OS keychain via secure storage
  */
 
+import {
+  clearAuthDataSecure,
+  getAuthDataSecure,
+} from "./secureStorage";
+
 /**
  * Clear all Lexi AI related localStorage data (non-auth)
  */
@@ -23,7 +28,6 @@ export function clearAllStorage(): void {
  */
 export async function clearAuthStorage(): Promise<void> {
   try {
-    const { clearAuthDataSecure } = await import("./secureStorage");
     await clearAuthDataSecure();
     console.log("✅ Auth storage cleared from secure storage");
   } catch (e) {
@@ -54,7 +58,6 @@ export async function getAllStorage(): Promise<Record<string, any>> {
 
   try {
     // Check secure storage for auth data
-    const { getAuthDataSecure } = await import("./secureStorage");
     const authData = await getAuthDataSecure();
     if (authData) {
       storage["lexi-auth"] = authData;

@@ -4,8 +4,9 @@
  * Handles all HTTP requests to the backend server with authentication support.
  */
 
-import { authStore } from "../store/authStore";
+import { getDeviceInfo } from "./deviceInfo";
 import { SystemType } from "./constants";
+import { authStore } from "../store/authStore";
 import type {
   ApiResponse,
   AuthResponse,
@@ -56,8 +57,6 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   try {
-    // Import device info utility
-    const { getDeviceInfo } = await import("./deviceInfo");
     const device = await getDeviceInfo();
 
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
@@ -211,8 +210,6 @@ export async function exchangeGoogleAuthCode(
   redirectUri?: string,
   deviceInfo?: { device_name?: string; device_type?: string },
 ): Promise<AuthResponse> {
-  // Import device info utility
-  const { getDeviceInfo } = await import("./deviceInfo");
   const device = deviceInfo || (await getDeviceInfo());
 
   // Ensure code_verifier is always sent if provided (required for PKCE)
@@ -338,8 +335,6 @@ export async function refreshJWTToken(
   refreshToken: string,
   deviceInfo?: { device_name?: string; device_type?: string },
 ): Promise<AuthResponse> {
-  // Import device info utility
-  const { getDeviceInfo } = await import("./deviceInfo");
   const device = deviceInfo || (await getDeviceInfo());
 
   const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {

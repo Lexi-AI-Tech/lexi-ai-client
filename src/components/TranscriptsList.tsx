@@ -5,17 +5,19 @@
  * Requires authentication to view transcripts.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
-import { useAuthStore } from "../store/authStore";
+import React, { useCallback, useEffect, useState } from "react";
+
 import {
-  getTranscripts,
   deleteTranscript,
-  type Transcript,
+  getTranscripts,
   type PaginatedTranscriptsResponse,
+  type Transcript,
 } from "../lib/apiClient";
-import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
+import { useAuthStore } from "../store/authStore";
+
+import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();

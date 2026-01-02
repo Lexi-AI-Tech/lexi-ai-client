@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+
 import {
   LanguageCode,
   getAllLanguageCodes,
   getLanguageName,
 } from "../lib/constants";
 import type { TauriAppConfig } from "../types";
+
+import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({

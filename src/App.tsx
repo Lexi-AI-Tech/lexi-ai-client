@@ -4,14 +4,13 @@
  * Displays the transcripts list on the homepage.
  */
 
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useState } from "react";
+
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
-import { useOnboardingStore } from "./store/onboardingStore";
-import { useAuthStore } from "./store/authStore";
-import { TranscriptsList } from "./components/TranscriptsList";
 import { SettingsPage } from "./components/SettingsPage";
 import { Sidebar } from "./components/Sidebar";
+import { TranscriptsList } from "./components/TranscriptsList";
+import { useOnboardingStore } from "./store/onboardingStore";
 
 type Page = "transcripts" | "settings";
 

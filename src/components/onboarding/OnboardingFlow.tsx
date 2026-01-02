@@ -1,10 +1,12 @@
 import React from "react";
+
 import { useOnboardingStore } from "../../store/onboardingStore";
-import { WelcomeScreen } from "./WelcomeScreen";
-import { PermissionsScreen } from "./PermissionsScreen";
+
 import { FnKeyTestScreen } from "./FnKeyTestScreen";
 import { MicrophoneTestScreen } from "./MicrophoneTestScreen";
 import { OnboardingTitlebar } from "./OnboardingTitlebar";
+import { PermissionsScreen } from "./PermissionsScreen";
+import { WelcomeScreen } from "./WelcomeScreen";
 
 export const OnboardingFlow: React.FC = () => {
   const { currentStep } = useOnboardingStore();
