@@ -5,10 +5,7 @@
  * Note: Auth data is now stored in OS keychain via secure storage
  */
 
-import {
-  clearAuthDataSecure,
-  getAuthDataSecure,
-} from "./secureStorage";
+import { clearAuthDataSecure, getAuthDataSecure } from "./secureStorage";
 
 /**
  * Clear all Lexi AI related localStorage data (non-auth)
