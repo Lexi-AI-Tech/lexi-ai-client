@@ -1,34 +1,25 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import {
+  LanguageCode,
+  getAllLanguageCodes,
+  getLanguageName,
+} from "../lib/constants";
 
 // Supported languages for transcription
-const SUPPORTED_LANGUAGES = [
-  { value: "auto", label: "Auto (Detect Language)" },
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "it", label: "Italian" },
-  { value: "pt", label: "Portuguese" },
-  { value: "ru", label: "Russian" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-  { value: "zh", label: "Chinese" },
-  { value: "ar", label: "Arabic" },
-  { value: "hi", label: "Hindi" },
-  { value: "nl", label: "Dutch" },
-  { value: "pl", label: "Polish" },
-  { value: "tr", label: "Turkish" },
-  { value: "sv", label: "Swedish" },
-  { value: "da", label: "Danish" },
-  { value: "no", label: "Norwegian" },
-  { value: "fi", label: "Finnish" },
-];
+const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
+  value: code,
+  label: getLanguageName(code),
+}));
 
 export const SettingsPage: React.FC = () => {
-  const [currentLanguage, setCurrentLanguage] = useState<string>("auto");
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("auto");
+  const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
+    LanguageCode.AUTO
+  );
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
+    LanguageCode.AUTO
+  );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,9 +37,11 @@ export const SettingsPage: React.FC = () => {
       try {
         const languages = await invoke<string[] | null>("get_language");
         if (languages && languages.length > 0) {
-          const firstLanguage = languages[0];
-          setCurrentLanguage(firstLanguage);
-          setSelectedLanguage(firstLanguage);
+          const firstLanguage = languages[0] as LanguageCode;
+          if (Object.values(LanguageCode).includes(firstLanguage)) {
+            setCurrentLanguage(firstLanguage);
+            setSelectedLanguage(firstLanguage);
+          }
         }
       } catch (err: any) {
         console.error("Failed to load language:", err);
@@ -186,7 +179,9 @@ export const SettingsPage: React.FC = () => {
             </div>
             <select
               value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value)}
+              onChange={(e) =>
+                setSelectedLanguage(e.target.value as LanguageCode)
+              }
               disabled={isUpdating || isLoading}
               style={{
                 width: "100%",

@@ -5,7 +5,7 @@
  */
 
 import { authStore } from "../store/authStore";
-
+import { SystemType, LanguageCode } from "./constants";
 // Use localhost in development, production URL in production builds
 // Can be overridden with VITE_API_BASE_URL environment variable
 const API_BASE_URL =
@@ -651,18 +651,18 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
  * App config types
  */
 export interface AppConfig {
-  system_type: string;
+  system_type: SystemType;
   transcription_hotkeys: string[];
-  languages: string[];
+  languages: LanguageCode[];
   enhance_transcription: boolean;
   transcribe_with_cursor_context: boolean;
   launch_on_system_startup: boolean;
 }
 
 export interface AppConfigUpdateRequest {
-  system_type?: string; // 'mac' or 'windows'
+  system_type?: SystemType;
   transcription_hotkeys?: string[];
-  languages?: string[];
+  languages?: LanguageCode[];
   enhance_transcription?: boolean;
   transcribe_with_cursor_context?: boolean;
   launch_on_system_startup?: boolean;
@@ -672,7 +672,7 @@ export interface AppConfigUpdateRequest {
  * Get current user's application configuration
  */
 export async function getAppConfig(
-  systemType: "mac" | "windows" = "mac",
+  systemType: SystemType = SystemType.MAC,
 ): Promise<AppConfig> {
   const params = new URLSearchParams({ system_type: systemType });
   const response = await authenticatedFetch(

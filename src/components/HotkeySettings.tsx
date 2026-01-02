@@ -9,42 +9,33 @@ import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { HotkeyInput, HotkeyConfig } from "./HotkeyInput";
+import {
+  LanguageCode,
+  getAllLanguageCodes,
+  getLanguageName,
+} from "../lib/constants";
 
 const DEFAULT_HOTKEY: HotkeyConfig = {
   hotkey: "Fn",
 };
 
 // Supported languages for transcription
-const SUPPORTED_LANGUAGES = [
-  { value: "auto", label: "Auto (Detect Language)" },
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "it", label: "Italian" },
-  { value: "pt", label: "Portuguese" },
-  { value: "ru", label: "Russian" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-  { value: "zh", label: "Chinese" },
-  { value: "ar", label: "Arabic" },
-  { value: "hi", label: "Hindi" },
-  { value: "nl", label: "Dutch" },
-  { value: "pl", label: "Polish" },
-  { value: "tr", label: "Turkish" },
-  { value: "sv", label: "Swedish" },
-  { value: "da", label: "Danish" },
-  { value: "no", label: "Norwegian" },
-  { value: "fi", label: "Finnish" },
-];
+const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
+  value: code,
+  label: getLanguageName(code),
+}));
 
 export const HotkeySettings: React.FC = () => {
   const [currentHotkey, setCurrentHotkey] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
   const [selectedHotkey, setSelectedHotkey] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
-  const [currentLanguage, setCurrentLanguage] = useState<string>("en");
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
+  const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
+    LanguageCode.EN
+  );
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
+    LanguageCode.EN
+  );
   const [systemType, setSystemType] = useState<"mac" | "windows">("mac");
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,9 +69,11 @@ export const HotkeySettings: React.FC = () => {
         try {
           const languages = await invoke<string[] | null>("get_language");
           if (languages && languages.length > 0) {
-            const firstLanguage = languages[0];
-            setCurrentLanguage(firstLanguage);
-            setSelectedLanguage(firstLanguage);
+            const firstLanguage = languages[0] as LanguageCode;
+            if (Object.values(LanguageCode).includes(firstLanguage)) {
+              setCurrentLanguage(firstLanguage);
+              setSelectedLanguage(firstLanguage);
+            }
           }
         } catch (langErr) {
           console.warn("Failed to load language from Tauri Store:", langErr);
@@ -252,7 +245,9 @@ export const HotkeySettings: React.FC = () => {
           </div>
           <select
             value={selectedLanguage}
-            onChange={(e) => setSelectedLanguage(e.target.value)}
+            onChange={(e) =>
+              setSelectedLanguage(e.target.value as LanguageCode)
+            }
             disabled={isUpdating}
             style={{
               width: "100%",
