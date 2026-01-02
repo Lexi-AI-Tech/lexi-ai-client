@@ -648,6 +648,14 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
 }
 
 /**
+ * Vocabulary item structure
+ */
+export interface VocabularyItem {
+  value: string;
+  isSystemGenerated: boolean;
+}
+
+/**
  * App config types
  */
 export interface AppConfig {
@@ -657,6 +665,7 @@ export interface AppConfig {
   enhance_transcription: boolean;
   transcribe_with_cursor_context: boolean;
   launch_on_system_startup: boolean;
+  vocabulary?: VocabularyItem[] | null;
 }
 
 export interface AppConfigUpdateRequest {
@@ -666,6 +675,7 @@ export interface AppConfigUpdateRequest {
   enhance_transcription?: boolean;
   transcribe_with_cursor_context?: boolean;
   launch_on_system_startup?: boolean;
+  vocabulary?: VocabularyItem[] | null;
 }
 
 /**

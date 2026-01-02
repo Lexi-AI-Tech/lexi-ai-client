@@ -13,6 +13,12 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
   label: getLanguageName(code),
 }));
 
+// Vocabulary item interface
+interface VocabularyItem {
+  value: string;
+  isSystemGenerated: boolean;
+}
+
 // AppConfig interface matching Rust struct
 interface AppConfig {
   languages?: string[] | null;
@@ -20,6 +26,7 @@ interface AppConfig {
   enhance_transcription?: boolean | null;
   transcribe_with_cursor_context?: boolean | null;
   launch_on_system_startup?: boolean | null;
+  vocabulary?: VocabularyItem[] | null;
 }
 
 export const SettingsPage: React.FC = () => {

@@ -18,6 +18,14 @@ use tauri_plugin_store::StoreExt;
 
 const STORE_FILE: &str = ".app-config.dat";
 
+/// Vocabulary item structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VocabularyItem {
+    pub value: String,
+    #[serde(rename = "isSystemGenerated")]
+    pub is_system_generated: bool,
+}
+
 /// Application configuration structure
 ///
 /// Represents all application settings that are persisted in Tauri Store.
@@ -34,6 +42,8 @@ pub struct AppConfig {
     pub transcribe_with_cursor_context: Option<bool>,
     /// Whether to launch application on system startup
     pub launch_on_system_startup: Option<bool>,
+    /// Vocabulary dictionary for transcription (array of vocabulary items)
+    pub vocabulary: Option<Vec<VocabularyItem>>,
 }
 
 impl Default for AppConfig {
@@ -49,6 +59,32 @@ impl Default for AppConfig {
             enhance_transcription: Some(false),
             transcribe_with_cursor_context: Some(false),
             launch_on_system_startup: Some(true),
+            vocabulary: Some(vec![
+                VocabularyItem {
+                    value: "Lexi".to_string(),
+                    is_system_generated: true,
+                },
+                VocabularyItem {
+                    value: "anadi".to_string(),
+                    is_system_generated: true,
+                },
+                VocabularyItem {
+                    value: "Ranjeet Baraik".to_string(),
+                    is_system_generated: true,
+                },
+                VocabularyItem {
+                    value: "linkedin".to_string(),
+                    is_system_generated: true,
+                },
+                VocabularyItem {
+                    value: "google".to_string(),
+                    is_system_generated: true,
+                },
+                VocabularyItem {
+                    value: "hey lexi".to_string(),
+                    is_system_generated: true,
+                },
+            ]),
         }
     }
 }

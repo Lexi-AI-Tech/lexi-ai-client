@@ -102,28 +102,24 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .transcribe_with_cursor_context
             .unwrap_or(false);
         
+        // TODO: Decode what to do with offline_transcription
         // offline_transcription is not in app config, keep as hardcoded for now
         let offline_transcription = true;
         
-        println!(
-            "⚙️  Transcription settings: enhance={}, cursor_context={}, offline={}",
-            enhance_transcription, transcribe_with_cursor_context, offline_transcription
-        );
-
-        // Hardcoded vocabulary array for offline transcription
-        // TODO: Get vocabulary from app config state
         // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript.
         // Do more experiment on how we can use this trick to manipulate the model behavior.
-        let vocabulary = vec![
-            "Lexi".to_string(),
-            "anadi".to_string(),
-            "Ranjeet Baraik".to_string(),
-            // shortcuts commands
-            "linkedin".to_string(),
-            "google".to_string(),
-            // action trigger
-            "hey lexi".to_string(),
-        ];
+        // Get vocabulary from app config
+        let vocabulary: Vec<String> = app_config
+            .vocabulary
+            .unwrap_or_default()
+            .into_iter()
+            .map(|item| item.value)
+            .collect();
+        
+        println!(
+            "⚙️  Transcription settings: enhance={}, cursor_context={}, offline={}, vocabulary_size={}",
+            enhance_transcription, transcribe_with_cursor_context, offline_transcription, vocabulary.len()
+        );
 
         // Get cursor context and print app name and selected text
         let cursor_context = crate::cursor_context::get_cursor_context();
