@@ -92,6 +92,7 @@ use commands::hotkey::{
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;
+use commands::utils::get_system_type;
 use commands::window::open_devtools;
 
 /// Command to control recording state
@@ -181,7 +182,8 @@ pub fn main() {
             clear_auth_data,
             has_auth_data,
             get_app_config,
-            update_app_config
+            update_app_config,
+            get_system_type
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS

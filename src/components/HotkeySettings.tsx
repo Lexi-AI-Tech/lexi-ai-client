@@ -52,7 +52,7 @@ export const HotkeySettings: React.FC = () => {
       try {
         // Detect system type
         const { getDeviceInfo } = await import("../lib/deviceInfo");
-        const deviceInfo = getDeviceInfo();
+        const deviceInfo = await getDeviceInfo();
         const detectedSystemType = deviceInfo.system_type || "mac";
         setSystemType(detectedSystemType);
 

@@ -42,7 +42,7 @@ const loadFromStorage = async () => {
           console.log("🔄 Access token expired, attempting to refresh...");
           try {
             const { getDeviceInfo } = await import("../lib/deviceInfo");
-            const device = getDeviceInfo();
+            const device = await getDeviceInfo();
             const API_BASE_URL =
               import.meta.env.MODE === "development"
                 ? "http://localhost:1230"
@@ -213,7 +213,7 @@ export const authStore: AuthState = {
     console.log("🔄 Token expiring soon, refreshing proactively...");
     try {
       const { getDeviceInfo } = await import("../lib/deviceInfo");
-      const device = getDeviceInfo();
+      const device = await getDeviceInfo();
       const API_BASE_URL =
         import.meta.env.MODE === "development"
           ? "http://localhost:1230"

@@ -58,7 +58,7 @@ async function refreshAccessToken(): Promise<string | null> {
   try {
     // Import device info utility
     const { getDeviceInfo } = await import("./deviceInfo");
-    const device = getDeviceInfo();
+    const device = await getDeviceInfo();
 
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: "POST",
@@ -213,7 +213,7 @@ export async function exchangeGoogleAuthCode(
 ): Promise<AuthResponse> {
   // Import device info utility
   const { getDeviceInfo } = await import("./deviceInfo");
-  const device = deviceInfo || getDeviceInfo();
+  const device = deviceInfo || (await getDeviceInfo());
 
   // Ensure code_verifier is always sent if provided (required for PKCE)
   const requestBody: any = {
@@ -340,7 +340,7 @@ export async function refreshJWTToken(
 ): Promise<AuthResponse> {
   // Import device info utility
   const { getDeviceInfo } = await import("./deviceInfo");
-  const device = deviceInfo || getDeviceInfo();
+  const device = deviceInfo || (await getDeviceInfo());
 
   const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
     method: "POST",
