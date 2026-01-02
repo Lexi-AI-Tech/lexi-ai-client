@@ -196,3 +196,7 @@ src-tauri/WixTools/
 # Temporary files
 *.tmp
 *.temp
+
+# Whisper model files (too large for Git)
+src-tauri/models/*.bin
+!src-tauri/models/README.md

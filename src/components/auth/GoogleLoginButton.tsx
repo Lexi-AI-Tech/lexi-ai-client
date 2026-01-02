@@ -1,17 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { useAuthStore } from "../../store/authStore";
-import {
-  refreshJWTToken,
-  logout as backendLogout,
-  checkOAuthStatus,
-} from "../../lib/apiClient";
-import "./auth.css";
 
-interface GoogleLoginButtonProps {
-  onSuccess?: (user: any) => void;
-  onError?: (error: string) => void;
-}
+import {
+  checkOAuthStatus,
+  logout as backendLogout,
+  storePkceVerifier,
+} from "../../lib/apiClient";
+import { useAuthStore, authStore } from "../../store/authStore";
+import type { GoogleLoginButtonProps } from "../../types";
+
+import "./auth.css";
 
 export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onSuccess,
@@ -24,7 +22,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     setAuthData,
     user,
     isAuthenticated,
-    tokens,
   } = useAuthStore();
   const [loading, setLocalLoading] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -34,56 +31,35 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     interval: NodeJS.Timeout | null;
   }>({ isPolling: false, interval: null });
 
-  // Check persistent storage for tokens (in case callback page stored them)
+  // Check auth store for tokens (auth store loads from secure storage)
   const checkStoredAuth = React.useCallback(() => {
     try {
-      // Use sync version for immediate checks (falls back to localStorage)
-      // The authStore will handle async Tauri Store loading on initialization
-      const { getStorageItemSync } = require("../lib/persistentStorage");
-      const stored = getStorageItemSync("lexi-auth");
-      console.log(
-        "Checking persistent storage for auth:",
-        stored ? "found" : "not found",
-      );
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        console.log("Parsed auth data:", {
-          hasTokens: !!parsed.tokens,
-          hasUser: !!parsed.user,
-          tokenKeys: parsed.tokens ? Object.keys(parsed.tokens) : [],
-          userKeys: parsed.user ? Object.keys(parsed.user) : [],
-        });
+      // Wait for auth store to initialize
+      if (!authStore.isInitialized) {
+        return false;
+      }
 
-        // Handle both formats: { tokens, user } and { isAuthenticated, tokens, user }
-        const tokens = parsed.tokens || parsed;
-        const user = parsed.user;
+      if (
+        authStore.isAuthenticated &&
+        authStore.tokens?.access_token &&
+        authStore.user
+      ) {
+        console.log("✅ Found stored auth in auth store, using it");
+        // Found stored auth, use it
+        setAuthData(authStore.tokens, authStore.user);
+        setLoading(false);
+        setLocalLoading(false);
 
-        if (tokens?.access_token && user) {
-          console.log("✅ Found stored auth in persistent storage, using it");
-          // Found stored auth, use it
-          setAuthData(tokens, user);
-          setLoading(false);
-          setLocalLoading(false);
-
-          // Clear timeout if it exists
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
-
-          // Note: We don't remove the stored auth here since authStore manages it
-          // The authStore will persist it properly using Tauri Store
-
-          if (onSuccess) {
-            onSuccess(user);
-          }
-          return true;
-        } else {
-          console.log("❌ Stored auth missing required fields:", {
-            hasAccessToken: !!tokens?.access_token,
-            hasUser: !!user,
-          });
+        // Clear timeout if it exists
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
         }
+
+        if (onSuccess) {
+          onSuccess(authStore.user);
+        }
+        return true;
       }
     } catch (e) {
       console.error("Error checking stored auth:", e);
@@ -133,22 +109,12 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     // Listen for postMessage (when opened from web)
     window.addEventListener("message", handleMessage);
 
-    // Listen for storage events (when callback page stores in localStorage)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "lexi-auth" && e.newValue) {
-        console.log("Storage event detected for lexi-auth");
-        checkStoredAuth();
-      }
-    };
-    window.addEventListener("storage", handleStorageChange);
-
     return () => {
       window.removeEventListener("message", handleMessage);
-      window.removeEventListener("storage", handleStorageChange);
     };
   }, [setAuthData, setError, setLoading, onSuccess, onError, checkStoredAuth]);
 
-  // Poll localStorage when loading (for when opened externally)
+  // Poll auth store when loading (auth store loads from secure storage)
   useEffect(() => {
     if (!loading) {
       // Stop polling when not loading
@@ -159,7 +125,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       return;
     }
 
-    console.log("Starting to poll localStorage, loading:", loading);
+    console.log("Starting to poll auth store, loading:", loading);
 
     // Check immediately
     if (checkStoredAuth()) {
@@ -175,7 +141,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     // Poll every 200ms (more frequent) until we find tokens
     console.log("Starting polling interval");
     pollIntervalRef.current = setInterval(() => {
-      console.log("Polling localStorage...");
+      console.log("Polling auth store...");
       if (checkStoredAuth()) {
         console.log("Auth found via polling, stopping");
         if (pollIntervalRef.current) {
@@ -230,7 +196,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       // Store verifier on backend (Redis) so callback page can retrieve it
       // This works even when callback opens in external browser
       try {
-        const { storePkceVerifier } = await import("../../lib/apiClient");
         await storePkceVerifier(pkceData.state, pkceData.verifier);
         console.log("Stored PKCE verifier on backend (Redis):", {
           state: pkceData.state,
@@ -244,7 +209,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       console.log("Waiting for OAuth callback...");
 
-      // Poll backend for OAuth completion (instead of localStorage)
+      // Poll backend for OAuth completion
       // This works across different browser contexts
       // Use ref to track polling state across async operations
       oauthPollingRef.current.isPolling = true;
@@ -380,65 +345,16 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       // Logout from backend first (revokes all sessions)
       await backendLogout();
 
-      // Clear Rust backend auth token
-      try {
-        await invoke("set_auth_token", { token: null });
-        console.log("✅ Auth token cleared from Rust backend");
-      } catch (error) {
-        console.warn("Failed to clear Rust backend token:", error);
-        // Continue with logout even if this fails
-      }
-
       // Clear local auth state
       clearAuth();
 
       console.log("✅ Logout successful");
     } catch (error) {
       console.error("Logout Failed:", error);
-      // Still clear local auth even if logout fails
-      clearAuth();
 
-      // Still try to clear Rust backend token
-      try {
-        await invoke("set_auth_token", { token: null });
-      } catch (rustError) {
-        console.warn("Failed to clear Rust backend token:", rustError);
-      }
+      clearAuth();
     } finally {
       setLocalLoading(false);
-      setLoading(false);
-    }
-  };
-
-  const handleRefresh = async () => {
-    try {
-      setLoading(true);
-
-      // Get refresh token from store
-      if (!tokens?.refresh_token) {
-        throw new Error("No refresh token available");
-      }
-
-      // Refresh backend JWT token
-      const refreshed = await refreshJWTToken(tokens.refresh_token);
-      console.log("Token Refreshed:", refreshed);
-
-      if (refreshed.access_token && user) {
-        const authTokens = {
-          access_token: refreshed.access_token,
-          refresh_token: refreshed.refresh_token || tokens.refresh_token,
-          expires_in: refreshed.expires_in,
-          expires_at: refreshed.expires_in
-            ? Date.now() + refreshed.expires_in * 1000
-            : undefined,
-        };
-
-        setAuthData(authTokens, user);
-      }
-    } catch (error: any) {
-      console.error("Refresh Failed:", error);
-      setError(error?.message || "Failed to refresh token");
-    } finally {
       setLoading(false);
     }
   };
@@ -461,14 +377,18 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         </div>
         <div className="auth-actions">
           <button
-            onClick={handleRefresh}
-            className="auth-button secondary"
+            onClick={handleLogout}
             disabled={loading}
+            className="auth-button secondary"
           >
-            Refresh Token
-          </button>
-          <button onClick={handleLogout} className="auth-button secondary">
-            Sign Out
+            {loading ? (
+              <>
+                <span className="auth-spinner">⏳</span>
+                Signing out...
+              </>
+            ) : (
+              "Sign Out"
+            )}
           </button>
         </div>
       </div>

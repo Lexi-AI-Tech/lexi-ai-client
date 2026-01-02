@@ -7,19 +7,17 @@
 //!
 //! - **Cursor Position Detection**: Gets the current mouse cursor coordinates using Core Graphics
 //! - **Element Identification**: Uses Accessibility API to identify the UI element at cursor position
-//! - **Hierarchy Traversal**: Traverses up the accessibility tree to find input fields and application details
-//! - **Text Extraction**: Extracts selected text and text content from input fields
+//! - **Application Identification**: Traverses up the accessibility tree to find the application at cursor position
+//! - **Text Extraction**: Extracts selected text using clipboard copy method (Cmd+C/Ctrl+C)
 //! - **Screen Capture**: Captures the entire screen and returns it as a base64-encoded PNG string
 //!
 //! ## Implementation Details
 //!
 //! - Uses **Core Graphics** (`CGEventGetLocation()`) to get cursor coordinates
 //! - Uses **Accessibility API** (`AXUIElementCopyElementAtPosition()`) to get element at cursor
-//! - Traverses accessibility hierarchy to find:
-//!   - Input fields (AXTextField, AXTextArea, etc.)
-//!   - Parent windows
-//!   - Parent applications
-//! - Extracts text via `AXSelectedText` and `AXValue` attributes
+//! - Traverses accessibility hierarchy to find the application PID
+//! - Extracts selected text by simulating copy command via `keyboard_simulator` module
+//!   (Cmd+C on macOS, Ctrl+C on Windows/Linux) and reading from clipboard
 //! - Uses **Core Graphics** (`CGWindowListCreateImage()`) to capture screen
 //! - Encodes screenshots as base64-encoded PNG strings
 //!
@@ -44,12 +42,17 @@ use objc::{msg_send, sel, sel_impl};
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
 
+use arboard::Clipboard;
+use std::thread;
+use std::time::Duration;
+
 // ============================================================================
 // Public Types
 // ============================================================================
 
 /// Result of cursor context query
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CursorContext {
     pub selected_text: Option<String>,
     pub app_name: Option<String>,
@@ -123,11 +126,9 @@ extern "C" {
 /// This function:
 /// 1. Gets the current cursor position using `CGEventGetLocation()`
 /// 2. Uses `AXUIElementCopyElementAtPosition()` to get the UI element at that position
-/// 3. Traverses up the accessibility hierarchy to find:
-///    - Input fields (text fields, text areas, etc.)
-///    - Parent windows
-///    - Parent applications
-/// 4. Extracts selected text and application details
+/// 3. Traverses up the accessibility hierarchy to find the application PID
+/// 4. Extracts selected text using clipboard copy method
+/// 5. Gets application name from PID
 ///
 /// Returns a CursorContext with selected text, app name, and PID, or None if retrieval fails.
 /// Requires Accessibility permission on macOS.
@@ -155,11 +156,7 @@ pub fn get_cursor_context() -> Option<CursorContext> {
                 y: screen_height - mouse_location.y,
             };
 
-            // Get the system-wide accessibility element (root)
-            // We need to get the element at the cursor position
-            // First, we'll try to get the element at the position using the system element
-
-            // Create a system-wide element (PID 0 is the system)
+            // Create a system-wide accessibility element
             let system_element = create_system_element();
             if system_element.is_null() {
                 return None;
@@ -179,15 +176,11 @@ pub fn get_cursor_context() -> Option<CursorContext> {
                 return None;
             }
 
-            // Traverse up the hierarchy to find input field and application
-            let (input_element, app_pid) = find_input_field_and_app(element_at_cursor);
+            // Traverse up the hierarchy to find application PID
+            let app_pid = find_app_pid(element_at_cursor);
 
-            // Extract text from the input element
-            let selected_text = if !input_element.is_null() {
-                extract_text_from_element(input_element)
-            } else {
-                None
-            };
+            // Extract selected text using clipboard copy method
+            let selected_text = get_selected_text_via_clipboard();
 
             // Get application name from PID
             let app_name = if let Some(pid) = app_pid {
@@ -198,9 +191,6 @@ pub fn get_cursor_context() -> Option<CursorContext> {
 
             // Cleanup
             CFRelease(element_at_cursor);
-            if !input_element.is_null() && input_element != element_at_cursor {
-                CFRelease(input_element);
-            }
             CFRelease(system_element);
 
             Some(CursorContext {
@@ -225,13 +215,10 @@ unsafe fn create_system_element() -> AXUIElementRef {
     AXUIElementCreateSystemWide()
 }
 
-/// Traverse up the accessibility hierarchy to find input field and application
+/// Traverse up the accessibility hierarchy to find application PID
 #[cfg(target_os = "macos")]
-unsafe fn find_input_field_and_app(element: AXUIElementRef) -> (AXUIElementRef, Option<i32>) {
-    let mut input_element: AXUIElementRef = std::ptr::null_mut();
-    let mut app_pid: Option<i32> = None;
+unsafe fn find_app_pid(element: AXUIElementRef) -> Option<i32> {
     let mut current_element = element;
-    let mut visited_elements = Vec::new();
 
     // Traverse up the hierarchy (max 20 levels to avoid infinite loops)
     for _ in 0..20 {
@@ -239,26 +226,12 @@ unsafe fn find_input_field_and_app(element: AXUIElementRef) -> (AXUIElementRef, 
             break;
         }
 
-        // Check if this is an input field
-        if input_element.is_null() {
-            let role = get_element_attribute(current_element, "AXRole");
-            if let Some(role) = role {
-                if is_input_field_role(&role) {
-                    input_element = current_element;
-                    // Don't release this element yet, we'll use it
-                }
-            }
-        }
-
         // Try to get PID (application level)
-        if app_pid.is_none() {
-            let mut pid: i32 = 0;
-            let ax_error = AXUIElementGetPid(current_element, &mut pid);
-            if ax_error == K_AX_ERROR_SUCCESS && pid != 0 {
-                app_pid = Some(pid);
-                // Found the application, we can stop here
-                break;
-            }
+        let mut pid: i32 = 0;
+        let ax_error = AXUIElementGetPid(current_element, &mut pid);
+        if ax_error == K_AX_ERROR_SUCCESS && pid != 0 {
+            // Found the application PID
+            return Some(pid);
         }
 
         // Get parent element using AXParent attribute
@@ -268,102 +241,82 @@ unsafe fn find_input_field_and_app(element: AXUIElementRef) -> (AXUIElementRef, 
             AXUIElementCopyAttributeValue(current_element, parent_attr, &mut parent_value);
         CFRelease(parent_attr);
 
-        let parent = if ax_error == K_AX_ERROR_SUCCESS && !parent_value.is_null() {
-            // parent_value is an AXUIElementRef
-            parent_value as AXUIElementRef
-        } else {
-            std::ptr::null_mut()
-        };
-
-        // Release previous element if we're moving up (except if it's the input_element)
-        if current_element != element && current_element != input_element {
-            if !visited_elements.contains(&current_element) {
-                CFRelease(current_element);
-            }
-        }
-
-        if ax_error != K_AX_ERROR_SUCCESS || parent.is_null() {
+        if ax_error != K_AX_ERROR_SUCCESS || parent_value.is_null() {
             break;
         }
 
-        visited_elements.push(current_element);
-        current_element = parent;
-    }
-
-    // Cleanup any remaining elements we traversed (except input_element)
-    for elem in visited_elements {
-        if elem != input_element {
-            CFRelease(elem);
+        // Release current element if it's not the original element
+        if current_element != element {
+            CFRelease(current_element);
         }
+
+        // Move to parent
+        current_element = parent_value as AXUIElementRef;
     }
 
-    (input_element, app_pid)
+    None
 }
 
-/// Check if a role represents an input field
-#[cfg(target_os = "macos")]
-fn is_input_field_role(role: &str) -> bool {
-    matches!(
-        role,
-        "AXTextField"
-            | "AXTextArea"
-            | "AXStaticText"
-            | "AXEditableText"
-            | "AXSearchField"
-            | "AXSecureTextField"
-    )
-}
-
-/// Extract text from an element (selected text or value)
-#[cfg(target_os = "macos")]
-unsafe fn extract_text_from_element(element: AXUIElementRef) -> Option<String> {
-    // Try to get selected text first
-    let selected_text_attr = create_cf_string("AXSelectedText");
-    let mut selected_text_value: CFTypeRef = std::ptr::null_mut();
-
-    let ax_error =
-        AXUIElementCopyAttributeValue(element, selected_text_attr, &mut selected_text_value);
-
-    let selected_text = if ax_error == K_AX_ERROR_SUCCESS && !selected_text_value.is_null() {
-        let text = cf_string_to_string(selected_text_value);
-        CFRelease(selected_text_value);
-        if !text.is_empty() {
-            Some(text)
-        } else {
-            None
+/// Get selected text by simulating copy command (Cmd+C on macOS, Ctrl+C elsewhere)
+///
+/// This function:
+/// 1. Saves the current clipboard content
+/// 2. Simulates copy command via `keyboard_simulator` module (Cmd+C on macOS, Ctrl+C on Windows/Linux)
+/// 3. Waits briefly for the copy operation to complete
+/// 4. Retrieves the copied text from clipboard
+/// 5. Restores the original clipboard content
+/// 6. Returns the selected text
+///
+/// This approach works across all applications including Chrome, browsers, and text editors.
+/// Keyboard simulation is handled by the `keyboard_simulator` module for cross-platform support.
+///
+/// # Returns
+/// * `Some(String)` - The selected text if any was copied
+/// * `None` - If no text was selected or an error occurred
+pub fn get_selected_text_via_clipboard() -> Option<String> {
+    let mut clipboard = match Clipboard::new() {
+        Ok(clip) => clip,
+        Err(e) => {
+            eprintln!("Failed to initialize clipboard: {}", e);
+            return None;
         }
-    } else {
-        None
     };
 
-    CFRelease(selected_text_attr);
+    // Step 1: Save current clipboard content
+    let original_clipboard = clipboard.get_text().unwrap_or_default();
 
-    // If we have selected text, return it
-    if selected_text.is_some() {
-        return selected_text;
+    // Step 2: Clear clipboard to ensure we get fresh data
+    if let Err(e) = clipboard.clear() {
+        eprintln!("Failed to clear clipboard: {}", e);
+        return None;
     }
 
-    // Otherwise, try to get the value attribute
-    let value_attr = create_cf_string("AXValue");
-    let mut value: CFTypeRef = std::ptr::null_mut();
+    // Step 3: Simulate copy command via keyboard_simulator module
+    // Handles platform-specific implementation (Cmd+C on macOS, Ctrl+C on Windows/Linux)
+    let copy_result = crate::keyboard_simulator::simulate_copy();
 
-    let ax_error = AXUIElementCopyAttributeValue(element, value_attr, &mut value);
+    if let Err(e) = copy_result {
+        eprintln!("Failed to simulate copy command: {}", e);
+        // Restore clipboard before returning
+        let _ = clipboard.set_text(original_clipboard);
+        return None;
+    }
 
-    let value_text = if ax_error == K_AX_ERROR_SUCCESS && !value.is_null() {
-        let text = cf_string_to_string(value);
-        CFRelease(value);
-        if !text.is_empty() {
-            Some(text)
-        } else {
-            None
-        }
-    } else {
+    // Step 4: Wait for copy operation to complete
+    thread::sleep(Duration::from_millis(50));
+
+    // Step 5: Get the copied text from clipboard
+    let selected_text = clipboard.get_text().unwrap_or_default();
+
+    // Step 6: Restore original clipboard content
+    let _ = clipboard.set_text(original_clipboard);
+
+    // Return the selected text (empty string means no selection)
+    if selected_text.is_empty() {
         None
-    };
-
-    CFRelease(value_attr);
-
-    value_text
+    } else {
+        Some(selected_text)
+    }
 }
 
 /// Get application name from PID
@@ -407,25 +360,6 @@ fn get_app_name_from_pid(pid: i32) -> Option<String> {
 
             None
         })
-    }
-}
-
-/// Get an element attribute value
-#[cfg(target_os = "macos")]
-unsafe fn get_element_attribute(element: AXUIElementRef, attribute: &str) -> Option<String> {
-    let attr_cf = create_cf_string(attribute);
-    let mut value: CFTypeRef = std::ptr::null_mut();
-
-    let ax_error = AXUIElementCopyAttributeValue(element, attr_cf, &mut value);
-
-    CFRelease(attr_cf);
-
-    if ax_error == K_AX_ERROR_SUCCESS && !value.is_null() {
-        let result = cf_string_to_string(value);
-        CFRelease(value);
-        Some(result)
-    } else {
-        None
     }
 }
 

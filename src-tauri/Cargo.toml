@@ -22,6 +22,8 @@ tauri = { version = "2.0", features = [ "macos-private-api", "devtools", "tray-i
 tauri-plugin-store = "2.0"
 tauri-plugin-single-instance = "2"
 tauri-plugin-devtools = "2.0"
+tauri-plugin-deep-link = "2.0"
+tauri-plugin-autostart = "2.0"
 hyper = { version = "1.0", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
 http-body-util = "0.1"
@@ -42,3 +44,5 @@ objc = "0.2"
 rdev = { git = "https://github.com/fufesou/rdev" }  # Fork fixes macOS issues
 arboard = "3.4"  # Cross-platform clipboard
 enigo = "0.6.1"    # Cross-platform input simulation
+uuid = { version = "1.0", features = ["v4"] }
+keyring = "2.3"  # OS keychain/credential manager for secure token storage

@@ -7,11 +7,15 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "build": "tauri build",
+    "build": "tauri build --features custom-protocol",
     "dev:frontend": "vite",
     "build:frontend": "vite build",
     "preview": "vite preview",
-    "format": "cd src-tauri && cargo fmt && cd .. && npx prettier --write ."
+    "format": "cd src-tauri && cargo fmt && cd .. && npx prettier --write .",
+    "download-model": "bash scripts/download-model.sh",
+    "setup": "bash scripts/setup.sh",
+    "predev": "npm run setup",
+    "prebuild": "npm run setup"
   },
   "dependencies": {
     "@choochmeque/tauri-plugin-google-auth-api": "^0.1.2",

@@ -5,18 +5,23 @@
  * Requires authentication to view transcripts.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
-import { useAuthStore } from "../store/authStore";
+import React, { useCallback, useEffect, useState } from "react";
+
 import {
-  getTranscripts,
   deleteTranscript,
-  type Transcript,
+  getTranscripts,
   type PaginatedTranscriptsResponse,
+  type Transcript,
 } from "../lib/apiClient";
+import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
+import { useAuthStore } from "../store/authStore";
+
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();
+  const networkStatus = useNetworkStatus();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,9 +30,20 @@ export const TranscriptsList: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  // Clear error on mount to prevent stale error messages
+  useEffect(() => {
+    setError(null);
+  }, []);
+
   // Fetch transcripts function
   const fetchTranscripts = useCallback(async () => {
-    if (!authStore.isAuthenticated) {
+    // This function should only be called when we're ready to fetch
+    // (initialized, authenticated, and tokens loaded)
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      // Should not happen if called correctly, but handle gracefully
+      setTranscripts([]);
+      setError(null);
+      setLoading(false);
       return;
     }
 
@@ -44,22 +60,113 @@ export const TranscriptsList: React.FC = () => {
       setTotal(response.total);
     } catch (err: any) {
       console.error("Failed to fetch transcripts:", err);
-      setError(err.message || "Failed to load transcripts");
+
+      // Check error type
+      const errorMessage = err.message || "Failed to load transcripts";
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized");
+
+      // Check for network errors (server unreachable, no internet, etc.)
+      const isNetworkError =
+        err.name === "TypeError" ||
+        err.name === "NetworkError" ||
+        errorMessage.includes("Failed to fetch") ||
+        errorMessage.includes("NetworkError") ||
+        errorMessage.includes("network") ||
+        errorMessage.includes("ECONNREFUSED");
+
+      if (isAuthError) {
+        // Auth error - clear transcripts and let the login prompt show
+        setTranscripts([]);
+        setError(null);
+      } else if (isNetworkError) {
+        // Network error - don't show error on initial load, just log it
+        // User can retry manually if needed
+        console.warn("Network error while fetching transcripts:", err);
+        setTranscripts([]);
+        setError(null); // Don't show network errors as they're often temporary
+      } else {
+        // Other API errors - show error message
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
-  }, [authStore.isAuthenticated, page]);
+  }, [
+    authStore.isAuthenticated,
+    authStore.isInitialized,
+    authStore.tokens?.access_token,
+    page,
+  ]);
 
   // Fetch transcripts when authenticated and page changes
   useEffect(() => {
-    if (authStore.isAuthenticated) {
-      fetchTranscripts();
-    } else {
-      // Clear transcripts when not authenticated
-      setTranscripts([]);
+    let cancelled = false;
+
+    const loadTranscripts = async () => {
+      // Step 1: Wait for auth store to initialize
+      if (!authStore.isInitialized) {
+        setLoading(true);
+        setError(null);
+        return; // Show loading while waiting for initialization
+      }
+
+      // Step 2: If authenticated, wait for tokens to be loaded
+      if (authStore.isAuthenticated && !authStore.tokens?.access_token) {
+        setLoading(true);
+        setError(null);
+        return; // Show loading while waiting for tokens
+      }
+
+      // Step 3: Now we know the auth state - either authenticated with tokens, or not authenticated
       setError(null);
-    }
-  }, [authStore.isAuthenticated, page, fetchTranscripts]);
+
+      if (authStore.isAuthenticated && authStore.tokens?.access_token) {
+        // Ready to fetch - user is authenticated and tokens are loaded
+        // Wait for network to be available (especially important on auto-startup)
+        setLoading(true);
+
+        // Give network time to connect on startup
+        await waitForStartupDelay(2000);
+        if (cancelled) return;
+
+        // Check network connectivity before making API call
+        const isOnline = await waitForNetwork(3, 1000);
+        if (cancelled) return;
+
+        if (isOnline) {
+          fetchTranscripts();
+        } else {
+          // Network not available - set loading to false so UI can show network message
+          console.debug("Network not available, skipping transcript fetch");
+          setTranscripts([]);
+          setError(null);
+          setLoading(false);
+          // Trigger network status check to update UI
+          networkStatus.retry();
+        }
+      } else {
+        // Not authenticated - clear and show login prompt
+        setTranscripts([]);
+        setError(null);
+        setLoading(false);
+      }
+    };
+
+    loadTranscripts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authStore.isAuthenticated,
+    authStore.isInitialized,
+    authStore.tokens?.access_token,
+    page,
+    fetchTranscripts,
+  ]);
 
   const handleDelete = async (transcriptId: number) => {
     if (!confirm("Are you sure you want to delete this transcript?")) {
@@ -126,7 +233,28 @@ export const TranscriptsList: React.FC = () => {
     }
   };
 
-  // Show login prompt if not authenticated
+  // Show loading while waiting for auth to initialize or tokens to load
+  if (
+    !authStore.isInitialized ||
+    (authStore.isAuthenticated && !authStore.tokens?.access_token)
+  ) {
+    return (
+      <div className="settings">
+        <h3>Transcripts</h3>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "24px",
+            color: "rgba(255, 255, 255, 0.6)",
+          }}
+        >
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated (only after we've confirmed auth state)
   if (!authStore.isAuthenticated) {
     return (
       <div className="settings">
@@ -194,6 +322,55 @@ export const TranscriptsList: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Show network offline message if not online */}
+      {!networkStatus.isOnline && authStore.isAuthenticated && (
+        <div
+          className="permission-message"
+          style={{
+            background: "rgba(255, 193, 7, 0.1)",
+            borderColor: "rgba(255, 193, 7, 0.2)",
+            color: "rgba(255, 193, 7, 0.9)",
+            marginBottom: "16px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  marginBottom: "4px",
+                }}
+              >
+                Internet Connection Required
+              </div>
+              <div style={{ fontSize: "11px", opacity: 0.8 }}>
+                Please check your internet connection to load transcripts.
+              </div>
+            </div>
+            <button
+              className="transcript-btn"
+              onClick={networkStatus.retry}
+              disabled={networkStatus.isChecking}
+              style={{
+                fontSize: "11px",
+                padding: "6px 12px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {networkStatus.isChecking ? "Checking..." : "Retry"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && transcripts.length === 0 && (
         <div

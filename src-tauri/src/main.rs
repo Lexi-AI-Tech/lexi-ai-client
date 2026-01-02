@@ -15,7 +15,7 @@
 //! 3. **Speech-to-Text Transcription**: Sends audio to Lexi AI Server API endpoint
 //!    (server handles Groq's Whisper API integration internally)
 //! 4. **Text Injection**: Injects transcribed text into the currently active application
-//!    using clipboard + paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere)
+//!    using clipboard + paste keystroke via keyboard_simulator module (Cmd+V on macOS, Ctrl+V elsewhere)
 //! 5. **Pill Overlay Window**: Manages a small transparent overlay window that displays
 //!    recording status and floats above all windows
 //! 6. **Google OAuth Authentication**: Handles user authentication via Google OAuth 2.0
@@ -42,9 +42,11 @@ use std::sync::{mpsc, Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, RunEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
 // Module declarations for core functionality
+mod actions; // Voice actions triggered by action trigger phrase (e.g., "Hey Lexi")
 mod audio_processor; // Audio processing and transcription orchestration
 mod audio_recorder; // Audio capture from default microphone using cpal, converts to WAV format
 mod commands;
@@ -52,20 +54,25 @@ mod config; // Application configuration (API base URL, OAuth redirect URI)
 mod cursor_context; // Cursor context retrieval using macOS Accessibility API (AXUIElement)
 mod global_key_listener; // Global keyboard event monitoring via rdev with configurable hotkey support
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
+mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
+mod secure_storage; // Secure storage using OS keychain for JWT tokens
+mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod utils; // Utility functions for common operations
+mod whisper; // Local Whisper model integration for offline transcription
+
+use whisper::preload_model;
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use global_key_listener::HotkeyConfig;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
-use state::{
-    AuthTokenState, HotkeyRecordingState, HotkeyWatchState, LanguageState, TranscriptionTaskState,
-};
+use state::{HotkeyRecordingState, HotkeyWatchState, TranscriptionTaskState};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -75,13 +82,17 @@ use permissions::{
     request_screen_recording_permission,
 };
 
-use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
-use commands::config::set_language;
+use commands::app_config::{get_app_config, update_app_config};
+use commands::auth::{
+    clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, start_google_login,
+    store_auth_data,
+};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;
+use commands::utils::get_system_type;
 use commands::window::open_devtools;
 
 /// Command to control recording state
@@ -113,7 +124,12 @@ pub fn main() {
     let devtools = tauri_plugin_devtools::init();
 
     let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None::<Vec<&str>>,
+        ))
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             #[cfg(target_os = "macos")]
             {
@@ -134,14 +150,10 @@ pub fn main() {
 
     // Add CrabNebula DevTools plugin (only in debug builds)
     #[cfg(debug_assertions)]
-    {
-        builder = builder.plugin(devtools);
-    }
+    let builder = builder.plugin(devtools);
 
     builder
         .manage(OAuthState::default())
-        .manage(AuthTokenState::default())
-        .manage(LanguageState::default())
         .manage(TranscriptionTaskState {
             task_handle: Mutex::new(None),
             cancel_tx: Mutex::new(None),
@@ -161,12 +173,17 @@ pub fn main() {
             open_devtools,
             start_google_login,
             get_pkce_verifier,
-            set_auth_token,
-            set_language,
             update_hotkey,
             get_current_hotkey,
             start_hotkey_recording,
-            stop_hotkey_recording
+            stop_hotkey_recording,
+            store_auth_data,
+            get_auth_data,
+            clear_auth_data,
+            has_auth_data,
+            get_app_config,
+            update_app_config,
+            get_system_type
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
@@ -180,6 +197,30 @@ pub fn main() {
             }
 
             let app_handle = app.handle();
+
+            // Handle deep links
+            // Check if app was started via deep link
+            if let Ok(Some(start_urls)) = app.deep_link().get_current() {
+                println!("🔗 App started via deep link: {:?}", start_urls);
+                // Show and focus the main window when opened via deep link
+                show_and_focus_main_window(&app_handle);
+            }
+
+            // Listen for deep links when app is already running
+            let app_handle_clone = app_handle.clone();
+            app.deep_link().on_open_url(move |event| {
+                println!("🔗 Deep link received: {:?}", event.urls());
+                // Show and focus the main window when deep link is received
+                show_and_focus_main_window(&app_handle_clone);
+            });
+
+            // Preload Whisper model in background to reduce first transcription latency
+            std::thread::spawn(move || {
+                if let Err(e) = preload_model() {
+                    eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
+                    eprintln!("💡 First transcription may be slower");
+                }
+            });
 
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup

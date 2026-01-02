@@ -12,6 +12,18 @@
     <string>Lexi AI needs Apple Events permission to paste transcribed text at your cursor position.</string>
     <key>NSAccessibilityUsageDescription</key>
     <string>Lexi AI needs accessibility permissions to identify the text field at your cursor position and provide context-aware transcription.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.lexi.ai</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>lexi-ai</string>
+                <string>lexi</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
 

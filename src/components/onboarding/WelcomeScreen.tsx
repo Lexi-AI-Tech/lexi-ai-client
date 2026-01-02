@@ -1,12 +1,15 @@
 import React, { useState } from "react";
-import { useOnboardingStore } from "../../store/onboardingStore";
-import { GoogleLoginButton } from "../auth/GoogleLoginButton";
-import { useAuthStore } from "../../store/authStore";
+
 import {
   clearAllStorage,
   clearAuthStorage,
   clearOnboardingStorage,
 } from "../../lib/storageUtils";
+import { useAuthStore } from "../../store/authStore";
+import { useOnboardingStore } from "../../store/onboardingStore";
+
+import { GoogleLoginButton } from "../auth/GoogleLoginButton";
+
 import "./onboarding.css";
 
 export const WelcomeScreen: React.FC = () => {

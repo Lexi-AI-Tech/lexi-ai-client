@@ -2,30 +2,12 @@
 //!
 //! This module defines all application state structures that are managed by Tauri.
 //! These states are shared across the application and can be accessed via Tauri's state management.
+//!
+//! Only runtime state that needs to be in-memory (like task handles, recording state) is stored here.
 
 use crate::global_key_listener::HotkeyConfig;
 use std::sync::Mutex;
 use tokio::sync::watch;
-
-/// Authentication token state for storing the current access token
-///
-/// This state is updated by the frontend whenever the authentication token changes.
-/// The token is used for authenticated API requests to the Lexi AI Server.
-#[derive(Default)]
-pub struct AuthTokenState {
-    /// The current authentication token, if available
-    pub token: Mutex<Option<String>>,
-}
-
-/// Language state for storing the current transcription language
-///
-/// This state is updated by the frontend whenever the language preference changes.
-/// The language is used for speech-to-text transcription requests.
-#[derive(Default)]
-pub struct LanguageState {
-    /// The current transcription language, if available (defaults to "auto" if not set)
-    pub language: Mutex<Option<String>>,
-}
 
 /// Transcription task state for managing abort handles
 ///

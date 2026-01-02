@@ -5,56 +5,50 @@
  * Supports any key combination including modifiers (Cmd, Shift, Alt, Ctrl).
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { HotkeyInput, HotkeyConfig } from "./HotkeyInput";
-import { getAppConfig, updateAppConfig } from "../lib/apiClient";
-import { useAuthStore } from "../store/authStore";
+
+import { getDeviceInfo } from "../lib/deviceInfo";
+import {
+  LanguageCode,
+  getAllLanguageCodes,
+  getLanguageName,
+} from "../lib/constants";
+import type { HotkeyConfig, TauriAppConfig } from "../types";
+
+import { HotkeyInput } from "./HotkeyInput";
 
 const DEFAULT_HOTKEY: HotkeyConfig = {
   hotkey: "Fn",
 };
 
 // Supported languages for transcription
-const SUPPORTED_LANGUAGES = [
-  { value: "auto", label: "Auto (Detect Language)" },
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "it", label: "Italian" },
-  { value: "pt", label: "Portuguese" },
-  { value: "ru", label: "Russian" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-  { value: "zh", label: "Chinese" },
-  { value: "ar", label: "Arabic" },
-  { value: "hi", label: "Hindi" },
-  { value: "nl", label: "Dutch" },
-  { value: "pl", label: "Polish" },
-  { value: "tr", label: "Turkish" },
-  { value: "sv", label: "Swedish" },
-  { value: "da", label: "Danish" },
-  { value: "no", label: "Norwegian" },
-  { value: "fi", label: "Finnish" },
-];
+const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
+  value: code,
+  label: getLanguageName(code),
+}));
 
 export const HotkeySettings: React.FC = () => {
-  const { tokens } = useAuthStore();
   const [currentHotkey, setCurrentHotkey] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
   const [selectedHotkey, setSelectedHotkey] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
-  const [currentLanguage, setCurrentLanguage] = useState<string>("en");
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
-  const [systemType, setSystemType] = useState<"mac" | "windows">("mac");
+  const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
+    LanguageCode.EN,
+  );
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
+    LanguageCode.EN,
+  );
+  const [systemType, setSystemType] = useState<"mac" | "windows" | "unknown">(
+    "unknown",
+  );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Load current config from DB on mount and when auth token changes
+  // Load current config on mount
   useEffect(() => {
     const loadConfig = async () => {
       setIsLoading(true);
@@ -62,12 +56,11 @@ export const HotkeySettings: React.FC = () => {
 
       try {
         // Detect system type
-        const { getDeviceInfo } = await import("../lib/deviceInfo");
-        const deviceInfo = getDeviceInfo();
-        const detectedSystemType = deviceInfo.system_type || "mac";
+        const deviceInfo = await getDeviceInfo();
+        const detectedSystemType = deviceInfo.system_type;
         setSystemType(detectedSystemType);
 
-        // Always load from Rust backend first (for hotkey)
+        // Load hotkey from Rust backend
         try {
           const hotkeyJson = await invoke<string>("get_current_hotkey");
           const hotkey: HotkeyConfig = JSON.parse(hotkeyJson);
@@ -77,38 +70,18 @@ export const HotkeySettings: React.FC = () => {
           console.warn("Failed to load hotkey from Rust backend:", rustErr);
         }
 
-        // Load from DB only if user is authenticated
-        if (tokens?.access_token) {
-          try {
-            const config = await getAppConfig(detectedSystemType);
-            if (config.hotkey) {
-              const dbHotkey: HotkeyConfig = { hotkey: config.hotkey };
-              setCurrentHotkey(dbHotkey);
-              setSelectedHotkey(dbHotkey);
-              // Update Rust backend with DB hotkey
-              await invoke("update_hotkey", {
-                configJson: JSON.stringify(dbHotkey),
-              });
-            }
-            if (config.language) {
-              setCurrentLanguage(config.language);
-              setSelectedLanguage(config.language);
-            }
-          } catch (dbErr: any) {
-            console.warn(
-              "Failed to load config from DB, using defaults:",
-              dbErr,
-            );
-            // If DB fails, we'll use the Rust backend values as defaults
-            if (
-              dbErr?.message?.includes("401") ||
-              dbErr?.message?.includes("Unauthorized")
-            ) {
-              setError("Please log in to save your configuration");
+        // Load language from app config
+        try {
+          const config = await invoke<TauriAppConfig>("get_app_config");
+          if (config.languages && config.languages.length > 0) {
+            const firstLanguage = config.languages[0] as LanguageCode;
+            if (Object.values(LanguageCode).includes(firstLanguage)) {
+              setCurrentLanguage(firstLanguage);
+              setSelectedLanguage(firstLanguage);
             }
           }
-        } else {
-          console.log("User not authenticated, using default config");
+        } catch (langErr) {
+          console.warn("Failed to load language from app config:", langErr);
         }
       } catch (err: any) {
         console.error("Failed to load config:", err);
@@ -119,7 +92,7 @@ export const HotkeySettings: React.FC = () => {
     };
 
     loadConfig();
-  }, [tokens?.access_token]);
+  }, []);
 
   // Listen for hotkey updates from backend
   useEffect(() => {
@@ -175,60 +148,19 @@ export const HotkeySettings: React.FC = () => {
         await invoke("update_hotkey", { configJson });
       }
 
-      // Update Rust backend if language changed (works even without auth)
+      // Update app config if language changed
       if (languageChanged) {
-        await invoke("set_language", { language: selectedLanguage });
+        await invoke("update_app_config", {
+          config: {
+            languages: [selectedLanguage],
+          },
+        });
+        setCurrentLanguage(selectedLanguage);
       }
 
-      // Save to DB only if user is authenticated
-      if (tokens?.access_token) {
-        // Save to DB (both hotkey and language) with system type
-        // Always send both values to ensure consistency
-        const updateData: {
-          system_type: string;
-          hotkey: string;
-          language: string;
-        } = {
-          system_type: systemType,
-          hotkey: selectedHotkey.hotkey,
-          language: selectedLanguage,
-        };
-
-        await updateAppConfig(updateData);
-
-        // Reload config from DB to get the latest values
-        try {
-          const updatedConfig = await getAppConfig(systemType);
-          if (updatedConfig.hotkey) {
-            const dbHotkey: HotkeyConfig = { hotkey: updatedConfig.hotkey };
-            setCurrentHotkey(dbHotkey);
-            setSelectedHotkey(dbHotkey);
-          }
-          if (updatedConfig.language) {
-            setCurrentLanguage(updatedConfig.language);
-            setSelectedLanguage(updatedConfig.language);
-          }
-        } catch (reloadErr) {
-          console.warn("Failed to reload config after update:", reloadErr);
-          // Still update local state even if reload fails
-          if (hotkeyChanged) {
-            setCurrentHotkey(selectedHotkey);
-          }
-          if (languageChanged) {
-            setCurrentLanguage(selectedLanguage);
-          }
-        }
-      } else {
-        // If not authenticated, just update local state
-        console.log(
-          "User not authenticated, saving only to local Rust backend",
-        );
-        if (hotkeyChanged) {
-          setCurrentHotkey(selectedHotkey);
-        }
-        if (languageChanged) {
-          setCurrentLanguage(selectedLanguage);
-        }
+      // Update local state for hotkey (hotkey is already saved via update_hotkey command)
+      if (hotkeyChanged) {
+        setCurrentHotkey(selectedHotkey);
       }
 
       setSuccess(true);
@@ -265,23 +197,6 @@ export const HotkeySettings: React.FC = () => {
   return (
     <div className="settings">
       <h3>Hotkey Settings</h3>
-
-      {!tokens?.access_token && (
-        <div
-          className="permission-message"
-          style={{
-            background: "rgba(255, 193, 7, 0.1)",
-            borderColor: "rgba(255, 193, 7, 0.2)",
-            color: "rgba(255, 193, 7, 0.9)",
-            fontSize: "11px",
-            padding: "8px",
-            marginBottom: "12px",
-          }}
-        >
-          Please log in to save your configuration to the cloud. Changes will
-          only be saved locally until you log in.
-        </div>
-      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         <div>
@@ -339,7 +254,9 @@ export const HotkeySettings: React.FC = () => {
           </div>
           <select
             value={selectedLanguage}
-            onChange={(e) => setSelectedLanguage(e.target.value)}
+            onChange={(e) =>
+              setSelectedLanguage(e.target.value as LanguageCode)
+            }
             disabled={isUpdating}
             style={{
               width: "100%",

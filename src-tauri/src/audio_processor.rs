@@ -2,14 +2,17 @@
 //!
 //! This module handles processing recorded audio data by:
 //! 1. Aborting any ongoing transcription task
-//! 2. Getting the authentication token from AuthTokenState
-//! 3. Sending the WAV audio data to Lexi AI Server API for transcription
-//! 4. Injecting the transcribed text into the active application using TextInjector
-//! 5. Emitting events to the frontend to update UI state
+//! 2. Getting the authentication token from secure storage (OS keychain or Tauri Store)
+//! 3. Getting the language preference from Tauri Store (persistent storage)
+//! 4. Sending the WAV audio data to Lexi AI Server API for transcription
+//! 5. Injecting the transcribed text into the active application using TextInjector
+//! 6. Emitting events to the frontend to update UI state
 
+use crate::actions::{check_action_trigger, perform_action};
+use crate::commands::app_config::get_app_config;
 use crate::commands::auth::get_auth_token;
-use crate::commands::config::get_language;
-use crate::state::{AuthTokenState, LanguageState, TranscriptionTaskState};
+use crate::shortcuts::check_command;
+use crate::state::TranscriptionTaskState;
 use crate::stt_service::SttService;
 use crate::text_injector::TextInjector;
 use std::time::Instant;
@@ -61,18 +64,16 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .emit("processing_start", ())
             .unwrap_or_default();
 
-        // Get authentication token from state
-        let auth_token = if let Some(state) = app_handle_for_task.try_state::<AuthTokenState>() {
-            get_auth_token(&state)
-        } else {
-            None
-        };
+        // Get authentication token from secure storage
+        let auth_token = get_auth_token(&app_handle_for_task);
 
         if auth_token.is_none() {
             eprintln!(
                 "⚠️  Warning: No authentication token available. Transcription will fail with 401."
             );
-            eprintln!("💡 Tip: Make sure you're logged in and the frontend has synced the token using set_auth_token");
+            eprintln!(
+                "💡 Tip: Make sure you're logged in and the token is stored in secure storage"
+            );
         } else {
             println!(
                 "✅ Auth token available (length: {})",
@@ -80,17 +81,65 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             );
         }
 
-        // Get language from state, default to "auto" if not set
-        let language = if let Some(state) = app_handle_for_task.try_state::<LanguageState>() {
-            get_language(&state).unwrap_or_else(|| "auto".to_string())
-        } else {
-            "auto".to_string()
+        // Get app config for transcription settings
+        let app_config = match get_app_config(app_handle_for_task.clone()).await {
+            Ok(config) => config,
+            Err(e) => {
+                let error_msg = format!("Failed to load app config: {}", e);
+                eprintln!("❌ {}", error_msg);
+                app_handle_for_task
+                    .emit("error", error_msg.as_str())
+                    .unwrap_or_default();
+                return;
+            }
         };
+
+        // Get first language from languages array
+        // Default to "auto" if not set
+        let language = app_config
+            .languages
+            .and_then(|langs| langs.first().cloned())
+            .unwrap_or_else(|| "auto".to_string());
         println!("🌐 Using language: {}", language);
 
-        // TODO: Get enhance_transcription and transcribe_with_cursor_context from app config state
-        let enhance_transcription = false;
-        let transcribe_with_cursor_context = true;
+        // Get transcription settings from app config
+        let enhance_transcription = app_config.enhance_transcription.unwrap_or(false);
+        let transcribe_with_cursor_context =
+            app_config.transcribe_with_cursor_context.unwrap_or(false);
+
+        // TODO: Decide what to do with offline_transcription
+        // offline_transcription is not in app config, keep as hardcoded for now
+        let offline_transcription = true;
+
+        // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript.
+        // Do more experiment on how we can use this trick to manipulate the model behavior.
+        // Get vocabulary from app config
+        let vocabulary: Vec<String> = app_config
+            .vocabulary
+            .unwrap_or_default()
+            .into_iter()
+            .map(|item| item.value)
+            .collect();
+
+        println!(
+            "⚙️  Transcription settings: enhance={}, cursor_context={}, offline={}, vocabulary_size={}",
+            enhance_transcription, transcribe_with_cursor_context, offline_transcription, vocabulary.len()
+        );
+
+        // Get cursor context and print app name and selected text
+        let cursor_context = crate::cursor_context::get_cursor_context();
+        let focused_app = cursor_context
+            .as_ref()
+            .and_then(|ctx| ctx.app_name.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+        println!("📱 Focused app: {}", focused_app);
+        println!(
+            "📝 Selected text: {}",
+            cursor_context
+                .as_ref()
+                .and_then(|ctx| ctx.selected_text.as_deref())
+                .unwrap_or("")
+        );
 
         // Capture screen and encode as base64 only if transcribe_with_cursor_context is true
         let base64_image = if transcribe_with_cursor_context {
@@ -111,6 +160,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
         let stt_service = SttService::new();
+
         let transcription_start = Instant::now();
         let transcription_result = stt_service
             .transcribe_audio(
@@ -119,8 +169,12 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 language,
                 enhance_transcription,
                 transcribe_with_cursor_context,
+                focused_app,
                 base64_image,
                 Some(cancel_rx),
+                Some(app_handle_for_task.clone()),
+                offline_transcription,
+                vocabulary,
             )
             .await;
         let transcription_duration = transcription_start.elapsed();
@@ -142,8 +196,47 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
                 // Only inject text if transcription is not empty
                 if !transcription.trim().is_empty() {
+                    // Check if transcription starts with action trigger (e.g., "Hey Lexi")
+                    let (text_to_inject, is_action) =
+                        if let Some(action_command) = check_action_trigger(&transcription) {
+                            // Action trigger detected - perform action and use its result
+                            println!(
+                                "🎯 Action trigger detected: '{}' -> performing action: '{}'",
+                                transcription.trim(),
+                                action_command
+                            );
+                            let result = perform_action(
+                                &action_command,
+                                &app_handle_for_task,
+                                cursor_context.as_ref(),
+                            )
+                            .await;
+                            (result, true)
+                        } else {
+                            // No action trigger - check if transcription matches a shortcut command
+                            let result = check_command(&transcription)
+                                .unwrap_or_else(|| transcription.clone());
+                            (result, false)
+                        };
+
+                    if text_to_inject != transcription {
+                        if is_action {
+                            println!(
+                                "🎯 Action performed: '{}' -> '{}'",
+                                transcription.trim(),
+                                text_to_inject
+                            );
+                        } else {
+                            println!(
+                                "🔧 Command detected: '{}' -> '{}'",
+                                transcription.trim(),
+                                text_to_inject
+                            );
+                        }
+                    }
+
                     let injector = TextInjector::new();
-                    match injector.inject_text(&transcription) {
+                    match injector.inject_text(&text_to_inject) {
                         Ok(_) => {
                             // Successfully injected text into active application
                             app_handle_for_task
