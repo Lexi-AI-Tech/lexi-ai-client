@@ -18,21 +18,21 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
 
 export const SettingsPage: React.FC = () => {
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
-    LanguageCode.AUTO,
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(
+    null,
   );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Derived values from config
-  const currentLanguage = config?.languages?.[0] as LanguageCode || LanguageCode.AUTO;
-  const autostartEnabled = config?.launch_on_system_startup ?? false;
-  const enhanceTranscription = config?.enhance_transcription ?? false;
-  const transcribeWithCursorContext = config?.transcribe_with_cursor_context ?? false;
-  const transcriptionHotkeys = config?.transcription_hotkeys ?? [];
-  const vocabulary = config?.vocabulary ?? [];
+  // Derived values from config - no defaults, rely entirely on backend
+  const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
+  const autostartEnabled = config?.launch_on_system_startup;
+  const enhanceTranscription = config?.enhance_transcription;
+  const transcribeWithCursorContext = config?.transcribe_with_cursor_context;
+  const transcriptionHotkeys = config?.transcription_hotkeys;
+  const vocabulary = config?.vocabulary;
 
   // Load app config on mount
   useEffect(() => {
@@ -44,12 +44,15 @@ export const SettingsPage: React.FC = () => {
         const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
         setConfig(loadedConfig);
 
-        // Set selected language for the dropdown
+        // Set selected language for the dropdown (only if backend provides it)
         if (loadedConfig.languages && loadedConfig.languages.length > 0) {
           const firstLanguage = loadedConfig.languages[0] as LanguageCode;
           if (Object.values(LanguageCode).includes(firstLanguage)) {
             setSelectedLanguage(firstLanguage);
           }
+        } else {
+          // Backend didn't provide a language, keep it null
+          setSelectedLanguage(null);
         }
       } catch (err: any) {
         console.error("Failed to load app config:", err);
@@ -79,6 +82,10 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleSaveLanguage = async () => {
+    if (selectedLanguage === null) {
+      return; // No language selected
+    }
+
     const languageChanged = selectedLanguage !== currentLanguage;
 
     if (!languageChanged) {
@@ -100,12 +107,13 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const isLanguageChanged = selectedLanguage !== currentLanguage;
+  const isLanguageChanged =
+    selectedLanguage !== null && selectedLanguage !== currentLanguage;
 
   const handleToggleAutostart = async () => {
     try {
       const updatedConfig = await updateConfig({
-        launch_on_system_startup: !autostartEnabled,
+        launch_on_system_startup: autostartEnabled === true ? false : true,
       });
       console.log(
         updatedConfig.launch_on_system_startup
@@ -120,7 +128,7 @@ export const SettingsPage: React.FC = () => {
   const handleToggleEnhanceTranscription = async () => {
     try {
       await updateConfig({
-        enhance_transcription: !enhanceTranscription,
+        enhance_transcription: enhanceTranscription === true ? false : true,
       });
     } catch (err: any) {
       // Error already set by updateConfig
@@ -130,7 +138,8 @@ export const SettingsPage: React.FC = () => {
   const handleToggleCursorContext = async () => {
     try {
       await updateConfig({
-        transcribe_with_cursor_context: !transcribeWithCursorContext,
+        transcribe_with_cursor_context:
+          transcribeWithCursorContext === true ? false : true,
       });
     } catch (err: any) {
       // Error already set by updateConfig
@@ -174,6 +183,71 @@ export const SettingsPage: React.FC = () => {
       />
     </button>
   );
+
+  // Don't render settings content until config is loaded to prevent flash of defaults
+  if (isLoading) {
+    return (
+      <div className="settings-page">
+        <h2
+          style={{
+            margin: 0,
+            marginBottom: "32px",
+            fontSize: "24px",
+            fontWeight: 600,
+            color: "#ffffff",
+          }}
+        >
+          Settings
+        </h2>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "40px",
+            color: "rgba(255, 255, 255, 0.6)",
+            fontSize: "14px",
+          }}
+        >
+          Loading settings...
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if config failed to load
+  if (config === null) {
+    return (
+      <div className="settings-page">
+        <h2
+          style={{
+            margin: 0,
+            marginBottom: "32px",
+            fontSize: "24px",
+            fontWeight: 600,
+            color: "#ffffff",
+          }}
+        >
+          Settings
+        </h2>
+        {error && (
+          <div
+            className="permission-message"
+            style={{
+              background: "rgba(255, 59, 48, 0.1)",
+              borderColor: "rgba(255, 59, 48, 0.2)",
+              color: "rgba(255, 59, 48, 0.9)",
+              fontSize: "11px",
+              padding: "12px",
+              marginBottom: "16px",
+            }}
+          >
+            {error}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="settings-page">
@@ -229,7 +303,7 @@ export const SettingsPage: React.FC = () => {
               Transcription Language
             </div>
             <select
-              value={selectedLanguage}
+              value={selectedLanguage || ""}
               onChange={(e) =>
                 setSelectedLanguage(e.target.value as LanguageCode)
               }
@@ -261,7 +335,9 @@ export const SettingsPage: React.FC = () => {
             >
               {selectedLanguage === "auto"
                 ? "Language will be automatically detected from audio"
-                : `Transcription will be limited to ${SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label || selectedLanguage}`}
+                : selectedLanguage
+                  ? `Transcription will be limited to ${SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label || selectedLanguage}`
+                  : "No language selected"}
             </div>
           </div>
 
@@ -297,7 +373,7 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={enhanceTranscription}
+              enabled={enhanceTranscription === true}
               onToggle={handleToggleEnhanceTranscription}
               disabled={isLoading}
             />
@@ -335,13 +411,13 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={transcribeWithCursorContext}
+              enabled={transcribeWithCursorContext === true}
               onToggle={handleToggleCursorContext}
               disabled={isLoading}
             />
           </div>
 
-          {transcriptionHotkeys.length > 0 && (
+          {transcriptionHotkeys && transcriptionHotkeys.length > 0 && (
             <div>
               <div
                 style={{
@@ -469,7 +545,7 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={autostartEnabled}
+              enabled={autostartEnabled === true}
               onToggle={handleToggleAutostart}
               disabled={isLoading}
             />
@@ -477,7 +553,7 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {vocabulary.length > 0 && (
+      {vocabulary && vocabulary.length > 0 && (
         <div style={{ marginTop: "32px" }}>
           <h3
             style={{
