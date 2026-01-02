@@ -24,11 +24,19 @@ export const SettingsPage: React.FC = () => {
     LanguageCode.AUTO,
   );
   const [autostartEnabled, setAutostartEnabled] = useState<boolean>(false);
+  const [enhanceTranscription, setEnhanceTranscription] = useState<boolean>(false);
+  const [transcribeWithCursorContext, setTranscribeWithCursorContext] = useState<boolean>(false);
+  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>([]);
+  const [vocabulary, setVocabulary] = useState<Array<{value: string; is_system_generated: boolean; hidden: boolean}>>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isTogglingAutostart, setIsTogglingAutostart] = useState(false);
+  const [isTogglingEnhance, setIsTogglingEnhance] = useState(false);
+  const [isTogglingCursorContext, setIsTogglingCursorContext] = useState(false);
+  const [fullConfig, setFullConfig] = useState<TauriAppConfig | null>(null);
+  const [showFullConfig, setShowFullConfig] = useState(false);
 
   // Load app config on mount
   useEffect(() => {
@@ -38,6 +46,9 @@ export const SettingsPage: React.FC = () => {
 
       try {
         const config = await invoke<TauriAppConfig>("get_app_config");
+        
+        // Store full config
+        setFullConfig(config);
 
         // Set language
         if (config.languages && config.languages.length > 0) {
@@ -54,6 +65,32 @@ export const SettingsPage: React.FC = () => {
           config.launch_on_system_startup !== undefined
         ) {
           setAutostartEnabled(config.launch_on_system_startup);
+        }
+
+        // Set enhance transcription
+        if (
+          config.enhance_transcription !== null &&
+          config.enhance_transcription !== undefined
+        ) {
+          setEnhanceTranscription(config.enhance_transcription);
+        }
+
+        // Set transcribe with cursor context
+        if (
+          config.transcribe_with_cursor_context !== null &&
+          config.transcribe_with_cursor_context !== undefined
+        ) {
+          setTranscribeWithCursorContext(config.transcribe_with_cursor_context);
+        }
+
+        // Set transcription hotkeys
+        if (config.transcription_hotkeys) {
+          setTranscriptionHotkeys(config.transcription_hotkeys);
+        }
+
+        // Set vocabulary
+        if (config.vocabulary) {
+          setVocabulary(config.vocabulary);
         }
       } catch (err: any) {
         console.error("Failed to load app config:", err);
@@ -90,6 +127,9 @@ export const SettingsPage: React.FC = () => {
         const firstLanguage = updatedConfig.languages[0] as LanguageCode;
         setCurrentLanguage(firstLanguage);
       }
+      
+      // Update full config
+      setFullConfig(updatedConfig);
 
       setSuccess(true);
       setIsUpdating(false);
@@ -130,6 +170,9 @@ export const SettingsPage: React.FC = () => {
             : "❌ Auto-startup disabled",
         );
       }
+      
+      // Update full config
+      setFullConfig(updatedConfig);
     } catch (err: any) {
       console.error("Failed to toggle autostart:", err);
       setError(err?.message || "Failed to update auto-startup setting");
@@ -137,6 +180,100 @@ export const SettingsPage: React.FC = () => {
       setIsTogglingAutostart(false);
     }
   };
+
+  const handleToggleEnhanceTranscription = async () => {
+    setIsTogglingEnhance(true);
+    setError(null);
+    try {
+      const newValue = !enhanceTranscription;
+
+      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
+        config: {
+          enhance_transcription: newValue,
+        },
+      });
+
+      if (
+        updatedConfig.enhance_transcription !== null &&
+        updatedConfig.enhance_transcription !== undefined
+      ) {
+        setEnhanceTranscription(updatedConfig.enhance_transcription);
+      }
+      
+      setFullConfig(updatedConfig);
+    } catch (err: any) {
+      console.error("Failed to toggle enhance transcription:", err);
+      setError(err?.message || "Failed to update enhance transcription setting");
+    } finally {
+      setIsTogglingEnhance(false);
+    }
+  };
+
+  const handleToggleCursorContext = async () => {
+    setIsTogglingCursorContext(true);
+    setError(null);
+    try {
+      const newValue = !transcribeWithCursorContext;
+
+      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
+        config: {
+          transcribe_with_cursor_context: newValue,
+        },
+      });
+
+      if (
+        updatedConfig.transcribe_with_cursor_context !== null &&
+        updatedConfig.transcribe_with_cursor_context !== undefined
+      ) {
+        setTranscribeWithCursorContext(updatedConfig.transcribe_with_cursor_context);
+      }
+      
+      setFullConfig(updatedConfig);
+    } catch (err: any) {
+      console.error("Failed to toggle cursor context:", err);
+      setError(err?.message || "Failed to update cursor context setting");
+    } finally {
+      setIsTogglingCursorContext(false);
+    }
+  };
+
+  const ToggleSwitch: React.FC<{
+    enabled: boolean;
+    onToggle: () => void;
+    disabled?: boolean;
+  }> = ({ enabled, onToggle, disabled = false }) => (
+    <button
+      onClick={onToggle}
+      disabled={disabled}
+      style={{
+        width: "44px",
+        height: "24px",
+        borderRadius: "12px",
+        border: "none",
+        backgroundColor: enabled
+          ? "rgba(52, 199, 89, 1)"
+          : "rgba(255, 255, 255, 0.2)",
+        cursor: disabled ? "not-allowed" : "pointer",
+        position: "relative",
+        transition: "background-color 0.2s",
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <div
+        style={{
+          width: "20px",
+          height: "20px",
+          borderRadius: "50%",
+          backgroundColor: "#ffffff",
+          position: "absolute",
+          top: "2px",
+          left: enabled ? "22px" : "2px",
+          transition: "left 0.2s",
+          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
+        }}
+      />
+    </button>
+  );
 
   return (
     <div className="settings-page">
@@ -227,6 +364,117 @@ export const SettingsPage: React.FC = () => {
                 : `Transcription will be limited to ${SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label || selectedLanguage}`}
             </div>
           </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px",
+              backgroundColor: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: "6px",
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "#ffffff",
+                  marginBottom: "4px",
+                  fontWeight: 500,
+                }}
+              >
+                Enhance Transcription
+              </div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "rgba(255, 255, 255, 0.6)",
+                }}
+              >
+                Use AI to improve transcription accuracy and formatting
+              </div>
+            </div>
+            <ToggleSwitch
+              enabled={enhanceTranscription}
+              onToggle={handleToggleEnhanceTranscription}
+              disabled={isTogglingEnhance || isLoading}
+            />
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px",
+              backgroundColor: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: "6px",
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "#ffffff",
+                  marginBottom: "4px",
+                  fontWeight: 500,
+                }}
+              >
+                Transcribe with Cursor Context
+              </div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "rgba(255, 255, 255, 0.6)",
+                }}
+              >
+                Use surrounding text context to improve transcription accuracy
+              </div>
+            </div>
+            <ToggleSwitch
+              enabled={transcribeWithCursorContext}
+              onToggle={handleToggleCursorContext}
+              disabled={isTogglingCursorContext || isLoading}
+            />
+          </div>
+
+          {transcriptionHotkeys.length > 0 && (
+            <div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "rgba(255, 255, 255, 0.6)",
+                  marginBottom: "8px",
+                }}
+              >
+                Transcription Hotkeys
+              </div>
+              <div
+                style={{
+                  padding: "12px",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  color: "rgba(255, 255, 255, 0.9)",
+                }}
+              >
+                {transcriptionHotkeys.join(", ")}
+              </div>
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: "rgba(255, 255, 255, 0.5)",
+                  marginTop: "6px",
+                }}
+              >
+                Configure hotkeys in the Hotkey Settings section
+              </div>
+            </div>
+          )}
 
           <button
             className="transcript-btn"
@@ -320,38 +568,137 @@ export const SettingsPage: React.FC = () => {
                 Automatically launch Lexi AI when your computer starts
               </div>
             </div>
-            <button
-              onClick={handleToggleAutostart}
-              disabled={isTogglingAutostart}
+            <ToggleSwitch
+              enabled={autostartEnabled}
+              onToggle={handleToggleAutostart}
+              disabled={isTogglingAutostart || isLoading}
+            />
+          </div>
+        </div>
+      </div>
+
+      {vocabulary.length > 0 && (
+        <div style={{ marginTop: "32px" }}>
+          <h3
+            style={{
+              margin: 0,
+              marginBottom: "16px",
+              fontSize: "18px",
+              fontWeight: 500,
+              color: "#ffffff",
+            }}
+          >
+            Vocabulary
+          </h3>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {vocabulary
+              .filter((item) => !item.hidden)
+              .map((item, index) => (
+                <div
+                  key={index}
+                  style={{
+                    padding: "12px",
+                    backgroundColor: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "6px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        color: "#ffffff",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {item.value}
+                    </div>
+                    {item.is_system_generated && (
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: "rgba(255, 255, 255, 0.5)",
+                          marginTop: "4px",
+                        }}
+                      >
+                        System generated
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: "32px" }}>
+        <h3
+          style={{
+            margin: 0,
+            marginBottom: "16px",
+            fontSize: "18px",
+            fontWeight: 500,
+            color: "#ffffff",
+          }}
+        >
+          Advanced
+        </h3>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <button
+            onClick={() => setShowFullConfig(!showFullConfig)}
+            style={{
+              padding: "8px 16px",
+              fontSize: "11px",
+              backgroundColor: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: "6px",
+              color: "#ffffff",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            {showFullConfig ? "▼ Hide" : "▶ Show"} Raw Configuration (JSON)
+          </button>
+
+          {showFullConfig && fullConfig && (
+            <div
               style={{
-                width: "44px",
-                height: "24px",
-                borderRadius: "12px",
-                border: "none",
-                backgroundColor: autostartEnabled
-                  ? "rgba(52, 199, 89, 1)"
-                  : "rgba(255, 255, 255, 0.2)",
-                cursor: isTogglingAutostart ? "not-allowed" : "pointer",
-                position: "relative",
-                transition: "background-color 0.2s",
-                opacity: isTogglingAutostart ? 0.5 : 1,
+                padding: "16px",
+                backgroundColor: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: "6px",
+                fontSize: "11px",
+                fontFamily: "monospace",
+                color: "rgba(255, 255, 255, 0.9)",
+                whiteSpace: "pre-wrap",
+                overflowX: "auto",
+                maxHeight: "400px",
+                overflowY: "auto",
               }}
             >
-              <div
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  borderRadius: "50%",
-                  backgroundColor: "#ffffff",
-                  position: "absolute",
-                  top: "2px",
-                  left: autostartEnabled ? "22px" : "2px",
-                  transition: "left 0.2s",
-                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
-                }}
-              />
-            </button>
-          </div>
+              {JSON.stringify(fullConfig, null, 2)}
+            </div>
+          )}
+
+          {showFullConfig && !fullConfig && !isLoading && (
+            <div
+              style={{
+                padding: "12px",
+                backgroundColor: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: "6px",
+                fontSize: "11px",
+                color: "rgba(255, 255, 255, 0.6)",
+              }}
+            >
+              No configuration loaded
+            </div>
+          )}
         </div>
       </div>
     </div>
