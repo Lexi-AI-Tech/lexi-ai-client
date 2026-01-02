@@ -146,7 +146,7 @@ async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> 
         .map_err(|e| format!("Failed to fetch app config from server: {}", e))?;
 
     let status = response.status();
-    
+
     // Parse response - might be wrapped in {data: {...}} or direct
     let json_value: serde_json::Value = response
         .json()
@@ -159,14 +159,12 @@ async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> 
             .or_else(|| json_value.get("detail"))
             .and_then(|v| v.as_str())
             .unwrap_or("Unknown error");
-        return Err(format!(
-            "Server error ({}): {}",
-            status, error_text
-        ));
+        return Err(format!("Server error ({}): {}", status, error_text));
     }
 
     // Check if response is wrapped in "data" field
-    let server_response: ServerAppConfigResponse = if let Some(data_field) = json_value.get("data") {
+    let server_response: ServerAppConfigResponse = if let Some(data_field) = json_value.get("data")
+    {
         serde_json::from_value(data_field.clone())
             .map_err(|e| format!("Failed to parse server response data: {}", e))?
     } else {
@@ -189,8 +187,8 @@ async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> 
         .store(STORE_FILE)
         .map_err(|e| format!("Failed to open store: {}", e))?;
 
-    let config_json = serde_json::to_value(&config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    let config_json =
+        serde_json::to_value(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
 
     store.set("config", config_json);
     store
