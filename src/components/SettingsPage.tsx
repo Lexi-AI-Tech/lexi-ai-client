@@ -35,8 +35,6 @@ export const SettingsPage: React.FC = () => {
   const [isTogglingAutostart, setIsTogglingAutostart] = useState(false);
   const [isTogglingEnhance, setIsTogglingEnhance] = useState(false);
   const [isTogglingCursorContext, setIsTogglingCursorContext] = useState(false);
-  const [fullConfig, setFullConfig] = useState<TauriAppConfig | null>(null);
-  const [showFullConfig, setShowFullConfig] = useState(false);
 
   // Load app config on mount
   useEffect(() => {
@@ -46,9 +44,6 @@ export const SettingsPage: React.FC = () => {
 
       try {
         const config = await invoke<TauriAppConfig>("get_app_config");
-        
-        // Store full config
-        setFullConfig(config);
 
         // Set language
         if (config.languages && config.languages.length > 0) {
@@ -127,9 +122,6 @@ export const SettingsPage: React.FC = () => {
         const firstLanguage = updatedConfig.languages[0] as LanguageCode;
         setCurrentLanguage(firstLanguage);
       }
-      
-      // Update full config
-      setFullConfig(updatedConfig);
 
       setSuccess(true);
       setIsUpdating(false);
@@ -170,9 +162,6 @@ export const SettingsPage: React.FC = () => {
             : "❌ Auto-startup disabled",
         );
       }
-      
-      // Update full config
-      setFullConfig(updatedConfig);
     } catch (err: any) {
       console.error("Failed to toggle autostart:", err);
       setError(err?.message || "Failed to update auto-startup setting");
@@ -199,8 +188,6 @@ export const SettingsPage: React.FC = () => {
       ) {
         setEnhanceTranscription(updatedConfig.enhance_transcription);
       }
-      
-      setFullConfig(updatedConfig);
     } catch (err: any) {
       console.error("Failed to toggle enhance transcription:", err);
       setError(err?.message || "Failed to update enhance transcription setting");
@@ -227,8 +214,6 @@ export const SettingsPage: React.FC = () => {
       ) {
         setTranscribeWithCursorContext(updatedConfig.transcribe_with_cursor_context);
       }
-      
-      setFullConfig(updatedConfig);
     } catch (err: any) {
       console.error("Failed to toggle cursor context:", err);
       setError(err?.message || "Failed to update cursor context setting");
@@ -634,73 +619,6 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
       )}
-
-      <div style={{ marginTop: "32px" }}>
-        <h3
-          style={{
-            margin: 0,
-            marginBottom: "16px",
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#ffffff",
-          }}
-        >
-          Advanced
-        </h3>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <button
-            onClick={() => setShowFullConfig(!showFullConfig)}
-            style={{
-              padding: "8px 16px",
-              fontSize: "11px",
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "6px",
-              color: "#ffffff",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            {showFullConfig ? "▼ Hide" : "▶ Show"} Raw Configuration (JSON)
-          </button>
-
-          {showFullConfig && fullConfig && (
-            <div
-              style={{
-                padding: "16px",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                borderRadius: "6px",
-                fontSize: "11px",
-                fontFamily: "monospace",
-                color: "rgba(255, 255, 255, 0.9)",
-                whiteSpace: "pre-wrap",
-                overflowX: "auto",
-                maxHeight: "400px",
-                overflowY: "auto",
-              }}
-            >
-              {JSON.stringify(fullConfig, null, 2)}
-            </div>
-          )}
-
-          {showFullConfig && !fullConfig && !isLoading && (
-            <div
-              style={{
-                padding: "12px",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                borderRadius: "6px",
-                fontSize: "11px",
-                color: "rgba(255, 255, 255, 0.6)",
-              }}
-            >
-              No configuration loaded
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 };
