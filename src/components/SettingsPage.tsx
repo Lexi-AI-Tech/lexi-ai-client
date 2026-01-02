@@ -44,10 +44,11 @@ export const SettingsPage: React.FC = () => {
       setError(null);
 
       try {
-        const language = await invoke<string | null>("get_language");
-        if (language) {
-          setCurrentLanguage(language);
-          setSelectedLanguage(language);
+        const languages = await invoke<string[] | null>("get_language");
+        if (languages && languages.length > 0) {
+          const firstLanguage = languages[0];
+          setCurrentLanguage(firstLanguage);
+          setSelectedLanguage(firstLanguage);
         }
       } catch (err: any) {
         console.error("Failed to load language:", err);
@@ -90,7 +91,7 @@ export const SettingsPage: React.FC = () => {
 
     try {
       // Save to Tauri Store (persists locally, no auth required)
-      await invoke("set_language", { language: selectedLanguage });
+      await invoke("set_language", { languages: [selectedLanguage] });
 
       // Update local state
       setCurrentLanguage(selectedLanguage);

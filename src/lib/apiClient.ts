@@ -652,18 +652,20 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
  */
 export interface AppConfig {
   system_type: string;
-  hotkey: string;
-  language: string;
+  transcription_hotkeys: string[];
+  languages: string[];
   enhance_transcription: boolean;
   transcribe_with_cursor_context: boolean;
+  launch_on_system_startup: boolean;
 }
 
 export interface AppConfigUpdateRequest {
   system_type?: string; // 'mac' or 'windows'
-  hotkey?: string;
-  language?: string;
+  transcription_hotkeys?: string[];
+  languages?: string[];
   enhance_transcription?: boolean;
   transcribe_with_cursor_context?: boolean;
+  launch_on_system_startup?: boolean;
 }
 
 /**

@@ -76,10 +76,11 @@ export const HotkeySettings: React.FC = () => {
 
         // Load language from Tauri Store
         try {
-          const language = await invoke<string | null>("get_language");
-          if (language) {
-            setCurrentLanguage(language);
-            setSelectedLanguage(language);
+          const languages = await invoke<string[] | null>("get_language");
+          if (languages && languages.length > 0) {
+            const firstLanguage = languages[0];
+            setCurrentLanguage(firstLanguage);
+            setSelectedLanguage(firstLanguage);
           }
         } catch (langErr) {
           console.warn("Failed to load language from Tauri Store:", langErr);
@@ -151,7 +152,7 @@ export const HotkeySettings: React.FC = () => {
 
       // Update Rust backend if language changed (saves to Tauri Store)
       if (languageChanged) {
-        await invoke("set_language", { language: selectedLanguage });
+        await invoke("set_language", { languages: [selectedLanguage] });
         setCurrentLanguage(selectedLanguage);
       }
 

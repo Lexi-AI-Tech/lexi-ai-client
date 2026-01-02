@@ -4,12 +4,12 @@
 //! It is the unified module for all configuration-related functionality, including:
 //!
 //! ## Configuration Storage (Tauri Store)
-//! - App configuration persistence (language, hotkey, transcription settings)
+//! - App configuration persistence (languages, transcription_hotkeys, transcription settings)
 //! - Direct read/write operations to persistent storage
 //! - All operations go directly to Tauri Store
 //!
 //! ## Language Configuration
-//! - Set/get transcription language preference
+//! - Set/get transcription language preferences (array of languages)
 //! - Internal and frontend-facing commands
 //!
 //! ## Auto-startup Configuration
@@ -33,14 +33,16 @@ const STORE_FILE: &str = ".app-config.dat";
 /// All fields are optional to allow for partial updates and backward compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// Transcription language preference (e.g., "en", "es", "auto")
-    pub language: Option<String>,
-    /// Global hotkey for triggering recording (e.g., "Fn", "Cmd+Shift+R")
-    pub hotkey: Option<String>,
+    /// Transcription language preferences (e.g., ["en"], ["es"], ["auto"])
+    pub languages: Option<Vec<String>>,
+    /// Global hotkeys for triggering recording (e.g., ["Fn"], ["Cmd+Shift+R"])
+    pub transcription_hotkeys: Option<Vec<String>>,
     /// Whether to enhance transcriptions with LLM processing
     pub enhance_transcription: Option<bool>,
     /// Whether to use cursor context when transcribing
     pub transcribe_with_cursor_context: Option<bool>,
+    /// Whether to launch application on system startup
+    pub launch_on_system_startup: Option<bool>,
 }
 
 impl Default for AppConfig {
@@ -51,10 +53,11 @@ impl Default for AppConfig {
     /// are explicitly set defaults.
     fn default() -> Self {
         Self {
-            language: Some("auto".to_string()),
-            hotkey: Some("Fn".to_string()),
+            languages: Some(vec!["auto".to_string()]),
+            transcription_hotkeys: Some(vec!["Fn".to_string()]),
             enhance_transcription: Some(false),
             transcribe_with_cursor_context: Some(false),
+            launch_on_system_startup: Some(true),
         }
     }
 }
@@ -136,10 +139,11 @@ pub fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig,
 ///
 /// # Arguments
 /// * `key` - The configuration key to retrieve. Supported keys:
-///   - `"language"` - Transcription language preference
-///   - `"hotkey"` - Global hotkey for recording
+///   - `"languages"` - Transcription language preferences
+///   - `"transcription_hotkeys"` - Global hotkeys for recording
 ///   - `"enhance_transcription"` - Whether to enhance transcriptions
 ///   - `"transcribe_with_cursor_context"` - Whether to use cursor context
+///   - `"launch_on_system_startup"` - Whether to launch on system startup
 ///
 /// # Returns
 /// * `Option<serde_json::Value>` - The config value if found, None otherwise
@@ -152,13 +156,16 @@ pub fn get_config_value(app: AppHandle, key: String) -> Result<Option<serde_json
     if let Some(config_value) = store.get("config") {
         if let Ok(config) = serde_json::from_value::<AppConfig>(config_value.clone()) {
             match key.as_str() {
-                "language" => Ok(config.language.map(|v| serde_json::json!(v))),
-                "hotkey" => Ok(config.hotkey.map(|v| serde_json::json!(v))),
+                "languages" => Ok(config.languages.map(|v| serde_json::json!(v))),
+                "transcription_hotkeys" => Ok(config.transcription_hotkeys.map(|v| serde_json::json!(v))),
                 "enhance_transcription" => {
                     Ok(config.enhance_transcription.map(|v| serde_json::json!(v)))
                 }
                 "transcribe_with_cursor_context" => Ok(config
                     .transcribe_with_cursor_context
+                    .map(|v| serde_json::json!(v))),
+                "launch_on_system_startup" => Ok(config
+                    .launch_on_system_startup
                     .map(|v| serde_json::json!(v))),
                 _ => Err(format!("Unknown config key: {}", key)),
             }
@@ -179,10 +186,11 @@ pub fn get_config_value(app: AppHandle, key: String) -> Result<Option<serde_json
 ///
 /// # Arguments
 /// * `key` - The configuration key to update. Supported keys:
-///   - `"language"` - Transcription language preference (String)
-///   - `"hotkey"` - Global hotkey for recording (String)
+///   - `"languages"` - Transcription language preferences (Vec<String>)
+///   - `"transcription_hotkeys"` - Global hotkeys for recording (Vec<String>)
 ///   - `"enhance_transcription"` - Whether to enhance transcriptions (bool)
 ///   - `"transcribe_with_cursor_context"` - Whether to use cursor context (bool)
+///   - `"launch_on_system_startup"` - Whether to launch on system startup (bool)
 /// * `value` - The new value to set (must match the expected type for the key)
 ///
 /// # Returns
@@ -198,17 +206,24 @@ pub fn set_config_value(
 
     // Update the specific field
     match key.as_str() {
-        "language" => {
-            config.language = value.as_str().map(|s| s.to_string());
+        "languages" => {
+            config.languages = serde_json::from_value(value)
+                .ok()
+                .map(|v: Vec<String>| v);
         }
-        "hotkey" => {
-            config.hotkey = value.as_str().map(|s| s.to_string());
+        "transcription_hotkeys" => {
+            config.transcription_hotkeys = serde_json::from_value(value)
+                .ok()
+                .map(|v: Vec<String>| v);
         }
         "enhance_transcription" => {
             config.enhance_transcription = value.as_bool();
         }
         "transcribe_with_cursor_context" => {
             config.transcribe_with_cursor_context = value.as_bool();
+        }
+        "launch_on_system_startup" => {
+            config.launch_on_system_startup = value.as_bool();
         }
         _ => return Err(format!("Unknown config key: {}", key)),
     }
@@ -226,37 +241,37 @@ pub fn set_config_value(
 // functions to interact with Tauri Store.
 // ============================================================================
 
-/// Set the transcription language from frontend
+/// Set the transcription languages from frontend
 ///
-/// This command persists the language preference to Tauri Store.
-/// The frontend should call this whenever the language preference changes.
+/// This command persists the language preferences to Tauri Store.
+/// The frontend should call this whenever the language preferences change.
 ///
 /// # Arguments
-/// * `language` - Optional language code from frontend (e.g., "en", "es", "auto")
+/// * `languages` - Optional list of language codes from frontend (e.g., ["en"], ["es"], ["auto"])
 #[tauri::command]
-pub fn set_language(app: AppHandle, language: Option<String>) -> Result<(), String> {
+pub fn set_language(app: AppHandle, languages: Option<Vec<String>>) -> Result<(), String> {
     // Persist to Tauri Store
-    set_config_value(app, "language".to_string(), serde_json::json!(language))?;
-    println!("💾 Language saved to Tauri Store: {:?}", language);
+    set_config_value(app, "languages".to_string(), serde_json::json!(languages))?;
+    println!("💾 Languages saved to Tauri Store: {:?}", languages);
 
     Ok(())
 }
 
-/// Get the current transcription language (internal function)
+/// Get the current transcription languages (internal function)
 ///
 /// Reads directly from Tauri Store. This is the internal function used by Rust code.
-/// For frontend access, use the `get_language` Tauri command instead.
+/// For frontend access, use the `get_languages` Tauri command instead.
 ///
 /// # Arguments
 /// * `app` - The Tauri AppHandle to access the store
 ///
 /// # Returns
-/// * `Option<String>` - The current language code if available, None otherwise
-pub fn get_language_internal(app: &AppHandle) -> Result<Option<String>, String> {
+/// * `Option<Vec<String>>` - The current language codes if available, None otherwise
+pub fn get_language_internal(app: &AppHandle) -> Result<Option<Vec<String>>, String> {
     // Read directly from Tauri Store
-    if let Ok(Some(language_value)) = get_config_value(app.clone(), "language".to_string()) {
-        if let Some(lang) = language_value.as_str() {
-            return Ok(Some(lang.to_string()));
+    if let Ok(Some(languages_value)) = get_config_value(app.clone(), "languages".to_string()) {
+        if let Ok(languages) = serde_json::from_value::<Vec<String>>(languages_value) {
+            return Ok(Some(languages));
         }
     }
 
@@ -264,14 +279,14 @@ pub fn get_language_internal(app: &AppHandle) -> Result<Option<String>, String> 
     Ok(None)
 }
 
-/// Get the current transcription language (Tauri command)
+/// Get the current transcription languages (Tauri command)
 ///
 /// Reads directly from Tauri Store. This is the Tauri command wrapper for frontend access.
 ///
 /// # Returns
-/// * `Option<String>` - The current language code if available, None otherwise
+/// * `Option<Vec<String>>` - The current language codes if available, None otherwise
 #[tauri::command]
-pub fn get_language(app: AppHandle) -> Result<Option<String>, String> {
+pub fn get_language(app: AppHandle) -> Result<Option<Vec<String>>, String> {
     get_language_internal(&app)
 }
 
