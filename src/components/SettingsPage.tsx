@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 import {
   LanguageCode,
   getAllLanguageCodes,
   getLanguageName,
 } from "../lib/constants";
-import type { TauriAppConfig } from "../types";
+import type { HotkeyConfig, TauriAppConfig } from "../types";
 
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import { HotkeySelector } from "./HotkeySelector";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -21,17 +23,31 @@ export const SettingsPage: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(
     null,
   );
+  const [selectedAutostart, setSelectedAutostart] = useState<boolean | null>(
+    null,
+  );
+  const [selectedEnhanceTranscription, setSelectedEnhanceTranscription] =
+    useState<boolean | null>(null);
+  const [
+    selectedTranscribeWithCursorContext,
+    setSelectedTranscribeWithCursorContext,
+  ] = useState<boolean | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
+    hotkeys: [],
+  });
+  const [selectedHotkeys, setSelectedHotkeys] = useState<HotkeyConfig>({
+    hotkeys: [],
+  });
 
   // Derived values from config - no defaults, rely entirely on backend
   const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
   const autostartEnabled = config?.launch_on_system_startup;
   const enhanceTranscription = config?.enhance_transcription;
   const transcribeWithCursorContext = config?.transcribe_with_cursor_context;
-  const transcriptionHotkeys = config?.transcription_hotkeys;
   const vocabulary = config?.vocabulary;
 
   // Load app config on mount
@@ -41,10 +57,23 @@ export const SettingsPage: React.FC = () => {
       setError(null);
 
       try {
+        // Load hotkeys from Tauri Store
+        try {
+          const hotkeyJson = await invoke<string>("get_current_hotkey");
+          const hotkey: HotkeyConfig = JSON.parse(hotkeyJson);
+          if (hotkey.hotkeys.length > 3) {
+            hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
+          }
+          setCurrentHotkeys(hotkey);
+          setSelectedHotkeys(hotkey);
+        } catch (hotkeyErr) {
+          console.warn("Failed to load hotkeys:", hotkeyErr);
+        }
+
         const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
         setConfig(loadedConfig);
 
-        // Set selected language for the dropdown (only if backend provides it)
+        // Set selected values for all settings (only if backend provides them)
         if (loadedConfig.languages && loadedConfig.languages.length > 0) {
           const firstLanguage = loadedConfig.languages[0] as LanguageCode;
           if (Object.values(LanguageCode).includes(firstLanguage)) {
@@ -54,6 +83,13 @@ export const SettingsPage: React.FC = () => {
           // Backend didn't provide a language, keep it null
           setSelectedLanguage(null);
         }
+        setSelectedAutostart(loadedConfig.launch_on_system_startup ?? null);
+        setSelectedEnhanceTranscription(
+          loadedConfig.enhance_transcription ?? null,
+        );
+        setSelectedTranscribeWithCursorContext(
+          loadedConfig.transcribe_with_cursor_context ?? null,
+        );
       } catch (err: any) {
         console.error("Failed to load app config:", err);
         setError(err?.message || "Failed to load configuration");
@@ -63,6 +99,43 @@ export const SettingsPage: React.FC = () => {
     };
 
     loadConfig();
+  }, []);
+
+  // Listen for hotkey updates from backend
+  useEffect(() => {
+    const setupListener = async () => {
+      const unlisten = await listen<string>("hotkey-updated", (event) => {
+        try {
+          const hotkey: HotkeyConfig = JSON.parse(event.payload);
+          if (hotkey.hotkeys.length > 3) {
+            hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
+          }
+          setCurrentHotkeys(hotkey);
+          setSelectedHotkeys(hotkey);
+          setSuccess(true);
+          setIsUpdating(false);
+          setError(null);
+
+          // Clear success message after 2 seconds
+          setTimeout(() => setSuccess(false), 2000);
+        } catch (err) {
+          console.error("Failed to parse hotkey update:", err);
+        }
+      });
+
+      return unlisten;
+    };
+
+    let unlistenFn: (() => void) | undefined;
+    setupListener().then((unlisten) => {
+      unlistenFn = unlisten;
+    });
+
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
   }, []);
 
   // Generic update function for app config
@@ -81,15 +154,42 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSaveLanguage = async () => {
-    if (selectedLanguage === null) {
-      return; // No language selected
-    }
+  const handleSaveSettings = async () => {
+    // Check if anything changed using the same logic as hasChanges
+    const hotkeysChanged =
+      JSON.stringify(selectedHotkeys.hotkeys) !==
+      JSON.stringify(currentHotkeys.hotkeys);
+    const languageChanged =
+      selectedLanguage !== null &&
+      selectedLanguage !== undefined &&
+      selectedLanguage !== currentLanguage;
 
-    const languageChanged = selectedLanguage !== currentLanguage;
+    const currentAutostart = autostartEnabled ?? false;
+    const autostartChanged =
+      selectedAutostart !== null &&
+      selectedAutostart !== undefined &&
+      selectedAutostart !== currentAutostart;
 
-    if (!languageChanged) {
-      return; // No change needed
+    const currentEnhance = enhanceTranscription ?? false;
+    const enhanceChanged =
+      selectedEnhanceTranscription !== null &&
+      selectedEnhanceTranscription !== undefined &&
+      selectedEnhanceTranscription !== currentEnhance;
+
+    const currentCursorContext = transcribeWithCursorContext ?? false;
+    const cursorContextChanged =
+      selectedTranscribeWithCursorContext !== null &&
+      selectedTranscribeWithCursorContext !== undefined &&
+      selectedTranscribeWithCursorContext !== currentCursorContext;
+
+    if (
+      !hotkeysChanged &&
+      !languageChanged &&
+      !autostartChanged &&
+      !enhanceChanged &&
+      !cursorContextChanged
+    ) {
+      return; // No changes needed
     }
 
     setIsUpdating(true);
@@ -97,7 +197,74 @@ export const SettingsPage: React.FC = () => {
     setSuccess(false);
 
     try {
-      await updateConfig({ languages: [selectedLanguage] });
+      // Validate hotkeys if changed
+      if (hotkeysChanged) {
+        if (selectedHotkeys.hotkeys.length > 3) {
+          setError("Maximum of 3 hotkeys allowed");
+          setIsUpdating(false);
+          return;
+        }
+        if (selectedHotkeys.hotkeys.length === 0) {
+          setError("At least one hotkey is required");
+          setIsUpdating(false);
+          return;
+        }
+      }
+
+      // Update Rust backend if hotkeys changed
+      if (hotkeysChanged) {
+        const configJson = JSON.stringify(selectedHotkeys);
+        await invoke("update_hotkey", { configJson });
+        setCurrentHotkeys(selectedHotkeys);
+      }
+
+      const updates: Partial<TauriAppConfig> = {};
+
+      if (languageChanged && selectedLanguage !== null) {
+        updates.languages = [selectedLanguage];
+      }
+      if (autostartChanged && selectedAutostart !== null) {
+        updates.launch_on_system_startup = selectedAutostart;
+      }
+      if (enhanceChanged && selectedEnhanceTranscription !== null) {
+        updates.enhance_transcription = selectedEnhanceTranscription;
+      }
+      if (
+        cursorContextChanged &&
+        selectedTranscribeWithCursorContext !== null
+      ) {
+        updates.transcribe_with_cursor_context =
+          selectedTranscribeWithCursorContext;
+      }
+
+      const updatedConfig = await updateConfig(updates);
+
+      // Update selected values to match the saved config
+      if (
+        languageChanged &&
+        updatedConfig.languages &&
+        updatedConfig.languages.length > 0
+      ) {
+        setSelectedLanguage(updatedConfig.languages[0] as LanguageCode);
+      }
+      if (
+        autostartChanged &&
+        updatedConfig.launch_on_system_startup !== undefined
+      ) {
+        setSelectedAutostart(updatedConfig.launch_on_system_startup);
+      }
+      if (enhanceChanged && updatedConfig.enhance_transcription !== undefined) {
+        setSelectedEnhanceTranscription(updatedConfig.enhance_transcription);
+      }
+      if (
+        cursorContextChanged &&
+        updatedConfig.transcribe_with_cursor_context !== undefined
+      ) {
+        setSelectedTranscribeWithCursorContext(
+          updatedConfig.transcribe_with_cursor_context,
+        );
+      }
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (err: any) {
@@ -107,43 +274,73 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const isLanguageChanged =
-    selectedLanguage !== null && selectedLanguage !== currentLanguage;
+  const hasChanges = () => {
+    // Compare hotkeys
+    const hotkeysChanged =
+      JSON.stringify(selectedHotkeys.hotkeys) !==
+      JSON.stringify(currentHotkeys.hotkeys);
 
-  const handleToggleAutostart = async () => {
-    try {
-      const updatedConfig = await updateConfig({
-        launch_on_system_startup: autostartEnabled === true ? false : true,
-      });
-      console.log(
-        updatedConfig.launch_on_system_startup
-          ? "✅ Auto-startup enabled"
-          : "❌ Auto-startup disabled",
-      );
-    } catch (err: any) {
-      // Error already set by updateConfig
-    }
+    // Compare language
+    const languageChanged =
+      selectedLanguage !== null &&
+      selectedLanguage !== undefined &&
+      selectedLanguage !== currentLanguage;
+
+    // Compare autostart (handle null/undefined properly)
+    // If selectedAutostart is null, it means unchanged, so no change
+    // If selectedAutostart is a boolean, compare it to current value
+    const currentAutostart = autostartEnabled ?? false;
+    const autostartChanged =
+      selectedAutostart !== null &&
+      selectedAutostart !== undefined &&
+      selectedAutostart !== currentAutostart;
+
+    // Compare enhance transcription
+    const currentEnhance = enhanceTranscription ?? false;
+    const enhanceChanged =
+      selectedEnhanceTranscription !== null &&
+      selectedEnhanceTranscription !== undefined &&
+      selectedEnhanceTranscription !== currentEnhance;
+
+    // Compare cursor context
+    const currentCursorContext = transcribeWithCursorContext ?? false;
+    const cursorContextChanged =
+      selectedTranscribeWithCursorContext !== null &&
+      selectedTranscribeWithCursorContext !== undefined &&
+      selectedTranscribeWithCursorContext !== currentCursorContext;
+
+    return (
+      hotkeysChanged ||
+      languageChanged ||
+      autostartChanged ||
+      enhanceChanged ||
+      cursorContextChanged
+    );
   };
 
-  const handleToggleEnhanceTranscription = async () => {
-    try {
-      await updateConfig({
-        enhance_transcription: enhanceTranscription === true ? false : true,
-      });
-    } catch (err: any) {
-      // Error already set by updateConfig
-    }
+  const handleToggleAutostart = () => {
+    const currentValue = selectedAutostart ?? autostartEnabled ?? false;
+    setSelectedAutostart(!currentValue);
   };
 
-  const handleToggleCursorContext = async () => {
-    try {
-      await updateConfig({
-        transcribe_with_cursor_context:
-          transcribeWithCursorContext === true ? false : true,
-      });
-    } catch (err: any) {
-      // Error already set by updateConfig
-    }
+  const handleToggleEnhanceTranscription = () => {
+    const currentValue =
+      selectedEnhanceTranscription ?? enhanceTranscription ?? false;
+    setSelectedEnhanceTranscription(!currentValue);
+  };
+
+  const handleToggleCursorContext = () => {
+    const currentValue =
+      selectedTranscribeWithCursorContext ??
+      transcribeWithCursorContext ??
+      false;
+    setSelectedTranscribeWithCursorContext(!currentValue);
+  };
+
+  const handleHotkeySelectorChange = (config: HotkeyConfig) => {
+    // Limit to 3 hotkeys
+    const limitedHotkeys = config.hotkeys.slice(0, 3);
+    setSelectedHotkeys({ hotkeys: limitedHotkeys });
   };
 
   const ToggleSwitch: React.FC<{
@@ -288,6 +485,111 @@ export const SettingsPage: React.FC = () => {
             color: "#ffffff",
           }}
         >
+          Hotkeys
+        </h3>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "32px" }}>
+          <div>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "rgba(255, 255, 255, 0.6)",
+                marginBottom: "8px",
+              }}
+            >
+              Current Hotkeys ({currentHotkeys.hotkeys.length}/3)
+            </div>
+            {currentHotkeys.hotkeys.length > 0 ? (
+              <div
+                style={{
+                  padding: "12px",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "6px",
+                  marginBottom: "8px",
+                }}
+              >
+                {currentHotkeys.hotkeys.map((hotkey, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      fontSize: "11px",
+                      fontFamily:
+                        'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                      color: "rgba(255, 255, 255, 0.9)",
+                      padding: "4px 0",
+                    }}
+                  >
+                    {hotkey}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "rgba(255, 255, 255, 0.4)",
+                  padding: "12px",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "6px",
+                  marginBottom: "8px",
+                }}
+              >
+                No hotkeys configured
+              </div>
+            )}
+            <div
+              style={{
+                fontSize: "10px",
+                color: "rgba(255, 255, 255, 0.5)",
+                marginTop: "6px",
+              }}
+            >
+              Press any of these combinations to start/stop recording
+            </div>
+          </div>
+
+          <div>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "rgba(255, 255, 255, 0.6)",
+                marginBottom: "8px",
+              }}
+            >
+              Configure Hotkeys
+            </div>
+            <HotkeySelector
+              value={selectedHotkeys}
+              onChange={handleHotkeySelectorChange}
+              maxHotkeys={3}
+              disabled={isUpdating}
+            />
+            <div
+              style={{
+                fontSize: "10px",
+                color: "rgba(255, 255, 255, 0.5)",
+                marginTop: "6px",
+              }}
+            >
+              Note: Fn key is handled separately and works on Mac. Other hotkeys
+              use Tauri global shortcuts.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3
+          style={{
+            margin: 0,
+            marginBottom: "16px",
+            fontSize: "18px",
+            fontWeight: 500,
+            color: "#ffffff",
+          }}
+        >
           Transcription
         </h3>
 
@@ -373,9 +675,13 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={enhanceTranscription === true}
+              enabled={
+                (selectedEnhanceTranscription ??
+                  enhanceTranscription ??
+                  false) === true
+              }
               onToggle={handleToggleEnhanceTranscription}
-              disabled={isLoading}
+              disabled={isLoading || isUpdating}
             />
           </div>
 
@@ -411,91 +717,15 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={transcribeWithCursorContext === true}
+              enabled={
+                (selectedTranscribeWithCursorContext ??
+                  transcribeWithCursorContext ??
+                  false) === true
+              }
               onToggle={handleToggleCursorContext}
-              disabled={isLoading}
+              disabled={isLoading || isUpdating}
             />
           </div>
-
-          {transcriptionHotkeys && transcriptionHotkeys.length > 0 && (
-            <div>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.6)",
-                  marginBottom: "8px",
-                }}
-              >
-                Transcription Hotkeys
-              </div>
-              <div
-                style={{
-                  padding: "12px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "6px",
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.9)",
-                }}
-              >
-                {transcriptionHotkeys.join(", ")}
-              </div>
-              <div
-                style={{
-                  fontSize: "10px",
-                  color: "rgba(255, 255, 255, 0.5)",
-                  marginTop: "6px",
-                }}
-              >
-                Configure hotkeys in the Hotkey Settings section
-              </div>
-            </div>
-          )}
-
-          <button
-            className="transcript-btn"
-            onClick={handleSaveLanguage}
-            disabled={isUpdating || !isLanguageChanged || isLoading}
-            style={{
-              marginTop: "8px",
-              padding: "8px 16px",
-              fontSize: "11px",
-              width: "100%",
-              opacity: isUpdating || !isLanguageChanged || isLoading ? 0.5 : 1,
-            }}
-          >
-            {isUpdating ? "Saving..." : "Save Language"}
-          </button>
-
-          {error && (
-            <div
-              className="permission-message"
-              style={{
-                background: "rgba(255, 59, 48, 0.1)",
-                borderColor: "rgba(255, 59, 48, 0.2)",
-                color: "rgba(255, 59, 48, 0.9)",
-                fontSize: "11px",
-                padding: "8px",
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div
-              className="permission-message"
-              style={{
-                background: "rgba(52, 199, 89, 0.1)",
-                borderColor: "rgba(52, 199, 89, 0.2)",
-                color: "rgba(52, 199, 89, 0.9)",
-                fontSize: "11px",
-                padding: "8px",
-              }}
-            >
-              Language saved successfully!
-            </div>
-          )}
         </div>
       </div>
 
@@ -545,9 +775,11 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={autostartEnabled === true}
+              enabled={
+                (selectedAutostart ?? autostartEnabled ?? false) === true
+              }
               onToggle={handleToggleAutostart}
-              disabled={isLoading}
+              disabled={isLoading || isUpdating}
             />
           </div>
         </div>
@@ -610,6 +842,76 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <div style={{ marginTop: "32px" }}>
+        <button
+          className="transcript-btn"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isUpdating && hasChanges() && !isLoading) {
+              handleSaveSettings();
+            }
+          }}
+          disabled={isUpdating || !hasChanges() || isLoading}
+          style={{
+            padding: "8px 16px",
+            fontSize: "11px",
+            width: "100%",
+            opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
+            cursor:
+              isUpdating || !hasChanges() || isLoading
+                ? "not-allowed"
+                : "pointer",
+            transition: "opacity 0.2s",
+          }}
+        >
+          {isUpdating ? "Saving..." : "Save Settings"}
+        </button>
+
+        {error && (
+          <div
+            className="permission-message"
+            style={{
+              background: "rgba(255, 59, 48, 0.1)",
+              borderColor: "rgba(255, 59, 48, 0.2)",
+              color: "rgba(255, 59, 48, 0.9)",
+              fontSize: "11px",
+              padding: "8px",
+              marginTop: "12px",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div
+            className="permission-message"
+            style={{
+              background: "rgba(52, 199, 89, 0.1)",
+              borderColor: "rgba(52, 199, 89, 0.2)",
+              color: "rgba(52, 199, 89, 0.9)",
+              fontSize: "11px",
+              padding: "8px",
+              marginTop: "12px",
+            }}
+          >
+            Settings saved successfully!
+          </div>
+        )}
+
+        <div
+          style={{
+            fontSize: "10px",
+            color: "rgba(255, 255, 255, 0.4)",
+            marginTop: "8px",
+            lineHeight: "1.4",
+          }}
+        >
+          The listener will restart automatically when you change the hotkey.
+        </div>
+      </div>
     </div>
   );
 };

@@ -41,12 +41,12 @@ pub struct UserData {
 /// Store authentication data securely
 /// In dev mode: Uses Tauri Store
 /// In production: Uses OS keychain
-pub fn store_auth_data(app: &AppHandle, data: &AuthData) -> Result<(), String> {
+pub fn store_auth_data(_app: &AppHandle, data: &AuthData) -> Result<(), String> {
     #[cfg(debug_assertions)]
     {
         // Dev mode: Use Tauri Store
         use tauri_plugin_store::StoreExt;
-        let store = app
+        let store = _app
             .store(STORE_FILE)
             .map_err(|e| format!("Failed to open store: {}", e))?;
 
@@ -128,12 +128,12 @@ pub fn store_auth_data(app: &AppHandle, data: &AuthData) -> Result<(), String> {
 /// Retrieve authentication data
 /// In dev mode: Uses Tauri Store
 /// In production: Uses OS keychain
-pub fn get_auth_data(app: &AppHandle) -> Result<Option<AuthData>, String> {
+pub fn get_auth_data(_app: &AppHandle) -> Result<Option<AuthData>, String> {
     #[cfg(debug_assertions)]
     {
         // Dev mode: Use Tauri Store
         use tauri_plugin_store::StoreExt;
-        let store = app
+        let store = _app
             .store(STORE_FILE)
             .map_err(|e| format!("Failed to open store: {}", e))?;
 
@@ -212,12 +212,12 @@ pub fn get_auth_data(app: &AppHandle) -> Result<Option<AuthData>, String> {
 /// Clear all authentication data
 /// In dev mode: Uses Tauri Store
 /// In production: Uses OS keychain
-pub fn clear_auth_data(app: &AppHandle) -> Result<(), String> {
+pub fn clear_auth_data(_app: &AppHandle) -> Result<(), String> {
     #[cfg(debug_assertions)]
     {
         // Dev mode: Use Tauri Store
         use tauri_plugin_store::StoreExt;
-        let store = app
+        let store = _app
             .store(STORE_FILE)
             .map_err(|e| format!("Failed to open store: {}", e))?;
 
@@ -260,12 +260,12 @@ pub fn clear_auth_data(app: &AppHandle) -> Result<(), String> {
 /// Check if authentication data exists
 /// In dev mode: Uses Tauri Store
 /// In production: Uses OS keychain
-pub fn has_auth_data(app: &AppHandle) -> Result<bool, String> {
+pub fn has_auth_data(_app: &AppHandle) -> Result<bool, String> {
     #[cfg(debug_assertions)]
     {
         // Dev mode: Use Tauri Store
         use tauri_plugin_store::StoreExt;
-        let store = app
+        let store = _app
             .store(STORE_FILE)
             .map_err(|e| format!("Failed to open store: {}", e))?;
 

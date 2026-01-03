@@ -165,7 +165,7 @@ export interface DeviceInfo {
 // ============================================================================
 
 export interface HotkeyConfig {
-  hotkey: string; // Human-readable format like "Ctrl+Shift+P"
+  hotkeys: string[]; // Array of up to 3 hotkeys (e.g., ["Fn", "Cmd+Shift+R", "Ctrl+Alt+T"])
 }
 
 export interface NetworkStatus {
@@ -207,12 +207,6 @@ export interface GoogleLoginButtonProps {
 export interface SidebarProps {
   currentPage: "transcripts" | "settings";
   onNavigate: (page: "transcripts" | "settings") => void;
-}
-
-export interface HotkeyInputProps {
-  value: HotkeyConfig;
-  onChange: (config: HotkeyConfig) => void;
-  disabled?: boolean;
 }
 
 export interface PermissionState {

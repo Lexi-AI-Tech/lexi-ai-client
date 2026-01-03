@@ -11,6 +11,7 @@
 //! - Google OAuth 2.0 authentication with PKCE
 //! - Token exchange and management
 
+use crate::commands::app_config;
 use crate::google_oauth;
 use crate::secure_storage::{self, AuthData, UserData};
 use serde::{Deserialize, Serialize};
@@ -96,12 +97,30 @@ impl From<UserData> for UserDataRequest {
 /// In dev mode: Uses Tauri Store (to avoid keychain prompts)
 /// In production: Uses OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
 ///
+/// After storing auth data, fetches app config from server and saves it to Tauri Store.
+/// This ensures we get the default settings from the server on first login.
+///
 /// # Arguments
 /// * `data` - Authentication data including tokens and user information
 #[tauri::command]
 pub async fn store_auth_data(app: AppHandle, data: AuthDataRequest) -> Result<(), String> {
     let auth_data: AuthData = data.into();
     secure_storage::store_auth_data(&app, &auth_data)?;
+
+    // After login, force fetch config from server and save it to Tauri Store
+    // This ensures we get default settings from server and override any first launch config
+    match app_config::fetch_config_from_server(&app).await {
+        Ok(mut config) => {
+            println!("✅ App config fetched and saved after login");
+            // Sync autostart status with OS based on server config
+            app_config::sync_autostart_status(&app, &mut config);
+        }
+        Err(e) => {
+            eprintln!("⚠️  Failed to fetch app config after login: {}", e);
+            // Don't fail the login if config fetch fails, but log it
+        }
+    }
+
     Ok(())
 }
 
