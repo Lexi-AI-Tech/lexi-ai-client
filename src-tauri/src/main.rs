@@ -135,12 +135,8 @@ pub fn main() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
-                    // Only handle press events for toggle behavior
-                    if event.state() != tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                        return;
-                    }
-
-                    println!("🔑 Global shortcut triggered: {:?}", shortcut);
+                    let event_state = event.state();
+                    println!("🔑 Global shortcut triggered: {:?}, state: {:?}", shortcut, event_state);
 
                     // Get the recording channel from app state
                     let app_handle = app.app_handle();
@@ -150,16 +146,38 @@ pub fn main() {
                     let tx_arc = recording_state.tx.clone();
                     let is_recording_arc = recording_state.is_recording.clone();
 
-                    // Check current recording state and toggle
-                    let is_currently_recording = {
-                        let guard = is_recording_arc.lock().ok();
-                        guard.map(|g| *g).unwrap_or(false)
-                    };
+                    // Determine command based on event state and current recording state
+                    let command = match event_state {
+                        tauri_plugin_global_shortcut::ShortcutState::Pressed => {
+                            // On press: check current state and toggle
+                            let is_currently_recording = {
+                                let guard = is_recording_arc.lock().ok();
+                                guard.map(|g| *g).unwrap_or(false)
+                            };
 
-                    let command = if is_currently_recording {
-                        RecordingCommand::Stop
-                    } else {
-                        RecordingCommand::Start
+                            if is_currently_recording {
+                                println!("🛑 Recording is active, sending Stop command");
+                                RecordingCommand::Stop
+                            } else {
+                                println!("🎙️  Recording is idle, sending Start command");
+                                RecordingCommand::Start
+                            }
+                        }
+                        tauri_plugin_global_shortcut::ShortcutState::Released => {
+                            // On release: only stop if currently recording (push-to-talk behavior)
+                            let is_currently_recording = {
+                                let guard = is_recording_arc.lock().ok();
+                                guard.map(|g| *g).unwrap_or(false)
+                            };
+
+                            if is_currently_recording {
+                                println!("🛑 Key released while recording, sending Stop command");
+                                RecordingCommand::Stop
+                            } else {
+                                // Not recording, ignore release event
+                                return;
+                            }
+                        }
                     };
 
                     let send_result = {
@@ -172,10 +190,10 @@ pub fn main() {
                             println!("✅ Sent {:?} command via global shortcut", command);
                         }
                         Some(Err(e)) => {
-                            eprintln!("Failed to send recording command: {:?}", e);
+                            eprintln!("❌ Failed to send recording command: {:?}", e);
                         }
                         None => {
-                            eprintln!("Recording channel not available");
+                            eprintln!("❌ Recording channel not available");
                         }
                     }
                 })
