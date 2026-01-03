@@ -37,7 +37,6 @@
 
 use crate::RecordingCommand;
 use rdev::{listen, Event, EventType, Key};
-use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -46,54 +45,38 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tokio::sync::watch;
 
 // ============================================================================
-// Hotkey Configuration
+// Hotkey Helper Functions
 // ============================================================================
+// These functions work directly with Vec<String> from AppConfig.transcription_hotkeys
+// which is the single source of truth stored in Tauri Store.
 
-/// Hotkey configuration supporting up to 3 hotkeys
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HotkeyConfig {
-    /// Array of up to 3 hotkey strings (e.g., ["Fn", "Cmd+Shift+R", "Ctrl+Alt+T"])
-    pub hotkeys: Vec<String>,
+/// Returns true if any hotkey contains the Fn key
+pub fn has_fn_key(hotkeys: &[String]) -> bool {
+    hotkeys.iter().any(|h| h.trim().eq_ignore_ascii_case("Fn"))
 }
 
-impl Default for HotkeyConfig {
-    fn default() -> Self {
-        // Default returns empty - actual defaults come from server
-        Self {
-            hotkeys: vec![],
-        }
-    }
+/// Returns hotkeys that should be handled by rdev (Fn key or keys that can't use Tauri)
+pub fn rdev_hotkeys(hotkeys: &[String]) -> Vec<String> {
+    hotkeys
+        .iter()
+        .filter(|h| {
+            let trimmed = h.trim();
+            trimmed.eq_ignore_ascii_case("Fn") || should_use_rdev(trimmed)
+        })
+        .cloned()
+        .collect()
 }
 
-impl HotkeyConfig {
-    /// Returns true if any hotkey contains the Fn key
-    pub fn has_fn_key(&self) -> bool {
-        self.hotkeys.iter().any(|h| h.trim().eq_ignore_ascii_case("Fn"))
-    }
-
-    /// Returns hotkeys that should be handled by rdev (Fn key or keys that can't use Tauri)
-    pub fn rdev_hotkeys(&self) -> Vec<String> {
-        self.hotkeys
-            .iter()
-            .filter(|h| {
-                let trimmed = h.trim();
-                trimmed.eq_ignore_ascii_case("Fn") || should_use_rdev(trimmed)
-            })
-            .cloned()
-            .collect()
-    }
-
-    /// Returns hotkeys that should use Tauri global shortcuts
-    pub fn tauri_hotkeys(&self) -> Vec<String> {
-        self.hotkeys
-            .iter()
-            .filter(|h| {
-                let trimmed = h.trim();
-                !trimmed.eq_ignore_ascii_case("Fn") && !should_use_rdev(trimmed)
-            })
-            .cloned()
-            .collect()
-    }
+/// Returns hotkeys that should use Tauri global shortcuts
+pub fn tauri_hotkeys(hotkeys: &[String]) -> Vec<String> {
+    hotkeys
+        .iter()
+        .filter(|h| {
+            let trimmed = h.trim();
+            !trimmed.eq_ignore_ascii_case("Fn") && !should_use_rdev(trimmed)
+        })
+        .cloned()
+        .collect()
 }
 
 // ============================================================================
@@ -533,7 +516,7 @@ fn is_function_key_event(event_type: &EventType) -> bool {
 pub fn start_listener(
     app: AppHandle,
     recording_tx: mpsc::Sender<RecordingCommand>,
-    mut config_rx: watch::Receiver<HotkeyConfig>,
+    mut config_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
 ) {
     // Manager thread: Watches config, restarts listener on change
@@ -543,11 +526,11 @@ pub fn start_listener(
         let recording_state_clone = recording_state.clone();
 
         loop {
-            // Get current config
-            let current_config = config_rx.borrow().clone();
+            // Get current hotkeys from watch channel (single source of truth: AppConfig.transcription_hotkeys)
+            let hotkeys = config_rx.borrow().clone();
             
             // Get hotkeys that should be handled by rdev
-            let rdev_hotkeys = current_config.rdev_hotkeys();
+            let rdev_hotkeys = rdev_hotkeys(&hotkeys);
             
             // Start rdev listener if there are rdev hotkeys
             if !rdev_hotkeys.is_empty() {

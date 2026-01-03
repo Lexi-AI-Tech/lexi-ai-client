@@ -69,7 +69,7 @@ mod whisper; // Local Whisper model integration for offline transcription
 use whisper::preload_model;
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
-use global_key_listener::{HotkeyConfig, register_hotkeys};
+use global_key_listener::{register_hotkeys, tauri_hotkeys};
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
 use state::{HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, TranscriptionTaskState};
@@ -291,11 +291,10 @@ pub fn main() {
                             println!("⚠️  Config not available, using empty hotkeys");
                             crate::commands::app_config::AppConfig::default()
                         });
-                    let hotkeys = config.transcription_hotkeys.unwrap_or_default();
-                    println!("🔑 Loaded hotkeys from store: {:?}", hotkeys);
-                    HotkeyConfig { hotkeys }
+                    config.transcription_hotkeys.unwrap_or_default()
                 })
             };
+            println!("🔑 Loaded hotkeys from store: {:?}", initial_config);
             let (config_tx, config_rx) = watch::channel(initial_config.clone());
 
             // Create recording state and manage it
@@ -334,8 +333,8 @@ pub fn main() {
             );
 
             // Register Tauri global shortcuts (always call - handles empty case)
-            let tauri_hotkeys = initial_config.tauri_hotkeys();
-            if let Err(e) = register_hotkeys(&app_handle, &tauri_hotkeys) {
+            let tauri_hotkeys_list = tauri_hotkeys(&initial_config);
+            if let Err(e) = register_hotkeys(&app_handle, &tauri_hotkeys_list) {
                 eprintln!("⚠️  Failed to register global shortcuts: {}", e);
             }
 

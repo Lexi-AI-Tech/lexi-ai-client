@@ -4,8 +4,9 @@
 //! All hotkeys are stored in Tauri Store as `transcription_hotkeys`.
 
 use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
-use crate::global_key_listener::{HotkeyConfig, register_hotkeys, unregister_all_hotkeys, validate_hotkey};
+use crate::global_key_listener::{register_hotkeys, unregister_all_hotkeys, validate_hotkey, tauri_hotkeys};
 use crate::state::{HotkeyRecordingState, HotkeyWatchState};
+use serde::Deserialize;
 use serde_json;
 use tauri::{AppHandle, Emitter, State};
 
@@ -15,7 +16,7 @@ use tauri::{AppHandle, Emitter, State};
 /// Supports up to 3 hotkeys. Fn key is handled via rdev, others via Tauri global shortcuts.
 ///
 /// # Arguments
-/// * `config_json` - JSON string representation of HotkeyConfig with hotkeys array
+/// * `config_json` - JSON string with `hotkeys` array (e.g., `{"hotkeys": ["Fn", "Cmd+Shift+R"]}`)
 ///
 /// # Returns
 /// * `Ok(())` - Successfully updated the hotkeys
@@ -26,36 +27,41 @@ pub async fn update_hotkey(
     app: AppHandle,
     state: State<'_, HotkeyWatchState>,
 ) -> Result<(), String> {
-    // Parse JSON to HotkeyConfig
-    let new_config: HotkeyConfig = serde_json::from_str(&config_json)
+    // Parse JSON - frontend sends {hotkeys: [...]}
+    #[derive(Deserialize)]
+    struct HotkeyConfigJson {
+        hotkeys: Vec<String>,
+    }
+    let config: HotkeyConfigJson = serde_json::from_str(&config_json)
         .map_err(|e| format!("Failed to parse hotkey config: {}", e))?;
+    
+    let new_hotkeys = config.hotkeys;
 
     // Validate: maximum 3 hotkeys
-    if new_config.hotkeys.len() > 3 {
+    if new_hotkeys.len() > 3 {
         return Err("Maximum of 3 hotkeys allowed".to_string());
     }
     
     // Validate each hotkey (check for system-reserved shortcuts, modifier-only, etc.)
-    for hotkey in &new_config.hotkeys {
+    for hotkey in &new_hotkeys {
         if let Err(e) = validate_hotkey(hotkey) {
             return Err(e);
         }
     }
 
-    // Get old config from watch state to unregister old shortcuts
-    let old_config = state.0.borrow().clone();
-    let old_tauri = old_config.tauri_hotkeys();
+    // Get old hotkeys from watch state to unregister old shortcuts
+    let old_hotkeys = state.0.borrow().clone();
+    let old_tauri = tauri_hotkeys(&old_hotkeys);
 
     // Unregister old Tauri hotkeys (rdev hotkeys are managed by listener restart)
     unregister_all_hotkeys(&app, &old_tauri);
 
-    // Save to Tauri Store
-    // First get current config, then update only transcription_hotkeys
+    // Save to Tauri Store (single source of truth)
     let current_config = get_app_config(app.clone()).await
         .unwrap_or_else(|_| AppConfig::default());
     
     let app_config_update = AppConfig {
-        transcription_hotkeys: Some(new_config.hotkeys.clone()),
+        transcription_hotkeys: Some(new_hotkeys.clone()),
         languages: current_config.languages,
         enhance_transcription: current_config.enhance_transcription,
         transcribe_with_cursor_context: current_config.transcribe_with_cursor_context,
@@ -66,15 +72,15 @@ pub async fn update_hotkey(
     update_app_config(app.clone(), app_config_update).await
         .map_err(|e| format!("Failed to save hotkeys to store: {}", e))?;
 
-    // Update watch state to notify listener thread
-    if state.0.send(new_config.clone()).is_err() {
+    // Update watch state to notify listener thread (single source of truth)
+    if state.0.send(new_hotkeys.clone()).is_err() {
         return Err("Failed to update hotkey watch state".to_string());
     }
 
     // Register new hotkeys (Tauri will try first, fall back to rdev if needed)
-    let tauri_hotkeys = new_config.tauri_hotkeys();
-    if !tauri_hotkeys.is_empty() {
-        match register_hotkeys(&app, &tauri_hotkeys) {
+    let tauri_hotkeys_list = tauri_hotkeys(&new_hotkeys);
+    if !tauri_hotkeys_list.is_empty() {
+        match register_hotkeys(&app, &tauri_hotkeys_list) {
             Ok(rdev_fallback) => {
                 if !rdev_fallback.is_empty() {
                     println!("ℹ️  {} hotkey(s) will be handled by rdev: {:?}", rdev_fallback.len(), rdev_fallback);
@@ -88,9 +94,10 @@ pub async fn update_hotkey(
     
     // Note: rdev hotkeys are automatically handled by the rdev listener when config changes
 
-    // Emit the config back as JSON for UI display
-    app.emit("hotkey-updated", &config_json).unwrap_or_default();
-    println!("🔑 Hotkeys updated to: {:?}", new_config);
+    // Emit the config back as JSON for UI display (frontend expects {hotkeys: [...]})
+    let response_json = serde_json::json!({ "hotkeys": new_hotkeys });
+    app.emit("hotkey-updated", response_json.to_string()).unwrap_or_default();
+    println!("🔑 Hotkeys updated to: {:?}", new_hotkeys);
     Ok(())
 }
 
@@ -99,15 +106,16 @@ pub async fn update_hotkey(
 /// Returns hotkeys from store. If no config exists, fetches from server (which provides defaults).
 ///
 /// # Returns
-/// * `String` - JSON string representation of the current HotkeyConfig
+/// * `String` - JSON string with `hotkeys` array (e.g., `{"hotkeys": ["Fn", "Cmd+Shift+R"]}`)
 #[tauri::command]
 pub async fn get_current_hotkey(app: AppHandle) -> Result<String, String> {
     let config = get_app_config(app).await?;
     let hotkeys = config.transcription_hotkeys
         .ok_or_else(|| "Server did not provide transcription_hotkeys".to_string())?;
     
-    let hotkey_config = HotkeyConfig { hotkeys };
-    serde_json::to_string(&hotkey_config)
+    // Frontend expects {hotkeys: [...]} format
+    let response = serde_json::json!({ "hotkeys": hotkeys });
+    serde_json::to_string(&response)
         .map_err(|e| format!("Failed to serialize hotkey config: {}", e))
 }
 

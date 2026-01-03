@@ -5,7 +5,6 @@
 //!
 //! Only runtime state that needs to be in-memory (like task handles, recording state) is stored here.
 
-use crate::global_key_listener::HotkeyConfig;
 use std::sync::{Arc, Mutex};
 use tokio::sync::watch;
 
@@ -24,8 +23,8 @@ pub struct TranscriptionTaskState {
 /// State for watch sender (to broadcast config changes)
 ///
 /// This state manages a watch channel that broadcasts hotkey configuration changes
-/// to the global key listener thread.
-pub struct HotkeyWatchState(pub watch::Sender<HotkeyConfig>);
+/// to the global key listener thread. Uses Vec<String> directly from AppConfig.transcription_hotkeys.
+pub struct HotkeyWatchState(pub watch::Sender<Vec<String>>);
 
 /// Hotkey recording state - tracks if we're in recording mode for hotkey selection
 ///
