@@ -482,7 +482,6 @@ impl KeyStateTracker {
         }
         None
     }
-
 }
 
 /// Helper to convert keyboard EventType to a string for frontend emission

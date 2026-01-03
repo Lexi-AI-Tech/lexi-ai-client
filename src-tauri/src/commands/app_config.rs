@@ -69,7 +69,10 @@ struct ServerAppConfigResponse {
 
 /// Get the complete app configuration from Tauri Store or server
 ///
-/// First tries to load from Tauri Store. If not found, fetches from server.
+/// First tries to load from Tauri Store. If not found:
+/// - If user is authenticated: fetches from server
+/// - If user is not authenticated (first launch): creates minimal config with autostart enabled
+/// Config will be synced from server when user logs in (handled in store_auth_data).
 /// Syncs autostart status from OS-level settings.
 #[tauri::command]
 pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
@@ -85,23 +88,67 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
             }
             Err(_) => {
                 println!("⚠️  Failed to deserialize config from store, fetching from server");
-                fetch_config_from_server(&app).await?
+                match fetch_config_from_server(&app).await {
+                    Ok(config) => config,
+                    Err(_) => {
+                        // No auth - first launch, create minimal config with autostart enabled
+                        println!("🔧 First launch detected (no auth), creating minimal config with autostart enabled");
+                        create_first_launch_config(&app)?
+                    }
+                }
             }
         },
         None => {
-            println!("📝 No config found in Tauri Store, fetching from server");
-            fetch_config_from_server(&app).await?
+            println!("📝 No config found in Tauri Store");
+            match fetch_config_from_server(&app).await {
+                Ok(config) => config,
+                Err(_) => {
+                    // No auth - first launch, create minimal config with autostart enabled
+                    println!("🔧 First launch detected (no auth), creating minimal config with autostart enabled");
+                    create_first_launch_config(&app)?
+                }
+            }
         }
     };
 
     // Sync launch_on_system_startup with actual OS autostart status
+    // This will enable autostart if config has launch_on_system_startup: Some(true) or None (defaults to true)
     sync_autostart_status(&app, &mut config);
 
     Ok(config)
 }
 
+/// Create minimal config for first launch (no auth)
+/// Only sets autostart to true - other settings will come from server when user logs in
+fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
+    println!("🔧 Creating first launch config with autostart enabled");
+
+    let first_launch_config = AppConfig {
+        languages: None,
+        transcription_hotkeys: None,
+        enhance_transcription: None,
+        transcribe_with_cursor_context: None,
+        launch_on_system_startup: Some(true), // Enable autostart by default on first launch
+        vocabulary: None,
+    };
+
+    // Save minimal config to store
+    save_config_to_store(app, &first_launch_config)?;
+
+    // Enable autostart on OS immediately
+    let autolaunch = app.autolaunch();
+    if let Err(e) = autolaunch.enable() {
+        eprintln!("⚠️  Failed to enable autostart: {}", e);
+    } else {
+        println!("✅ Enabled autostart on OS (first launch)");
+    }
+
+    Ok(first_launch_config)
+}
+
 /// Fetch app configuration from server and save to local store
-async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> {
+/// This bypasses the local store and always fetches fresh config from server
+pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> {
     let auth_token =
         get_auth_token(app).ok_or_else(|| "Please sign in to sync your settings".to_string())?;
 
@@ -176,7 +223,7 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
 /// Sync launch_on_system_startup with actual OS autostart status
 /// If config says it should be enabled but OS has it disabled, enable it on OS
 /// If config says it should be disabled but OS has it enabled, disable it on OS
-fn sync_autostart_status(app: &AppHandle, config: &mut AppConfig) {
+pub(crate) fn sync_autostart_status(app: &AppHandle, config: &mut AppConfig) {
     let autolaunch = app.autolaunch();
 
     // Get current OS autostart status

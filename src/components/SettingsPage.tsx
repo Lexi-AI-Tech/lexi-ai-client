@@ -26,8 +26,10 @@ export const SettingsPage: React.FC = () => {
   );
   const [selectedEnhanceTranscription, setSelectedEnhanceTranscription] =
     useState<boolean | null>(null);
-  const [selectedTranscribeWithCursorContext, setSelectedTranscribeWithCursorContext] =
-    useState<boolean | null>(null);
+  const [
+    selectedTranscribeWithCursorContext,
+    setSelectedTranscribeWithCursorContext,
+  ] = useState<boolean | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,9 @@ export const SettingsPage: React.FC = () => {
           setSelectedLanguage(null);
         }
         setSelectedAutostart(loadedConfig.launch_on_system_startup ?? null);
-        setSelectedEnhanceTranscription(loadedConfig.enhance_transcription ?? null);
+        setSelectedEnhanceTranscription(
+          loadedConfig.enhance_transcription ?? null,
+        );
         setSelectedTranscribeWithCursorContext(
           loadedConfig.transcribe_with_cursor_context ?? null,
         );
@@ -99,26 +103,31 @@ export const SettingsPage: React.FC = () => {
       selectedLanguage !== null &&
       selectedLanguage !== undefined &&
       selectedLanguage !== currentLanguage;
-    
+
     const currentAutostart = autostartEnabled ?? false;
-    const autostartChanged = 
-      selectedAutostart !== null && 
+    const autostartChanged =
+      selectedAutostart !== null &&
       selectedAutostart !== undefined &&
       selectedAutostart !== currentAutostart;
-    
+
     const currentEnhance = enhanceTranscription ?? false;
-    const enhanceChanged = 
-      selectedEnhanceTranscription !== null && 
+    const enhanceChanged =
+      selectedEnhanceTranscription !== null &&
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
-    
+
     const currentCursorContext = transcribeWithCursorContext ?? false;
-    const cursorContextChanged = 
-      selectedTranscribeWithCursorContext !== null && 
+    const cursorContextChanged =
+      selectedTranscribeWithCursorContext !== null &&
       selectedTranscribeWithCursorContext !== undefined &&
       selectedTranscribeWithCursorContext !== currentCursorContext;
 
-    if (!languageChanged && !autostartChanged && !enhanceChanged && !cursorContextChanged) {
+    if (
+      !languageChanged &&
+      !autostartChanged &&
+      !enhanceChanged &&
+      !cursorContextChanged
+    ) {
       return; // No changes needed
     }
 
@@ -138,26 +147,42 @@ export const SettingsPage: React.FC = () => {
       if (enhanceChanged && selectedEnhanceTranscription !== null) {
         updates.enhance_transcription = selectedEnhanceTranscription;
       }
-      if (cursorContextChanged && selectedTranscribeWithCursorContext !== null) {
-        updates.transcribe_with_cursor_context = selectedTranscribeWithCursorContext;
+      if (
+        cursorContextChanged &&
+        selectedTranscribeWithCursorContext !== null
+      ) {
+        updates.transcribe_with_cursor_context =
+          selectedTranscribeWithCursorContext;
       }
 
       const updatedConfig = await updateConfig(updates);
-      
+
       // Update selected values to match the saved config
-      if (languageChanged && updatedConfig.languages && updatedConfig.languages.length > 0) {
+      if (
+        languageChanged &&
+        updatedConfig.languages &&
+        updatedConfig.languages.length > 0
+      ) {
         setSelectedLanguage(updatedConfig.languages[0] as LanguageCode);
       }
-      if (autostartChanged && updatedConfig.launch_on_system_startup !== undefined) {
+      if (
+        autostartChanged &&
+        updatedConfig.launch_on_system_startup !== undefined
+      ) {
         setSelectedAutostart(updatedConfig.launch_on_system_startup);
       }
       if (enhanceChanged && updatedConfig.enhance_transcription !== undefined) {
         setSelectedEnhanceTranscription(updatedConfig.enhance_transcription);
       }
-      if (cursorContextChanged && updatedConfig.transcribe_with_cursor_context !== undefined) {
-        setSelectedTranscribeWithCursorContext(updatedConfig.transcribe_with_cursor_context);
+      if (
+        cursorContextChanged &&
+        updatedConfig.transcribe_with_cursor_context !== undefined
+      ) {
+        setSelectedTranscribeWithCursorContext(
+          updatedConfig.transcribe_with_cursor_context,
+        );
       }
-      
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (err: any) {
@@ -173,31 +198,36 @@ export const SettingsPage: React.FC = () => {
       selectedLanguage !== null &&
       selectedLanguage !== undefined &&
       selectedLanguage !== currentLanguage;
-    
+
     // Compare autostart (handle null/undefined properly)
     // If selectedAutostart is null, it means unchanged, so no change
     // If selectedAutostart is a boolean, compare it to current value
     const currentAutostart = autostartEnabled ?? false;
-    const autostartChanged = 
-      selectedAutostart !== null && 
+    const autostartChanged =
+      selectedAutostart !== null &&
       selectedAutostart !== undefined &&
       selectedAutostart !== currentAutostart;
-    
+
     // Compare enhance transcription
     const currentEnhance = enhanceTranscription ?? false;
-    const enhanceChanged = 
-      selectedEnhanceTranscription !== null && 
+    const enhanceChanged =
+      selectedEnhanceTranscription !== null &&
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
-    
+
     // Compare cursor context
     const currentCursorContext = transcribeWithCursorContext ?? false;
-    const cursorContextChanged = 
-      selectedTranscribeWithCursorContext !== null && 
+    const cursorContextChanged =
+      selectedTranscribeWithCursorContext !== null &&
       selectedTranscribeWithCursorContext !== undefined &&
       selectedTranscribeWithCursorContext !== currentCursorContext;
 
-    return languageChanged || autostartChanged || enhanceChanged || cursorContextChanged;
+    return (
+      languageChanged ||
+      autostartChanged ||
+      enhanceChanged ||
+      cursorContextChanged
+    );
   };
 
   const handleToggleAutostart = () => {
@@ -206,12 +236,16 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleToggleEnhanceTranscription = () => {
-    const currentValue = selectedEnhanceTranscription ?? enhanceTranscription ?? false;
+    const currentValue =
+      selectedEnhanceTranscription ?? enhanceTranscription ?? false;
     setSelectedEnhanceTranscription(!currentValue);
   };
 
   const handleToggleCursorContext = () => {
-    const currentValue = selectedTranscribeWithCursorContext ?? transcribeWithCursorContext ?? false;
+    const currentValue =
+      selectedTranscribeWithCursorContext ??
+      transcribeWithCursorContext ??
+      false;
     setSelectedTranscribeWithCursorContext(!currentValue);
   };
 
@@ -442,7 +476,11 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={(selectedEnhanceTranscription ?? enhanceTranscription ?? false) === true}
+              enabled={
+                (selectedEnhanceTranscription ??
+                  enhanceTranscription ??
+                  false) === true
+              }
               onToggle={handleToggleEnhanceTranscription}
               disabled={isLoading || isUpdating}
             />
@@ -480,7 +518,11 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={(selectedTranscribeWithCursorContext ?? transcribeWithCursorContext ?? false) === true}
+              enabled={
+                (selectedTranscribeWithCursorContext ??
+                  transcribeWithCursorContext ??
+                  false) === true
+              }
               onToggle={handleToggleCursorContext}
               disabled={isLoading || isUpdating}
             />
@@ -569,7 +611,9 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={(selectedAutostart ?? autostartEnabled ?? false) === true}
+              enabled={
+                (selectedAutostart ?? autostartEnabled ?? false) === true
+              }
               onToggle={handleToggleAutostart}
               disabled={isLoading || isUpdating}
             />
@@ -651,7 +695,10 @@ export const SettingsPage: React.FC = () => {
             fontSize: "11px",
             width: "100%",
             opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
-            cursor: isUpdating || !hasChanges() || isLoading ? "not-allowed" : "pointer",
+            cursor:
+              isUpdating || !hasChanges() || isLoading
+                ? "not-allowed"
+                : "pointer",
             transition: "opacity 0.2s",
           }}
         >
