@@ -25,10 +25,12 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
 }));
 
 export const HotkeySettings: React.FC = () => {
-  const [currentHotkeys, setCurrentHotkeys] =
-    useState<HotkeyConfig>({ hotkeys: [] });
-  const [selectedHotkeys, setSelectedHotkeys] =
-    useState<HotkeyConfig>({ hotkeys: [] });
+  const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
+    hotkeys: [],
+  });
+  const [selectedHotkeys, setSelectedHotkeys] = useState<HotkeyConfig>({
+    hotkeys: [],
+  });
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
     LanguageCode.EN,
   );
@@ -120,7 +122,9 @@ export const HotkeySettings: React.FC = () => {
 
   const handleSaveConfig = async () => {
     // Check if anything changed
-    const hotkeysChanged = JSON.stringify(selectedHotkeys.hotkeys) !== JSON.stringify(currentHotkeys.hotkeys);
+    const hotkeysChanged =
+      JSON.stringify(selectedHotkeys.hotkeys) !==
+      JSON.stringify(currentHotkeys.hotkeys);
     const languageChanged = selectedLanguage !== currentLanguage;
 
     if (!hotkeysChanged && !languageChanged) {
@@ -138,7 +142,7 @@ export const HotkeySettings: React.FC = () => {
         setIsUpdating(false);
         return;
       }
-      
+
       // Validate: at least one hotkey
       if (selectedHotkeys.hotkeys.length === 0) {
         setError("At least one hotkey is required");
@@ -213,7 +217,9 @@ export const HotkeySettings: React.FC = () => {
     }
   };
 
-  const isHotkeysChanged = JSON.stringify(selectedHotkeys.hotkeys) !== JSON.stringify(currentHotkeys.hotkeys);
+  const isHotkeysChanged =
+    JSON.stringify(selectedHotkeys.hotkeys) !==
+    JSON.stringify(currentHotkeys.hotkeys);
   const isLanguageChanged = selectedLanguage !== currentLanguage;
   const hasChanges = isHotkeysChanged || isLanguageChanged;
 
@@ -227,7 +233,6 @@ export const HotkeySettings: React.FC = () => {
       </div>
     );
   }
-
 
   return (
     <div className="settings">
@@ -339,7 +344,8 @@ export const HotkeySettings: React.FC = () => {
               marginTop: "6px",
             }}
           >
-            Note: Fn key is handled separately and works on Mac. Other hotkeys use Tauri global shortcuts.
+            Note: Fn key is handled separately and works on Mac. Other hotkeys
+            use Tauri global shortcuts.
           </div>
         </div>
 

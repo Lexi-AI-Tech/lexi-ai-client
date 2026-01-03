@@ -69,10 +69,12 @@ mod whisper; // Local Whisper model integration for offline transcription
 use whisper::preload_model;
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
-use global_key_listener::{register_hotkeys, tauri_hotkeys};
+use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
-use state::{HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, TranscriptionTaskState};
+use state::{
+    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, TranscriptionTaskState,
+};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -143,11 +145,11 @@ pub fn main() {
                     // Get the recording channel from app state
                     let app_handle = app.app_handle();
                     let recording_state = app_handle.state::<RecordingChannelState>();
-                    
+
                     // Clone the Arc to avoid lifetime issues
                     let tx_arc = recording_state.tx.clone();
                     let is_recording_arc = recording_state.is_recording.clone();
-                    
+
                     // Check current recording state and toggle
                     let is_currently_recording = {
                         let guard = is_recording_arc.lock().ok();
@@ -164,7 +166,7 @@ pub fn main() {
                         let tx_guard = tx_arc.lock().ok();
                         tx_guard.and_then(|guard| guard.as_ref().map(|tx| tx.send(command)))
                     };
-                    
+
                     match send_result {
                         Some(Ok(_)) => {
                             println!("✅ Sent {:?} command via global shortcut", command);
@@ -308,7 +310,7 @@ pub fn main() {
                 tx: Arc::new(Mutex::new(Some(recording_tx.clone()))),
                 is_recording: recording_state_tracker.clone(),
             });
-            
+
             // Listen to recording events to update state tracker
             let app_handle_for_events = app_handle.clone();
             let recording_state_tracker_clone = recording_state_tracker.clone();
@@ -324,19 +326,13 @@ pub fn main() {
                 }
             });
 
-            // Start rdev listener (always start - it checks config internally)
-            global_key_listener::start_listener(
+            // Start listeners (rdev always running, manager thread handles Tauri shortcuts)
+            start_listener(
                 app_handle.clone(),
                 recording_tx.clone(),
                 config_rx,
                 recording_state_arc,
             );
-
-            // Register Tauri global shortcuts (always call - handles empty case)
-            let tauri_hotkeys_list = tauri_hotkeys(&initial_config);
-            if let Err(e) = register_hotkeys(&app_handle, &tauri_hotkeys_list) {
-                eprintln!("⚠️  Failed to register global shortcuts: {}", e);
-            }
 
             // Create system tray with menu
             let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
