@@ -41,7 +41,7 @@
 use std::sync::{mpsc, Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, Manager, RunEvent};
+use tauri::{Emitter, Listener, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
@@ -69,7 +69,7 @@ mod whisper; // Local Whisper model integration for offline transcription
 use whisper::preload_model;
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
-use global_key_listener::{HotkeyConfig, register_hotkeys, unregister_all_hotkeys};
+use global_key_listener::{HotkeyConfig, register_hotkeys};
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
 use state::{HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, TranscriptionTaskState};
@@ -82,7 +82,7 @@ use permissions::{
     request_screen_recording_permission,
 };
 
-use commands::app_config::{get_app_config, update_app_config, AppConfig};
+use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
     clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, start_google_login,
     store_auth_data,
@@ -123,7 +123,7 @@ pub fn main() {
     #[cfg(debug_assertions)]
     let devtools = tauri_plugin_devtools::init();
 
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_autostart::init(
@@ -144,13 +144,15 @@ pub fn main() {
                     let app_handle = app.app_handle();
                     let recording_state = app_handle.state::<RecordingChannelState>();
                     
+                    // Clone the Arc to avoid lifetime issues
+                    let tx_arc = recording_state.tx.clone();
+                    let is_recording_arc = recording_state.is_recording.clone();
+                    
                     // Check current recording state and toggle
-                    let is_currently_recording = recording_state
-                        .is_recording
-                        .lock()
-                        .ok()
-                        .map(|guard| *guard)
-                        .unwrap_or(false);
+                    let is_currently_recording = {
+                        let guard = is_recording_arc.lock().ok();
+                        guard.map(|g| *g).unwrap_or(false)
+                    };
 
                     let command = if is_currently_recording {
                         RecordingCommand::Stop
@@ -158,13 +160,20 @@ pub fn main() {
                         RecordingCommand::Start
                     };
 
-                    if let Ok(tx_guard) = recording_state.tx.lock() {
-                        if let Some(ref tx) = *tx_guard {
-                            if let Err(e) = tx.send(command) {
-                                eprintln!("Failed to send recording command: {:?}", e);
-                            } else {
-                                println!("✅ Sent {:?} command via global shortcut", command);
-                            }
+                    let send_result = {
+                        let tx_guard = tx_arc.lock().ok();
+                        tx_guard.and_then(|guard| guard.as_ref().map(|tx| tx.send(command)))
+                    };
+                    
+                    match send_result {
+                        Some(Ok(_)) => {
+                            println!("✅ Sent {:?} command via global shortcut", command);
+                        }
+                        Some(Err(e)) => {
+                            eprintln!("Failed to send recording command: {:?}", e);
+                        }
+                        None => {
+                            eprintln!("Recording channel not available");
                         }
                     }
                 })

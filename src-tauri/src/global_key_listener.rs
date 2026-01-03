@@ -42,7 +42,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
-use tauri_plugin_global_shortcut::Shortcut;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tokio::sync::watch;
 
 // ============================================================================
@@ -217,7 +217,7 @@ pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
 }
 
 /// Checks if a shortcut is modifier-only
-fn is_modifier_only(shortcut: &Shortcut, normalized: &str) -> bool {
+fn is_modifier_only(_shortcut: &Shortcut, normalized: &str) -> bool {
     // Check if the normalized string contains only modifiers
     let parts: Vec<&str> = normalized.split('+').collect();
     let modifier_count = parts.iter().filter(|p| is_modifier_key(p)).count();
@@ -658,7 +658,6 @@ pub fn start_listener(
                                 eprintln!("Failed to emit {} event: {:?}", event_name, e);
                             }
                         }
-                    }
 
                     // Emit all keyboard events for debug
                     if let Some(event_string) = event_type_to_string(&event.event_type) {
@@ -677,7 +676,7 @@ pub fn start_listener(
                 // Wait for config change or channel close
                 // Since we're in a blocking std thread, create a small runtime to await the future
                 let shutdown_for_wait = shutdown.clone();
-            let changed_result = if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                let changed_result = if let Ok(handle) = tokio::runtime::Handle::try_current() {
                 handle.block_on(config_rx.changed())
             } else {
                 // If no runtime available, create a small one just for this operation
@@ -690,14 +689,14 @@ pub fn start_listener(
                         break;
                     }
                 }
-            };
+                };
 
-            if changed_result.is_err() {
-                // Channel closed, shutdown and exit
-                shutdown_for_wait.store(true, Ordering::Relaxed);
-                let _ = listener_thread.join();
-                break;
-            }
+                if changed_result.is_err() {
+                    // Channel closed, shutdown and exit
+                    shutdown_for_wait.store(true, Ordering::Relaxed);
+                    let _ = listener_thread.join();
+                    break;
+                }
 
                 // New config available: Shutdown old and loop to restart
                 println!("🔄 Hotkey config changed, restarting listener...");
@@ -713,7 +712,20 @@ pub fn start_listener(
                 let _ = listener_thread.join(); // Wait for clean shutdown
             } else {
                 // No rdev hotkeys - just wait for config changes
-                if config_rx.changed().is_err() {
+                let changed_result = if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                    handle.block_on(config_rx.changed())
+                } else {
+                    // If no runtime available, create a small one just for this operation
+                    match tokio::runtime::Runtime::new() {
+                        Ok(rt) => rt.block_on(config_rx.changed()),
+                        Err(_) => {
+                            // Can't create runtime, exit
+                            break;
+                        }
+                    }
+                };
+
+                if changed_result.is_err() {
                     break;
                 }
             }

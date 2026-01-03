@@ -8,7 +8,6 @@ use crate::global_key_listener::{HotkeyConfig, register_hotkeys, unregister_all_
 use crate::state::{HotkeyRecordingState, HotkeyWatchState};
 use serde_json;
 use tauri::{AppHandle, Emitter, State};
-use tauri_plugin_store::StoreExt;
 
 /// Update the hotkey configuration dynamically
 ///
