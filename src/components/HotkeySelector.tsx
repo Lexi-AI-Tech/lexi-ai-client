@@ -2,6 +2,8 @@ import type React from "react";
 
 import { useState, useRef, useEffect } from "react";
 
+import type { HotkeyConfig } from "../types";
+
 interface Hotkey {
   id: string;
   keys: string[];
@@ -9,34 +11,52 @@ interface Hotkey {
 }
 
 interface HotkeySelectorProps {
-  value?: Hotkey[];
-  onChange?: (hotkeys: Hotkey[]) => void;
+  value?: HotkeyConfig;
+  onChange?: (config: HotkeyConfig) => void;
   maxHotkeys?: number;
   disabled?: boolean;
 }
 
 export function HotkeySelector({
-  value = [],
+  value = { hotkeys: [] },
   onChange,
   maxHotkeys = 3,
   disabled = false,
 }: HotkeySelectorProps) {
-  const [hotkeys, setHotkeys] = useState<Hotkey[]>(value);
+  // Convert HotkeyConfig (string[]) to internal Hotkey[] format
+  const configToHotkeys = (config: HotkeyConfig): Hotkey[] => {
+    return config.hotkeys.map((hotkeyStr, index) => ({
+      id: `hotkey-${index}-${hotkeyStr}`,
+      keys: hotkeyStr.split("+"),
+      display: hotkeyStr,
+    }));
+  };
+
+  // Convert internal Hotkey[] format to HotkeyConfig (string[])
+  const hotkeysToConfig = (hotkeys: Hotkey[]): HotkeyConfig => {
+    return {
+      hotkeys: hotkeys.map((h) => h.display),
+    };
+  };
+
+  const [hotkeys, setHotkeys] = useState<Hotkey[]>(() =>
+    configToHotkeys(value),
+  );
   const [isRecording, setIsRecording] = useState(false);
   const [currentKeys, setCurrentKeys] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLDivElement>(null);
 
   // Update local state when value prop changes
   useEffect(() => {
-    if (value.length > 0) {
-      setHotkeys(value);
-    }
-  }, [value]);
+    const newHotkeys = configToHotkeys(value);
+    setHotkeys(newHotkeys);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.hotkeys.join(",")]);
 
   // Notify parent when hotkeys change
   useEffect(() => {
     if (onChange) {
-      onChange(hotkeys);
+      onChange(hotkeysToConfig(hotkeys));
     }
   }, [hotkeys, onChange]);
 
@@ -129,12 +149,16 @@ export function HotkeySelector({
   // Add a hotkey
   const addHotkey = (keys: string[], display: string) => {
     if (hotkeys.length < maxHotkeys) {
-      const newHotkey: Hotkey = {
-        id: Date.now().toString(),
-        keys,
-        display,
-      };
-      setHotkeys([...hotkeys, newHotkey]);
+      // Check if this hotkey already exists
+      const exists = hotkeys.some((h) => h.display === display);
+      if (!exists) {
+        const newHotkey: Hotkey = {
+          id: Date.now().toString(),
+          keys,
+          display,
+        };
+        setHotkeys([...hotkeys, newHotkey]);
+      }
     }
   };
 

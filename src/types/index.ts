@@ -209,12 +209,6 @@ export interface SidebarProps {
   onNavigate: (page: "transcripts" | "settings") => void;
 }
 
-export interface HotkeyInputProps {
-  value: HotkeyConfig;
-  onChange: (config: HotkeyConfig) => void;
-  disabled?: boolean;
-}
-
 export interface PermissionState {
   granted: boolean;
   checking: boolean;

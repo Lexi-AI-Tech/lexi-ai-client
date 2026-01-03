@@ -16,7 +16,7 @@ import {
 } from "../lib/constants";
 import type { HotkeyConfig, TauriAppConfig } from "../types";
 
-import { HotkeyInput } from "./HotkeyInput";
+import { HotkeySelector } from "./HotkeySelector";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -183,38 +183,10 @@ export const HotkeySettings: React.FC = () => {
     }
   };
 
-  const handleHotkeyInputChange = (index: number, config: HotkeyConfig) => {
-    const newHotkeys = [...selectedHotkeys.hotkeys];
-    // HotkeyInput returns a HotkeyConfig with hotkeys array
-    // Extract the hotkey string (support both old and new format for compatibility)
-    const hotkeyStr = config.hotkeys?.[0] || (config as any).hotkey || "";
-    if (hotkeyStr && index < newHotkeys.length) {
-      newHotkeys[index] = hotkeyStr;
-    } else if (hotkeyStr) {
-      newHotkeys.push(hotkeyStr);
-    }
+  const handleHotkeySelectorChange = (config: HotkeyConfig) => {
     // Limit to 3 hotkeys
-    if (newHotkeys.length > 3) {
-      newHotkeys.splice(3);
-    }
-    setSelectedHotkeys({ hotkeys: newHotkeys });
-  };
-
-  const handleRemoveHotkey = (index: number) => {
-    const newHotkeys = selectedHotkeys.hotkeys.filter((_, i) => i !== index);
-    // Keep at least one hotkey
-    if (newHotkeys.length === 0 && selectedHotkeys.hotkeys.length > 0) {
-      return;
-    }
-    setSelectedHotkeys({ hotkeys: newHotkeys });
-  };
-
-  const handleAddHotkey = () => {
-    if (selectedHotkeys.hotkeys.length < 3) {
-      setSelectedHotkeys({
-        hotkeys: [...selectedHotkeys.hotkeys, ""],
-      });
-    }
+    const limitedHotkeys = config.hotkeys.slice(0, 3);
+    setSelectedHotkeys({ hotkeys: limitedHotkeys });
   };
 
   const isHotkeysChanged =
@@ -249,15 +221,46 @@ export const HotkeySettings: React.FC = () => {
           >
             Current Hotkeys ({currentHotkeys.hotkeys.length}/3)
           </div>
-          {currentHotkeys.hotkeys.map((hotkey, index) => (
-            <div key={index} style={{ marginBottom: "8px" }}>
-              <HotkeyInput
-                value={{ hotkeys: [hotkey] }}
-                onChange={() => {}} // Read-only
-                disabled={true}
-              />
+          {currentHotkeys.hotkeys.length > 0 ? (
+            <div
+              style={{
+                padding: "12px",
+                backgroundColor: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: "6px",
+                marginBottom: "8px",
+              }}
+            >
+              {currentHotkeys.hotkeys.map((hotkey, index) => (
+                <div
+                  key={index}
+                  style={{
+                    fontSize: "11px",
+                    fontFamily:
+                      'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                    color: "rgba(255, 255, 255, 0.9)",
+                    padding: "4px 0",
+                  }}
+                >
+                  {hotkey}
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <div
+              style={{
+                fontSize: "11px",
+                color: "rgba(255, 255, 255, 0.4)",
+                padding: "12px",
+                backgroundColor: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: "6px",
+                marginBottom: "8px",
+              }}
+            >
+              No hotkeys configured
+            </div>
+          )}
           <div
             style={{
               fontSize: "10px",
@@ -275,68 +278,16 @@ export const HotkeySettings: React.FC = () => {
               fontSize: "11px",
               color: "rgba(255, 255, 255, 0.6)",
               marginBottom: "8px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
             }}
           >
-            <span>Configure Hotkeys ({selectedHotkeys.hotkeys.length}/3)</span>
-            {selectedHotkeys.hotkeys.length < 3 && (
-              <button
-                onClick={handleAddHotkey}
-                disabled={isUpdating}
-                style={{
-                  fontSize: "10px",
-                  padding: "4px 8px",
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                  borderRadius: "4px",
-                  color: "#ffffff",
-                  cursor: isUpdating ? "not-allowed" : "pointer",
-                  opacity: isUpdating ? 0.5 : 1,
-                }}
-              >
-                + Add Hotkey
-              </button>
-            )}
+            Configure Hotkeys
           </div>
-          {selectedHotkeys.hotkeys.map((hotkey, index) => (
-            <div
-              key={index}
-              style={{
-                marginBottom: "8px",
-                display: "flex",
-                gap: "8px",
-                alignItems: "center",
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <HotkeyInput
-                  value={{ hotkeys: [hotkey] }}
-                  onChange={(config) => handleHotkeyInputChange(index, config)}
-                  disabled={isUpdating}
-                />
-              </div>
-              {selectedHotkeys.hotkeys.length > 1 && (
-                <button
-                  onClick={() => handleRemoveHotkey(index)}
-                  disabled={isUpdating}
-                  style={{
-                    fontSize: "10px",
-                    padding: "4px 8px",
-                    backgroundColor: "rgba(255, 59, 48, 0.2)",
-                    border: "1px solid rgba(255, 59, 48, 0.3)",
-                    borderRadius: "4px",
-                    color: "rgba(255, 59, 48, 0.9)",
-                    cursor: isUpdating ? "not-allowed" : "pointer",
-                    opacity: isUpdating ? 0.5 : 1,
-                  }}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          ))}
+          <HotkeySelector
+            value={selectedHotkeys}
+            onChange={handleHotkeySelectorChange}
+            maxHotkeys={3}
+            disabled={isUpdating}
+          />
           <div
             style={{
               fontSize: "10px",
