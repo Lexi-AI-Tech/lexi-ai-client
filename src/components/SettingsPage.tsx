@@ -94,17 +94,29 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleSaveSettings = async () => {
-    // Check if anything changed
+    // Check if anything changed using the same logic as hasChanges
     const languageChanged =
-      selectedLanguage !== null && selectedLanguage !== currentLanguage;
-    const autostartChanged =
-      selectedAutostart !== null && selectedAutostart !== autostartEnabled;
-    const enhanceChanged =
-      selectedEnhanceTranscription !== null &&
-      selectedEnhanceTranscription !== enhanceTranscription;
-    const cursorContextChanged =
-      selectedTranscribeWithCursorContext !== null &&
-      selectedTranscribeWithCursorContext !== transcribeWithCursorContext;
+      selectedLanguage !== null &&
+      selectedLanguage !== undefined &&
+      selectedLanguage !== currentLanguage;
+    
+    const currentAutostart = autostartEnabled ?? false;
+    const autostartChanged = 
+      selectedAutostart !== null && 
+      selectedAutostart !== undefined &&
+      selectedAutostart !== currentAutostart;
+    
+    const currentEnhance = enhanceTranscription ?? false;
+    const enhanceChanged = 
+      selectedEnhanceTranscription !== null && 
+      selectedEnhanceTranscription !== undefined &&
+      selectedEnhanceTranscription !== currentEnhance;
+    
+    const currentCursorContext = transcribeWithCursorContext ?? false;
+    const cursorContextChanged = 
+      selectedTranscribeWithCursorContext !== null && 
+      selectedTranscribeWithCursorContext !== undefined &&
+      selectedTranscribeWithCursorContext !== currentCursorContext;
 
     if (!languageChanged && !autostartChanged && !enhanceChanged && !cursorContextChanged) {
       return; // No changes needed
@@ -156,34 +168,51 @@ export const SettingsPage: React.FC = () => {
   };
 
   const hasChanges = () => {
+    // Compare language
     const languageChanged =
-      selectedLanguage !== null && selectedLanguage !== currentLanguage;
-    const autostartChanged =
-      selectedAutostart !== null && selectedAutostart !== autostartEnabled;
-    const enhanceChanged =
-      selectedEnhanceTranscription !== null &&
-      selectedEnhanceTranscription !== enhanceTranscription;
-    const cursorContextChanged =
-      selectedTranscribeWithCursorContext !== null &&
-      selectedTranscribeWithCursorContext !== transcribeWithCursorContext;
+      selectedLanguage !== null &&
+      selectedLanguage !== undefined &&
+      selectedLanguage !== currentLanguage;
+    
+    // Compare autostart (handle null/undefined properly)
+    // If selectedAutostart is null, it means unchanged, so no change
+    // If selectedAutostart is a boolean, compare it to current value
+    const currentAutostart = autostartEnabled ?? false;
+    const autostartChanged = 
+      selectedAutostart !== null && 
+      selectedAutostart !== undefined &&
+      selectedAutostart !== currentAutostart;
+    
+    // Compare enhance transcription
+    const currentEnhance = enhanceTranscription ?? false;
+    const enhanceChanged = 
+      selectedEnhanceTranscription !== null && 
+      selectedEnhanceTranscription !== undefined &&
+      selectedEnhanceTranscription !== currentEnhance;
+    
+    // Compare cursor context
+    const currentCursorContext = transcribeWithCursorContext ?? false;
+    const cursorContextChanged = 
+      selectedTranscribeWithCursorContext !== null && 
+      selectedTranscribeWithCursorContext !== undefined &&
+      selectedTranscribeWithCursorContext !== currentCursorContext;
 
     return languageChanged || autostartChanged || enhanceChanged || cursorContextChanged;
   };
 
   const handleToggleAutostart = () => {
-    setSelectedAutostart(selectedAutostart === true ? false : true);
+    const currentValue = selectedAutostart ?? autostartEnabled ?? false;
+    setSelectedAutostart(!currentValue);
   };
 
   const handleToggleEnhanceTranscription = () => {
-    setSelectedEnhanceTranscription(
-      selectedEnhanceTranscription === true ? false : true,
-    );
+    const currentValue = selectedEnhanceTranscription ?? enhanceTranscription ?? false;
+    setSelectedEnhanceTranscription(!currentValue);
   };
 
   const handleToggleCursorContext = () => {
-    setSelectedTranscribeWithCursorContext(
-      selectedTranscribeWithCursorContext === true ? false : true,
-    );
+    const currentValue = selectedTranscribeWithCursorContext ?? transcribeWithCursorContext ?? false;
+    setSelectedTranscribeWithCursorContext(!currentValue);
   };
 
   const ToggleSwitch: React.FC<{
@@ -413,7 +442,7 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={selectedEnhanceTranscription === true}
+              enabled={(selectedEnhanceTranscription ?? enhanceTranscription ?? false) === true}
               onToggle={handleToggleEnhanceTranscription}
               disabled={isLoading || isUpdating}
             />
@@ -451,7 +480,7 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={selectedTranscribeWithCursorContext === true}
+              enabled={(selectedTranscribeWithCursorContext ?? transcribeWithCursorContext ?? false) === true}
               onToggle={handleToggleCursorContext}
               disabled={isLoading || isUpdating}
             />
@@ -540,7 +569,7 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={selectedAutostart === true}
+              enabled={(selectedAutostart ?? autostartEnabled ?? false) === true}
               onToggle={handleToggleAutostart}
               disabled={isLoading || isUpdating}
             />
@@ -609,13 +638,21 @@ export const SettingsPage: React.FC = () => {
       <div style={{ marginTop: "32px" }}>
         <button
           className="transcript-btn"
-          onClick={handleSaveSettings}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isUpdating && hasChanges() && !isLoading) {
+              handleSaveSettings();
+            }
+          }}
           disabled={isUpdating || !hasChanges() || isLoading}
           style={{
             padding: "8px 16px",
             fontSize: "11px",
             width: "100%",
             opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
+            cursor: isUpdating || !hasChanges() || isLoading ? "not-allowed" : "pointer",
+            transition: "opacity 0.2s",
           }}
         >
           {isUpdating ? "Saving..." : "Save Settings"}
