@@ -31,7 +31,7 @@ pub struct VocabularyItem {
 ///
 /// Represents all application settings that are persisted in Tauri Store.
 /// All fields are optional to allow for partial updates and backward compatibility.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     /// Transcription language preferences (e.g., ["en"], ["es"], ["auto"])
     pub languages: Option<Vec<String>>,

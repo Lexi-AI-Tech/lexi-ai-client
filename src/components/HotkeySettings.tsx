@@ -9,7 +9,6 @@ import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-import { getDeviceInfo } from "../lib/deviceInfo";
 import {
   LanguageCode,
   getAllLanguageCodes,
@@ -40,9 +39,6 @@ export const HotkeySettings: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
     LanguageCode.EN,
   );
-  const [systemType, setSystemType] = useState<"mac" | "windows" | "unknown">(
-    "unknown",
-  );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,12 +51,7 @@ export const HotkeySettings: React.FC = () => {
       setError(null);
 
       try {
-        // Detect system type
-        const deviceInfo = await getDeviceInfo();
-        const detectedSystemType = deviceInfo.system_type;
-        setSystemType(detectedSystemType);
-
-        // Load hotkeys from Rust backend
+        // Load hotkeys from Tauri Store
         try {
           const hotkeyJson = await invoke<string>("get_current_hotkey");
           const hotkey: HotkeyConfig = JSON.parse(hotkeyJson);
@@ -75,7 +66,11 @@ export const HotkeySettings: React.FC = () => {
           setCurrentHotkeys(hotkey);
           setSelectedHotkeys(hotkey);
         } catch (rustErr) {
-          console.warn("Failed to load hotkeys from Rust backend:", rustErr);
+          console.warn("Failed to load hotkeys from store:", rustErr);
+          // Fallback to default
+          const defaultHotkey: HotkeyConfig = { hotkeys: ["Fn"] };
+          setCurrentHotkeys(defaultHotkey);
+          setSelectedHotkeys(defaultHotkey);
         }
 
         // Load language from app config

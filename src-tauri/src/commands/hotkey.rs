@@ -1,15 +1,18 @@
 //! Hotkey Commands
 //!
 //! This module provides Tauri commands for managing hotkey configuration.
+//! All hotkeys are stored in Tauri Store as `transcription_hotkeys`.
 
+use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
 use crate::global_key_listener::{HotkeyConfig, register_hotkeys, unregister_all_hotkeys, validate_hotkey};
 use crate::state::{HotkeyRecordingState, HotkeyWatchState};
 use serde_json;
 use tauri::{AppHandle, Emitter, State};
+use tauri_plugin_store::StoreExt;
 
 /// Update the hotkey configuration dynamically
 ///
-/// This command allows the frontend to change the hotkeys that trigger recording.
+/// This command saves hotkeys to Tauri Store and updates the runtime listener.
 /// Supports up to 3 hotkeys. Fn key is handled via rdev, others via Tauri global shortcuts.
 ///
 /// # Arguments
@@ -19,10 +22,10 @@ use tauri::{AppHandle, Emitter, State};
 /// * `Ok(())` - Successfully updated the hotkeys
 /// * `Err(String)` - An error message if parsing failed or update failed
 #[tauri::command]
-pub fn update_hotkey(
+pub async fn update_hotkey(
     config_json: String,
     app: AppHandle,
-    state: State<HotkeyWatchState>,
+    state: State<'_, HotkeyWatchState>,
 ) -> Result<(), String> {
     // Parse JSON to HotkeyConfig
     let new_config: HotkeyConfig = serde_json::from_str(&config_json)
@@ -40,16 +43,33 @@ pub fn update_hotkey(
         }
     }
 
-    // Get old config to unregister old shortcuts
+    // Get old config from watch state to unregister old shortcuts
     let old_config = state.0.borrow().clone();
     let old_tauri = old_config.tauri_hotkeys();
 
     // Unregister old Tauri hotkeys (rdev hotkeys are managed by listener restart)
     unregister_all_hotkeys(&app, &old_tauri);
 
-    // Update the config
+    // Save to Tauri Store
+    // First get current config, then update only transcription_hotkeys
+    let current_config = get_app_config(app.clone()).await
+        .unwrap_or_else(|_| AppConfig::default());
+    
+    let app_config_update = AppConfig {
+        transcription_hotkeys: Some(new_config.hotkeys.clone()),
+        languages: current_config.languages,
+        enhance_transcription: current_config.enhance_transcription,
+        transcribe_with_cursor_context: current_config.transcribe_with_cursor_context,
+        launch_on_system_startup: current_config.launch_on_system_startup,
+        vocabulary: current_config.vocabulary,
+    };
+    
+    update_app_config(app.clone(), app_config_update).await
+        .map_err(|e| format!("Failed to save hotkeys to store: {}", e))?;
+
+    // Update watch state to notify listener thread
     if state.0.send(new_config.clone()).is_err() {
-        return Err("Failed to update hotkey config".to_string());
+        return Err("Failed to update hotkey watch state".to_string());
     }
 
     // Register new hotkeys (Tauri will try first, fall back to rdev if needed)
@@ -75,14 +95,25 @@ pub fn update_hotkey(
     Ok(())
 }
 
-/// Get the current hotkey configuration
+/// Get the current hotkey configuration from Tauri Store
 ///
 /// # Returns
 /// * `String` - JSON string representation of the current HotkeyConfig
 #[tauri::command]
-pub fn get_current_hotkey(state: State<HotkeyWatchState>) -> String {
-    let config = state.0.borrow().clone();
-    serde_json::to_string(&config).unwrap_or_else(|_| r#"{"hotkeys":["Fn"]}"#.to_string())
+pub async fn get_current_hotkey(app: AppHandle) -> String {
+    // Read from Tauri Store
+    match get_app_config(app).await {
+        Ok(config) => {
+            let hotkeys = config.transcription_hotkeys.unwrap_or_else(|| vec!["Fn".to_string()]);
+            let hotkey_config = HotkeyConfig { hotkeys };
+            serde_json::to_string(&hotkey_config)
+                .unwrap_or_else(|_| r#"{"hotkeys":["Fn"]}"#.to_string())
+        }
+        Err(_) => {
+            // Fallback to default if store read fails
+            r#"{"hotkeys":["Fn"]}"#.to_string()
+        }
+    }
 }
 
 /// Start hotkey recording mode - enables key event emission for hotkey selection

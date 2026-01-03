@@ -82,7 +82,7 @@ use permissions::{
     request_screen_recording_permission,
 };
 
-use commands::app_config::{get_app_config, update_app_config};
+use commands::app_config::{get_app_config, update_app_config, AppConfig};
 use commands::auth::{
     clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, start_google_login,
     store_auth_data,
@@ -272,10 +272,29 @@ pub fn main() {
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
             let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
 
-            // Create watch channel with initial config (Function key default)
-            let initial_config = HotkeyConfig {
-                hotkeys: vec!["Fn".to_string()],
+            // Load hotkeys from Tauri Store
+            // Use default if store is not available or doesn't have hotkeys
+            let initial_config = {
+                let app_handle_for_store = app_handle.clone();
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    match get_app_config(app_handle_for_store).await {
+                        Ok(config) => {
+                            let hotkeys = config.transcription_hotkeys
+                                .unwrap_or_else(|| vec!["Fn".to_string()]);
+                            HotkeyConfig { hotkeys }
+                        }
+                        Err(_) => {
+                            println!("⚠️  Failed to load hotkeys from store, using default");
+                            HotkeyConfig {
+                                hotkeys: vec!["Fn".to_string()],
+                            }
+                        }
+                    }
+                })
             };
+            
+            println!("🔑 Loaded hotkeys from store: {:?}", initial_config.hotkeys);
             let (config_tx, config_rx) = watch::channel(initial_config.clone());
 
             // Create recording state and manage it
