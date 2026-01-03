@@ -50,11 +50,6 @@ use tokio::sync::watch;
 // These functions work directly with Vec<String> from AppConfig.transcription_hotkeys
 // which is the single source of truth stored in Tauri Store.
 
-/// Returns true if any hotkey contains the Fn key
-pub fn has_fn_key(hotkeys: &[String]) -> bool {
-    hotkeys.iter().any(|h| h.trim().eq_ignore_ascii_case("Fn"))
-}
-
 /// Returns hotkeys that should be handled by rdev (Fn key or keys that can't use Tauri)
 pub fn rdev_hotkeys(hotkeys: &[String]) -> Vec<String> {
     hotkeys
@@ -488,12 +483,6 @@ impl KeyStateTracker {
         None
     }
 
-    /// Reset state (e.g., when listener restarts)
-    fn reset(&mut self) {
-        self.state = KeyState::Released;
-        self.last_state_change = Instant::now();
-        println!("🔑 Key state tracker reset to Released");
-    }
 }
 
 /// Helper to convert keyboard EventType to a string for frontend emission
