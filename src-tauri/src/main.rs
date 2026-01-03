@@ -52,7 +52,7 @@ mod audio_recorder; // Audio capture from default microphone using cpal, convert
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
 mod cursor_context; // Cursor context retrieval using macOS Accessibility API (AXUIElement)
-mod global_key_listener; // Global keyboard event monitoring via rdev with configurable hotkey support
+mod global_key_listener; // Unified hotkey management (rdev for Fn key, Tauri shortcuts for others)
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
@@ -69,10 +69,10 @@ mod whisper; // Local Whisper model integration for offline transcription
 use whisper::preload_model;
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
-use global_key_listener::HotkeyConfig;
+use global_key_listener::{HotkeyConfig, register_hotkeys, unregister_all_hotkeys};
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
-use state::{HotkeyRecordingState, HotkeyWatchState, TranscriptionTaskState};
+use state::{HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, TranscriptionTaskState};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -130,6 +130,46 @@ pub fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
         ))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    // Only handle press events for toggle behavior
+                    if event.state() != tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        return;
+                    }
+
+                    println!("🔑 Global shortcut triggered: {:?}", shortcut);
+
+                    // Get the recording channel from app state
+                    let app_handle = app.app_handle();
+                    let recording_state = app_handle.state::<RecordingChannelState>();
+                    
+                    // Check current recording state and toggle
+                    let is_currently_recording = recording_state
+                        .is_recording
+                        .lock()
+                        .ok()
+                        .map(|guard| *guard)
+                        .unwrap_or(false);
+
+                    let command = if is_currently_recording {
+                        RecordingCommand::Stop
+                    } else {
+                        RecordingCommand::Start
+                    };
+
+                    if let Ok(tx_guard) = recording_state.tx.lock() {
+                        if let Some(ref tx) = *tx_guard {
+                            if let Err(e) = tx.send(command) {
+                                eprintln!("Failed to send recording command: {:?}", e);
+                            } else {
+                                println!("✅ Sent {:?} command via global shortcut", command);
+                            }
+                        }
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             #[cfg(target_os = "macos")]
             {
@@ -234,9 +274,9 @@ pub fn main() {
 
             // Create watch channel with initial config (Function key default)
             let initial_config = HotkeyConfig {
-                hotkey: "Fn".to_string(),
+                hotkeys: vec!["Fn".to_string()],
             };
-            let (config_tx, config_rx) = watch::channel(initial_config);
+            let (config_tx, config_rx) = watch::channel(initial_config.clone());
 
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));
@@ -244,15 +284,43 @@ pub fn main() {
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });
+            let recording_state_tracker = Arc::new(Mutex::new(false));
+            app.manage(RecordingChannelState {
+                tx: Arc::new(Mutex::new(Some(recording_tx.clone()))),
+                is_recording: recording_state_tracker.clone(),
+            });
+            
+            // Listen to recording events to update state tracker
+            let app_handle_for_events = app_handle.clone();
+            let recording_state_tracker_clone = recording_state_tracker.clone();
+            app_handle.listen("recording_started", move |_| {
+                if let Ok(mut state) = recording_state_tracker_clone.lock() {
+                    *state = true;
+                }
+            });
+            let recording_state_tracker_clone2 = recording_state_tracker.clone();
+            app_handle_for_events.listen("recording_stopped", move |_| {
+                if let Ok(mut state) = recording_state_tracker_clone2.lock() {
+                    *state = false;
+                }
+            });
 
-            // Start the global input listener (rdev) in a background thread
+            // Start the global input listener (rdev) in a background thread for Fn key only
             // Pass the channel sender and config receiver so it can trigger recording on hotkey press/release
             global_key_listener::start_listener(
                 app_handle.clone(),
-                recording_tx,
+                recording_tx.clone(),
                 config_rx,
                 recording_state_arc,
             );
+
+            // Register Tauri global shortcuts for non-Fn hotkeys
+            let non_fn_hotkeys = initial_config.non_fn_hotkeys();
+            if !non_fn_hotkeys.is_empty() {
+                if let Err(e) = register_hotkeys(&app_handle, &non_fn_hotkeys) {
+                    eprintln!("⚠️  Failed to register initial global shortcuts: {}", e);
+                }
+            }
 
             // Create system tray with menu
             let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;

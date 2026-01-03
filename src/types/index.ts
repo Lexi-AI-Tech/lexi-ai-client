@@ -165,7 +165,7 @@ export interface DeviceInfo {
 // ============================================================================
 
 export interface HotkeyConfig {
-  hotkey: string; // Human-readable format like "Ctrl+Shift+P"
+  hotkeys: string[]; // Array of up to 3 hotkeys (e.g., ["Fn", "Cmd+Shift+R", "Ctrl+Alt+T"])
 }
 
 export interface NetworkStatus {

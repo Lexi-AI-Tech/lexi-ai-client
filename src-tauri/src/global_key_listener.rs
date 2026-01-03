@@ -1,25 +1,39 @@
-//! Global Keyboard Listener Module
+//! Global Keyboard Listener and Shortcut Manager Module
 //!
-//! This module provides system-wide keyboard event monitoring using the `rdev` crate.
-//! It listens for configurable hotkey press/release events to trigger audio recording
-//! start/stop, even when the application is not in focus.
+//! This module provides unified hotkey management using both:
+//! - **rdev** for Fn key detection (low-level, requires Input Monitoring permission)
+//! - **Tauri global shortcuts** for other hotkeys (modifier + key combinations)
 //!
 //! ## Features
 //!
-//! - **Function Key Hotkey**: Supports Function (Fn) key only for triggering recording
-//! - **Dynamic Configuration**: Hotkey config can be changed at runtime (currently always Function key)
+//! - **Function Key Hotkey**: Supports Function (Fn) key via rdev (hardware-handled on macOS)
+//! - **Tauri Global Shortcuts**: Supports modifier + key combinations via Tauri plugin
+//! - **Dynamic Configuration**: Hotkey config can be changed at runtime (up to 3 hotkeys)
 //! - **Hotkey Recording Mode**: Emits key events to frontend for interactive hotkey selection
+//! - **System Shortcut Validation**: Prevents registration of system-reserved shortcuts
 //!
 //! ## Architecture
 //!
-//! The listener runs in a manager thread that watches for configuration changes.
-//! When the hotkey config changes, it shuts down the old `rdev::listen` thread and
-//! spawns a new one with the updated configuration. This allows hotkey changes without
-//! restarting the entire application.
+//! The listener runs in a manager thread that watches for config changes via `config_rx`.
+//! When the hotkey config changes, it:
+//! - Shuts down the old rdev listener (if Fn key was present)
+//! - Unregisters old Tauri global shortcuts
+//! - Registers new Tauri global shortcuts (for non-Fn keys)
+//! - Starts new rdev listener (if Fn key is present)
 //!
 //! ## Permissions Required
 //!
 //! - **Input Monitoring** (macOS): Required for `rdev::listen` to work system-wide
+//!
+//! ## Limitations
+//!
+//! Tauri global shortcuts cannot detect:
+//! - Modifier-only shortcuts (Cmd, Shift, Ctrl, Alt alone)
+//! - System-reserved shortcuts (Cmd+Space, Cmd+Tab, etc.)
+//! - Fn key (handled separately via rdev)
+//! - Media keys (volume, brightness, etc.)
+//!
+//! This module validates and rejects such shortcuts.
 
 use crate::RecordingCommand;
 use rdev::{listen, Event, EventType, Key};
@@ -28,7 +42,309 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_global_shortcut::Shortcut;
 use tokio::sync::watch;
+
+// ============================================================================
+// Hotkey Configuration
+// ============================================================================
+
+/// Hotkey configuration supporting up to 3 hotkeys
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct HotkeyConfig {
+    /// Array of up to 3 hotkey strings (e.g., ["Fn", "Cmd+Shift+R", "Ctrl+Alt+T"])
+    pub hotkeys: Vec<String>,
+}
+
+impl Default for HotkeyConfig {
+    fn default() -> Self {
+        Self {
+            hotkeys: vec!["Fn".to_string()],
+        }
+    }
+}
+
+impl HotkeyConfig {
+    /// Returns true if any hotkey contains the Fn key
+    pub fn has_fn_key(&self) -> bool {
+        self.hotkeys.iter().any(|h| h.trim().eq_ignore_ascii_case("Fn"))
+    }
+
+    /// Returns hotkeys that are NOT the Fn key (for Tauri global shortcuts)
+    pub fn non_fn_hotkeys(&self) -> Vec<String> {
+        self.hotkeys
+            .iter()
+            .filter(|h| !h.trim().eq_ignore_ascii_case("Fn"))
+            .cloned()
+            .collect()
+    }
+}
+
+// ============================================================================
+// System Shortcut Validation
+// ============================================================================
+
+/// macOS system-reserved shortcuts that cannot be registered
+/// These are intercepted by macOS before Tauri sees them
+const SYSTEM_RESERVED_SHORTCUTS: &[&str] = &[
+    // Spotlight and system navigation
+    "CommandOrControl+Space",        // Spotlight
+    "CommandOrControl+Tab",          // App switcher
+    "CommandOrControl+Shift+Tab",     // Reverse app switcher
+    "CommandOrControl+`",            // Window switcher
+    "CommandOrControl+Shift+`",      // Reverse window switcher
+    
+    // Application control
+    "CommandOrControl+H",            // Hide app
+    "CommandOrControl+M",             // Minimize window
+    "CommandOrControl+W",             // Close window
+    "CommandOrControl+Q",             // Quit app
+    "CommandOrControl+Option+Esc",   // Force Quit
+    "CommandOrControl+Control+Q",    // Lock Screen
+    
+    // Text editing (system-level)
+    "CommandOrControl+C",             // Copy
+    "CommandOrControl+V",             // Paste
+    "CommandOrControl+X",             // Cut
+    "CommandOrControl+A",             // Select All
+    "CommandOrControl+Z",             // Undo
+    "CommandOrControl+Shift+Z",      // Redo
+    
+    // System dialogs
+    "CommandOrControl+Comma",         // Preferences
+    "CommandOrControl+Period",        // Settings (some apps)
+    
+    // Mission Control and Spaces
+    "CommandOrControl+Up",            // Mission Control
+    "CommandOrControl+Down",          // Application windows
+    "CommandOrControl+Left",          // Previous space
+    "CommandOrControl+Right",         // Next space
+    "CommandOrControl+1",             // Switch to desktop 1
+    "CommandOrControl+2",             // Switch to desktop 2
+    "CommandOrControl+3",             // Switch to desktop 3
+    
+    // Screenshots
+    "CommandOrControl+Shift+3",       // Screenshot
+    "CommandOrControl+Shift+4",       // Screenshot selection
+    "CommandOrControl+Shift+5",       // Screenshot options
+    
+    // Finder
+    "CommandOrControl+N",             // New window
+    "CommandOrControl+T",             // New tab
+    "CommandOrControl+Delete",        // Move to Trash
+    "CommandOrControl+Shift+Delete",  // Empty Trash
+];
+
+/// Validates a hotkey string and returns an error if it's invalid
+pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
+    let trimmed = hotkey.trim();
+    
+    // Skip validation for Fn key (handled separately via rdev)
+    if trimmed.eq_ignore_ascii_case("Fn") {
+        return Ok(());
+    }
+    
+    // Normalize the hotkey for comparison
+    let normalized = normalize_hotkey(trimmed);
+    
+    // Check if it's a system-reserved shortcut
+    if SYSTEM_RESERVED_SHORTCUTS.iter().any(|&reserved| {
+        reserved.eq_ignore_ascii_case(&normalized)
+    }) {
+        return Err(format!(
+            "Hotkey '{}' is reserved by macOS and cannot be used. Please choose a different combination.",
+            hotkey
+        ));
+    }
+    
+    // Parse to check if it's valid Tauri format
+    let shortcut: Shortcut = normalized.parse().map_err(|e| {
+        format!("Invalid hotkey format '{}': {}", hotkey, e)
+    })?;
+    
+    // Check if it's modifier-only (not allowed by Tauri)
+    if is_modifier_only(&shortcut, &normalized) {
+        return Err(format!(
+            "Modifier-only shortcuts (like '{}') are not supported. Please include at least one non-modifier key.",
+            hotkey
+        ));
+    }
+    
+    // Check if it's a single key without modifiers (risky, but allow with warning)
+    if is_single_key_without_modifiers(&normalized) {
+        // We'll allow it but it's not recommended
+        // The user will see a warning in the UI
+    }
+    
+    Ok(())
+}
+
+/// Checks if a shortcut is modifier-only
+fn is_modifier_only(shortcut: &Shortcut, normalized: &str) -> bool {
+    // Check if the normalized string contains only modifiers
+    let parts: Vec<&str> = normalized.split('+').collect();
+    let modifier_count = parts.iter().filter(|p| is_modifier_key(p)).count();
+    
+    // If all parts are modifiers, it's modifier-only
+    modifier_count == parts.len() && !parts.is_empty()
+}
+
+/// Checks if a hotkey is a single key without modifiers
+fn is_single_key_without_modifiers(normalized: &str) -> bool {
+    let parts: Vec<&str> = normalized.split('+').collect();
+    parts.len() == 1 && !is_modifier_key(parts[0])
+}
+
+/// Checks if a key string is a modifier
+fn is_modifier_key(key: &str) -> bool {
+    matches!(
+        key.to_lowercase().as_str(),
+        "commandorcontrol" | "command" | "control" | "ctrl" | "alt" | "option" | "shift" | "meta" | "super"
+    )
+}
+
+// ============================================================================
+// Hotkey Normalization
+// ============================================================================
+
+/// Normalize a hotkey string to Tauri global shortcut format
+/// Converts frontend key names (e.g., "Cmd+Shift+R") to Tauri format (e.g., "CommandOrControl+Shift+R")
+pub fn normalize_hotkey(hotkey: &str) -> String {
+    hotkey
+        .split('+')
+        .map(|key_str| normalize_single_key(key_str.trim()))
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
+/// Normalize a single key string
+fn normalize_single_key(key: &str) -> String {
+    match key.to_lowercase().as_str() {
+        "cmd" | "command" | "meta" | "super" => "CommandOrControl".to_string(),
+        "ctrl" | "control" => "Control".to_string(),
+        "option" | "alt" => "Alt".to_string(),
+        "shift" => "Shift".to_string(),
+        "space" => "Space".to_string(),
+        "return" => "Enter".to_string(),
+        "arrowup" => "Up".to_string(),
+        "arrowdown" => "Down".to_string(),
+        "arrowleft" => "Left".to_string(),
+        "arrowright" => "Right".to_string(),
+        _ => {
+            // For single letter keys, uppercase them
+            if key.len() == 1 && key.chars().all(|c| c.is_alphabetic()) {
+                key.to_uppercase()
+            } else {
+                key.to_string()
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Tauri Global Shortcut Management
+// ============================================================================
+
+/// Register a hotkey as a Tauri global shortcut (if it's not the Fn key)
+pub fn register_hotkey(
+    app: &AppHandle,
+    hotkey: &str,
+) -> Result<(), String> {
+    // Skip Fn key - it's handled by rdev
+    if hotkey.trim().eq_ignore_ascii_case("Fn") {
+        return Ok(());
+    }
+    
+    // Validate the hotkey before registering
+    validate_hotkey(hotkey)?;
+
+    let normalized = normalize_hotkey(hotkey);
+    println!("🔑 Registering Tauri global shortcut: {} (normalized: {})", hotkey, normalized);
+
+    // Parse the normalized shortcut
+    let shortcut: Shortcut = normalized.parse().map_err(|e| {
+        format!("Failed to parse hotkey '{}' (normalized: '{}'): {}", hotkey, normalized, e)
+    })?;
+
+    // Register the shortcut (handler is set up in main.rs via the plugin builder)
+    app.global_shortcut()
+        .register(shortcut)
+        .map_err(|e| {
+            let error_msg = e.to_string();
+            let error_lower = error_msg.to_lowercase();
+            
+            // Provide helpful error message based on error type
+            if error_lower.contains("already registered") || error_lower.contains("conflict") || error_lower.contains("in use") {
+                format!("Hotkey '{}' is already in use by another application. Please choose a different combination.", hotkey)
+            } else if error_lower.contains("parse") || error_lower.contains("invalid") {
+                format!("Invalid hotkey combination '{}'. Please use a valid key combination.", hotkey)
+            } else {
+                format!("Failed to register hotkey '{}': {}", hotkey, e)
+            }
+        })?;
+
+    println!("✅ Successfully registered Tauri global shortcut: {}", hotkey);
+    Ok(())
+}
+
+/// Unregister a hotkey
+pub fn unregister_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
+    // Skip Fn key - it's handled by rdev
+    if hotkey.trim().eq_ignore_ascii_case("Fn") {
+        return Ok(());
+    }
+
+    let normalized = normalize_hotkey(hotkey);
+    println!("🔑 Unregistering Tauri global shortcut: {} (normalized: {})", hotkey, normalized);
+
+    let shortcut: Shortcut = normalized.parse().map_err(|e| {
+        format!("Failed to parse hotkey '{}' (normalized: '{}'): {}", hotkey, normalized, e)
+    })?;
+
+    app.global_shortcut()
+        .unregister(shortcut)
+        .map_err(|e| format!("Failed to unregister hotkey '{}': {}", hotkey, e))?;
+
+    println!("✅ Successfully unregistered Tauri global shortcut: {}", hotkey);
+    Ok(())
+}
+
+/// Register multiple hotkeys (up to 3)
+pub fn register_hotkeys(
+    app: &AppHandle,
+    hotkeys: &[String],
+) -> Result<(), String> {
+    // Limit to 3 hotkeys
+    if hotkeys.len() > 3 {
+        return Err("Maximum of 3 hotkeys allowed".to_string());
+    }
+
+    let mut errors = Vec::new();
+    for hotkey in hotkeys {
+        if let Err(e) = register_hotkey(app, hotkey) {
+            errors.push(format!("Failed to register '{}': {}", hotkey, e));
+        }
+    }
+    
+    if !errors.is_empty() {
+        return Err(errors.join("; "));
+    }
+
+    Ok(())
+}
+
+/// Unregister all hotkeys
+pub fn unregister_all_hotkeys(app: &AppHandle, hotkeys: &[String]) {
+    for hotkey in hotkeys {
+        if let Err(e) = unregister_hotkey(app, hotkey) {
+            eprintln!("⚠️  Failed to unregister hotkey '{}': {}", hotkey, e);
+        }
+    }
+}
+
+// ============================================================================
+// rdev Listener (for Fn key)
+// ============================================================================
 
 /// Tracks the actual state of the Function key to prevent spurious events
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,24 +426,6 @@ impl KeyStateTracker {
     }
 }
 
-/// Hotkey configuration (simplified to Function key only)
-/// Kept for compatibility with existing config system
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HotkeyConfig {
-    /// Human-readable hotkey string (currently only "Fn" is supported)
-    pub hotkey: String,
-}
-
-impl HotkeyConfig {
-    // Simplified - we only support Function key now
-    // This method is kept for compatibility but always returns Function key
-    #[allow(dead_code)]
-    pub fn get_key_and_modifiers(&self) -> (String, Option<u32>, ()) {
-        // Always return Function key regardless of config
-        ("Function".to_string(), Some(179), ())
-    }
-}
-
 /// Helper to convert keyboard EventType to a string for frontend emission
 /// Only handles keyboard events (KeyPress and KeyRelease)
 fn event_type_to_string(event_type: &EventType) -> Option<String> {
@@ -184,7 +482,18 @@ pub fn start_listener(
         loop {
             // Get current config
             let current_config = config_rx.borrow().clone();
-            println!("🔑 Starting rdev listener for hotkey: {:?}", current_config);
+            
+            // Only start rdev listener if Fn key is in the config
+            if !current_config.has_fn_key() {
+                println!("🔑 No Fn key in config, skipping rdev listener");
+                // Wait for config change
+                if config_rx.changed().is_err() {
+                    break;
+                }
+                continue;
+            }
+            
+            println!("🔑 Starting rdev listener for Fn key: {:?}", current_config);
 
             // Shutdown flag for this listener instance
             let shutdown = Arc::new(AtomicBool::new(false));

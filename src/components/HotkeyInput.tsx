@@ -103,7 +103,9 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateDisplayText = useCallback((config: HotkeyConfig) => {
-    const parts = config.hotkey.split("+").map((p) => p.trim());
+    // Support both old format (hotkey) and new format (hotkeys array)
+    const hotkeyStr = config.hotkeys?.[0] || (config as any).hotkey || "";
+    const parts = hotkeyStr.split("+").map((p) => p.trim());
     const displayParts = parts.map((part) => {
       const partLower = part.toLowerCase();
       if (partLower === "cmd" || partLower === "command") return "⌘";
@@ -302,7 +304,7 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
       if (!isCurrentKeyModifier) {
         const hotkeyStr = buildHotkeyString(mappedKey, modifiers);
         const newConfig: HotkeyConfig = {
-          hotkey: hotkeyStr,
+          hotkeys: [hotkeyStr],
         };
 
         onChange(newConfig);
@@ -320,7 +322,7 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
               pendingKeyRef.current.modifiers,
             );
             const newConfig: HotkeyConfig = {
-              hotkey: hotkeyStr,
+              hotkeys: [hotkeyStr],
             };
 
             onChange(newConfig);
@@ -412,7 +414,7 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
                   pendingKeyRef.current.modifiers,
                 );
                 const newConfig: HotkeyConfig = {
-                  hotkey: hotkeyStr,
+                  hotkeys: [hotkeyStr],
                 };
 
                 onChange(newConfig);

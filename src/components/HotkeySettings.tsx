@@ -20,7 +20,7 @@ import type { HotkeyConfig, TauriAppConfig } from "../types";
 import { HotkeyInput } from "./HotkeyInput";
 
 const DEFAULT_HOTKEY: HotkeyConfig = {
-  hotkey: "Fn",
+  hotkeys: ["Fn"],
 };
 
 // Supported languages for transcription
@@ -30,9 +30,9 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
 }));
 
 export const HotkeySettings: React.FC = () => {
-  const [currentHotkey, setCurrentHotkey] =
+  const [currentHotkeys, setCurrentHotkeys] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
-  const [selectedHotkey, setSelectedHotkey] =
+  const [selectedHotkeys, setSelectedHotkeys] =
     useState<HotkeyConfig>(DEFAULT_HOTKEY);
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
     LanguageCode.EN,
@@ -60,14 +60,22 @@ export const HotkeySettings: React.FC = () => {
         const detectedSystemType = deviceInfo.system_type;
         setSystemType(detectedSystemType);
 
-        // Load hotkey from Rust backend
+        // Load hotkeys from Rust backend
         try {
           const hotkeyJson = await invoke<string>("get_current_hotkey");
           const hotkey: HotkeyConfig = JSON.parse(hotkeyJson);
-          setCurrentHotkey(hotkey);
-          setSelectedHotkey(hotkey);
+          // Ensure hotkeys array exists and has at least one entry
+          if (!hotkey.hotkeys || hotkey.hotkeys.length === 0) {
+            hotkey.hotkeys = ["Fn"];
+          }
+          // Limit to 3 hotkeys
+          if (hotkey.hotkeys.length > 3) {
+            hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
+          }
+          setCurrentHotkeys(hotkey);
+          setSelectedHotkeys(hotkey);
         } catch (rustErr) {
-          console.warn("Failed to load hotkey from Rust backend:", rustErr);
+          console.warn("Failed to load hotkeys from Rust backend:", rustErr);
         }
 
         // Load language from app config
@@ -100,8 +108,15 @@ export const HotkeySettings: React.FC = () => {
       const unlisten = await listen<string>("hotkey-updated", (event) => {
         try {
           const hotkey: HotkeyConfig = JSON.parse(event.payload);
-          setCurrentHotkey(hotkey);
-          setSelectedHotkey(hotkey);
+          // Ensure hotkeys array exists
+          if (!hotkey.hotkeys || hotkey.hotkeys.length === 0) {
+            hotkey.hotkeys = ["Fn"];
+          }
+          if (hotkey.hotkeys.length > 3) {
+            hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
+          }
+          setCurrentHotkeys(hotkey);
+          setSelectedHotkeys(hotkey);
           setSuccess(true);
           setIsUpdating(false);
           setError(null);
@@ -130,10 +145,10 @@ export const HotkeySettings: React.FC = () => {
 
   const handleSaveConfig = async () => {
     // Check if anything changed
-    const hotkeyChanged = selectedHotkey.hotkey !== currentHotkey.hotkey;
+    const hotkeysChanged = JSON.stringify(selectedHotkeys.hotkeys) !== JSON.stringify(currentHotkeys.hotkeys);
     const languageChanged = selectedLanguage !== currentLanguage;
 
-    if (!hotkeyChanged && !languageChanged) {
+    if (!hotkeysChanged && !languageChanged) {
       return; // No change needed
     }
 
@@ -142,9 +157,16 @@ export const HotkeySettings: React.FC = () => {
     setSuccess(false);
 
     try {
-      // Update Rust backend if hotkey changed (works even without auth)
-      if (hotkeyChanged) {
-        const configJson = JSON.stringify(selectedHotkey);
+      // Validate: maximum 3 hotkeys
+      if (selectedHotkeys.hotkeys.length > 3) {
+        setError("Maximum of 3 hotkeys allowed");
+        setIsUpdating(false);
+        return;
+      }
+
+      // Update Rust backend if hotkeys changed (works even without auth)
+      if (hotkeysChanged) {
+        const configJson = JSON.stringify(selectedHotkeys);
         await invoke("update_hotkey", { configJson });
       }
 
@@ -158,9 +180,9 @@ export const HotkeySettings: React.FC = () => {
         setCurrentLanguage(selectedLanguage);
       }
 
-      // Update local state for hotkey (hotkey is already saved via update_hotkey command)
-      if (hotkeyChanged) {
-        setCurrentHotkey(selectedHotkey);
+      // Update local state for hotkeys (hotkeys are already saved via update_hotkey command)
+      if (hotkeysChanged) {
+        setCurrentHotkeys(selectedHotkeys);
       }
 
       setSuccess(true);
@@ -175,13 +197,43 @@ export const HotkeySettings: React.FC = () => {
     }
   };
 
-  const handleHotkeyInputChange = (config: HotkeyConfig) => {
-    setSelectedHotkey(config);
+  const handleHotkeyInputChange = (index: number, config: HotkeyConfig) => {
+    const newHotkeys = [...selectedHotkeys.hotkeys];
+    // HotkeyInput returns a HotkeyConfig with hotkeys array
+    // Extract the hotkey string (support both old and new format for compatibility)
+    const hotkeyStr = config.hotkeys?.[0] || (config as any).hotkey || "";
+    if (hotkeyStr && index < newHotkeys.length) {
+      newHotkeys[index] = hotkeyStr;
+    } else if (hotkeyStr) {
+      newHotkeys.push(hotkeyStr);
+    }
+    // Limit to 3 hotkeys
+    if (newHotkeys.length > 3) {
+      newHotkeys.splice(3);
+    }
+    setSelectedHotkeys({ hotkeys: newHotkeys });
   };
 
-  const isHotkeyChanged = selectedHotkey.hotkey !== currentHotkey.hotkey;
+  const handleRemoveHotkey = (index: number) => {
+    const newHotkeys = selectedHotkeys.hotkeys.filter((_, i) => i !== index);
+    // Ensure at least one hotkey
+    if (newHotkeys.length === 0) {
+      newHotkeys.push("Fn");
+    }
+    setSelectedHotkeys({ hotkeys: newHotkeys });
+  };
+
+  const handleAddHotkey = () => {
+    if (selectedHotkeys.hotkeys.length < 3) {
+      setSelectedHotkeys({
+        hotkeys: [...selectedHotkeys.hotkeys, ""],
+      });
+    }
+  };
+
+  const isHotkeysChanged = JSON.stringify(selectedHotkeys.hotkeys) !== JSON.stringify(currentHotkeys.hotkeys);
   const isLanguageChanged = selectedLanguage !== currentLanguage;
-  const hasChanges = isHotkeyChanged || isLanguageChanged;
+  const hasChanges = isHotkeysChanged || isLanguageChanged;
 
   if (isLoading) {
     return (
@@ -207,13 +259,17 @@ export const HotkeySettings: React.FC = () => {
               marginBottom: "8px",
             }}
           >
-            Current Hotkey
+            Current Hotkeys ({currentHotkeys.hotkeys.length}/3)
           </div>
-          <HotkeyInput
-            value={currentHotkey}
-            onChange={() => {}} // Read-only
-            disabled={true}
-          />
+          {currentHotkeys.hotkeys.map((hotkey, index) => (
+            <div key={index} style={{ marginBottom: "8px" }}>
+              <HotkeyInput
+                value={{ hotkeys: [hotkey] }}
+                onChange={() => {}} // Read-only
+                disabled={true}
+              />
+            </div>
+          ))}
           <div
             style={{
               fontSize: "10px",
@@ -221,7 +277,7 @@ export const HotkeySettings: React.FC = () => {
               marginTop: "6px",
             }}
           >
-            Press this combination to start/stop recording
+            Press any of these combinations to start/stop recording
           </div>
         </div>
 
@@ -231,15 +287,77 @@ export const HotkeySettings: React.FC = () => {
               fontSize: "11px",
               color: "rgba(255, 255, 255, 0.6)",
               marginBottom: "8px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
             }}
           >
-            Change Hotkey
+            <span>Configure Hotkeys ({selectedHotkeys.hotkeys.length}/3)</span>
+            {selectedHotkeys.hotkeys.length < 3 && (
+              <button
+                onClick={handleAddHotkey}
+                disabled={isUpdating}
+                style={{
+                  fontSize: "10px",
+                  padding: "4px 8px",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  borderRadius: "4px",
+                  color: "#ffffff",
+                  cursor: isUpdating ? "not-allowed" : "pointer",
+                  opacity: isUpdating ? 0.5 : 1,
+                }}
+              >
+                + Add Hotkey
+              </button>
+            )}
           </div>
-          <HotkeyInput
-            value={selectedHotkey}
-            onChange={handleHotkeyInputChange}
-            disabled={isUpdating}
-          />
+          {selectedHotkeys.hotkeys.map((hotkey, index) => (
+            <div
+              key={index}
+              style={{
+                marginBottom: "8px",
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <HotkeyInput
+                  value={{ hotkeys: [hotkey] }}
+                  onChange={(config) => handleHotkeyInputChange(index, config)}
+                  disabled={isUpdating}
+                />
+              </div>
+              {selectedHotkeys.hotkeys.length > 1 && (
+                <button
+                  onClick={() => handleRemoveHotkey(index)}
+                  disabled={isUpdating}
+                  style={{
+                    fontSize: "10px",
+                    padding: "4px 8px",
+                    backgroundColor: "rgba(255, 59, 48, 0.2)",
+                    border: "1px solid rgba(255, 59, 48, 0.3)",
+                    borderRadius: "4px",
+                    color: "rgba(255, 59, 48, 0.9)",
+                    cursor: isUpdating ? "not-allowed" : "pointer",
+                    opacity: isUpdating ? 0.5 : 1,
+                  }}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          ))}
+          <div
+            style={{
+              fontSize: "10px",
+              color: "rgba(255, 255, 255, 0.5)",
+              marginTop: "6px",
+            }}
+          >
+            Note: Fn key is handled separately and works on Mac. Other hotkeys use Tauri global shortcuts.
+          </div>
         </div>
 
         <div>
