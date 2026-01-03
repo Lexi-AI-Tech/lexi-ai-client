@@ -26,9 +26,9 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
 
 export const HotkeySettings: React.FC = () => {
   const [currentHotkeys, setCurrentHotkeys] =
-    useState<HotkeyConfig | null>(null);
+    useState<HotkeyConfig>({ hotkeys: [] });
   const [selectedHotkeys, setSelectedHotkeys] =
-    useState<HotkeyConfig | null>(null);
+    useState<HotkeyConfig>({ hotkeys: [] });
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(
     LanguageCode.EN,
   );
@@ -47,26 +47,15 @@ export const HotkeySettings: React.FC = () => {
       setError(null);
 
       try {
-        // Load hotkeys from Tauri Store (server provides defaults if none exist)
-        try {
-          const hotkeyJson = await invoke<string>("get_current_hotkey");
-          const hotkey: HotkeyConfig = JSON.parse(hotkeyJson);
-          // Server should provide hotkeys, but handle empty case (user not logged in)
-          if (!hotkey.hotkeys || hotkey.hotkeys.length === 0) {
-            console.warn("No hotkeys available (user may not be logged in)");
-            // Don't set state - UI will show loading/error state
-            return;
-          }
-          // Limit to 3 hotkeys
-          if (hotkey.hotkeys.length > 3) {
-            hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
-          }
-          setCurrentHotkeys(hotkey);
-          setSelectedHotkeys(hotkey);
-        } catch (rustErr) {
-          console.error("Failed to load hotkeys:", rustErr);
-          setError("Failed to load hotkeys. Please ensure you are logged in.");
+        // Load hotkeys from Tauri Store (server provides defaults)
+        const hotkeyJson = await invoke<string>("get_current_hotkey");
+        const hotkey: HotkeyConfig = JSON.parse(hotkeyJson);
+        // Server should always provide hotkeys
+        if (hotkey.hotkeys.length > 3) {
+          hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
         }
+        setCurrentHotkeys(hotkey);
+        setSelectedHotkeys(hotkey);
 
         // Load language from app config
         try {
@@ -98,11 +87,6 @@ export const HotkeySettings: React.FC = () => {
       const unlisten = await listen<string>("hotkey-updated", (event) => {
         try {
           const hotkey: HotkeyConfig = JSON.parse(event.payload);
-          // Ensure hotkeys array exists (should always be provided)
-          if (!hotkey.hotkeys || hotkey.hotkeys.length === 0) {
-            console.warn("Received empty hotkeys in update event");
-            return;
-          }
           if (hotkey.hotkeys.length > 3) {
             hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
           }
@@ -135,8 +119,6 @@ export const HotkeySettings: React.FC = () => {
   }, []);
 
   const handleSaveConfig = async () => {
-    if (!selectedHotkeys || !currentHotkeys) return;
-    
     // Check if anything changed
     const hotkeysChanged = JSON.stringify(selectedHotkeys.hotkeys) !== JSON.stringify(currentHotkeys.hotkeys);
     const languageChanged = selectedLanguage !== currentLanguage;
@@ -198,7 +180,6 @@ export const HotkeySettings: React.FC = () => {
   };
 
   const handleHotkeyInputChange = (index: number, config: HotkeyConfig) => {
-    if (!selectedHotkeys) return;
     const newHotkeys = [...selectedHotkeys.hotkeys];
     // HotkeyInput returns a HotkeyConfig with hotkeys array
     // Extract the hotkey string (support both old and new format for compatibility)
@@ -216,18 +197,15 @@ export const HotkeySettings: React.FC = () => {
   };
 
   const handleRemoveHotkey = (index: number) => {
-    if (!selectedHotkeys) return;
     const newHotkeys = selectedHotkeys.hotkeys.filter((_, i) => i !== index);
-    // Ensure at least one hotkey (use first available or empty array)
+    // Keep at least one hotkey
     if (newHotkeys.length === 0 && selectedHotkeys.hotkeys.length > 0) {
-      // Keep at least one hotkey - don't allow removing all
       return;
     }
     setSelectedHotkeys({ hotkeys: newHotkeys });
   };
 
   const handleAddHotkey = () => {
-    if (!selectedHotkeys) return;
     if (selectedHotkeys.hotkeys.length < 3) {
       setSelectedHotkeys({
         hotkeys: [...selectedHotkeys.hotkeys, ""],
@@ -235,9 +213,7 @@ export const HotkeySettings: React.FC = () => {
     }
   };
 
-  const isHotkeysChanged = currentHotkeys && selectedHotkeys 
-    ? JSON.stringify(selectedHotkeys.hotkeys) !== JSON.stringify(currentHotkeys.hotkeys)
-    : false;
+  const isHotkeysChanged = JSON.stringify(selectedHotkeys.hotkeys) !== JSON.stringify(currentHotkeys.hotkeys);
   const isLanguageChanged = selectedLanguage !== currentLanguage;
   const hasChanges = isHotkeysChanged || isLanguageChanged;
 
@@ -252,23 +228,12 @@ export const HotkeySettings: React.FC = () => {
     );
   }
 
-  if (!currentHotkeys || !selectedHotkeys) {
-    return (
-      <div className="settings">
-        <h3>Hotkey Settings</h3>
-        <div style={{ color: "rgba(255, 255, 255, 0.6)", fontSize: "11px" }}>
-          {error || "Please log in to configure hotkeys. Defaults will be provided by the server."}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="settings">
       <h3>Hotkey Settings</h3>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {currentHotkeys && (
         <div>
           <div
             style={{
@@ -298,9 +263,7 @@ export const HotkeySettings: React.FC = () => {
             Press any of these combinations to start/stop recording
           </div>
         </div>
-        )}
 
-        {selectedHotkeys && (
         <div>
           <div
             style={{
@@ -312,8 +275,8 @@ export const HotkeySettings: React.FC = () => {
               alignItems: "center",
             }}
           >
-            <span>Configure Hotkeys ({selectedHotkeys?.hotkeys.length || 0}/3)</span>
-            {selectedHotkeys && selectedHotkeys.hotkeys.length < 3 && (
+            <span>Configure Hotkeys ({selectedHotkeys.hotkeys.length}/3)</span>
+            {selectedHotkeys.hotkeys.length < 3 && (
               <button
                 onClick={handleAddHotkey}
                 disabled={isUpdating}
@@ -332,7 +295,7 @@ export const HotkeySettings: React.FC = () => {
               </button>
             )}
           </div>
-          {selectedHotkeys?.hotkeys.map((hotkey, index) => (
+          {selectedHotkeys.hotkeys.map((hotkey, index) => (
             <div
               key={index}
               style={{
@@ -349,7 +312,7 @@ export const HotkeySettings: React.FC = () => {
                   disabled={isUpdating}
                 />
               </div>
-              {selectedHotkeys && selectedHotkeys.hotkeys.length > 1 && (
+              {selectedHotkeys.hotkeys.length > 1 && (
                 <button
                   onClick={() => handleRemoveHotkey(index)}
                   disabled={isUpdating}
@@ -379,7 +342,6 @@ export const HotkeySettings: React.FC = () => {
             Note: Fn key is handled separately and works on Mac. Other hotkeys use Tauri global shortcuts.
           </div>
         </div>
-        )}
 
         <div>
           <div

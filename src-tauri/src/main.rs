@@ -272,32 +272,19 @@ pub fn main() {
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
             let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
 
-            // Load hotkeys from Tauri Store (server provides defaults if none exist)
-            // If user is not logged in, start with empty config - listener will start once config is available
+            // Load hotkeys from Tauri Store (server provides defaults)
             let initial_config = {
                 let app_handle_for_store = app_handle.clone();
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
-                    match get_app_config(app_handle_for_store).await {
-                        Ok(config) => {
-                            match config.transcription_hotkeys {
-                                Some(hotkeys) if !hotkeys.is_empty() => {
-                                    println!("🔑 Loaded hotkeys from store: {:?}", hotkeys);
-                                    HotkeyConfig { hotkeys }
-                                }
-                                _ => {
-                                    println!("⚠️  No hotkeys in config (user may not be logged in yet)");
-                                    // Start with empty - will be populated when user logs in and server provides defaults
-                                    HotkeyConfig { hotkeys: vec![] }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            println!("⚠️  Failed to load hotkeys from store: {} (user may not be logged in)", e);
-                            // Start with empty - will be populated when user logs in
-                            HotkeyConfig { hotkeys: vec![] }
-                        }
-                    }
+                    let config = get_app_config(app_handle_for_store).await
+                        .unwrap_or_else(|_| {
+                            println!("⚠️  Config not available, using empty hotkeys");
+                            crate::commands::app_config::AppConfig::default()
+                        });
+                    let hotkeys = config.transcription_hotkeys.unwrap_or_default();
+                    println!("🔑 Loaded hotkeys from store: {:?}", hotkeys);
+                    HotkeyConfig { hotkeys }
                 })
             };
             let (config_tx, config_rx) = watch::channel(initial_config.clone());
@@ -329,8 +316,7 @@ pub fn main() {
                 }
             });
 
-            // Start the global input listener (rdev) in a background thread for Fn key only
-            // Pass the channel sender and config receiver so it can trigger recording on hotkey press/release
+            // Start rdev listener (always start - it checks config internally)
             global_key_listener::start_listener(
                 app_handle.clone(),
                 recording_tx.clone(),
@@ -338,19 +324,10 @@ pub fn main() {
                 recording_state_arc,
             );
 
-            // Register Tauri global shortcuts (will fall back to rdev if needed)
+            // Register Tauri global shortcuts (always call - handles empty case)
             let tauri_hotkeys = initial_config.tauri_hotkeys();
-            if !tauri_hotkeys.is_empty() {
-                match register_hotkeys(&app_handle, &tauri_hotkeys) {
-                    Ok(rdev_fallback) => {
-                        if !rdev_fallback.is_empty() {
-                            println!("ℹ️  {} hotkey(s) will be handled by rdev: {:?}", rdev_fallback.len(), rdev_fallback);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("⚠️  Failed to register initial global shortcuts: {}", e);
-                    }
-                }
+            if let Err(e) = register_hotkeys(&app_handle, &tauri_hotkeys) {
+                eprintln!("⚠️  Failed to register global shortcuts: {}", e);
             }
 
             // Create system tray with menu

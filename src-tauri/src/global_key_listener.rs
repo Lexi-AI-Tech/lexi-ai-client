@@ -549,31 +549,23 @@ pub fn start_listener(
             // Get hotkeys that should be handled by rdev
             let rdev_hotkeys = current_config.rdev_hotkeys();
             
-            // Start rdev listener if there are any rdev hotkeys
-            if rdev_hotkeys.is_empty() {
-                println!("🔑 No rdev hotkeys in config, skipping rdev listener");
-                // Wait for config change
-                if config_rx.changed().is_err() {
-                    break;
-                }
-                continue;
-            }
-            
-            println!("🔑 Starting rdev listener for hotkeys: {:?}", rdev_hotkeys);
+            // Start rdev listener if there are rdev hotkeys
+            if !rdev_hotkeys.is_empty() {
+                println!("🔑 Starting rdev listener for hotkeys: {:?}", rdev_hotkeys);
 
-            // Shutdown flag for this listener instance
-            let shutdown = Arc::new(AtomicBool::new(false));
-            let shutdown_for_callback = shutdown.clone();
-            let app_for_callback = app_clone.clone();
-            let recording_tx_for_callback = recording_tx_clone.clone();
-            let recording_state_for_callback = recording_state_clone.clone();
+                // Shutdown flag for this listener instance
+                let shutdown = Arc::new(AtomicBool::new(false));
+                let shutdown_for_callback = shutdown.clone();
+                let app_for_callback = app_clone.clone();
+                let recording_tx_for_callback = recording_tx_clone.clone();
+                let recording_state_for_callback = recording_state_clone.clone();
 
-            // Key state tracker to prevent spurious/duplicate events
-            let key_state_tracker = Arc::new(Mutex::new(KeyStateTracker::new()));
-            let key_state_tracker_for_callback = key_state_tracker.clone();
+                // Key state tracker to prevent spurious/duplicate events
+                let key_state_tracker = Arc::new(Mutex::new(KeyStateTracker::new()));
+                let key_state_tracker_for_callback = key_state_tracker.clone();
 
-            // Spawn the actual rdev listener thread
-            let listener_thread = std::thread::spawn(move || {
+                // Spawn the actual rdev listener thread
+                let listener_thread = std::thread::spawn(move || {
                 let callback = move |event: Event| {
                     if shutdown_for_callback.load(Ordering::Relaxed) {
                         return; // Early exit if shutdown signaled
@@ -680,11 +672,11 @@ pub fn start_listener(
                 if let Err(error) = listen(callback) {
                     eprintln!("rdev listen error: {:?}", error);
                 }
-            });
+                });
 
-            // Wait for config change or channel close
-            // Since we're in a blocking std thread, create a small runtime to await the future
-            let shutdown_for_wait = shutdown.clone();
+                // Wait for config change or channel close
+                // Since we're in a blocking std thread, create a small runtime to await the future
+                let shutdown_for_wait = shutdown.clone();
             let changed_result = if let Ok(handle) = tokio::runtime::Handle::try_current() {
                 handle.block_on(config_rx.changed())
             } else {
@@ -707,18 +699,24 @@ pub fn start_listener(
                 break;
             }
 
-            // New config available: Shutdown old and loop to restart
-            println!("🔄 Hotkey config changed, restarting listener...");
-            shutdown.store(true, Ordering::Relaxed);
+                // New config available: Shutdown old and loop to restart
+                println!("🔄 Hotkey config changed, restarting listener...");
+                shutdown.store(true, Ordering::Relaxed);
 
-            // Reset the key state tracker to ensure clean state on restart
-            if let Ok(mut tracker) = key_state_tracker.lock() {
-                tracker.reset();
+                // Reset the key state tracker to ensure clean state on restart
+                if let Ok(mut tracker) = key_state_tracker.lock() {
+                    tracker.reset();
+                }
+
+                // Unpark the listener thread if blocked (rdev::listen is blocking, but AtomicBool check is polled)
+                // Note: rdev doesn't have built-in shutdown; the flag + next event will exit loop implicitly
+                let _ = listener_thread.join(); // Wait for clean shutdown
+            } else {
+                // No rdev hotkeys - just wait for config changes
+                if config_rx.changed().is_err() {
+                    break;
+                }
             }
-
-            // Unpark the listener thread if blocked (rdev::listen is blocking, but AtomicBool check is polled)
-            // Note: rdev doesn't have built-in shutdown; the flag + next event will exit loop implicitly
-            let _ = listener_thread.join(); // Wait for clean shutdown
         }
     });
 }
