@@ -97,21 +97,27 @@ pub async fn update_hotkey(
 
 /// Get the current hotkey configuration from Tauri Store
 ///
+/// Returns hotkeys from store. If no config exists, fetches from server (which provides defaults).
+/// If user is not logged in, returns empty array - frontend should handle this gracefully.
+///
 /// # Returns
 /// * `String` - JSON string representation of the current HotkeyConfig
 #[tauri::command]
-pub async fn get_current_hotkey(app: AppHandle) -> String {
-    // Read from Tauri Store
+pub async fn get_current_hotkey(app: AppHandle) -> Result<String, String> {
+    // Read from Tauri Store (will fetch from server if not found and user is logged in)
     match get_app_config(app).await {
         Ok(config) => {
-            let hotkeys = config.transcription_hotkeys.unwrap_or_else(|| vec!["Fn".to_string()]);
+            // Use hotkeys from config, or empty array if not set (user not logged in)
+            let hotkeys = config.transcription_hotkeys.unwrap_or_default();
             let hotkey_config = HotkeyConfig { hotkeys };
             serde_json::to_string(&hotkey_config)
-                .unwrap_or_else(|_| r#"{"hotkeys":["Fn"]}"#.to_string())
+                .map_err(|e| format!("Failed to serialize hotkey config: {}", e))
         }
-        Err(_) => {
-            // Fallback to default if store read fails
-            r#"{"hotkeys":["Fn"]}"#.to_string()
+        Err(e) => {
+            // If we can't get config (e.g., user not logged in), return empty
+            let hotkey_config = HotkeyConfig { hotkeys: vec![] };
+            serde_json::to_string(&hotkey_config)
+                .map_err(|_| format!("Failed to get config: {}", e))
         }
     }
 }

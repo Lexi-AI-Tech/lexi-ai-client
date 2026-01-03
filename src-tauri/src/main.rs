@@ -272,29 +272,34 @@ pub fn main() {
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
             let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
 
-            // Load hotkeys from Tauri Store
-            // Use default if store is not available or doesn't have hotkeys
+            // Load hotkeys from Tauri Store (server provides defaults if none exist)
+            // If user is not logged in, start with empty config - listener will start once config is available
             let initial_config = {
                 let app_handle_for_store = app_handle.clone();
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
                     match get_app_config(app_handle_for_store).await {
                         Ok(config) => {
-                            let hotkeys = config.transcription_hotkeys
-                                .unwrap_or_else(|| vec!["Fn".to_string()]);
-                            HotkeyConfig { hotkeys }
-                        }
-                        Err(_) => {
-                            println!("⚠️  Failed to load hotkeys from store, using default");
-                            HotkeyConfig {
-                                hotkeys: vec!["Fn".to_string()],
+                            match config.transcription_hotkeys {
+                                Some(hotkeys) if !hotkeys.is_empty() => {
+                                    println!("🔑 Loaded hotkeys from store: {:?}", hotkeys);
+                                    HotkeyConfig { hotkeys }
+                                }
+                                _ => {
+                                    println!("⚠️  No hotkeys in config (user may not be logged in yet)");
+                                    // Start with empty - will be populated when user logs in and server provides defaults
+                                    HotkeyConfig { hotkeys: vec![] }
+                                }
                             }
+                        }
+                        Err(e) => {
+                            println!("⚠️  Failed to load hotkeys from store: {} (user may not be logged in)", e);
+                            // Start with empty - will be populated when user logs in
+                            HotkeyConfig { hotkeys: vec![] }
                         }
                     }
                 })
             };
-            
-            println!("🔑 Loaded hotkeys from store: {:?}", initial_config.hotkeys);
             let (config_tx, config_rx) = watch::channel(initial_config.clone());
 
             // Create recording state and manage it

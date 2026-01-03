@@ -58,8 +58,9 @@ pub struct HotkeyConfig {
 
 impl Default for HotkeyConfig {
     fn default() -> Self {
+        // Default returns empty - actual defaults come from server
         Self {
-            hotkeys: vec!["Fn".to_string()],
+            hotkeys: vec![],
         }
     }
 }
