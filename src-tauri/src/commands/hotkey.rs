@@ -42,23 +42,32 @@ pub fn update_hotkey(
 
     // Get old config to unregister old shortcuts
     let old_config = state.0.borrow().clone();
-    let old_non_fn = old_config.non_fn_hotkeys();
+    let old_tauri = old_config.tauri_hotkeys();
 
-    // Unregister old non-Fn hotkeys
-    unregister_all_hotkeys(&app, &old_non_fn);
+    // Unregister old Tauri hotkeys (rdev hotkeys are managed by listener restart)
+    unregister_all_hotkeys(&app, &old_tauri);
 
     // Update the config
     if state.0.send(new_config.clone()).is_err() {
         return Err("Failed to update hotkey config".to_string());
     }
 
-    // Register new non-Fn hotkeys
-    let new_non_fn = new_config.non_fn_hotkeys();
-    if !new_non_fn.is_empty() {
-        if let Err(e) = register_hotkeys(&app, &new_non_fn) {
-            return Err(format!("Failed to register global shortcuts: {}", e));
+    // Register new hotkeys (Tauri will try first, fall back to rdev if needed)
+    let tauri_hotkeys = new_config.tauri_hotkeys();
+    if !tauri_hotkeys.is_empty() {
+        match register_hotkeys(&app, &tauri_hotkeys) {
+            Ok(rdev_fallback) => {
+                if !rdev_fallback.is_empty() {
+                    println!("ℹ️  {} hotkey(s) will be handled by rdev: {:?}", rdev_fallback.len(), rdev_fallback);
+                }
+            }
+            Err(e) => {
+                return Err(format!("Failed to register global shortcuts: {}", e));
+            }
         }
     }
+    
+    // Note: rdev hotkeys are automatically handled by the rdev listener when config changes
 
     // Emit the config back as JSON for UI display
     app.emit("hotkey-updated", &config_json).unwrap_or_default();

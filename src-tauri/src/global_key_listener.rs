@@ -70,11 +70,26 @@ impl HotkeyConfig {
         self.hotkeys.iter().any(|h| h.trim().eq_ignore_ascii_case("Fn"))
     }
 
-    /// Returns hotkeys that are NOT the Fn key (for Tauri global shortcuts)
-    pub fn non_fn_hotkeys(&self) -> Vec<String> {
+    /// Returns hotkeys that should be handled by rdev (Fn key or keys that can't use Tauri)
+    pub fn rdev_hotkeys(&self) -> Vec<String> {
         self.hotkeys
             .iter()
-            .filter(|h| !h.trim().eq_ignore_ascii_case("Fn"))
+            .filter(|h| {
+                let trimmed = h.trim();
+                trimmed.eq_ignore_ascii_case("Fn") || should_use_rdev(trimmed)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Returns hotkeys that should use Tauri global shortcuts
+    pub fn tauri_hotkeys(&self) -> Vec<String> {
+        self.hotkeys
+            .iter()
+            .filter(|h| {
+                let trimmed = h.trim();
+                !trimmed.eq_ignore_ascii_case("Fn") && !should_use_rdev(trimmed)
+            })
             .cloned()
             .collect()
     }
@@ -135,19 +150,54 @@ const SYSTEM_RESERVED_SHORTCUTS: &[&str] = &[
     "CommandOrControl+Shift+Delete",  // Empty Trash
 ];
 
+/// Checks if a hotkey should be handled by rdev instead of Tauri global shortcuts
+/// Returns true for keys that Tauri cannot handle reliably
+pub fn should_use_rdev(hotkey: &str) -> bool {
+    let trimmed = hotkey.trim();
+    
+    // Fn key must use rdev
+    if trimmed.eq_ignore_ascii_case("Fn") {
+        return true;
+    }
+    
+    // Normalize for checking
+    let normalized = normalize_hotkey(trimmed);
+    
+    // Check if it's modifier-only (Tauri can't handle, but rdev can)
+    if let Ok(shortcut) = normalized.parse::<Shortcut>() {
+        if is_modifier_only(&shortcut, &normalized) {
+            return true;
+        }
+    }
+    
+    // Check if it's a single key without modifiers (risky with Tauri, better with rdev)
+    if is_single_key_without_modifiers(&normalized) {
+        return true;
+    }
+    
+    false
+}
+
 /// Validates a hotkey string and returns an error if it's invalid
+/// Note: Keys that can't use Tauri will be handled by rdev automatically
 pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
     let trimmed = hotkey.trim();
     
-    // Skip validation for Fn key (handled separately via rdev)
+    // Fn key is always valid (handled by rdev)
     if trimmed.eq_ignore_ascii_case("Fn") {
         return Ok(());
     }
     
-    // Normalize the hotkey for comparison
+    // If it should use rdev, it's valid (rdev can handle more keys)
+    if should_use_rdev(trimmed) {
+        return Ok(());
+    }
+    
+    // For Tauri shortcuts, check if it's system-reserved
     let normalized = normalize_hotkey(trimmed);
     
-    // Check if it's a system-reserved shortcut
+    // System-reserved shortcuts cannot be overridden even with rdev
+    // (macOS intercepts them before any app sees them)
     if SYSTEM_RESERVED_SHORTCUTS.iter().any(|&reserved| {
         reserved.eq_ignore_ascii_case(&normalized)
     }) {
@@ -157,24 +207,10 @@ pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
         ));
     }
     
-    // Parse to check if it's valid Tauri format
-    let shortcut: Shortcut = normalized.parse().map_err(|e| {
+    // Try to parse as Tauri shortcut to validate format
+    let _shortcut: Shortcut = normalized.parse().map_err(|e| {
         format!("Invalid hotkey format '{}': {}", hotkey, e)
     })?;
-    
-    // Check if it's modifier-only (not allowed by Tauri)
-    if is_modifier_only(&shortcut, &normalized) {
-        return Err(format!(
-            "Modifier-only shortcuts (like '{}') are not supported. Please include at least one non-modifier key.",
-            hotkey
-        ));
-    }
-    
-    // Check if it's a single key without modifiers (risky, but allow with warning)
-    if is_single_key_without_modifiers(&normalized) {
-        // We'll allow it but it's not recommended
-        // The user will see a warning in the UI
-    }
     
     Ok(())
 }
@@ -245,84 +281,107 @@ fn normalize_single_key(key: &str) -> String {
 // Tauri Global Shortcut Management
 // ============================================================================
 
-/// Register a hotkey as a Tauri global shortcut (if it's not the Fn key)
+/// Register a hotkey, trying Tauri first, falling back to rdev if needed
+/// Returns (success, used_rdev) tuple
 pub fn register_hotkey(
     app: &AppHandle,
     hotkey: &str,
-) -> Result<(), String> {
-    // Skip Fn key - it's handled by rdev
-    if hotkey.trim().eq_ignore_ascii_case("Fn") {
-        return Ok(());
+) -> Result<bool, String> {
+    let trimmed = hotkey.trim();
+    
+    // Validate the hotkey
+    validate_hotkey(trimmed)?;
+    
+    // If it should use rdev, mark it for rdev handling
+    if should_use_rdev(trimmed) {
+        println!("🔑 Hotkey '{}' will be handled by rdev (not supported by Tauri global shortcuts)", trimmed);
+        return Ok(true); // true = use rdev
     }
     
-    // Validate the hotkey before registering
-    validate_hotkey(hotkey)?;
-
-    let normalized = normalize_hotkey(hotkey);
-    println!("🔑 Registering Tauri global shortcut: {} (normalized: {})", hotkey, normalized);
+    // Try to register with Tauri global shortcuts
+    let normalized = normalize_hotkey(trimmed);
+    println!("🔑 Attempting to register Tauri global shortcut: {} (normalized: {})", trimmed, normalized);
 
     // Parse the normalized shortcut
-    let shortcut: Shortcut = normalized.parse().map_err(|e| {
-        format!("Failed to parse hotkey '{}' (normalized: '{}'): {}", hotkey, normalized, e)
-    })?;
+    let shortcut: Shortcut = match normalized.parse() {
+        Ok(s) => s,
+        Err(e) => {
+            // If parsing fails, fall back to rdev
+            println!("⚠️  Failed to parse hotkey '{}' for Tauri, will use rdev: {}", trimmed, e);
+            return Ok(true); // Use rdev
+        }
+    };
 
-    // Register the shortcut (handler is set up in main.rs via the plugin builder)
-    app.global_shortcut()
-        .register(shortcut)
-        .map_err(|e| {
+    // Try to register with Tauri
+    match app.global_shortcut().register(shortcut) {
+        Ok(_) => {
+            println!("✅ Successfully registered Tauri global shortcut: {}", trimmed);
+            Ok(false) // false = using Tauri
+        }
+        Err(e) => {
             let error_msg = e.to_string();
             let error_lower = error_msg.to_lowercase();
             
-            // Provide helpful error message based on error type
+            // If it's a conflict or already in use, that's a real error
             if error_lower.contains("already registered") || error_lower.contains("conflict") || error_lower.contains("in use") {
-                format!("Hotkey '{}' is already in use by another application. Please choose a different combination.", hotkey)
-            } else if error_lower.contains("parse") || error_lower.contains("invalid") {
-                format!("Invalid hotkey combination '{}'. Please use a valid key combination.", hotkey)
+                Err(format!("Hotkey '{}' is already in use by another application. Please choose a different combination.", trimmed))
             } else {
-                format!("Failed to register hotkey '{}': {}", hotkey, e)
+                // For other errors, fall back to rdev
+                println!("⚠️  Failed to register '{}' with Tauri ({}), will use rdev instead", trimmed, e);
+                Ok(true) // Use rdev
             }
-        })?;
-
-    println!("✅ Successfully registered Tauri global shortcut: {}", hotkey);
-    Ok(())
+        }
+    }
 }
 
-/// Unregister a hotkey
+/// Unregister a hotkey (only for Tauri shortcuts, rdev hotkeys are handled by config change)
 pub fn unregister_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
-    // Skip Fn key - it's handled by rdev
-    if hotkey.trim().eq_ignore_ascii_case("Fn") {
+    let trimmed = hotkey.trim();
+    
+    // Skip rdev-handled keys (they're managed by the rdev listener)
+    if should_use_rdev(trimmed) {
         return Ok(());
     }
 
-    let normalized = normalize_hotkey(hotkey);
-    println!("🔑 Unregistering Tauri global shortcut: {} (normalized: {})", hotkey, normalized);
+    let normalized = normalize_hotkey(trimmed);
+    println!("🔑 Unregistering Tauri global shortcut: {} (normalized: {})", trimmed, normalized);
 
     let shortcut: Shortcut = normalized.parse().map_err(|e| {
-        format!("Failed to parse hotkey '{}' (normalized: '{}'): {}", hotkey, normalized, e)
+        format!("Failed to parse hotkey '{}' (normalized: '{}'): {}", trimmed, normalized, e)
     })?;
 
     app.global_shortcut()
         .unregister(shortcut)
-        .map_err(|e| format!("Failed to unregister hotkey '{}': {}", hotkey, e))?;
+        .map_err(|e| format!("Failed to unregister hotkey '{}': {}", trimmed, e))?;
 
-    println!("✅ Successfully unregistered Tauri global shortcut: {}", hotkey);
+    println!("✅ Successfully unregistered Tauri global shortcut: {}", trimmed);
     Ok(())
 }
 
 /// Register multiple hotkeys (up to 3)
+/// Returns list of hotkeys that will be handled by rdev
 pub fn register_hotkeys(
     app: &AppHandle,
     hotkeys: &[String],
-) -> Result<(), String> {
+) -> Result<Vec<String>, String> {
     // Limit to 3 hotkeys
     if hotkeys.len() > 3 {
         return Err("Maximum of 3 hotkeys allowed".to_string());
     }
 
+    let mut rdev_hotkeys = Vec::new();
     let mut errors = Vec::new();
+    
     for hotkey in hotkeys {
-        if let Err(e) = register_hotkey(app, hotkey) {
-            errors.push(format!("Failed to register '{}': {}", hotkey, e));
+        match register_hotkey(app, hotkey) {
+            Ok(use_rdev) => {
+                if use_rdev {
+                    rdev_hotkeys.push(hotkey.clone());
+                }
+            }
+            Err(e) => {
+                errors.push(format!("Failed to register '{}': {}", hotkey, e));
+            }
         }
     }
     
@@ -330,14 +389,17 @@ pub fn register_hotkeys(
         return Err(errors.join("; "));
     }
 
-    Ok(())
+    Ok(rdev_hotkeys)
 }
 
-/// Unregister all hotkeys
+/// Unregister all Tauri hotkeys (rdev hotkeys are managed by config)
 pub fn unregister_all_hotkeys(app: &AppHandle, hotkeys: &[String]) {
     for hotkey in hotkeys {
-        if let Err(e) = unregister_hotkey(app, hotkey) {
-            eprintln!("⚠️  Failed to unregister hotkey '{}': {}", hotkey, e);
+        // Only unregister Tauri shortcuts, rdev ones are handled by listener restart
+        if !should_use_rdev(hotkey) {
+            if let Err(e) = unregister_hotkey(app, hotkey) {
+                eprintln!("⚠️  Failed to unregister hotkey '{}': {}", hotkey, e);
+            }
         }
     }
 }
@@ -483,9 +545,12 @@ pub fn start_listener(
             // Get current config
             let current_config = config_rx.borrow().clone();
             
-            // Only start rdev listener if Fn key is in the config
-            if !current_config.has_fn_key() {
-                println!("🔑 No Fn key in config, skipping rdev listener");
+            // Get hotkeys that should be handled by rdev
+            let rdev_hotkeys = current_config.rdev_hotkeys();
+            
+            // Start rdev listener if there are any rdev hotkeys
+            if rdev_hotkeys.is_empty() {
+                println!("🔑 No rdev hotkeys in config, skipping rdev listener");
                 // Wait for config change
                 if config_rx.changed().is_err() {
                     break;
@@ -493,7 +558,7 @@ pub fn start_listener(
                 continue;
             }
             
-            println!("🔑 Starting rdev listener for Fn key: {:?}", current_config);
+            println!("🔑 Starting rdev listener for hotkeys: {:?}", rdev_hotkeys);
 
             // Shutdown flag for this listener instance
             let shutdown = Arc::new(AtomicBool::new(false));
@@ -536,28 +601,34 @@ pub fn start_listener(
                         }
                     }
 
-                    // Check if this is a Function key event and process through state tracker
-                    if is_function_key_event(&event.event_type) {
-                        // Use state tracker to filter spurious/duplicate events
-                        let command = {
-                            if let Ok(mut tracker) = key_state_tracker_for_callback.lock() {
-                                tracker.process_event(&event.event_type)
-                            } else {
-                                eprintln!("❌ Failed to lock key state tracker");
-                                None
-                            }
-                        };
+                    // Check if this event matches any rdev hotkey
+                    // For Fn key, use the state tracker; for others, check key combinations
+                    let command = if is_function_key_event(&event.event_type) {
+                        // Use state tracker for Fn key (press/release behavior)
+                        if let Ok(mut tracker) = key_state_tracker_for_callback.lock() {
+                            tracker.process_event(&event.event_type)
+                        } else {
+                            eprintln!("❌ Failed to lock key state tracker");
+                            None
+                        }
+                    } else {
+                        // For other rdev hotkeys, we need to track key combinations
+                        // This is a simplified version - for full support, we'd need to track
+                        // all pressed keys and match against hotkey patterns
+                        // For now, we'll handle Fn key and let Tauri handle others
+                        None
+                    };
 
-                        // Only process if state tracker approved the transition
-                        if let Some(command) = command {
+                    // Only process if we got a command
+                    if let Some(command) = command {
                             // Log the trigger
                             let trigger_type = match command {
                                 RecordingCommand::Start => "PRESSED",
                                 RecordingCommand::Stop => "RELEASED",
                             };
                             println!(
-                                "=== HOTKEY TRIGGER: {} ({:?}) ===",
-                                trigger_type, current_config
+                                "=== HOTKEY TRIGGER: {} ===",
+                                trigger_type
                             );
 
                             // Query cursor context

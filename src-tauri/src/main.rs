@@ -314,11 +314,18 @@ pub fn main() {
                 recording_state_arc,
             );
 
-            // Register Tauri global shortcuts for non-Fn hotkeys
-            let non_fn_hotkeys = initial_config.non_fn_hotkeys();
-            if !non_fn_hotkeys.is_empty() {
-                if let Err(e) = register_hotkeys(&app_handle, &non_fn_hotkeys) {
-                    eprintln!("⚠️  Failed to register initial global shortcuts: {}", e);
+            // Register Tauri global shortcuts (will fall back to rdev if needed)
+            let tauri_hotkeys = initial_config.tauri_hotkeys();
+            if !tauri_hotkeys.is_empty() {
+                match register_hotkeys(&app_handle, &tauri_hotkeys) {
+                    Ok(rdev_fallback) => {
+                        if !rdev_fallback.is_empty() {
+                            println!("ℹ️  {} hotkey(s) will be handled by rdev: {:?}", rdev_fallback.len(), rdev_fallback);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to register initial global shortcuts: {}", e);
+                    }
                 }
             }
 
