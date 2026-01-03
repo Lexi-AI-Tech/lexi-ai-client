@@ -21,6 +21,13 @@ export const SettingsPage: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(
     null,
   );
+  const [selectedAutostart, setSelectedAutostart] = useState<boolean | null>(
+    null,
+  );
+  const [selectedEnhanceTranscription, setSelectedEnhanceTranscription] =
+    useState<boolean | null>(null);
+  const [selectedTranscribeWithCursorContext, setSelectedTranscribeWithCursorContext] =
+    useState<boolean | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +51,7 @@ export const SettingsPage: React.FC = () => {
         const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
         setConfig(loadedConfig);
 
-        // Set selected language for the dropdown (only if backend provides it)
+        // Set selected values for all settings (only if backend provides them)
         if (loadedConfig.languages && loadedConfig.languages.length > 0) {
           const firstLanguage = loadedConfig.languages[0] as LanguageCode;
           if (Object.values(LanguageCode).includes(firstLanguage)) {
@@ -54,6 +61,11 @@ export const SettingsPage: React.FC = () => {
           // Backend didn't provide a language, keep it null
           setSelectedLanguage(null);
         }
+        setSelectedAutostart(loadedConfig.launch_on_system_startup ?? null);
+        setSelectedEnhanceTranscription(loadedConfig.enhance_transcription ?? null);
+        setSelectedTranscribeWithCursorContext(
+          loadedConfig.transcribe_with_cursor_context ?? null,
+        );
       } catch (err: any) {
         console.error("Failed to load app config:", err);
         setError(err?.message || "Failed to load configuration");
@@ -81,15 +93,21 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSaveLanguage = async () => {
-    if (selectedLanguage === null) {
-      return; // No language selected
-    }
+  const handleSaveSettings = async () => {
+    // Check if anything changed
+    const languageChanged =
+      selectedLanguage !== null && selectedLanguage !== currentLanguage;
+    const autostartChanged =
+      selectedAutostart !== null && selectedAutostart !== autostartEnabled;
+    const enhanceChanged =
+      selectedEnhanceTranscription !== null &&
+      selectedEnhanceTranscription !== enhanceTranscription;
+    const cursorContextChanged =
+      selectedTranscribeWithCursorContext !== null &&
+      selectedTranscribeWithCursorContext !== transcribeWithCursorContext;
 
-    const languageChanged = selectedLanguage !== currentLanguage;
-
-    if (!languageChanged) {
-      return; // No change needed
+    if (!languageChanged && !autostartChanged && !enhanceChanged && !cursorContextChanged) {
+      return; // No changes needed
     }
 
     setIsUpdating(true);
@@ -97,7 +115,37 @@ export const SettingsPage: React.FC = () => {
     setSuccess(false);
 
     try {
-      await updateConfig({ languages: [selectedLanguage] });
+      const updates: Partial<TauriAppConfig> = {};
+
+      if (languageChanged && selectedLanguage !== null) {
+        updates.languages = [selectedLanguage];
+      }
+      if (autostartChanged && selectedAutostart !== null) {
+        updates.launch_on_system_startup = selectedAutostart;
+      }
+      if (enhanceChanged && selectedEnhanceTranscription !== null) {
+        updates.enhance_transcription = selectedEnhanceTranscription;
+      }
+      if (cursorContextChanged && selectedTranscribeWithCursorContext !== null) {
+        updates.transcribe_with_cursor_context = selectedTranscribeWithCursorContext;
+      }
+
+      const updatedConfig = await updateConfig(updates);
+      
+      // Update selected values to match the saved config
+      if (languageChanged && updatedConfig.languages && updatedConfig.languages.length > 0) {
+        setSelectedLanguage(updatedConfig.languages[0] as LanguageCode);
+      }
+      if (autostartChanged && updatedConfig.launch_on_system_startup !== undefined) {
+        setSelectedAutostart(updatedConfig.launch_on_system_startup);
+      }
+      if (enhanceChanged && updatedConfig.enhance_transcription !== undefined) {
+        setSelectedEnhanceTranscription(updatedConfig.enhance_transcription);
+      }
+      if (cursorContextChanged && updatedConfig.transcribe_with_cursor_context !== undefined) {
+        setSelectedTranscribeWithCursorContext(updatedConfig.transcribe_with_cursor_context);
+      }
+      
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (err: any) {
@@ -107,43 +155,35 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const isLanguageChanged =
-    selectedLanguage !== null && selectedLanguage !== currentLanguage;
+  const hasChanges = () => {
+    const languageChanged =
+      selectedLanguage !== null && selectedLanguage !== currentLanguage;
+    const autostartChanged =
+      selectedAutostart !== null && selectedAutostart !== autostartEnabled;
+    const enhanceChanged =
+      selectedEnhanceTranscription !== null &&
+      selectedEnhanceTranscription !== enhanceTranscription;
+    const cursorContextChanged =
+      selectedTranscribeWithCursorContext !== null &&
+      selectedTranscribeWithCursorContext !== transcribeWithCursorContext;
 
-  const handleToggleAutostart = async () => {
-    try {
-      const updatedConfig = await updateConfig({
-        launch_on_system_startup: autostartEnabled === true ? false : true,
-      });
-      console.log(
-        updatedConfig.launch_on_system_startup
-          ? "✅ Auto-startup enabled"
-          : "❌ Auto-startup disabled",
-      );
-    } catch (err: any) {
-      // Error already set by updateConfig
-    }
+    return languageChanged || autostartChanged || enhanceChanged || cursorContextChanged;
   };
 
-  const handleToggleEnhanceTranscription = async () => {
-    try {
-      await updateConfig({
-        enhance_transcription: enhanceTranscription === true ? false : true,
-      });
-    } catch (err: any) {
-      // Error already set by updateConfig
-    }
+  const handleToggleAutostart = () => {
+    setSelectedAutostart(selectedAutostart === true ? false : true);
   };
 
-  const handleToggleCursorContext = async () => {
-    try {
-      await updateConfig({
-        transcribe_with_cursor_context:
-          transcribeWithCursorContext === true ? false : true,
-      });
-    } catch (err: any) {
-      // Error already set by updateConfig
-    }
+  const handleToggleEnhanceTranscription = () => {
+    setSelectedEnhanceTranscription(
+      selectedEnhanceTranscription === true ? false : true,
+    );
+  };
+
+  const handleToggleCursorContext = () => {
+    setSelectedTranscribeWithCursorContext(
+      selectedTranscribeWithCursorContext === true ? false : true,
+    );
   };
 
   const ToggleSwitch: React.FC<{
@@ -373,9 +413,9 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={enhanceTranscription === true}
+              enabled={selectedEnhanceTranscription === true}
               onToggle={handleToggleEnhanceTranscription}
-              disabled={isLoading}
+              disabled={isLoading || isUpdating}
             />
           </div>
 
@@ -411,9 +451,9 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={transcribeWithCursorContext === true}
+              enabled={selectedTranscribeWithCursorContext === true}
               onToggle={handleToggleCursorContext}
-              disabled={isLoading}
+              disabled={isLoading || isUpdating}
             />
           </div>
 
@@ -449,51 +489,6 @@ export const SettingsPage: React.FC = () => {
               >
                 Configure hotkeys in the Hotkey Settings section
               </div>
-            </div>
-          )}
-
-          <button
-            className="transcript-btn"
-            onClick={handleSaveLanguage}
-            disabled={isUpdating || !isLanguageChanged || isLoading}
-            style={{
-              marginTop: "8px",
-              padding: "8px 16px",
-              fontSize: "11px",
-              width: "100%",
-              opacity: isUpdating || !isLanguageChanged || isLoading ? 0.5 : 1,
-            }}
-          >
-            {isUpdating ? "Saving..." : "Save Language"}
-          </button>
-
-          {error && (
-            <div
-              className="permission-message"
-              style={{
-                background: "rgba(255, 59, 48, 0.1)",
-                borderColor: "rgba(255, 59, 48, 0.2)",
-                color: "rgba(255, 59, 48, 0.9)",
-                fontSize: "11px",
-                padding: "8px",
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div
-              className="permission-message"
-              style={{
-                background: "rgba(52, 199, 89, 0.1)",
-                borderColor: "rgba(52, 199, 89, 0.2)",
-                color: "rgba(52, 199, 89, 0.9)",
-                fontSize: "11px",
-                padding: "8px",
-              }}
-            >
-              Language saved successfully!
             </div>
           )}
         </div>
@@ -545,9 +540,9 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              enabled={autostartEnabled === true}
+              enabled={selectedAutostart === true}
               onToggle={handleToggleAutostart}
-              disabled={isLoading}
+              disabled={isLoading || isUpdating}
             />
           </div>
         </div>
@@ -610,6 +605,54 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <div style={{ marginTop: "32px" }}>
+        <button
+          className="transcript-btn"
+          onClick={handleSaveSettings}
+          disabled={isUpdating || !hasChanges() || isLoading}
+          style={{
+            padding: "8px 16px",
+            fontSize: "11px",
+            width: "100%",
+            opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
+          }}
+        >
+          {isUpdating ? "Saving..." : "Save Settings"}
+        </button>
+
+        {error && (
+          <div
+            className="permission-message"
+            style={{
+              background: "rgba(255, 59, 48, 0.1)",
+              borderColor: "rgba(255, 59, 48, 0.2)",
+              color: "rgba(255, 59, 48, 0.9)",
+              fontSize: "11px",
+              padding: "8px",
+              marginTop: "12px",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div
+            className="permission-message"
+            style={{
+              background: "rgba(52, 199, 89, 0.1)",
+              borderColor: "rgba(52, 199, 89, 0.2)",
+              color: "rgba(52, 199, 89, 0.9)",
+              fontSize: "11px",
+              padding: "8px",
+              marginTop: "12px",
+            }}
+          >
+            Settings saved successfully!
+          </div>
+        )}
+      </div>
     </div>
   );
 };
