@@ -7,10 +7,10 @@ use crate::commands::auth::get_auth_token;
 use crate::config;
 use reqwest::multipart;
 use std::error::Error;
-use std::process::Command;
 use std::fs;
-use tempfile::TempDir;
+use std::process::Command;
 use tauri::AppHandle;
+use tempfile::TempDir;
 
 /// Text-to-Speech service using Lexi AI Server
 pub struct TtsService {
@@ -74,7 +74,10 @@ impl TtsService {
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(format!("TTS API error ({}): {}", status, error_text).into());
         }
 
@@ -89,9 +92,7 @@ impl TtsService {
         // Play audio using macOS `afplay` command
         #[cfg(target_os = "macos")]
         {
-            let output = Command::new("afplay")
-                .arg(&audio_path)
-                .output()?;
+            let output = Command::new("afplay").arg(&audio_path).output()?;
 
             if !output.status.success() {
                 let error = String::from_utf8_lossy(&output.stderr);
@@ -105,14 +106,18 @@ impl TtsService {
             // Try to use system default audio player
             #[cfg(target_os = "linux")]
             {
-                Command::new("mpg123")
-                    .arg(&audio_path)
-                    .output()?;
+                Command::new("mpg123").arg(&audio_path).output()?;
             }
             #[cfg(target_os = "windows")]
             {
                 Command::new("powershell")
-                    .args(&["-Command", &format!("(New-Object Media.SoundPlayer '{}').PlaySync()", audio_path.display())])
+                    .args(&[
+                        "-Command",
+                        &format!(
+                            "(New-Object Media.SoundPlayer '{}').PlaySync()",
+                            audio_path.display()
+                        ),
+                    ])
                     .output()?;
             }
         }
@@ -121,4 +126,3 @@ impl TtsService {
         Ok(())
     }
 }
-

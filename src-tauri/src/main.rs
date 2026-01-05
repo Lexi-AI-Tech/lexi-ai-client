@@ -137,7 +137,10 @@ pub fn main() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
                     let event_state = event.state();
-                    println!("🔑 Global shortcut triggered: {:?}, state: {:?}", shortcut, event_state);
+                    println!(
+                        "🔑 Global shortcut triggered: {:?}, state: {:?}",
+                        shortcut, event_state
+                    );
 
                     // Get the recording channel from app state
                     let app_handle = app.app_handle();

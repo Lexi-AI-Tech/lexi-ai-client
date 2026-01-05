@@ -198,46 +198,47 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 // Only process if transcription is not empty
                 if !transcription.trim().is_empty() {
                     // Check if transcription starts with action trigger (e.g., "Hey Lexi")
-                    let action_result = if let Some(action_command) = check_action_trigger(&transcription) {
-                        // Action trigger detected - perform action and use its result
-                        println!(
-                            "🎯 Action trigger detected: '{}' -> performing action: '{}'",
-                            transcription.trim(),
-                            action_command
-                        );
-                        let result = perform_action(
-                            &action_command,
-                            &app_handle_for_task,
-                            cursor_context.as_ref(),
-                        )
-                        .await;
-                        Some(result)
-                    } else {
-                        // No action trigger - check if transcription matches a shortcut command
-                        let text_to_inject = check_command(&transcription)
-                            .unwrap_or_else(|| transcription.clone());
-                        
-                        if text_to_inject != transcription {
+                    let action_result =
+                        if let Some(action_command) = check_action_trigger(&transcription) {
+                            // Action trigger detected - perform action and use its result
                             println!(
-                                "🔧 Command detected: '{}' -> '{}'",
+                                "🎯 Action trigger detected: '{}' -> performing action: '{}'",
                                 transcription.trim(),
-                                text_to_inject
+                                action_command
                             );
-                        }
-                        
-                        // For non-action transcriptions, create a text action response
-                        Some(ActionResponse {
-                            action_type: "text".to_string(),
-                            value: text_to_inject,
-                        })
-                    };
+                            let result = perform_action(
+                                &action_command,
+                                &app_handle_for_task,
+                                cursor_context.as_ref(),
+                            )
+                            .await;
+                            Some(result)
+                        } else {
+                            // No action trigger - check if transcription matches a shortcut command
+                            let text_to_inject = check_command(&transcription)
+                                .unwrap_or_else(|| transcription.clone());
+
+                            if text_to_inject != transcription {
+                                println!(
+                                    "🔧 Command detected: '{}' -> '{}'",
+                                    transcription.trim(),
+                                    text_to_inject
+                                );
+                            }
+
+                            // For non-action transcriptions, create a text action response
+                            Some(ActionResponse {
+                                action_type: "text".to_string(),
+                                value: text_to_inject,
+                            })
+                        };
 
                     if let Some(action_response) = action_result {
                         match action_response.action_type.as_str() {
                             "voice" => {
                                 // Use TTS to read the text
                                 println!("🔊 Voice action detected - reading text using TTS");
-                                
+
                                 let tts_service = TtsService::new(app_handle_for_task.clone());
                                 match tts_service.speak(&action_response.value, None).await {
                                     Ok(_) => {
@@ -274,7 +275,10 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                                 }
                             }
                             _ => {
-                                eprintln!("⚠️  Unknown action type: {}", action_response.action_type);
+                                eprintln!(
+                                    "⚠️  Unknown action type: {}",
+                                    action_response.action_type
+                                );
                                 // Fallback to text injection
                                 let injector = TextInjector::new();
                                 if let Err(e) = injector.inject_text(&action_response.value) {
