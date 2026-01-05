@@ -1,118 +1,129 @@
 //! Whisper.cpp Integration Module
 //!
 //! This module provides local speech-to-text transcription using whisper.cpp binary.
-//! It handles path resolution for bundled resources and executes the whisper.cpp
+//! It handles path resolution for user-downloaded resources and executes the whisper.cpp
 //! binary to transcribe audio files.
 //!
 //! ## Architecture
 //!
-//! - Uses external whisper.cpp binary bundled with the app
+//! - Uses external whisper.cpp binary stored in user data directory
+//! - Uses models stored in user data directory (downloaded on-demand)
 //! - Requires pre-recorded audio file in WAV format (16 kHz, mono, 16-bit PCM)
 //! - Returns plain text transcription
 //!
 //! ## Resources
 //!
-//! The following resources must be bundled in tauri.conf.json:
-//! - `bin/whisper` - The whisper.cpp binary
-//! - `models/ggml-small-q5_1.bin` - The quantized multilingual model file
+//! Models and executables are stored in platform-specific user data directories:
+//! - macOS: `~/Library/Application Support/com.lexi.ai/`
+//! - Linux: `~/.local/share/lexi-ai/`
+//! - Windows: `%APPDATA%\lexi-ai\`
 //!
-//! ## Extending to Other Models
-//!
-//! To use a different Whisper model, see `src-tauri/models/README.md` for detailed instructions.
+//! Users can download models through the UI. The default model is `ggml-small-q5_1.bin`.
 
+use crate::model_manager;
 use std::path::PathBuf;
 use std::process::Command;
 use uuid::Uuid;
 
-/// Resolves the paths to the bundled whisper binary and model file
+/// Resolves the paths to the whisper binary and model file
 ///
-/// Searches in multiple locations:
-/// 1. Tauri resource directory (production bundle)
-/// 2. Executable directory (production)
-/// 3. Development paths (only in debug mode, avoids file access permissions)
+/// Searches in the following order:
+/// 1. User data directory (primary location for downloaded models/executables)
+/// 2. Development paths (only in debug mode, for local testing)
 ///
 /// # Returns
 /// * `Ok((PathBuf, PathBuf))` - Tuple of (whisper_bin_path, model_path)
 /// * `Err(String)` - Error message if paths cannot be resolved
 pub fn resolve_whisper_paths() -> Result<(PathBuf, PathBuf), String> {
-    let mut search_dirs = Vec::new();
+    // Default model name (can be made configurable in the future)
+    let default_model = "ggml-small-q5_1.bin";
 
-    // Note: We avoid using std::env::current_dir() in production to prevent
-    // macOS file access permission prompts. We only use it in debug mode.
-
-    // Try to get executable directory (production bundle)
-    if let Ok(exe_path) = std::env::current_exe() {
-        let mut dir_opt = exe_path.parent();
-        while let Some(dir) = dir_opt {
-            // In macOS bundle, resources are in Contents/Resources
-            #[cfg(target_os = "macos")]
+    // Try to get whisper executable from user data directory
+    let whisper_bin = match model_manager::resolve_whisper_executable_path() {
+        Ok(path) if path.exists() => path,
+        _ => {
+            // Fallback to development paths in debug mode
+            #[cfg(debug_assertions)]
             {
-                let resources_dir = dir.join("Resources");
-                if resources_dir.exists() {
-                    search_dirs.push(resources_dir);
+                if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+                    let dev_path = PathBuf::from(manifest_dir).join("bin").join("whisper");
+                    #[cfg(target_os = "windows")]
+                    let dev_path = dev_path.with_extension("exe");
+                    if dev_path.exists() {
+                        dev_path
+                    } else {
+                        return Err(format!(
+                            "Whisper executable not found. Please download it and place it in: {}",
+                            model_manager::get_executables_directory()
+                                .unwrap_or_else(|_| PathBuf::from("user-data/bin"))
+                                .display()
+                        ));
+                    }
+                } else {
+                    return Err(format!(
+                        "Whisper executable not found. Please download it and place it in: {}",
+                        model_manager::get_executables_directory()
+                            .unwrap_or_else(|_| PathBuf::from("user-data/bin"))
+                            .display()
+                    ));
                 }
-                // Also check MacOS directory (where externalBin might be)
-                search_dirs.push(dir.to_path_buf());
             }
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(debug_assertions))]
             {
-                search_dirs.push(dir.to_path_buf());
-            }
-            dir_opt = dir.parent();
-        }
-    }
-
-    // Only add development paths in debug mode to avoid file access permissions in production
-    #[cfg(debug_assertions)]
-    {
-        // Try to get the project root from CARGO_MANIFEST_DIR if available
-        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-            let manifest_path = PathBuf::from(manifest_dir);
-            search_dirs.push(manifest_path.clone());
-            // Also check parent directory (project root)
-            if let Some(parent) = manifest_path.parent() {
-                search_dirs.push(parent.to_path_buf());
+                return Err(format!(
+                    "Whisper executable not found. Please download it and place it in: {}",
+                    model_manager::get_executables_directory()
+                        .unwrap_or_else(|_| PathBuf::from("user-data/bin"))
+                        .display()
+                ));
             }
         }
+    };
 
-        // Only use current_dir in debug mode as a last resort
-        if let Ok(cwd) = std::env::current_dir() {
-            // Only add if it's not already in the list and looks like a development directory
-            let cwd_str = cwd.to_string_lossy();
-            if cwd_str.contains("lexi-ai-client") || cwd_str.contains("src-tauri") {
-                search_dirs.push(cwd.join("src-tauri"));
-                search_dirs.push(cwd);
+    // Try to get model from user data directory
+    let model = match model_manager::resolve_model_path(default_model) {
+        Ok(path) if path.exists() => path,
+        _ => {
+            // Fallback to development paths in debug mode
+            #[cfg(debug_assertions)]
+            {
+                if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+                    let dev_path = PathBuf::from(manifest_dir)
+                        .join("models")
+                        .join(default_model);
+                    if dev_path.exists() {
+                        dev_path
+                    } else {
+                        return Err(format!(
+                            "Model '{}' not found. Please download it through the Settings page or place it in: {}",
+                            default_model,
+                            model_manager::get_models_directory()
+                                .unwrap_or_else(|_| PathBuf::from("user-data/models"))
+                                .display()
+                        ));
+                    }
+                } else {
+                    return Err(format!(
+                        "Model '{}' not found. Please download it through the Settings page or place it in: {}",
+                        default_model,
+                        model_manager::get_models_directory()
+                            .unwrap_or_else(|_| PathBuf::from("user-data/models"))
+                            .display()
+                    ));
+                }
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                return Err(format!(
+                    "Model '{}' not found. Please download it through the Settings page or place it in: {}",
+                    default_model,
+                    model_manager::get_models_directory()
+                        .unwrap_or_else(|_| PathBuf::from("user-data/models"))
+                        .display()
+                ));
             }
         }
-    }
-
-    // Search for whisper binary
-    let mut whisper_bin: Option<PathBuf> = None;
-    for dir in &search_dirs {
-        let candidate = dir.join("bin").join("whisper");
-        #[cfg(target_os = "windows")]
-        let candidate = candidate.with_extension("exe");
-        if candidate.exists() {
-            whisper_bin = Some(candidate);
-            break;
-        }
-    }
-
-    let whisper_bin = whisper_bin
-        .ok_or_else(|| format!("whisper binary not found. Searched in: {:?}", search_dirs))?;
-
-    // Search for model
-    let mut model: Option<PathBuf> = None;
-    for dir in &search_dirs {
-        let candidate = dir.join("models").join("ggml-small-q5_1.bin");
-        if candidate.exists() {
-            model = Some(candidate);
-            break;
-        }
-    }
-
-    let model =
-        model.ok_or_else(|| format!("whisper model not found. Searched in: {:?}", search_dirs))?;
+    };
 
     Ok((whisper_bin, model))
 }

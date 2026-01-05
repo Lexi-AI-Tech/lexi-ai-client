@@ -56,6 +56,7 @@ mod cursor_context; // Cursor context retrieval using macOS Accessibility API (A
 mod global_key_listener; // Unified hotkey management (rdev for Fn key, Tauri shortcuts for others)
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
+mod model_manager; // Model and executable management (download, list, resolve paths)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
@@ -67,8 +68,6 @@ mod text_injector; // Text injection into active application via clipboard + pas
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod whisper; // Local Whisper model integration for offline transcription
-
-use whisper::preload_model;
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use global_key_listener::start_listener;
@@ -93,6 +92,10 @@ use commands::auth::{
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
+};
+use commands::model::{
+    download_model, get_executables_directory, get_installed_models, get_models_directory,
+    is_model_installed, is_whisper_executable_installed, list_available_models,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;
@@ -257,7 +260,14 @@ pub fn main() {
             has_auth_data,
             get_app_config,
             update_app_config,
-            get_system_type
+            get_system_type,
+            list_available_models,
+            get_installed_models,
+            is_model_installed,
+            get_models_directory,
+            get_executables_directory,
+            is_whisper_executable_installed,
+            download_model
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
@@ -289,10 +299,21 @@ pub fn main() {
             });
 
             // Preload Whisper model in background to reduce first transcription latency
+            // Only preload if model and executable are available (optional)
             std::thread::spawn(move || {
-                if let Err(e) = preload_model() {
-                    eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
-                    eprintln!("💡 First transcription may be slower");
+                // Check if model and executable exist before preloading
+                let model_exists = model_manager::model_exists("ggml-small-q5_1.bin")
+                    .unwrap_or(false);
+                let exe_exists = model_manager::whisper_executable_exists()
+                    .unwrap_or(false);
+
+                if model_exists && exe_exists {
+                    if let Err(e) = whisper::preload_model() {
+                        eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
+                        eprintln!("💡 First transcription may be slower");
+                    }
+                } else {
+                    println!("ℹ️  Whisper model or executable not found. Offline transcription will not be available until models are downloaded.");
                 }
             });
 

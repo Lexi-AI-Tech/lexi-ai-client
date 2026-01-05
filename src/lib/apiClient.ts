@@ -9,7 +9,7 @@ import { SystemType } from "./constants";
 import { authStore } from "../store/authStore";
 import {
   AUTH_ENDPOINTS,
-  STT_ENDPOINTS,
+  TRANSCRIPT_ENDPOINTS,
   USER_ENDPOINTS,
   getApiUrl,
 } from "./apiEndpoints";
@@ -525,7 +525,7 @@ export async function getTranscripts(
   }
 
   const response = await authenticatedFetch(
-    getApiUrl(STT_ENDPOINTS.transcripts(params.toString())),
+    getApiUrl(TRANSCRIPT_ENDPOINTS.list(params.toString())),
     {
       method: "GET",
     },
@@ -551,7 +551,7 @@ export async function getTranscripts(
  */
 export async function getTranscript(transcriptId: number): Promise<Transcript> {
   const response = await authenticatedFetch(
-    getApiUrl(STT_ENDPOINTS.transcript(transcriptId)),
+    getApiUrl(TRANSCRIPT_ENDPOINTS.get(transcriptId)),
     {
       method: "GET",
     },
@@ -577,7 +577,7 @@ export async function getTranscript(transcriptId: number): Promise<Transcript> {
  */
 export async function deleteTranscript(transcriptId: number): Promise<void> {
   const response = await authenticatedFetch(
-    getApiUrl(STT_ENDPOINTS.transcript(transcriptId)),
+    getApiUrl(TRANSCRIPT_ENDPOINTS.delete(transcriptId)),
     {
       method: "DELETE",
     },

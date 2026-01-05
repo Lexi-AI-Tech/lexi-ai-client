@@ -61,9 +61,7 @@ pub mod auth {
 pub mod stt {
     use super::*;
 
-    pub const TRANSCRIBE: &str = "/stt";
-    pub const FORMATS: &str = "/stt/formats";
-    pub const TRANSCRIPTS: &str = "/stt/transcripts";
+    pub const TRANSCRIBE: &str = "/stt/";
 
     /// Build transcribe endpoint URL with query parameters
     pub fn transcribe_url(
@@ -83,33 +81,46 @@ pub mod stt {
             urlencoding::encode(focused_app)
         )
     }
+}
+
+/// Transcripts endpoints
+pub mod transcripts {
+    use super::*;
+
+    pub const LIST: &str = "/transcripts";
 
     /// Build transcripts list endpoint URL with optional query parameters
-    pub fn transcripts_url(params: Option<&str>) -> String {
+    pub fn list_url(params: Option<&str>) -> String {
         match params {
             Some(p) => format!(
                 "{}{}{}?{}",
                 config::api_base_url(),
                 super::API_V1_PREFIX,
-                TRANSCRIPTS,
+                LIST,
                 p
             ),
-            None => format!(
-                "{}{}{}",
-                config::api_base_url(),
-                super::API_V1_PREFIX,
-                TRANSCRIPTS
-            ),
+            None => format!("{}{}{}", config::api_base_url(), super::API_V1_PREFIX, LIST),
         }
     }
 
     /// Build single transcript endpoint URL
-    pub fn transcript_url(id: &str) -> String {
+    pub fn get_url(id: &str) -> String {
         format!(
             "{}{}{}/{}",
             config::api_base_url(),
             super::API_V1_PREFIX,
-            TRANSCRIPTS,
+            LIST,
+            id
+        )
+    }
+
+    /// Build delete transcript endpoint URL
+    pub fn delete_url(id: &str) -> String {
+        format!(
+            "{}{}{}/{}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            LIST,
             id
         )
     }

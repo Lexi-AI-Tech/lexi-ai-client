@@ -61,6 +61,13 @@ if [ -f "$BIN_FILE" ] || [ -f "$BIN_DIR/$BIN_NAME" ]; then
 else
     echo -e "${YELLOW}⚠️  Whisper binary not found: $BIN_DIR/$BIN_NAME${NC}"
     echo ""
+    echo -e "${YELLOW}Note: Binaries are no longer bundled with the app${NC}"
+    echo -e "${YELLOW}The app will look for the whisper executable in the user data directory:${NC}"
+    echo ""
+    echo "  macOS:   ~/Library/Application Support/com.lexi.ai/bin/whisper"
+    echo "  Linux:   ~/.local/share/lexi-ai/bin/whisper"
+    echo "  Windows: %APPDATA%\\lexi-ai\\bin\\whisper.exe"
+    echo ""
     echo -e "${YELLOW}To build the Whisper binary:${NC}"
     echo ""
     echo "1. Install prerequisites:"
@@ -73,50 +80,19 @@ else
     echo "   cd whisper.cpp"
     echo "   make"
     echo ""
-    echo "3. Copy the binary:"
-    echo "   cp build/bin/whisper-cli $BIN_FILE"
-    echo "   chmod +x $BIN_FILE"
+    echo "3. Copy the binary to the user data directory (see paths above)"
     echo ""
-    echo "See src-tauri/bin/README.md for detailed instructions."
-    echo ""
-    echo -e "${YELLOW}⚠️  Continuing without binary - app will fail at runtime if binary is not present${NC}"
+    echo -e "${YELLOW}⚠️  Continuing without binary - offline transcription will not work until binary is installed${NC}"
     BIN_MISSING=1
 fi
 
 echo ""
 
-# Check Whisper model
-echo -e "${BLUE}Checking Whisper model...${NC}"
-if [ -f "$MODEL_FILE" ]; then
-    FILE_SIZE=$(du -h "$MODEL_FILE" | cut -f1)
-    echo -e "${GREEN}✅ Model found: $MODEL_FILE (${FILE_SIZE})${NC}"
-else
-    echo -e "${YELLOW}📥 Model not found. Downloading...${NC}"
-    
-    # Create models directory if it doesn't exist
-    mkdir -p "$MODEL_DIR"
-    
-    MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin"
-    
-    # Download the model
-    if command -v curl &> /dev/null; then
-        curl -L --progress-bar -o "$MODEL_FILE" "$MODEL_URL"
-    elif command -v wget &> /dev/null; then
-        wget --progress=bar -O "$MODEL_FILE" "$MODEL_URL"
-    else
-        echo -e "${RED}❌ Error: Neither curl nor wget is installed${NC}"
-        exit 1
-    fi
-    
-    # Verify the file was downloaded
-    if [ -f "$MODEL_FILE" ]; then
-        FILE_SIZE=$(du -h "$MODEL_FILE" | cut -f1)
-        echo -e "${GREEN}✅ Model downloaded successfully (${FILE_SIZE})${NC}"
-    else
-        echo -e "${RED}❌ Error: Model download failed${NC}"
-        exit 1
-    fi
-fi
+# Note: Models are no longer bundled with the app
+# Users can download models through the Settings UI
+echo -e "${BLUE}Note: Models are no longer bundled with the app${NC}"
+echo -e "${YELLOW}📦 Models can be downloaded through the Settings page in the app${NC}"
+echo -e "${YELLOW}   Models will be stored in the user data directory${NC}"
 
 echo ""
 
