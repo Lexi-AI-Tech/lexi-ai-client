@@ -22,7 +22,7 @@
 //! - **Error Handling**: Comprehensive error messages for debugging
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
-use crate::config;
+use crate::api_endpoints::stt;
 use crate::whisper;
 use reqwest::multipart;
 use std::error::Error;
@@ -157,18 +157,12 @@ impl SttService {
                 println!("🔍 DEBUG: Added base64_image to multipart form");
             }
 
-            // Build the request
-            // Get API base URL from configuration
-            let api_base_url = config::api_base_url();
-
-            // Build URL with required parameters
-            let url = format!(
-                "{}/api/v1/stt?language={}&enhance_stt_output={}&transcribe_with_cursor_context={}&focused_app={}",
-                api_base_url,
-                urlencoding::encode(&language),
+            // Build the request URL using centralized endpoint
+            let url = stt::transcribe_url(
+                &language,
                 enhance_transcription,
                 transcribe_with_cursor_context,
-                urlencoding::encode(&focused_app)
+                &focused_app,
             );
             let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
 

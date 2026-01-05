@@ -3,8 +3,8 @@
 //! This module handles text-to-speech conversion by calling the Lexi AI Server TTS endpoint.
 //! It converts text to speech and plays the audio output.
 
+use crate::api_endpoints::tts;
 use crate::commands::auth::get_auth_token;
-use crate::config;
 use reqwest::multipart;
 use std::error::Error;
 use std::fs;
@@ -51,17 +51,14 @@ impl TtsService {
             return Err("Authentication required. Please log in.".into());
         }
 
-        // Get API base URL
-        let api_base_url = config::api_base_url();
-
         // Create HTTP client
         let client = reqwest::Client::new();
 
         // Build multipart form
         let form = multipart::Form::new().text("text", text.to_string());
 
-        // Build the request
-        let url = format!("{}/api/v1/tts/speak", api_base_url);
+        // Build the request URL using centralized endpoint
+        let url = tts::speak_url();
         let mut request = client.post(&url).multipart(form);
 
         // Add authorization header

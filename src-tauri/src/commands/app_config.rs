@@ -13,8 +13,8 @@ use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
+use crate::api_endpoints::user;
 use crate::commands::auth::get_auth_token;
-use crate::config;
 use crate::utils;
 
 const STORE_FILE: &str = ".app-config.dat";
@@ -153,11 +153,7 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
         get_auth_token(app).ok_or_else(|| "Please sign in to sync your settings".to_string())?;
 
     let client = reqwest::Client::new();
-    let url = format!(
-        "{}/api/v1/users/me/config?system_type={}",
-        config::api_base_url(),
-        utils::get_system_type()
-    );
+    let url = user::config_url(Some(&format!("system_type={}", utils::get_system_type())));
 
     let response = client
         .get(&url)
@@ -395,7 +391,7 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
     };
 
     let client = reqwest::Client::new();
-    let url = format!("{}/api/v1/users/me/config", config::api_base_url());
+    let url = user::config_url(None);
     let request_body = build_request_body(config);
 
     match client

@@ -12,8 +12,8 @@
 //! - **Text Injection**: The result from `perform_action` is injected instead of the
 //!   original transcription
 
+use crate::api_endpoints::action;
 use crate::commands::auth::get_auth_token;
-use crate::config;
 use crate::cursor_context::CursorContext;
 use reqwest::multipart;
 use serde::{Deserialize, Serialize};
@@ -312,7 +312,6 @@ async fn send_action_request(
     auth_token: Option<String>,
 ) -> Result<ActionResponse, Box<dyn Error>> {
     let client = reqwest::Client::new();
-    let api_base_url = config::api_base_url();
 
     // Build multipart form
     let mut form = multipart::Form::new()
@@ -330,8 +329,8 @@ async fn send_action_request(
         form = form.part("base64_image", image_part);
     }
 
-    // Build the request
-    let url = format!("{}/api/v1/actions/perform", api_base_url);
+    // Build the request URL using centralized endpoint
+    let url = action::perform_url();
     let mut request = client.post(&url).multipart(form);
 
     // Add authorization header if token is provided

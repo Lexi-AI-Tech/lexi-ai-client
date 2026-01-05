@@ -12,6 +12,7 @@ import {
   getAuthDataSecure,
   clearAuthDataSecure,
 } from "../lib/secureStorage";
+import { AUTH_ENDPOINTS, getApiUrl } from "../lib/apiEndpoints";
 import type { AuthUser, AuthTokens, AuthState } from "../types";
 
 // Store state
@@ -43,25 +44,18 @@ const loadFromStorage = async () => {
           console.log("🔄 Access token expired, attempting to refresh...");
           try {
             const device = await getDeviceInfo();
-            const API_BASE_URL =
-              import.meta.env.MODE === "development"
-                ? "http://localhost:1230"
-                : "https://lexi-ai-server.onrender.com";
 
-            const response = await fetch(
-              `${API_BASE_URL}/api/v1/auth/refresh`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  refresh_token: tokens.refresh_token,
-                  device_name: device.device_name,
-                  device_type: device.device_type,
-                }),
+            const response = await fetch(getApiUrl(AUTH_ENDPOINTS.refresh), {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
               },
-            );
+              body: JSON.stringify({
+                refresh_token: tokens.refresh_token,
+                device_name: device.device_name,
+                device_type: device.device_type,
+              }),
+            });
 
             if (response.ok) {
               const data = await response.json();
@@ -216,12 +210,8 @@ export const authStore: AuthState = {
     console.log("🔄 Token expiring soon, refreshing proactively...");
     try {
       const device = await getDeviceInfo();
-      const API_BASE_URL =
-        import.meta.env.MODE === "development"
-          ? "http://localhost:1230"
-          : "https://lexi-ai-server.onrender.com";
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      const response = await fetch(getApiUrl(AUTH_ENDPOINTS.refresh), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
