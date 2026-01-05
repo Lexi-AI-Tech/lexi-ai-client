@@ -1,7 +1,7 @@
 //! Hotkey Commands
 //!
 //! This module provides Tauri commands for managing hotkey configuration.
-//! All hotkeys are stored in Tauri Store as `transcription_hotkeys`.
+//! All hotkeys are stored in Tauri Store as `hotkeys`.
 
 use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
 use crate::global_key_listener::{
@@ -64,7 +64,7 @@ pub async fn update_hotkey(
         .unwrap_or_else(|_| AppConfig::default());
 
     let app_config_update = AppConfig {
-        transcription_hotkeys: Some(new_hotkeys.clone()),
+        hotkeys: Some(new_hotkeys.clone()),
         languages: current_config.languages,
         enhance_transcription: current_config.enhance_transcription,
         transcribe_with_cursor_context: current_config.transcribe_with_cursor_context,
@@ -120,8 +120,8 @@ pub async fn update_hotkey(
 pub async fn get_current_hotkey(app: AppHandle) -> Result<String, String> {
     let config = get_app_config(app).await?;
     let hotkeys = config
-        .transcription_hotkeys
-        .ok_or_else(|| "Server did not provide transcription_hotkeys".to_string())?;
+        .hotkeys
+        .ok_or_else(|| "Server did not provide hotkeys".to_string())?;
 
     // Frontend expects {hotkeys: [...]} format
     let response = serde_json::json!({ "hotkeys": hotkeys });

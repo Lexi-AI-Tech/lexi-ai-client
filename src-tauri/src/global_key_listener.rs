@@ -47,7 +47,7 @@ use tokio::sync::watch;
 // ============================================================================
 // Hotkey Helper Functions
 // ============================================================================
-// These functions work directly with Vec<String> from AppConfig.transcription_hotkeys
+// These functions work directly with Vec<String> from AppConfig.hotkeys
 // which is the single source of truth stored in Tauri Store.
 
 /// Returns hotkeys that should be handled by rdev (Fn key or keys that can't use Tauri)
@@ -539,7 +539,7 @@ fn matches_rdev_hotkey(event_type: &EventType, rdev_hotkeys: &[String]) -> bool 
 /// # Arguments
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
 /// * `recording_tx` - Channel sender to signal start/stop recording
-/// * `config_rx` - Watch receiver for hotkey config changes (from AppConfig.transcription_hotkeys)
+/// * `config_rx` - Watch receiver for hotkey config changes (from AppConfig.hotkeys)
 /// * `recording_state` - Shared state to check if we're in hotkey recording mode
 pub fn start_listener(
     app: AppHandle,
@@ -673,7 +673,7 @@ pub fn start_listener(
         let mut config_rx_manager = config_rx;
 
         loop {
-            // Get current hotkeys from watch channel (single source of truth: AppConfig.transcription_hotkeys)
+            // Get current hotkeys from watch channel (single source of truth: AppConfig.hotkeys)
             let hotkeys = config_rx_manager.borrow().clone();
 
             // Get hotkeys that should use Tauri global shortcuts

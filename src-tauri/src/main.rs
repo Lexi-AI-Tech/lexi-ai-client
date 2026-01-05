@@ -315,7 +315,7 @@ pub fn main() {
                             println!("⚠️  Config not available, using empty hotkeys");
                             crate::commands::app_config::AppConfig::default()
                         });
-                    config.transcription_hotkeys.unwrap_or_default()
+                    config.hotkeys.unwrap_or_default()
                 })
             };
             println!("🔑 Loaded hotkeys from store: {:?}", initial_config);
