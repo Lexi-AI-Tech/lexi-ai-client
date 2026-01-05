@@ -195,14 +195,14 @@ pub fn transcribe_audio_data(
     let result = transcribe_audio_file(temp_path.to_string(), language, vocabulary);
 
     // Clean up temporary file
-    // if let Err(e) = std::fs::remove_file(&temp_file) {
-    //     eprintln!(
-    //         "⚠️  Warning: Failed to remove temp file {:?}: {}",
-    //         temp_file, e
-    //     );
-    // } else {
-    //     println!("🧹 Cleaned up temp file: {:?}", temp_file);
-    // }
+    if let Err(e) = std::fs::remove_file(&temp_file) {
+        eprintln!(
+            "⚠️  Warning: Failed to remove temp file {:?}: {}",
+            temp_file, e
+        );
+    } else {
+        println!("🧹 Cleaned up temp file: {:?}", temp_file);
+    }
 
     result
 }
