@@ -61,7 +61,7 @@ pub mod auth {
 pub mod stt {
     use super::*;
 
-    pub const TRANSCRIBE: &str = "/stt";
+    pub const TRANSCRIBE: &str = "/stt/";
     pub const FORMATS: &str = "/stt/formats";
     pub const TRANSCRIPTS: &str = "/stt/transcripts";
 
