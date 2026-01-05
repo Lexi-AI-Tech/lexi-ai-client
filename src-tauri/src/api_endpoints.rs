@@ -62,7 +62,6 @@ pub mod stt {
     use super::*;
 
     pub const TRANSCRIBE: &str = "/stt/";
-    pub const FORMATS: &str = "/stt/formats";
     pub const TRANSCRIPTS: &str = "/stt/transcripts";
 
     /// Build transcribe endpoint URL with query parameters

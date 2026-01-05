@@ -37,7 +37,6 @@ export const AUTH_ENDPOINTS = {
  */
 export const STT_ENDPOINTS = {
   transcribe: `${API_V1_PREFIX}/stt`,
-  formats: `${API_V1_PREFIX}/stt/formats`,
   transcripts: (params?: string) =>
     `${API_V1_PREFIX}/stt/transcripts${params ? `?${params}` : ""}`,
   transcript: (id: number | string) => `${API_V1_PREFIX}/stt/transcripts/${id}`,
