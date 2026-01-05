@@ -471,12 +471,18 @@ pub fn main() {
         .on_page_load(|webview, _| {
             let window = webview.window();
             if window.label() == "main" {
-                println!("📄 Page loaded for main window, ensuring visibility...");
-                let app_handle = window.app_handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    show_and_focus_main_window(&app_handle);
-                });
+                // Only show/focus if window is not already visible to prevent reload loops
+                let is_visible = window.is_visible().unwrap_or(false);
+                if !is_visible {
+                    println!("📄 Page loaded for main window, ensuring visibility...");
+                    let app_handle = window.app_handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        show_and_focus_main_window(&app_handle);
+                    });
+                } else {
+                    println!("📄 Page loaded for main window (already visible, skipping show/focus)");
+                }
             }
         })
         .build(tauri::generate_context!())
