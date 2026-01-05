@@ -69,17 +69,11 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         let auth_token = get_auth_token(&app_handle_for_task);
 
         if auth_token.is_none() {
-            eprintln!(
-                "⚠️  Warning: No authentication token available. Transcription will fail with 401."
-            );
-            eprintln!(
-                "💡 Tip: Make sure you're logged in and the token is stored in secure storage"
-            );
-        } else {
-            println!(
-                "✅ Auth token available (length: {})",
-                auth_token.as_ref().unwrap().len()
-            );
+            let error_msg = "User unauthenticated. Please log in.";
+            app_handle_for_task
+                .emit("error", error_msg)
+                .unwrap_or_default();
+            return;
         }
 
         // Get app config for transcription settings
@@ -87,7 +81,6 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             Ok(config) => config,
             Err(e) => {
                 let error_msg = format!("Failed to load app config: {}", e);
-                eprintln!("❌ {}", error_msg);
                 app_handle_for_task
                     .emit("error", error_msg.as_str())
                     .unwrap_or_default();
@@ -101,14 +94,13 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .languages
             .and_then(|langs| langs.first().cloned())
             .unwrap_or_else(|| "auto".to_string());
-        println!("🌐 Using language: {}", language);
 
         // Get transcription settings from app config
         let enhance_transcription = app_config.enhance_transcription.unwrap_or(false);
         let transcribe_with_cursor_context =
             app_config.transcribe_with_cursor_context.unwrap_or(false);
 
-        // TODO: Decide what to do with offline_transcription
+        // TODO: Implement this as on demand download feature on paid plans
         // offline_transcription is not in app config, keep as hardcoded for now
         let offline_transcription = false;
 
@@ -133,14 +125,6 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .as_ref()
             .and_then(|ctx| ctx.app_name.clone())
             .unwrap_or_else(|| "Unknown".to_string());
-        println!("📱 Focused app: {}", focused_app);
-        println!(
-            "📝 Selected text: {}",
-            cursor_context
-                .as_ref()
-                .and_then(|ctx| ctx.selected_text.as_deref())
-                .unwrap_or("")
-        );
 
         // Capture screen and encode as base64 only if transcribe_with_cursor_context is true
         let base64_image = if transcribe_with_cursor_context {
