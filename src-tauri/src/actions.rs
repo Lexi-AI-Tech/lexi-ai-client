@@ -16,11 +16,19 @@ use crate::commands::auth::get_auth_token;
 use crate::config;
 use crate::cursor_context::CursorContext;
 use reqwest::multipart;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use tauri::{AppHandle, Emitter};
 
 /// Hardcoded action trigger phrase (case-insensitive)
 const ACTION_TRIGGER: &str = "hey lexi";
+
+/// Action response from the server
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionResponse {
+    pub action_type: String,
+    pub value: String,
+}
 
 /// Normalizes text by removing punctuation and normalizing whitespace.
 ///
@@ -174,13 +182,13 @@ pub fn check_action_trigger(transcription: &str) -> Option<String> {
     }
 }
 
-/// Performs an action based on the action command and returns the result text.
+/// Performs an action based on the action command and returns the action response.
 ///
 /// This function:
 /// 1. Gets the current app name from the provided cursor context
 /// 2. Captures a fresh screenshot of the current screen
 /// 3. Sends the action command, app name, and screenshot to the server
-/// 4. Returns the result text to inject
+/// 4. Returns the action response with action_type and value
 ///
 /// # Arguments
 /// * `action_command` - The action command extracted from the transcription
@@ -189,12 +197,12 @@ pub fn check_action_trigger(transcription: &str) -> Option<String> {
 /// * `cursor_context` - Optional cursor context (contains app name and selected text)
 ///
 /// # Returns
-/// * `String` - The text result to inject from the server, or a fallback message on error
+/// * `ActionResponse` - The action response with action_type and value
 pub async fn perform_action(
     action_command: &str,
     app_handle: &AppHandle,
     cursor_context: Option<&CursorContext>,
-) -> String {
+) -> ActionResponse {
     println!("🎯 Performing action: '{}'", action_command);
 
     // Notify frontend that action processing has started
@@ -231,7 +239,10 @@ pub async fn perform_action(
         app_handle
             .emit("action_error", "Authentication required. Please log in.")
             .unwrap_or_default();
-        return "Action failed: Authentication required. Please log in.".to_string();
+        return ActionResponse {
+            action_type: "text".to_string(),
+            value: "Action failed: Authentication required. Please log in.".to_string(),
+        };
     }
 
     // Send action request to server
@@ -244,13 +255,13 @@ pub async fn perform_action(
     )
     .await
     {
-        Ok(result) => {
-            println!("✅ Action completed successfully");
+        Ok(action_response) => {
+            println!("✅ Action completed successfully - type: {}", action_response.action_type);
             // Notify frontend that action processing has completed successfully
             app_handle
-                .emit("action_success", &result)
+                .emit("action_success", &action_response.value)
                 .unwrap_or_default();
-            result
+            action_response
         }
         Err(e) => {
             let error_msg = format!("Action failed: {}", e);
@@ -259,7 +270,10 @@ pub async fn perform_action(
             app_handle
                 .emit("action_error", error_msg.as_str())
                 .unwrap_or_default();
-            error_msg
+            ActionResponse {
+                action_type: "text".to_string(),
+                value: error_msg,
+            }
         }
     };
 
@@ -276,7 +290,7 @@ pub async fn perform_action(
 /// * `auth_token` - Authentication token for the request
 ///
 /// # Returns
-/// * `Ok(String)` - The result text from the server
+/// * `Ok(ActionResponse)` - The action response from the server
 /// * `Err(Box<dyn Error>)` - An error if the API call fails
 async fn send_action_request(
     action_command: &str,
@@ -284,7 +298,7 @@ async fn send_action_request(
     selected_text: Option<String>,
     base64_image: Option<String>,
     auth_token: Option<String>,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<ActionResponse, Box<dyn Error>> {
     let client = reqwest::Client::new();
     let api_base_url = config::api_base_url();
 
@@ -327,7 +341,7 @@ async fn send_action_request(
         return Err(format!("Server error ({}): {}", status, error_text).into());
     }
 
-    // Read response as text
-    let result_text = res.text().await?;
-    Ok(result_text)
+    // Read response as JSON
+    let action_response: ActionResponse = res.json().await?;
+    Ok(action_response)
 }
