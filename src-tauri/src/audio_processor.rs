@@ -110,7 +110,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
         // TODO: Decide what to do with offline_transcription
         // offline_transcription is not in app config, keep as hardcoded for now
-        let offline_transcription = true;
+        let offline_transcription = false;
 
         // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript.
         // Do more experiment on how we can use this trick to manipulate the model behavior.
