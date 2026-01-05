@@ -13,8 +13,8 @@ use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
+use crate::api_endpoints::user;
 use crate::commands::auth::get_auth_token;
-use crate::config;
 use crate::utils;
 
 const STORE_FILE: &str = ".app-config.dat";
@@ -36,7 +36,7 @@ pub struct AppConfig {
     /// Transcription language preferences (e.g., ["en"], ["es"], ["auto"])
     pub languages: Option<Vec<String>>,
     /// Global hotkeys for triggering recording (e.g., ["Fn"], ["Cmd+Shift+R"])
-    pub transcription_hotkeys: Option<Vec<String>>,
+    pub hotkeys: Option<Vec<String>>,
     /// Whether to enhance transcriptions with LLM processing
     pub enhance_transcription: Option<bool>,
     /// Whether to use cursor context when transcribing
@@ -59,7 +59,7 @@ pub struct AppConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ServerAppConfigResponse {
     system_type: String,
-    transcription_hotkeys: Vec<String>,
+    hotkeys: Vec<String>,
     languages: Vec<String>,
     enhance_transcription: bool,
     transcribe_with_cursor_context: bool,
@@ -125,7 +125,7 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
 
     let first_launch_config = AppConfig {
         languages: None,
-        transcription_hotkeys: None,
+        hotkeys: None,
         enhance_transcription: None,
         transcribe_with_cursor_context: None,
         launch_on_system_startup: Some(true), // Enable autostart by default on first launch
@@ -153,11 +153,7 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
         get_auth_token(app).ok_or_else(|| "Please sign in to sync your settings".to_string())?;
 
     let client = reqwest::Client::new();
-    let url = format!(
-        "{}/api/users/me/config?system_type={}",
-        config::api_base_url(),
-        utils::get_system_type()
-    );
+    let url = user::config_url(Some(&format!("system_type={}", utils::get_system_type())));
 
     let response = client
         .get(&url)
@@ -271,8 +267,8 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.languages.is_some() {
         current.languages = provided.languages;
     }
-    if provided.transcription_hotkeys.is_some() {
-        current.transcription_hotkeys = provided.transcription_hotkeys;
+    if provided.hotkeys.is_some() {
+        current.hotkeys = provided.hotkeys;
     }
     if provided.enhance_transcription.is_some() {
         current.enhance_transcription = provided.enhance_transcription;
@@ -309,7 +305,7 @@ fn save_config_to_store(app: &AppHandle, config: &AppConfig) -> Result<(), Strin
 fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig {
     AppConfig {
         languages: Some(response.languages),
-        transcription_hotkeys: Some(response.transcription_hotkeys),
+        hotkeys: Some(response.hotkeys),
         enhance_transcription: Some(response.enhance_transcription),
         transcribe_with_cursor_context: Some(response.transcribe_with_cursor_context),
         launch_on_system_startup: Some(response.launch_on_system_startup),
@@ -345,10 +341,10 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
             serde_json::to_value(languages).unwrap(),
         );
     }
-    if let Some(ref transcription_hotkeys) = config.transcription_hotkeys {
+    if let Some(ref hotkeys) = config.hotkeys {
         body.insert(
-            "transcription_hotkeys".to_string(),
-            serde_json::to_value(transcription_hotkeys).unwrap(),
+            "hotkeys".to_string(),
+            serde_json::to_value(hotkeys).unwrap(),
         );
     }
     if let Some(enhance_transcription) = config.enhance_transcription {
@@ -395,7 +391,7 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
     };
 
     let client = reqwest::Client::new();
-    let url = format!("{}/api/users/me/config", config::api_base_url());
+    let url = user::config_url(None);
     let request_body = build_request_body(config);
 
     match client

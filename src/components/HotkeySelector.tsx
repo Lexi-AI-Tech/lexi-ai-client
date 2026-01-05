@@ -78,9 +78,7 @@ export function HotkeySelector({
       ArrowLeft: "←",
       ArrowRight: "→",
     };
-    return (
-      keyMap[key] || (key.length === 1 ? key.toUpperCase() : key)
-    );
+    return keyMap[key] || (key.length === 1 ? key.toUpperCase() : key);
   };
 
   // Handle key down
@@ -233,9 +231,7 @@ export function HotkeySelector({
           cursor: disabled ? "not-allowed" : "text",
           outline: "none",
           transition: "all 0.2s ease",
-          boxShadow: isRecording
-            ? "0 0 0 3px rgba(0, 122, 255, 0.1)"
-            : "none",
+          boxShadow: isRecording ? "0 0 0 3px rgba(0, 122, 255, 0.1)" : "none",
           minHeight: "44px",
         }}
         tabIndex={disabled ? -1 : 0}
@@ -430,4 +426,3 @@ export function HotkeySelector({
     </div>
   );
 }
-

@@ -215,10 +215,39 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       oauthPollingRef.current.isPolling = true;
       oauthPollingRef.current.interval = null;
 
+      // Track poll count - maximum 10 polls
+      let pollCount = 0;
+      const MAX_POLLS = 10;
+
       const pollOAuthStatus = async (): Promise<boolean> => {
         if (!oauthPollingRef.current.isPolling) {
           console.log("Polling already stopped, skipping");
           return true; // Already stopped
+        }
+
+        // Increment poll count
+        pollCount++;
+        console.log(`OAuth status poll attempt ${pollCount}/${MAX_POLLS}`);
+
+        // Check if we've exceeded max polls
+        if (pollCount > MAX_POLLS) {
+          console.log("Maximum poll attempts reached, stopping");
+          oauthPollingRef.current.isPolling = false;
+          if (oauthPollingRef.current.interval) {
+            clearInterval(oauthPollingRef.current.interval);
+            oauthPollingRef.current.interval = null;
+          }
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          setLocalLoading(false);
+          setLoading(false);
+          setError("Login failed. Please try again.");
+          if (onError) {
+            onError("Login failed");
+          }
+          return true; // Stop polling
         }
 
         try {
@@ -283,13 +312,14 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         } catch (error) {
           console.error("Error checking OAuth status:", error);
           // Don't stop polling on error - might be temporary network issue
+          // But still count it as a poll attempt
           return false;
         }
       };
 
       // Poll immediately, then every 500ms
       if (await pollOAuthStatus()) {
-        return; // Already completed
+        return; // Already completed or failed
       }
 
       oauthPollingRef.current.interval = setInterval(async () => {

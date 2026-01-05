@@ -488,7 +488,14 @@ export const SettingsPage: React.FC = () => {
           Hotkeys
         </h3>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "32px" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            marginBottom: "32px",
+          }}
+        >
           <div>
             <div
               style={{

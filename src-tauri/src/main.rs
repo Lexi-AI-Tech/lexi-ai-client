@@ -47,6 +47,7 @@ use tokio::sync::watch;
 
 // Module declarations for core functionality
 mod actions; // Voice actions triggered by action trigger phrase (e.g., "Hey Lexi")
+mod api_endpoints; // Centralized API endpoint definitions
 mod audio_processor; // Audio processing and transcription orchestration
 mod audio_recorder; // Audio capture from default microphone using cpal, converts to WAV format
 mod commands;
@@ -63,6 +64,7 @@ mod shortcuts; // Voice command shortcuts that replace transcriptions with prede
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod whisper; // Local Whisper model integration for offline transcription
 
@@ -136,7 +138,10 @@ pub fn main() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
                     let event_state = event.state();
-                    println!("🔑 Global shortcut triggered: {:?}, state: {:?}", shortcut, event_state);
+                    println!(
+                        "🔑 Global shortcut triggered: {:?}, state: {:?}",
+                        shortcut, event_state
+                    );
 
                     // Get the recording channel from app state
                     let app_handle = app.app_handle();
@@ -311,7 +316,7 @@ pub fn main() {
                             println!("⚠️  Config not available, using empty hotkeys");
                             crate::commands::app_config::AppConfig::default()
                         });
-                    config.transcription_hotkeys.unwrap_or_default()
+                    config.hotkeys.unwrap_or_default()
                 })
             };
             println!("🔑 Loaded hotkeys from store: {:?}", initial_config);
@@ -470,12 +475,18 @@ pub fn main() {
         .on_page_load(|webview, _| {
             let window = webview.window();
             if window.label() == "main" {
-                println!("📄 Page loaded for main window, ensuring visibility...");
-                let app_handle = window.app_handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    show_and_focus_main_window(&app_handle);
-                });
+                // Only show/focus if window is not already visible to prevent reload loops
+                let is_visible = window.is_visible().unwrap_or(false);
+                if !is_visible {
+                    println!("📄 Page loaded for main window, ensuring visibility...");
+                    let app_handle = window.app_handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        show_and_focus_main_window(&app_handle);
+                    });
+                } else {
+                    println!("📄 Page loaded for main window (already visible, skipping show/focus)");
+                }
             }
         })
         .build(tauri::generate_context!())

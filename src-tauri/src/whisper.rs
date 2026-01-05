@@ -268,9 +268,9 @@ pub fn transcribe_audio_file(
     if let Some(vocab) = vocabulary {
         if !vocab.is_empty() {
             let prompt = vocab.join(", ");
+            println!("📝 Using prompt for vocabulary: {}", prompt);
             args.push("--prompt".to_string());
             args.push(prompt);
-            println!("📝 Using prompt for vocabulary");
         }
     }
 
