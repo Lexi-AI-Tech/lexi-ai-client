@@ -163,7 +163,7 @@ impl SttService {
 
             // Build URL with required parameters
             let url = format!(
-                "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}&focused_app={}",
+                "{}/api/stt?language={}&enhance_stt={}&transcribe_with_cursor_context={}&focused_app={}",
                 api_base_url,
                 urlencoding::encode(&language),
                 enhance_transcription,

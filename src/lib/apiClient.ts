@@ -532,7 +532,7 @@ export async function getTranscripts(
   }
 
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/transcription/transcripts?${params.toString()}`,
+    `${API_BASE_URL}/api/stt/transcripts?${params.toString()}`,
     {
       method: "GET",
     },
@@ -558,7 +558,7 @@ export async function getTranscripts(
  */
 export async function getTranscript(transcriptId: number): Promise<Transcript> {
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/transcription/transcripts/${transcriptId}`,
+    `${API_BASE_URL}/api/stt/transcripts/${transcriptId}`,
     {
       method: "GET",
     },
@@ -584,7 +584,7 @@ export async function getTranscript(transcriptId: number): Promise<Transcript> {
  */
 export async function deleteTranscript(transcriptId: number): Promise<void> {
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/transcription/transcripts/${transcriptId}`,
+    `${API_BASE_URL}/api/stt/transcripts/${transcriptId}`,
     {
       method: "DELETE",
     },
