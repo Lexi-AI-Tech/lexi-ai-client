@@ -99,12 +99,7 @@ pub mod transcripts {
                 LIST,
                 p
             ),
-            None => format!(
-                "{}{}{}",
-                config::api_base_url(),
-                super::API_V1_PREFIX,
-                LIST
-            ),
+            None => format!("{}{}{}", config::api_base_url(), super::API_V1_PREFIX, LIST),
         }
     }
 
