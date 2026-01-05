@@ -24,10 +24,10 @@ pub fn api_base_url() -> &'static str {
 pub fn oauth_redirect_uri() -> &'static str {
     #[cfg(feature = "custom-protocol")]
     {
-        "https://lexi-ai-server.onrender.com/api/auth/google/callback"
+        "https://lexi-ai-server.onrender.com/api/v1/auth/google/callback"
     }
     #[cfg(not(feature = "custom-protocol"))]
     {
-        "http://localhost:1230/api/auth/google/callback"
+        "http://localhost:1230/api/v1/auth/google/callback"
     }
 }

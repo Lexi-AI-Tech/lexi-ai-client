@@ -59,7 +59,7 @@ async function refreshAccessToken(): Promise<string | null> {
   try {
     const device = await getDeviceInfo();
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -166,7 +166,7 @@ export async function getGoogleOAuthUrl(): Promise<{
   url: string;
   state?: string;
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/google/url`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/url`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -247,7 +247,7 @@ export async function exchangeGoogleAuthCode(
       : "missing",
   });
 
-  const response = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/callback`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -292,7 +292,7 @@ export async function exchangeGoogleTokens(googleTokens: {
   refresh_token?: string;
   expires_in?: number;
 }): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/google`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -337,7 +337,7 @@ export async function refreshJWTToken(
 ): Promise<AuthResponse> {
   const device = deviceInfo || (await getDeviceInfo());
 
-  const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -376,7 +376,7 @@ export async function refreshJWTToken(
  * Get current user from backend
  */
 export async function getCurrentUser(): Promise<AuthResponse["user"]> {
-  const response = await authenticatedFetch(`${API_BASE_URL}/api/auth/me`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/me`, {
     method: "GET",
   });
 
@@ -392,9 +392,12 @@ export async function getCurrentUser(): Promise<AuthResponse["user"]> {
  * Logout from backend
  */
 export async function logout(): Promise<void> {
-  const response = await authenticatedFetch(`${API_BASE_URL}/api/auth/logout`, {
-    method: "POST",
-  });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/v1/auth/logout`,
+    {
+      method: "POST",
+    },
+  );
 
   if (!response.ok) {
     // Even if logout fails on backend, we'll clear local auth
@@ -409,7 +412,7 @@ export async function storePkceVerifier(
   state: string,
   verifier: string,
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/oauth/verifier`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/oauth/verifier`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -437,7 +440,7 @@ export async function storePkceVerifier(
  */
 export async function getPkceVerifier(state: string): Promise<string> {
   const response = await fetch(
-    `${API_BASE_URL}/api/auth/oauth/verifier/${encodeURIComponent(state)}`,
+    `${API_BASE_URL}/api/v1/auth/oauth/verifier/${encodeURIComponent(state)}`,
     {
       method: "GET",
       headers: {
@@ -484,7 +487,7 @@ export async function checkOAuthStatus(state: string): Promise<{
   expires_in?: number;
 }> {
   const response = await fetch(
-    `${API_BASE_URL}/api/auth/oauth/status/${encodeURIComponent(state)}`,
+    `${API_BASE_URL}/api/v1/auth/oauth/status/${encodeURIComponent(state)}`,
     {
       method: "GET",
       headers: {
@@ -532,7 +535,7 @@ export async function getTranscripts(
   }
 
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/stt/transcripts?${params.toString()}`,
+    `${API_BASE_URL}/api/v1/stt/transcripts?${params.toString()}`,
     {
       method: "GET",
     },
@@ -558,7 +561,7 @@ export async function getTranscripts(
  */
 export async function getTranscript(transcriptId: number): Promise<Transcript> {
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/stt/transcripts/${transcriptId}`,
+    `${API_BASE_URL}/api/v1/stt/transcripts/${transcriptId}`,
     {
       method: "GET",
     },
@@ -584,7 +587,7 @@ export async function getTranscript(transcriptId: number): Promise<Transcript> {
  */
 export async function deleteTranscript(transcriptId: number): Promise<void> {
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/stt/transcripts/${transcriptId}`,
+    `${API_BASE_URL}/api/v1/stt/transcripts/${transcriptId}`,
     {
       method: "DELETE",
     },
@@ -612,7 +615,7 @@ export async function getAppConfig(
 ): Promise<AppConfig> {
   const params = new URLSearchParams({ system_type: systemType });
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/users/me/config?${params.toString()}`,
+    `${API_BASE_URL}/api/v1/users/me/config?${params.toString()}`,
     {
       method: "GET",
     },
@@ -640,7 +643,7 @@ export async function updateAppConfig(
   config: AppConfigUpdateRequest,
 ): Promise<AppConfig> {
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/users/me/config`,
+    `${API_BASE_URL}/api/v1/users/me/config`,
     {
       method: "PUT",
       headers: {

@@ -331,7 +331,7 @@ async fn send_action_request(
     }
 
     // Build the request
-    let url = format!("{}/api/actions/perform", api_base_url);
+    let url = format!("{}/api/v1/actions/perform", api_base_url);
     let mut request = client.post(&url).multipart(form);
 
     // Add authorization header if token is provided

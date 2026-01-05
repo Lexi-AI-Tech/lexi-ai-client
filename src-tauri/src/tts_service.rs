@@ -61,7 +61,7 @@ impl TtsService {
         let form = multipart::Form::new().text("text", text.to_string());
 
         // Build the request
-        let url = format!("{}/api/tts/speak", api_base_url);
+        let url = format!("{}/api/v1/tts/speak", api_base_url);
         let mut request = client.post(&url).multipart(form);
 
         // Add authorization header

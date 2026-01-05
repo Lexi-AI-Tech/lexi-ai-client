@@ -48,17 +48,20 @@ const loadFromStorage = async () => {
                 ? "http://localhost:1230"
                 : "https://lexi-ai-server.onrender.com";
 
-            const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
+            const response = await fetch(
+              `${API_BASE_URL}/api/v1/auth/refresh`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  refresh_token: tokens.refresh_token,
+                  device_name: device.device_name,
+                  device_type: device.device_type,
+                }),
               },
-              body: JSON.stringify({
-                refresh_token: tokens.refresh_token,
-                device_name: device.device_name,
-                device_type: device.device_type,
-              }),
-            });
+            );
 
             if (response.ok) {
               const data = await response.json();
@@ -218,7 +221,7 @@ export const authStore: AuthState = {
           ? "http://localhost:1230"
           : "https://lexi-ai-server.onrender.com";
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

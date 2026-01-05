@@ -154,7 +154,7 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
 
     let client = reqwest::Client::new();
     let url = format!(
-        "{}/api/users/me/config?system_type={}",
+        "{}/api/v1/users/me/config?system_type={}",
         config::api_base_url(),
         utils::get_system_type()
     );
@@ -395,7 +395,7 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
     };
 
     let client = reqwest::Client::new();
-    let url = format!("{}/api/users/me/config", config::api_base_url());
+    let url = format!("{}/api/v1/users/me/config", config::api_base_url());
     let request_body = build_request_body(config);
 
     match client
