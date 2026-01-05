@@ -18,6 +18,7 @@ use crate::cursor_context::CursorContext;
 use reqwest::multipart;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
 /// Hardcoded action trigger phrase (case-insensitive)
@@ -203,6 +204,7 @@ pub async fn perform_action(
     app_handle: &AppHandle,
     cursor_context: Option<&CursorContext>,
 ) -> ActionResponse {
+    let action_start = Instant::now();
     println!("🎯 Performing action: '{}'", action_command);
 
     // Notify frontend that action processing has started
@@ -256,7 +258,12 @@ pub async fn perform_action(
     .await
     {
         Ok(action_response) => {
-            println!("✅ Action completed successfully - type: {}", action_response.action_type);
+            let action_duration = action_start.elapsed();
+            println!(
+                "✅ Action completed in {:.2}s - type: {}",
+                action_duration.as_secs_f64(),
+                action_response.action_type
+            );
             // Notify frontend that action processing has completed successfully
             app_handle
                 .emit("action_success", &action_response.value)
@@ -264,8 +271,13 @@ pub async fn perform_action(
             action_response
         }
         Err(e) => {
+            let action_duration = action_start.elapsed();
             let error_msg = format!("Action failed: {}", e);
-            eprintln!("❌ Action failed: {}", e);
+            eprintln!(
+                "❌ Action failed after {:.2}s: {}",
+                action_duration.as_secs_f64(),
+                e
+            );
             // Notify frontend that action processing has completed (with error)
             app_handle
                 .emit("action_error", error_msg.as_str())
