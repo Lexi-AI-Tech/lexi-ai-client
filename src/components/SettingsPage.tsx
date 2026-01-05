@@ -11,6 +11,7 @@ import type { HotkeyConfig, TauriAppConfig } from "../types";
 
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { HotkeySelector } from "./HotkeySelector";
+import { ModelsSection } from "./ModelsSection";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -849,6 +850,10 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* 
+      <div style={{ marginTop: "32px" }}>
+        <ModelsSection />
+      </div> */}
 
       <div style={{ marginTop: "32px" }}>
         <button
