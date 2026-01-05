@@ -1,0 +1,393 @@
+<!-- "open test-pill-sounds.html" -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pill Sound Tester</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #fff;
+            border-bottom: 2px solid #4a9eff;
+            padding-bottom: 10px;
+        }
+        .sound-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #3a3a3a;
+        }
+        .sound-section h2 {
+            color: #4a9eff;
+            margin-top: 0;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 200px 1fr 100px;
+            gap: 15px;
+            align-items: center;
+            margin: 15px 0;
+        }
+        label {
+            font-weight: 500;
+            color: #b0b0b0;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        input[type="number"] {
+            width: 80px;
+            padding: 5px;
+            background: #1a1a1a;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+            color: #e0e0e0;
+        }
+        button {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #3a8eef;
+        }
+        button:active {
+            background: #2a7edf;
+        }
+        .play-button {
+            background: #10b981;
+            margin-top: 20px;
+            width: 100%;
+        }
+        .play-button:hover {
+            background: #0ea572;
+        }
+        .info {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+        .waveform-type {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .waveform-type label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        input[type="radio"] {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Pill Sound Tester</h1>
+    <p>Adjust the parameters below and click "Play Sound" to test. Open browser console to see the values.</p>
+
+    <!-- Processing Sound -->
+    <div class="sound-section">
+        <h2>Processing Sound</h2>
+        <div class="controls">
+            <label>Start Frequency (Hz):</label>
+            <input type="range" id="proc-start-freq" min="200" max="1000" value="400" step="10">
+            <input type="number" id="proc-start-freq-value" value="400" step="10">
+        </div>
+        <div class="controls">
+            <label>End Frequency (Hz):</label>
+            <input type="range" id="proc-end-freq" min="200" max="1000" value="600" step="10">
+            <input type="number" id="proc-end-freq-value" value="600" step="10">
+        </div>
+        <div class="controls">
+            <label>Duration (seconds):</label>
+            <input type="range" id="proc-duration" min="0.05" max="0.5" value="0.15" step="0.01">
+            <input type="number" id="proc-duration-value" value="0.15" step="0.01">
+        </div>
+        <div class="controls">
+            <label>Start Volume:</label>
+            <input type="range" id="proc-start-vol" min="0" max="1" value="0.3" step="0.01">
+            <input type="number" id="proc-start-vol-value" value="0.3" step="0.01">
+        </div>
+        <div class="controls">
+            <label>End Volume:</label>
+            <input type="range" id="proc-end-vol" min="0" max="1" value="0.01" step="0.01">
+            <input type="number" id="proc-end-vol-value" value="0.01" step="0.01">
+        </div>
+        <div>
+            <label>Waveform Type:</label>
+            <div class="waveform-type">
+                <label><input type="radio" name="proc-waveform" value="sine" checked> Sine</label>
+                <label><input type="radio" name="proc-waveform" value="square"> Square</label>
+                <label><input type="radio" name="proc-waveform" value="sawtooth"> Sawtooth</label>
+                <label><input type="radio" name="proc-waveform" value="triangle"> Triangle</label>
+            </div>
+        </div>
+        <button class="play-button" onclick="playProcessingSound()">▶ Play Processing Sound</button>
+    </div>
+
+    <!-- Done Sound -->
+    <div class="sound-section">
+        <h2>Done Sound (Two-Tone)</h2>
+        <h3>Tone 1 (First Note)</h3>
+        <div class="controls">
+            <label>Frequency (Hz):</label>
+            <input type="range" id="done1-freq" min="200" max="1000" value="523.25" step="1">
+            <input type="number" id="done1-freq-value" value="523.25" step="1">
+        </div>
+        <div class="controls">
+            <label>Duration (seconds):</label>
+            <input type="range" id="done1-duration" min="0.05" max="0.3" value="0.1" step="0.01">
+            <input type="number" id="done1-duration-value" value="0.1" step="0.01">
+        </div>
+        <div class="controls">
+            <label>Volume:</label>
+            <input type="range" id="done1-vol" min="0" max="1" value="0.3" step="0.01">
+            <input type="number" id="done1-vol-value" value="0.3" step="0.01">
+        </div>
+        
+        <h3>Tone 2 (Second Note)</h3>
+        <div class="controls">
+            <label>Frequency (Hz):</label>
+            <input type="range" id="done2-freq" min="200" max="1000" value="659.25" step="1">
+            <input type="number" id="done2-freq-value" value="659.25" step="1">
+        </div>
+        <div class="controls">
+            <label>Start Delay (seconds):</label>
+            <input type="range" id="done2-delay" min="0" max="0.5" value="0.1" step="0.01">
+            <input type="number" id="done2-delay-value" value="0.1" step="0.01">
+        </div>
+        <div class="controls">
+            <label>Duration (seconds):</label>
+            <input type="range" id="done2-duration" min="0.05" max="0.3" value="0.15" step="0.01">
+            <input type="number" id="done2-duration-value" value="0.15" step="0.01">
+        </div>
+        <div class="controls">
+            <label>Volume:</label>
+            <input type="range" id="done2-vol" min="0" max="1" value="0.3" step="0.01">
+            <input type="number" id="done2-vol-value" value="0.3" step="0.01">
+        </div>
+        <div>
+            <label>Waveform Type:</label>
+            <div class="waveform-type">
+                <label><input type="radio" name="done-waveform" value="sine" checked> Sine</label>
+                <label><input type="radio" name="done-waveform" value="square"> Square</label>
+                <label><input type="radio" name="done-waveform" value="sawtooth"> Sawtooth</label>
+                <label><input type="radio" name="done-waveform" value="triangle"> Triangle</label>
+            </div>
+        </div>
+        <button class="play-button" onclick="playDoneSound()">▶ Play Done Sound</button>
+    </div>
+
+    <div class="sound-section">
+        <h2>📋 Code Output</h2>
+        <p>Copy the code below and paste it into pill.tsx to use these settings:</p>
+        <pre id="code-output" style="background: #1a1a1a; padding: 15px; border-radius: 4px; overflow-x: auto; color: #4a9eff;"></pre>
+        <button onclick="updateCodeOutput()">Update Code Output</button>
+    </div>
+
+    <script>
+        // Sync range inputs with number inputs
+        function setupSyncInputs(rangeId, valueId) {
+            const range = document.getElementById(rangeId);
+            const value = document.getElementById(valueId);
+            range.addEventListener('input', () => value.value = range.value);
+            value.addEventListener('input', () => range.value = value.value);
+        }
+
+        // Setup all input syncs
+        const inputs = [
+            ['proc-start-freq', 'proc-start-freq-value'],
+            ['proc-end-freq', 'proc-end-freq-value'],
+            ['proc-duration', 'proc-duration-value'],
+            ['proc-start-vol', 'proc-start-vol-value'],
+            ['proc-end-vol', 'proc-end-vol-value'],
+            ['done1-freq', 'done1-freq-value'],
+            ['done1-duration', 'done1-duration-value'],
+            ['done1-vol', 'done1-vol-value'],
+            ['done2-freq', 'done2-freq-value'],
+            ['done2-delay', 'done2-delay-value'],
+            ['done2-duration', 'done2-duration-value'],
+            ['done2-vol', 'done2-vol-value'],
+        ];
+
+        inputs.forEach(([rangeId, valueId]) => setupSyncInputs(rangeId, valueId));
+
+        function playProcessingSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                const startFreq = parseFloat(document.getElementById('proc-start-freq').value);
+                const endFreq = parseFloat(document.getElementById('proc-end-freq').value);
+                const duration = parseFloat(document.getElementById('proc-duration').value);
+                const startVol = parseFloat(document.getElementById('proc-start-vol').value);
+                const endVol = parseFloat(document.getElementById('proc-end-vol').value);
+                const waveform = document.querySelector('input[name="proc-waveform"]:checked').value;
+
+                oscillator.frequency.setValueAtTime(startFreq, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(
+                    endFreq,
+                    audioContext.currentTime + duration
+                );
+                oscillator.type = waveform;
+                gainNode.gain.setValueAtTime(startVol, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(
+                    endVol,
+                    audioContext.currentTime + duration
+                );
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + duration);
+
+                console.log('Processing sound:', { startFreq, endFreq, duration, startVol, endVol, waveform });
+            } catch (error) {
+                console.error('Audio playback error:', error);
+                alert('Audio playback failed. Make sure your browser supports Web Audio API.');
+            }
+        }
+
+        function playDoneSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const waveform = document.querySelector('input[name="done-waveform"]:checked').value;
+
+                const playTone = (freq, time, duration, volume) => {
+                    const osc = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioContext.destination);
+                    osc.frequency.value = freq;
+                    osc.type = waveform;
+                    gain.gain.setValueAtTime(0, time);
+                    gain.gain.linearRampToValueAtTime(volume, time + 0.01);
+                    gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
+                    osc.start(time);
+                    osc.stop(time + duration);
+                };
+
+                const freq1 = parseFloat(document.getElementById('done1-freq').value);
+                const duration1 = parseFloat(document.getElementById('done1-duration').value);
+                const vol1 = parseFloat(document.getElementById('done1-vol').value);
+                const freq2 = parseFloat(document.getElementById('done2-freq').value);
+                const delay2 = parseFloat(document.getElementById('done2-delay').value);
+                const duration2 = parseFloat(document.getElementById('done2-duration').value);
+                const vol2 = parseFloat(document.getElementById('done2-vol').value);
+
+                const startTime = audioContext.currentTime;
+                playTone(freq1, startTime, duration1, vol1);
+                playTone(freq2, startTime + delay2, duration2, vol2);
+
+                console.log('Done sound:', { 
+                    tone1: { freq: freq1, duration: duration1, vol: vol1 },
+                    tone2: { freq: freq2, delay: delay2, duration: duration2, vol: vol2 },
+                    waveform 
+                });
+            } catch (error) {
+                console.error('Audio playback error:', error);
+                alert('Audio playback failed. Make sure your browser supports Web Audio API.');
+            }
+        }
+
+        function updateCodeOutput() {
+            const procStartFreq = parseFloat(document.getElementById('proc-start-freq').value);
+            const procEndFreq = parseFloat(document.getElementById('proc-end-freq').value);
+            const procDuration = parseFloat(document.getElementById('proc-duration').value);
+            const procStartVol = parseFloat(document.getElementById('proc-start-vol').value);
+            const procEndVol = parseFloat(document.getElementById('proc-end-vol').value);
+            const procWaveform = document.querySelector('input[name="proc-waveform"]:checked').value;
+
+            const done1Freq = parseFloat(document.getElementById('done1-freq').value);
+            const done1Duration = parseFloat(document.getElementById('done1-duration').value);
+            const done1Vol = parseFloat(document.getElementById('done1-vol').value);
+            const done2Freq = parseFloat(document.getElementById('done2-freq').value);
+            const done2Delay = parseFloat(document.getElementById('done2-delay').value);
+            const done2Duration = parseFloat(document.getElementById('done2-duration').value);
+            const done2Vol = parseFloat(document.getElementById('done2-vol').value);
+            const doneWaveform = document.querySelector('input[name="done-waveform"]:checked').value;
+
+            const code = `  // Play sound effect using Web Audio API
+  const playSound = (type: "processing" | "done") => {
+    try {
+      const audioContext = new (
+        window.AudioContext || (window as any).webkitAudioContext
+      )();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      if (type === "processing") {
+        // Processing sound: gentle ascending tone
+        oscillator.frequency.setValueAtTime(${procStartFreq}, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(
+          ${procEndFreq},
+          audioContext.currentTime + ${procDuration},
+        );
+        oscillator.type = "${procWaveform}";
+        gainNode.gain.setValueAtTime(${procStartVol}, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(
+          ${procEndVol},
+          audioContext.currentTime + ${procDuration},
+        );
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + ${procDuration});
+      } else if (type === "done") {
+        // Done sound: pleasant success chime (two-tone)
+        const playTone = (freq: number, time: number, duration: number) => {
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+          osc.frequency.value = freq;
+          osc.type = "${doneWaveform}";
+          gain.gain.setValueAtTime(0, time);
+          gain.gain.linearRampToValueAtTime(${done1Vol}, time + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
+          osc.start(time);
+          osc.stop(time + duration);
+        };
+        playTone(${done1Freq}, audioContext.currentTime, ${done1Duration}); // First tone
+        playTone(${done2Freq}, audioContext.currentTime + ${done2Delay}, ${done2Duration}); // Second tone
+      }
+    } catch (error) {
+      // Silently fail if audio context is not available
+      console.log("Audio playback not available:", error);
+    }
+  };`;
+
+            document.getElementById('code-output').textContent = code;
+        }
+
+        // Update code output on any change
+        document.addEventListener('input', updateCodeOutput);
+        document.addEventListener('change', updateCodeOutput);
+        
+        // Initial code output
+        updateCodeOutput();
+    </script>
+</body>
+</html>
