@@ -161,6 +161,8 @@ const Pill: React.FC = () => {
           // Resize window to expanded size
           const window = getCurrentWindow();
           await window.setSize(new LogicalSize(60, 40));
+
+          playSound("processing");
         });
 
         // Listen for recording stopped
@@ -169,8 +171,6 @@ const Pill: React.FC = () => {
           // Keep expanded size for processing
           const window = getCurrentWindow();
           await window.setSize(new LogicalSize(60, 40));
-          // Play processing sound
-          playSound("processing");
         });
 
         // Listen for processing start
@@ -181,8 +181,6 @@ const Pill: React.FC = () => {
             // Keep expanded size for processing
             const window = getCurrentWindow();
             await window.setSize(new LogicalSize(60, 40));
-            // Play processing sound
-            playSound("processing");
           },
         );
 
