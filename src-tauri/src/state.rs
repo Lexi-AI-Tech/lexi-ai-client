@@ -2,30 +2,11 @@
 //!
 //! This module defines all application state structures that are managed by Tauri.
 //! These states are shared across the application and can be accessed via Tauri's state management.
+//!
+//! Only runtime state that needs to be in-memory (like task handles, recording state) is stored here.
 
-use crate::global_key_listener::HotkeyConfig;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tokio::sync::watch;
-
-/// Authentication token state for storing the current access token
-///
-/// This state is updated by the frontend whenever the authentication token changes.
-/// The token is used for authenticated API requests to the Lexi AI Server.
-#[derive(Default)]
-pub struct AuthTokenState {
-    /// The current authentication token, if available
-    pub token: Mutex<Option<String>>,
-}
-
-/// Language state for storing the current transcription language
-///
-/// This state is updated by the frontend whenever the language preference changes.
-/// The language is used for speech-to-text transcription requests.
-#[derive(Default)]
-pub struct LanguageState {
-    /// The current transcription language, if available (defaults to "auto" if not set)
-    pub language: Mutex<Option<String>>,
-}
 
 /// Transcription task state for managing abort handles
 ///
@@ -42,8 +23,8 @@ pub struct TranscriptionTaskState {
 /// State for watch sender (to broadcast config changes)
 ///
 /// This state manages a watch channel that broadcasts hotkey configuration changes
-/// to the global key listener thread.
-pub struct HotkeyWatchState(pub watch::Sender<HotkeyConfig>);
+/// to the global key listener thread. Uses Vec<String> directly from AppConfig.hotkeys.
+pub struct HotkeyWatchState(pub watch::Sender<Vec<String>>);
 
 /// Hotkey recording state - tracks if we're in recording mode for hotkey selection
 ///
@@ -52,4 +33,14 @@ pub struct HotkeyWatchState(pub watch::Sender<HotkeyConfig>);
 pub struct HotkeyRecordingState {
     /// Whether hotkey recording mode is currently active
     pub is_recording: std::sync::Arc<Mutex<bool>>,
+}
+
+/// Recording channel state - stores the sender for recording commands
+///
+/// This allows the global shortcut handler to trigger recording
+pub struct RecordingChannelState {
+    /// Sender for recording commands (Start/Stop)
+    pub tx: std::sync::Arc<Mutex<Option<std::sync::mpsc::Sender<crate::RecordingCommand>>>>,
+    /// Current recording state (true if recording, false if idle)
+    pub is_recording: Arc<Mutex<bool>>,
 }

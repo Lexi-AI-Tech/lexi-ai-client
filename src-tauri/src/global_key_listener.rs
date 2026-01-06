@@ -1,34 +1,415 @@
-//! Global Keyboard Listener Module
+//! Global Keyboard Listener and Shortcut Manager Module
 //!
-//! This module provides system-wide keyboard event monitoring using the `rdev` crate.
-//! It listens for configurable hotkey press/release events to trigger audio recording
-//! start/stop, even when the application is not in focus.
+//! This module provides unified hotkey management using both:
+//! - **rdev** for Fn key detection (low-level, requires Input Monitoring permission)
+//! - **Tauri global shortcuts** for other hotkeys (modifier + key combinations)
 //!
 //! ## Features
 //!
-//! - **Function Key Hotkey**: Supports Function (Fn) key only for triggering recording
-//! - **Dynamic Configuration**: Hotkey config can be changed at runtime (currently always Function key)
+//! - **Function Key Hotkey**: Supports Function (Fn) key via rdev (hardware-handled on macOS)
+//! - **Tauri Global Shortcuts**: Supports modifier + key combinations via Tauri plugin
+//! - **Dynamic Configuration**: Hotkey config can be changed at runtime (up to 3 hotkeys)
 //! - **Hotkey Recording Mode**: Emits key events to frontend for interactive hotkey selection
+//! - **System Shortcut Validation**: Prevents registration of system-reserved shortcuts
 //!
 //! ## Architecture
 //!
-//! The listener runs in a manager thread that watches for configuration changes.
-//! When the hotkey config changes, it shuts down the old `rdev::listen` thread and
-//! spawns a new one with the updated configuration. This allows hotkey changes without
-//! restarting the entire application.
+//! The listener runs two threads:
+//! 1. **rdev listener thread**: Always running, reads hotkeys dynamically from AppConfig on each event
+//! 2. **Manager thread**: Watches config changes and handles Tauri global shortcut registration/unregistration
+//!
+//! When hotkeys change:
+//! - rdev listener automatically sees new hotkeys (reads from config on each event)
+//! - Manager thread unregisters old Tauri shortcuts and registers new ones
 //!
 //! ## Permissions Required
 //!
 //! - **Input Monitoring** (macOS): Required for `rdev::listen` to work system-wide
+//!
+//! ## Limitations
+//!
+//! Tauri global shortcuts cannot detect:
+//! - Modifier-only shortcuts (Cmd, Shift, Ctrl, Alt alone)
+//! - System-reserved shortcuts (Cmd+Space, Cmd+Tab, etc.)
+//! - Fn key (handled separately via rdev)
+//! - Media keys (volume, brightness, etc.)
+//!
+//! This module validates and rejects such shortcuts.
 
 use crate::RecordingCommand;
 use rdev::{listen, Event, EventType, Key};
-use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tokio::sync::watch;
+
+// ============================================================================
+// Hotkey Helper Functions
+// ============================================================================
+// These functions work directly with Vec<String> from AppConfig.hotkeys
+// which is the single source of truth stored in Tauri Store.
+
+/// Returns hotkeys that should be handled by rdev (Fn key or keys that can't use Tauri)
+pub fn rdev_hotkeys(hotkeys: &[String]) -> Vec<String> {
+    hotkeys
+        .iter()
+        .filter(|h| {
+            let trimmed = h.trim();
+            trimmed.eq_ignore_ascii_case("Fn") || should_use_rdev(trimmed)
+        })
+        .cloned()
+        .collect()
+}
+
+/// Returns hotkeys that should use Tauri global shortcuts
+pub fn tauri_hotkeys(hotkeys: &[String]) -> Vec<String> {
+    hotkeys
+        .iter()
+        .filter(|h| {
+            let trimmed = h.trim();
+            !trimmed.eq_ignore_ascii_case("Fn") && !should_use_rdev(trimmed)
+        })
+        .cloned()
+        .collect()
+}
+
+// ============================================================================
+// System Shortcut Validation
+// ============================================================================
+
+/// macOS system-reserved shortcuts that cannot be registered
+/// These are intercepted by macOS before Tauri sees them
+const SYSTEM_RESERVED_SHORTCUTS: &[&str] = &[
+    // Spotlight and system navigation
+    "CommandOrControl+Space",     // Spotlight
+    "CommandOrControl+Tab",       // App switcher
+    "CommandOrControl+Shift+Tab", // Reverse app switcher
+    "CommandOrControl+`",         // Window switcher
+    "CommandOrControl+Shift+`",   // Reverse window switcher
+    // Application control
+    "CommandOrControl+H",          // Hide app
+    "CommandOrControl+M",          // Minimize window
+    "CommandOrControl+W",          // Close window
+    "CommandOrControl+Q",          // Quit app
+    "CommandOrControl+Option+Esc", // Force Quit
+    "CommandOrControl+Control+Q",  // Lock Screen
+    // Text editing (system-level)
+    "CommandOrControl+C",       // Copy
+    "CommandOrControl+V",       // Paste
+    "CommandOrControl+X",       // Cut
+    "CommandOrControl+A",       // Select All
+    "CommandOrControl+Z",       // Undo
+    "CommandOrControl+Shift+Z", // Redo
+    // System dialogs
+    "CommandOrControl+Comma",  // Preferences
+    "CommandOrControl+Period", // Settings (some apps)
+    // Mission Control and Spaces
+    "CommandOrControl+Up",    // Mission Control
+    "CommandOrControl+Down",  // Application windows
+    "CommandOrControl+Left",  // Previous space
+    "CommandOrControl+Right", // Next space
+    "CommandOrControl+1",     // Switch to desktop 1
+    "CommandOrControl+2",     // Switch to desktop 2
+    "CommandOrControl+3",     // Switch to desktop 3
+    // Screenshots
+    "CommandOrControl+Shift+3", // Screenshot
+    "CommandOrControl+Shift+4", // Screenshot selection
+    "CommandOrControl+Shift+5", // Screenshot options
+    // Finder
+    "CommandOrControl+N",            // New window
+    "CommandOrControl+T",            // New tab
+    "CommandOrControl+Delete",       // Move to Trash
+    "CommandOrControl+Shift+Delete", // Empty Trash
+];
+
+/// Checks if a hotkey should be handled by rdev instead of Tauri global shortcuts
+/// Returns true for keys that Tauri cannot handle reliably
+pub fn should_use_rdev(hotkey: &str) -> bool {
+    let trimmed = hotkey.trim();
+
+    // Fn key must use rdev
+    if trimmed.eq_ignore_ascii_case("Fn") {
+        return true;
+    }
+
+    // Normalize for checking
+    let normalized = normalize_hotkey(trimmed);
+
+    // Check if it's modifier-only (Tauri can't handle, but rdev can)
+    if let Ok(shortcut) = normalized.parse::<Shortcut>() {
+        if is_modifier_only(&shortcut, &normalized) {
+            return true;
+        }
+    }
+
+    // Check if it's a single key without modifiers (risky with Tauri, better with rdev)
+    if is_single_key_without_modifiers(&normalized) {
+        return true;
+    }
+
+    false
+}
+
+/// Validates a hotkey string and returns an error if it's invalid
+/// Note: Keys that can't use Tauri will be handled by rdev automatically
+pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
+    let trimmed = hotkey.trim();
+
+    // Fn key is always valid (handled by rdev)
+    if trimmed.eq_ignore_ascii_case("Fn") {
+        return Ok(());
+    }
+
+    // If it should use rdev, it's valid (rdev can handle more keys)
+    if should_use_rdev(trimmed) {
+        return Ok(());
+    }
+
+    // For Tauri shortcuts, check if it's system-reserved
+    let normalized = normalize_hotkey(trimmed);
+
+    // System-reserved shortcuts cannot be overridden even with rdev
+    // (macOS intercepts them before any app sees them)
+    if SYSTEM_RESERVED_SHORTCUTS
+        .iter()
+        .any(|&reserved| reserved.eq_ignore_ascii_case(&normalized))
+    {
+        return Err(format!(
+            "Hotkey '{}' is reserved by macOS and cannot be used. Please choose a different combination.",
+            hotkey
+        ));
+    }
+
+    // Try to parse as Tauri shortcut to validate format
+    let _shortcut: Shortcut = normalized
+        .parse()
+        .map_err(|e| format!("Invalid hotkey format '{}': {}", hotkey, e))?;
+
+    Ok(())
+}
+
+/// Checks if a shortcut is modifier-only
+fn is_modifier_only(_shortcut: &Shortcut, normalized: &str) -> bool {
+    // Check if the normalized string contains only modifiers
+    let parts: Vec<&str> = normalized.split('+').collect();
+    let modifier_count = parts.iter().filter(|p| is_modifier_key(p)).count();
+
+    // If all parts are modifiers, it's modifier-only
+    modifier_count == parts.len() && !parts.is_empty()
+}
+
+/// Checks if a hotkey is a single key without modifiers
+fn is_single_key_without_modifiers(normalized: &str) -> bool {
+    let parts: Vec<&str> = normalized.split('+').collect();
+    parts.len() == 1 && !is_modifier_key(parts[0])
+}
+
+/// Checks if a key string is a modifier
+fn is_modifier_key(key: &str) -> bool {
+    matches!(
+        key.to_lowercase().as_str(),
+        "commandorcontrol"
+            | "command"
+            | "control"
+            | "ctrl"
+            | "alt"
+            | "option"
+            | "shift"
+            | "meta"
+            | "super"
+    )
+}
+
+// ============================================================================
+// Hotkey Normalization
+// ============================================================================
+
+/// Normalize a hotkey string to Tauri global shortcut format
+/// Converts frontend key names (e.g., "Cmd+Shift+R") to Tauri format (e.g., "CommandOrControl+Shift+R")
+pub fn normalize_hotkey(hotkey: &str) -> String {
+    hotkey
+        .split('+')
+        .map(|key_str| normalize_single_key(key_str.trim()))
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
+/// Normalize a single key string
+fn normalize_single_key(key: &str) -> String {
+    match key.to_lowercase().as_str() {
+        "cmd" | "command" | "meta" | "super" => "CommandOrControl".to_string(),
+        "ctrl" | "control" => "Control".to_string(),
+        "option" | "alt" => "Alt".to_string(),
+        "shift" => "Shift".to_string(),
+        "space" => "Space".to_string(),
+        "return" => "Enter".to_string(),
+        "arrowup" => "Up".to_string(),
+        "arrowdown" => "Down".to_string(),
+        "arrowleft" => "Left".to_string(),
+        "arrowright" => "Right".to_string(),
+        _ => {
+            // For single letter keys, uppercase them
+            if key.len() == 1 && key.chars().all(|c| c.is_alphabetic()) {
+                key.to_uppercase()
+            } else {
+                key.to_string()
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Tauri Global Shortcut Management
+// ============================================================================
+
+/// Register a hotkey, trying Tauri first, falling back to rdev if needed
+/// Returns (success, used_rdev) tuple
+pub fn register_hotkey(app: &AppHandle, hotkey: &str) -> Result<bool, String> {
+    let trimmed = hotkey.trim();
+
+    // Validate the hotkey
+    validate_hotkey(trimmed)?;
+
+    // If it should use rdev, mark it for rdev handling
+    if should_use_rdev(trimmed) {
+        println!(
+            "🔑 Hotkey '{}' will be handled by rdev (not supported by Tauri global shortcuts)",
+            trimmed
+        );
+        return Ok(true); // true = use rdev
+    }
+
+    // Try to register with Tauri global shortcuts
+    let normalized = normalize_hotkey(trimmed);
+    println!(
+        "🔑 Attempting to register Tauri global shortcut: {} (normalized: {})",
+        trimmed, normalized
+    );
+
+    // Parse the normalized shortcut
+    let shortcut: Shortcut = match normalized.parse() {
+        Ok(s) => s,
+        Err(e) => {
+            // If parsing fails, fall back to rdev
+            println!(
+                "⚠️  Failed to parse hotkey '{}' for Tauri, will use rdev: {}",
+                trimmed, e
+            );
+            return Ok(true); // Use rdev
+        }
+    };
+
+    // Try to register with Tauri
+    match app.global_shortcut().register(shortcut) {
+        Ok(_) => {
+            println!(
+                "✅ Successfully registered Tauri global shortcut: {}",
+                trimmed
+            );
+            Ok(false) // false = using Tauri
+        }
+        Err(e) => {
+            let error_msg = e.to_string();
+            let error_lower = error_msg.to_lowercase();
+
+            // If it's a conflict or already in use, that's a real error
+            if error_lower.contains("already registered")
+                || error_lower.contains("conflict")
+                || error_lower.contains("in use")
+            {
+                Err(format!("Hotkey '{}' is already in use by another application. Please choose a different combination.", trimmed))
+            } else {
+                // For other errors, fall back to rdev
+                println!(
+                    "⚠️  Failed to register '{}' with Tauri ({}), will use rdev instead",
+                    trimmed, e
+                );
+                Ok(true) // Use rdev
+            }
+        }
+    }
+}
+
+/// Unregister a hotkey (only for Tauri shortcuts, rdev hotkeys are handled by config change)
+pub fn unregister_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
+    let trimmed = hotkey.trim();
+
+    // Skip rdev-handled keys (they're managed by the rdev listener)
+    if should_use_rdev(trimmed) {
+        return Ok(());
+    }
+
+    let normalized = normalize_hotkey(trimmed);
+    println!(
+        "🔑 Unregistering Tauri global shortcut: {} (normalized: {})",
+        trimmed, normalized
+    );
+
+    let shortcut: Shortcut = normalized.parse().map_err(|e| {
+        format!(
+            "Failed to parse hotkey '{}' (normalized: '{}'): {}",
+            trimmed, normalized, e
+        )
+    })?;
+
+    app.global_shortcut()
+        .unregister(shortcut)
+        .map_err(|e| format!("Failed to unregister hotkey '{}': {}", trimmed, e))?;
+
+    println!(
+        "✅ Successfully unregistered Tauri global shortcut: {}",
+        trimmed
+    );
+    Ok(())
+}
+
+/// Register multiple hotkeys (up to 3)
+/// Returns list of hotkeys that will be handled by rdev
+pub fn register_hotkeys(app: &AppHandle, hotkeys: &[String]) -> Result<Vec<String>, String> {
+    // Limit to 3 hotkeys
+    if hotkeys.len() > 3 {
+        return Err("Maximum of 3 hotkeys allowed".to_string());
+    }
+
+    let mut rdev_hotkeys = Vec::new();
+    let mut errors = Vec::new();
+
+    for hotkey in hotkeys {
+        match register_hotkey(app, hotkey) {
+            Ok(use_rdev) => {
+                if use_rdev {
+                    rdev_hotkeys.push(hotkey.clone());
+                }
+            }
+            Err(e) => {
+                errors.push(format!("Failed to register '{}': {}", hotkey, e));
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        return Err(errors.join("; "));
+    }
+
+    Ok(rdev_hotkeys)
+}
+
+/// Unregister all Tauri hotkeys (rdev hotkeys are managed by config)
+pub fn unregister_all_hotkeys(app: &AppHandle, hotkeys: &[String]) {
+    for hotkey in hotkeys {
+        // Only unregister Tauri shortcuts, rdev ones are handled by listener restart
+        if !should_use_rdev(hotkey) {
+            if let Err(e) = unregister_hotkey(app, hotkey) {
+                eprintln!("⚠️  Failed to unregister hotkey '{}': {}", hotkey, e);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// rdev Listener (for Fn key)
+// ============================================================================
 
 /// Tracks the actual state of the Function key to prevent spurious events
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,7 +436,7 @@ impl KeyStateTracker {
     /// Filters out duplicate events and ensures proper Start→Stop ordering
     fn process_event(&mut self, event_type: &EventType) -> Option<RecordingCommand> {
         const MIN_STATE_DURATION: Duration = Duration::from_millis(50);
-        
+
         match event_type {
             EventType::KeyPress(Key::Function) => {
                 // Only transition to Pressed if currently Released
@@ -67,7 +448,10 @@ impl KeyStateTracker {
                         println!("🔑 Key state: Released → Pressed (after {:?})", elapsed);
                         return Some(RecordingCommand::Start);
                     } else {
-                        println!("⚠️  Ignoring rapid KeyPress (only {:?} since last change)", elapsed);
+                        println!(
+                            "⚠️  Ignoring rapid KeyPress (only {:?} since last change)",
+                            elapsed
+                        );
                     }
                 } else {
                     // Already pressed - ignore duplicate KeyPress
@@ -84,7 +468,10 @@ impl KeyStateTracker {
                         println!("🔑 Key state: Pressed → Released (held for {:?})", elapsed);
                         return Some(RecordingCommand::Stop);
                     } else {
-                        println!("⚠️  Ignoring rapid KeyRelease (only {:?} since press)", elapsed);
+                        println!(
+                            "⚠️  Ignoring rapid KeyRelease (only {:?} since press)",
+                            elapsed
+                        );
                     }
                 } else {
                     // Already released - ignore duplicate KeyRelease
@@ -94,31 +481,6 @@ impl KeyStateTracker {
             _ => {}
         }
         None
-    }
-    
-    /// Reset state (e.g., when listener restarts)
-    fn reset(&mut self) {
-        self.state = KeyState::Released;
-        self.last_state_change = Instant::now();
-        println!("🔑 Key state tracker reset to Released");
-    }
-}
-
-/// Hotkey configuration (simplified to Function key only)
-/// Kept for compatibility with existing config system
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HotkeyConfig {
-    /// Human-readable hotkey string (currently only "Fn" is supported)
-    pub hotkey: String,
-}
-
-impl HotkeyConfig {
-    // Simplified - we only support Function key now
-    // This method is kept for compatibility but always returns Function key
-    #[allow(dead_code)]
-    pub fn get_key_and_modifiers(&self) -> (String, Option<u32>, ()) {
-        // Always return Function key regardless of config
-        ("Function".to_string(), Some(179), ())
     }
 }
 
@@ -144,194 +506,229 @@ fn key_to_string(key: &Key) -> String {
     }
 }
 
-/// Checks if the event is a Function key event (press or release)
-/// Returns true if it's a Function key event that should be processed by the state tracker
-fn is_function_key_event(event_type: &EventType) -> bool {
-    matches!(
-        event_type,
-        EventType::KeyPress(Key::Function) | EventType::KeyRelease(Key::Function)
-    )
+/// Checks if a keyboard event matches any of the configured rdev hotkeys
+/// Returns true if the event should trigger recording
+fn matches_rdev_hotkey(event_type: &EventType, rdev_hotkeys: &[String]) -> bool {
+    for hotkey in rdev_hotkeys {
+        let trimmed = hotkey.trim();
+
+        // Check for Fn key
+        if trimmed.eq_ignore_ascii_case("Fn") {
+            if matches!(
+                event_type,
+                EventType::KeyPress(Key::Function) | EventType::KeyRelease(Key::Function)
+            ) {
+                return true;
+            }
+        }
+
+        // For other rdev hotkeys, we'd need to parse and match
+        // Currently only Fn is supported via rdev, others go to Tauri
+        // This can be extended in the future for modifier-only or single-key hotkeys
+    }
+
+    false
 }
 
-/// Starts the global keyboard listener in a background thread with dynamic config support.
+/// Starts the global keyboard listener with dynamic config support.
 ///
-/// This spawns a manager thread that watches for config changes via `config_rx`.
-/// On change, it shuts down the old rdev listener and spawns a new one with the updated config.
+/// This spawns two threads:
+/// 1. **rdev listener thread**: Always running, reads hotkeys dynamically from config on each event
+/// 2. **Manager thread**: Watches config changes and handles Tauri global shortcut registration/unregistration
 ///
 /// # Arguments
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
 /// * `recording_tx` - Channel sender to signal start/stop recording
-/// * `config_rx` - Watch receiver for hotkey config changes
+/// * `config_rx` - Watch receiver for hotkey config changes (from AppConfig.hotkeys)
 /// * `recording_state` - Shared state to check if we're in hotkey recording mode
 pub fn start_listener(
     app: AppHandle,
     recording_tx: mpsc::Sender<RecordingCommand>,
-    mut config_rx: watch::Receiver<HotkeyConfig>,
+    config_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
 ) {
-    // Manager thread: Watches config, restarts listener on change
+    let app_for_rdev = app.clone();
+    let recording_tx_for_rdev = recording_tx.clone();
+    let recording_state_for_rdev = recording_state.clone();
+    let config_rx_for_rdev = config_rx.clone();
+
+    // Key state tracker to prevent spurious/duplicate events
+    let key_state_tracker = Arc::new(Mutex::new(KeyStateTracker::new()));
+
+    // Start rdev listener thread - always running, reads hotkeys dynamically
     std::thread::spawn(move || {
-        let app_clone = app.clone();
-        let recording_tx_clone = recording_tx.clone();
-        let recording_state_clone = recording_state.clone();
+        let key_state_tracker_for_callback = key_state_tracker.clone();
+        let callback = move |event: Event| {
+            // Check if we're in hotkey recording mode (for UI hotkey selection)
+            let is_recording = recording_state_for_rdev
+                .lock()
+                .map(|guard| *guard)
+                .unwrap_or(false);
+
+            // If in recording mode, emit key events to frontend for hotkey selection
+            if is_recording {
+                match &event.event_type {
+                    EventType::KeyPress(ref key) => {
+                        let key_str = key_to_string(key);
+                        let _ = app_for_rdev.emit(
+                            "hotkey-recorded",
+                            serde_json::json!({
+                                "key": key_str,
+                                "modifiers": []
+                            }),
+                        );
+                    }
+                    _ => {}
+                }
+            }
+
+            // Get current hotkeys from AppConfig (single source of truth: Tauri Store)
+            let current_hotkeys = config_rx_for_rdev.borrow().clone();
+            let current_rdev_hotkeys = rdev_hotkeys(&current_hotkeys);
+
+            // Check if this event matches any configured rdev hotkey
+            let command = if matches_rdev_hotkey(&event.event_type, &current_rdev_hotkeys) {
+                // For Fn key, use the state tracker (press/release behavior)
+                if matches!(
+                    &event.event_type,
+                    EventType::KeyPress(Key::Function) | EventType::KeyRelease(Key::Function)
+                ) {
+                    // Use state tracker for Fn key
+                    if let Ok(mut tracker) = key_state_tracker_for_callback.lock() {
+                        tracker.process_event(&event.event_type)
+                    } else {
+                        eprintln!("❌ Failed to lock key state tracker");
+                        None
+                    }
+                } else {
+                    // For other rdev hotkeys (modifier-only, single keys, etc.)
+                    // This can be extended in the future
+                    None
+                }
+            } else {
+                None
+            };
+
+            // Process command if we got one
+            if let Some(command) = command {
+                let trigger_type = match command {
+                    RecordingCommand::Start => "PRESSED",
+                    RecordingCommand::Stop => "RELEASED",
+                };
+                println!("=== HOTKEY TRIGGER: {} ===", trigger_type);
+
+                // Query cursor context
+                if let Some(context) = crate::cursor_context::get_cursor_context() {
+                    println!(
+                        "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
+                        context.app_name, context.pid, context.selected_text
+                    );
+                }
+
+                println!(
+                    "Hotkey {} - {} recording",
+                    match command {
+                        RecordingCommand::Start => "pressed",
+                        RecordingCommand::Stop => "released",
+                    },
+                    match command {
+                        RecordingCommand::Start => "Starting",
+                        RecordingCommand::Stop => "Stopping",
+                    }
+                );
+
+                // Send to recording
+                if let Err(e) = recording_tx_for_rdev.send(command) {
+                    eprintln!("Failed to send recording signal: {:?}", e);
+                }
+
+                // Emit to frontend
+                let event_name = match command {
+                    RecordingCommand::Start => "recording_started",
+                    RecordingCommand::Stop => "recording_stopped",
+                };
+                if let Err(e) = app_for_rdev.emit(event_name, ()) {
+                    eprintln!("Failed to emit {} event: {:?}", event_name, e);
+                }
+            }
+
+            // Emit all keyboard events for debug (commented out by default)
+            if let Some(event_string) = event_type_to_string(&event.event_type) {
+                // println!("Keyboard event: {:?}", event);
+                if let Err(e) = app_for_rdev.emit("global-input", &event_string) {
+                    eprintln!("Failed to emit event: {:?}", e);
+                }
+            }
+        };
+
+        println!("🔑 Starting rdev listener (always running, reads hotkeys dynamically)");
+        if let Err(error) = listen(callback) {
+            eprintln!("rdev listen error: {:?}", error);
+        }
+    });
+
+    // Manager thread: Watches config changes and handles Tauri global shortcut registration
+    std::thread::spawn(move || {
+        let mut current_tauri_hotkeys: Vec<String> = Vec::new();
+        let mut config_rx_manager = config_rx;
 
         loop {
-            // Get current config
-            let current_config = config_rx.borrow().clone();
-            println!("🔑 Starting rdev listener for hotkey: {:?}", current_config);
+            // Get current hotkeys from watch channel (single source of truth: AppConfig.hotkeys)
+            let hotkeys = config_rx_manager.borrow().clone();
 
-            // Shutdown flag for this listener instance
-            let shutdown = Arc::new(AtomicBool::new(false));
-            let shutdown_for_callback = shutdown.clone();
-            let app_for_callback = app_clone.clone();
-            let recording_tx_for_callback = recording_tx_clone.clone();
-            let recording_state_for_callback = recording_state_clone.clone();
+            // Get hotkeys that should use Tauri global shortcuts
+            let new_tauri_hotkeys = tauri_hotkeys(&hotkeys);
 
-            // Key state tracker to prevent spurious/duplicate events
-            let key_state_tracker = Arc::new(Mutex::new(KeyStateTracker::new()));
-            let key_state_tracker_for_callback = key_state_tracker.clone();
+            // Check if Tauri hotkeys changed
+            if new_tauri_hotkeys != current_tauri_hotkeys {
+                println!(
+                    "🔄 Tauri hotkeys changed: {:?} -> {:?}",
+                    current_tauri_hotkeys, new_tauri_hotkeys
+                );
 
-            // Spawn the actual rdev listener thread
-            let listener_thread = std::thread::spawn(move || {
-                let callback = move |event: Event| {
-                    if shutdown_for_callback.load(Ordering::Relaxed) {
-                        return; // Early exit if shutdown signaled
-                    }
-
-                    // Check if we're in hotkey recording mode (for UI hotkey selection)
-                    let is_recording = recording_state_for_callback
-                        .lock()
-                        .map(|guard| *guard)
-                        .unwrap_or(false);
-
-                    // If in recording mode, emit key events to frontend for hotkey selection
-                    if is_recording {
-                        match &event.event_type {
-                            EventType::KeyPress(ref key) => {
-                                let key_str = key_to_string(key);
-                                let _ = app_for_callback.emit(
-                                    "hotkey-recorded",
-                                    serde_json::json!({
-                                        "key": key_str,
-                                        "modifiers": []
-                                    }),
-                                );
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    // Check if this is a Function key event and process through state tracker
-                    if is_function_key_event(&event.event_type) {
-                        // Use state tracker to filter spurious/duplicate events
-                        let command = {
-                            if let Ok(mut tracker) = key_state_tracker_for_callback.lock() {
-                                tracker.process_event(&event.event_type)
-                            } else {
-                                eprintln!("❌ Failed to lock key state tracker");
-                                None
-                            }
-                        };
-
-                        // Only process if state tracker approved the transition
-                        if let Some(command) = command {
-                            // Log the trigger
-                            let trigger_type = match command {
-                                RecordingCommand::Start => "PRESSED",
-                                RecordingCommand::Stop => "RELEASED",
-                            };
-                            println!(
-                                "=== HOTKEY TRIGGER: {} ({:?}) ===",
-                                trigger_type, current_config
-                            );
-
-                            // Query cursor context
-                            if let Some(context) = crate::cursor_context::get_cursor_context() {
-                                println!(
-                                    "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
-                                    context.app_name, context.pid, context.selected_text
-                                );
-                            }
-
-                            println!(
-                                "Hotkey {} - {} recording",
-                                match command {
-                                    RecordingCommand::Start => "pressed",
-                                    RecordingCommand::Stop => "released",
-                                },
-                                match command {
-                                    RecordingCommand::Start => "Starting",
-                                    RecordingCommand::Stop => "Stopping",
-                                }
-                            );
-
-                            // Send to recording
-                            if let Err(e) = recording_tx_for_callback.send(command) {
-                                eprintln!("Failed to send recording signal: {:?}", e);
-                            }
-
-                            // Emit to frontend
-                            let event_name = match command {
-                                RecordingCommand::Start => "recording_started",
-                                RecordingCommand::Stop => "recording_stopped",
-                            };
-                            if let Err(e) = app_for_callback.emit(event_name, ()) {
-                                eprintln!("Failed to emit {} event: {:?}", event_name, e);
-                            }
-                        }
-                    }
-
-                    // Emit all keyboard events for debug
-                    if let Some(event_string) = event_type_to_string(&event.event_type) {
-                        // println!("Keyboard event: {:?}", event);
-                        if let Err(e) = app_for_callback.emit("global-input", &event_string) {
-                            eprintln!("Failed to emit event: {:?}", e);
-                        }
-                    }
-                };
-
-                if let Err(error) = listen(callback) {
-                    eprintln!("rdev listen error: {:?}", error);
+                // Unregister old Tauri hotkeys
+                if !current_tauri_hotkeys.is_empty() {
+                    unregister_all_hotkeys(&app, &current_tauri_hotkeys);
                 }
-            });
 
-            // Wait for config change or channel close
-            // Since we're in a blocking std thread, create a small runtime to await the future
-            let shutdown_for_wait = shutdown.clone();
+                // Register new Tauri hotkeys
+                if !new_tauri_hotkeys.is_empty() {
+                    match register_hotkeys(&app, &new_tauri_hotkeys) {
+                        Ok(rdev_fallback) => {
+                            if !rdev_fallback.is_empty() {
+                                println!(
+                                    "ℹ️  {} hotkey(s) will be handled by rdev: {:?}",
+                                    rdev_fallback.len(),
+                                    rdev_fallback
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️  Failed to register Tauri global shortcuts: {}", e);
+                        }
+                    }
+                }
+
+                current_tauri_hotkeys = new_tauri_hotkeys;
+            }
+
+            // Wait for config change
             let changed_result = if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                handle.block_on(config_rx.changed())
+                handle.block_on(config_rx_manager.changed())
             } else {
-                // If no runtime available, create a small one just for this operation
                 match tokio::runtime::Runtime::new() {
-                    Ok(rt) => rt.block_on(config_rx.changed()),
+                    Ok(rt) => rt.block_on(config_rx_manager.changed()),
                     Err(_) => {
-                        // Can't create runtime, exit
-                        shutdown_for_wait.store(true, Ordering::Relaxed);
-                        let _ = listener_thread.join();
+                        eprintln!("❌ Failed to create runtime for config watch");
                         break;
                     }
                 }
             };
 
             if changed_result.is_err() {
-                // Channel closed, shutdown and exit
-                shutdown_for_wait.store(true, Ordering::Relaxed);
-                let _ = listener_thread.join();
+                // Channel closed, exit
                 break;
             }
-
-            // New config available: Shutdown old and loop to restart
-            println!("🔄 Hotkey config changed, restarting listener...");
-            shutdown.store(true, Ordering::Relaxed);
-            
-            // Reset the key state tracker to ensure clean state on restart
-            if let Ok(mut tracker) = key_state_tracker.lock() {
-                tracker.reset();
-            }
-            
-            // Unpark the listener thread if blocked (rdev::listen is blocking, but AtomicBool check is polled)
-            // Note: rdev doesn't have built-in shutdown; the flag + next event will exit loop implicitly
-            let _ = listener_thread.join(); // Wait for clean shutdown
         }
     });
 }

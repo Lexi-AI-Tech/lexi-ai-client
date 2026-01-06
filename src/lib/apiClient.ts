@@ -4,41 +4,30 @@
  * Handles all HTTP requests to the backend server with authentication support.
  */
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://lexi-ai-server.onrender.com";
-
-export interface ApiResponse<T = any> {
-  success?: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-  [key: string]: any;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
-  user: {
-    email: string;
-    name: string;
-    picture?: string;
-    id?: string;
-  };
-  expires_in?: number;
-}
-
-import { getStorageItemSync } from "./persistentStorage";
+import { getDeviceInfo } from "./deviceInfo";
+import { SystemType } from "./constants";
+import { authStore } from "../store/authStore";
+import {
+  AUTH_ENDPOINTS,
+  TRANSCRIPT_ENDPOINTS,
+  USER_ENDPOINTS,
+  getApiUrl,
+} from "./apiEndpoints";
+import type {
+  ApiResponse,
+  AuthResponse,
+  Transcript,
+  PaginatedTranscriptsResponse,
+  AppConfig,
+  AppConfigUpdateRequest,
+} from "../types";
 
 /**
- * Get the current access token from persistent storage
+ * Get the current access token from auth store
  */
 function getAccessToken(): string | null {
   try {
-    const stored = getStorageItemSync("lexi-auth");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return parsed.tokens?.access_token || null;
-    }
+    return authStore.tokens?.access_token || null;
   } catch (e) {
     console.error("Failed to get access token:", e);
   }
@@ -46,15 +35,11 @@ function getAccessToken(): string | null {
 }
 
 /**
- * Get the refresh token from persistent storage
+ * Get the refresh token from auth store
  */
 function getRefreshToken(): string | null {
   try {
-    const stored = getStorageItemSync("lexi-auth");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return parsed.tokens?.refresh_token || null;
-    }
+    return authStore.tokens?.refresh_token || null;
   } catch (e) {
     console.error("Failed to get refresh token:", e);
   }
@@ -71,11 +56,9 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   try {
-    // Import device info utility
-    const { getDeviceInfo } = await import("./deviceInfo");
-    const device = getDeviceInfo();
+    const device = await getDeviceInfo();
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    const response = await fetch(getApiUrl(AUTH_ENDPOINTS.refresh), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -94,24 +77,22 @@ async function refreshAccessToken(): Promise<string | null> {
     const data: ApiResponse<AuthResponse> = await response.json();
 
     if (data.access_token) {
-      // Update stored tokens
+      // Update tokens in auth store
       try {
-        const { getStorageItem, setStorageItem } =
-          await import("./persistentStorage");
-        const stored = await getStorageItem("lexi-auth");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          parsed.tokens = {
-            ...parsed.tokens,
-            access_token: data.access_token,
-            refresh_token: data.refresh_token || parsed.tokens.refresh_token,
-            expires_in: data.expires_in,
-            expires_at: data.expires_in
-              ? Date.now() + data.expires_in * 1000
-              : parsed.tokens.expires_at,
-          };
-          // Use async storage for persistence
-          await setStorageItem("lexi-auth", JSON.stringify(parsed));
+        if (authStore.tokens && authStore.user) {
+          authStore.setAuthData(
+            {
+              ...authStore.tokens,
+              access_token: data.access_token,
+              refresh_token:
+                data.refresh_token || authStore.tokens.refresh_token,
+              expires_in: data.expires_in,
+              expires_at: data.expires_in
+                ? Date.now() + data.expires_in * 1000
+                : authStore.tokens.expires_at,
+            },
+            authStore.user,
+          );
         }
       } catch (e) {
         console.error("Failed to update tokens:", e);
@@ -134,7 +115,15 @@ export async function authenticatedFetch(
   url: string,
   options: RequestInit = {},
 ): Promise<Response> {
-  const token = getAccessToken();
+  // Proactively refresh token if it's expiring soon
+  try {
+    await authStore.refreshTokenIfNeeded();
+  } catch (e) {
+    // Ignore errors in proactive refresh, will handle on 401
+    console.debug("Proactive refresh check failed:", e);
+  }
+
+  let token = getAccessToken();
 
   // Add authorization header if token exists
   const headers = new Headers(options.headers);
@@ -149,6 +138,7 @@ export async function authenticatedFetch(
 
   // If unauthorized, try to refresh token and retry once
   if (response.status === 401 && token) {
+    console.log("🔄 Received 401, attempting token refresh...");
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers.set("Authorization", `Bearer ${newToken}`);
@@ -158,8 +148,7 @@ export async function authenticatedFetch(
       });
     } else {
       // Refresh failed, clear auth
-      const { removeStorageItem } = await import("./persistentStorage");
-      await removeStorageItem("lexi-auth");
+      authStore.clearAuth();
       // Dispatch event to notify app of auth failure
       window.dispatchEvent(new CustomEvent("auth-expired"));
     }
@@ -176,7 +165,7 @@ export async function getGoogleOAuthUrl(): Promise<{
   url: string;
   state?: string;
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/google/url`, {
+  const response = await fetch(getApiUrl(AUTH_ENDPOINTS.googleUrl), {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -220,9 +209,7 @@ export async function exchangeGoogleAuthCode(
   redirectUri?: string,
   deviceInfo?: { device_name?: string; device_type?: string },
 ): Promise<AuthResponse> {
-  // Import device info utility
-  const { getDeviceInfo } = await import("./deviceInfo");
-  const device = deviceInfo || getDeviceInfo();
+  const device = deviceInfo || (await getDeviceInfo());
 
   // Ensure code_verifier is always sent if provided (required for PKCE)
   const requestBody: any = {
@@ -259,7 +246,7 @@ export async function exchangeGoogleAuthCode(
       : "missing",
   });
 
-  const response = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
+  const response = await fetch(getApiUrl(AUTH_ENDPOINTS.googleCallback), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -304,7 +291,7 @@ export async function exchangeGoogleTokens(googleTokens: {
   refresh_token?: string;
   expires_in?: number;
 }): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+  const response = await fetch(getApiUrl(AUTH_ENDPOINTS.google), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -347,11 +334,9 @@ export async function refreshJWTToken(
   refreshToken: string,
   deviceInfo?: { device_name?: string; device_type?: string },
 ): Promise<AuthResponse> {
-  // Import device info utility
-  const { getDeviceInfo } = await import("./deviceInfo");
-  const device = deviceInfo || getDeviceInfo();
+  const device = deviceInfo || (await getDeviceInfo());
 
-  const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+  const response = await fetch(getApiUrl(AUTH_ENDPOINTS.refresh), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -390,7 +375,7 @@ export async function refreshJWTToken(
  * Get current user from backend
  */
 export async function getCurrentUser(): Promise<AuthResponse["user"]> {
-  const response = await authenticatedFetch(`${API_BASE_URL}/api/auth/me`, {
+  const response = await authenticatedFetch(getApiUrl(AUTH_ENDPOINTS.me), {
     method: "GET",
   });
 
@@ -406,7 +391,7 @@ export async function getCurrentUser(): Promise<AuthResponse["user"]> {
  * Logout from backend
  */
 export async function logout(): Promise<void> {
-  const response = await authenticatedFetch(`${API_BASE_URL}/api/auth/logout`, {
+  const response = await authenticatedFetch(getApiUrl(AUTH_ENDPOINTS.logout), {
     method: "POST",
   });
 
@@ -423,7 +408,7 @@ export async function storePkceVerifier(
   state: string,
   verifier: string,
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/oauth/verifier`, {
+  const response = await fetch(getApiUrl(AUTH_ENDPOINTS.storeOAuthVerifier), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -450,15 +435,12 @@ export async function storePkceVerifier(
  * Retrieve PKCE verifier from backend (Redis) using state
  */
 export async function getPkceVerifier(state: string): Promise<string> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/auth/oauth/verifier/${encodeURIComponent(state)}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+  const response = await fetch(getApiUrl(AUTH_ENDPOINTS.oauthVerifier(state)), {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+  });
 
   if (!response.ok) {
     const errorData = await response
@@ -497,15 +479,12 @@ export async function checkOAuthStatus(state: string): Promise<{
   };
   expires_in?: number;
 }> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/auth/oauth/status/${encodeURIComponent(state)}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+  const response = await fetch(getApiUrl(AUTH_ENDPOINTS.oauthStatus(state)), {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+  });
 
   if (!response.ok) {
     const errorData = await response
@@ -522,36 +501,7 @@ export async function checkOAuthStatus(state: string): Promise<{
   return data;
 }
 
-/**
- * Transcript types
- */
-export interface Transcript {
-  id: number;
-  user_id: number;
-  original_text: string | null;
-  original_text_word_count: number;
-  original_text_character_count: number;
-  is_enhanced: boolean;
-  enhanced_text: string | null;
-  enhanced_text_word_count: number | null;
-  enhanced_text_character_count: number | null;
-  audio_file_url: string | null;
-  audio_file_size: number | null;
-  provider: string | null;
-  asr_model: string | null;
-  status: string;
-  error_message: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PaginatedTranscriptsResponse {
-  transcripts: Transcript[];
-  total: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-}
+// Transcript types are imported from ../types
 
 /**
  * Get paginated list of transcripts
@@ -575,7 +525,7 @@ export async function getTranscripts(
   }
 
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/transcription/transcripts?${params.toString()}`,
+    getApiUrl(TRANSCRIPT_ENDPOINTS.list(params.toString())),
     {
       method: "GET",
     },
@@ -601,7 +551,7 @@ export async function getTranscripts(
  */
 export async function getTranscript(transcriptId: number): Promise<Transcript> {
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/transcription/transcripts/${transcriptId}`,
+    getApiUrl(TRANSCRIPT_ENDPOINTS.get(transcriptId)),
     {
       method: "GET",
     },
@@ -627,7 +577,7 @@ export async function getTranscript(transcriptId: number): Promise<Transcript> {
  */
 export async function deleteTranscript(transcriptId: number): Promise<void> {
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/transcription/transcripts/${transcriptId}`,
+    getApiUrl(TRANSCRIPT_ENDPOINTS.delete(transcriptId)),
     {
       method: "DELETE",
     },
@@ -645,34 +595,17 @@ export async function deleteTranscript(transcriptId: number): Promise<void> {
   }
 }
 
-/**
- * App config types
- */
-export interface AppConfig {
-  system_type: string;
-  hotkey: string;
-  language: string;
-  enhance_transcription: boolean;
-  transcribe_with_cursor_context: boolean;
-}
-
-export interface AppConfigUpdateRequest {
-  system_type?: string; // 'mac' or 'windows'
-  hotkey?: string;
-  language?: string;
-  enhance_transcription?: boolean;
-  transcribe_with_cursor_context?: boolean;
-}
+// App config types are imported from ../types
 
 /**
  * Get current user's application configuration
  */
 export async function getAppConfig(
-  systemType: "mac" | "windows" = "mac",
+  systemType: SystemType = SystemType.MAC,
 ): Promise<AppConfig> {
   const params = new URLSearchParams({ system_type: systemType });
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/users/me/config?${params.toString()}`,
+    getApiUrl(USER_ENDPOINTS.config(params.toString())),
     {
       method: "GET",
     },
@@ -700,7 +633,7 @@ export async function updateAppConfig(
   config: AppConfigUpdateRequest,
 ): Promise<AppConfig> {
   const response = await authenticatedFetch(
-    `${API_BASE_URL}/api/users/me/config`,
+    getApiUrl(USER_ENDPOINTS.config()),
     {
       method: "PUT",
       headers: {

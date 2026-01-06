@@ -1,15 +1,17 @@
 /**
  * Storage Utilities
  *
- * Helper functions for managing localStorage
+ * Helper functions for managing localStorage (non-auth data)
+ * Note: Auth data is now stored in OS keychain via secure storage
  */
 
+import { clearAuthDataSecure, getAuthDataSecure } from "./secureStorage";
+
 /**
- * Clear all Lexi AI related localStorage data
+ * Clear all Lexi AI related localStorage data (non-auth)
  */
 export function clearAllStorage(): void {
   try {
-    localStorage.removeItem("lexi-auth");
     localStorage.removeItem("lexi-onboarding");
     console.log("✅ All localStorage cleared");
   } catch (e) {
@@ -19,12 +21,12 @@ export function clearAllStorage(): void {
 }
 
 /**
- * Clear only authentication data
+ * Clear only authentication data from secure storage
  */
-export function clearAuthStorage(): void {
+export async function clearAuthStorage(): Promise<void> {
   try {
-    localStorage.removeItem("lexi-auth");
-    console.log("✅ Auth storage cleared");
+    await clearAuthDataSecure();
+    console.log("✅ Auth storage cleared from secure storage");
   } catch (e) {
     console.error("Failed to clear auth storage:", e);
     throw e;
@@ -46,14 +48,16 @@ export function clearOnboardingStorage(): void {
 
 /**
  * Get all Lexi AI storage keys and their values (for debugging)
+ * Note: Auth data is stored in OS keychain, not localStorage
  */
-export function getAllStorage(): Record<string, any> {
+export async function getAllStorage(): Promise<Record<string, any>> {
   const storage: Record<string, any> = {};
 
   try {
-    const auth = localStorage.getItem("lexi-auth");
-    if (auth) {
-      storage["lexi-auth"] = JSON.parse(auth);
+    // Check secure storage for auth data
+    const authData = await getAuthDataSecure();
+    if (authData) {
+      storage["lexi-auth"] = authData;
     }
 
     const onboarding = localStorage.getItem("lexi-onboarding");

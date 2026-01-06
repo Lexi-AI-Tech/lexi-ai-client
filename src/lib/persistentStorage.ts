@@ -3,7 +3,10 @@
  *
  * Provides a unified storage interface that uses Tauri Store in production
  * and falls back to localStorage for development/web environments.
- * This ensures tokens persist reliably in production builds.
+ *
+ * NOTE: This is no longer used for auth data. Auth tokens are now stored
+ * securely in OS keychain via secureStorage.ts. This utility may be used
+ * for other non-sensitive data if needed.
  */
 
 let storeInstance: any = null;

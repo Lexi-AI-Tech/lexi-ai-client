@@ -11,6 +11,7 @@ import ReactDOM from "react-dom/client";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/window";
+import { playSound } from "./lib/soundUtils";
 import "./index.css";
 
 /**
@@ -101,7 +102,7 @@ const Pill: React.FC = () => {
         const intensityVariation = Math.sin(elapsed * 2) * 0.15;
         const currentIntensity = Math.max(
           0.3,
-          Math.min(1, voiceIntensity + intensityVariation)
+          Math.min(1, voiceIntensity + intensityVariation),
         );
 
         const newLevels = Array(numBars)
@@ -125,7 +126,7 @@ const Pill: React.FC = () => {
               (wave1 + wave2 + wave3 + randomVariation) * currentIntensity;
             const level = Math.max(
               0.2,
-              Math.min(1, (combined + 1) * 0.35 + 0.3)
+              Math.min(1, (combined + 1) * 0.35 + 0.3),
             );
 
             return level;
@@ -160,6 +161,8 @@ const Pill: React.FC = () => {
           // Resize window to expanded size
           const window = getCurrentWindow();
           await window.setSize(new LogicalSize(60, 40));
+
+          playSound("processing");
         });
 
         // Listen for recording stopped
@@ -168,8 +171,6 @@ const Pill: React.FC = () => {
           // Keep expanded size for processing
           const window = getCurrentWindow();
           await window.setSize(new LogicalSize(60, 40));
-          // Play processing sound
-          playSound("processing");
         });
 
         // Listen for processing start
@@ -180,9 +181,7 @@ const Pill: React.FC = () => {
             // Keep expanded size for processing
             const window = getCurrentWindow();
             await window.setSize(new LogicalSize(60, 40));
-            // Play processing sound
-            playSound("processing");
-          }
+          },
         );
 
         // Listen for transcription success
@@ -195,7 +194,7 @@ const Pill: React.FC = () => {
             await window.setSize(new LogicalSize(40, 6.6));
             // Play done sound
             playSound("done");
-          }
+          },
         );
 
         // Listen for transcription error
@@ -236,7 +235,7 @@ const Pill: React.FC = () => {
                       Math.sin(phase + timeOffset * freq) * 0.3;
                     const level = Math.max(
                       0.2,
-                      Math.min(1, normalizedVolume * 0.75 + waveOffset + 0.25)
+                      Math.min(1, normalizedVolume * 0.75 + waveOffset + 0.25),
                     );
                     return level;
                   });
@@ -251,9 +250,28 @@ const Pill: React.FC = () => {
           // Volume updates might not be available, that's okay - will use simulation
           console.log(
             "Volume update event not available, using simulation:",
-            error
+            error,
           );
         }
+
+        // Listen for action success
+        const unlistenActionSuccess = await listen(
+          "action_success",
+          async () => {
+            setStatus("idle");
+            // Resize window to thin rectangular size
+            const window = getCurrentWindow();
+            await window.setSize(new LogicalSize(40, 6.6));
+          },
+        );
+
+        // Listen for action error
+        const unlistenActionError = await listen("action_error", async () => {
+          setStatus("idle");
+          // Resize window to thin rectangular size
+          const window = getCurrentWindow();
+          await window.setSize(new LogicalSize(40, 6.6));
+        });
 
         // Cleanup function
         return () => {
@@ -265,6 +283,8 @@ const Pill: React.FC = () => {
           if (unlistenVolume) {
             unlistenVolume();
           }
+          unlistenActionSuccess();
+          unlistenActionError();
         };
       } catch (error) {
         console.error("Failed to set up event listeners:", error);
@@ -284,55 +304,6 @@ const Pill: React.FC = () => {
     }
   };
 
-  // Play sound effect using Web Audio API
-  const playSound = (type: "processing" | "done") => {
-    try {
-      const audioContext = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      if (type === "processing") {
-        // Processing sound: gentle ascending tone
-        oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(
-          600,
-          audioContext.currentTime + 0.15
-        );
-        oscillator.type = "sine";
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(
-          0.01,
-          audioContext.currentTime + 0.15
-        );
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.15);
-      } else if (type === "done") {
-        // Done sound: pleasant success chime (two-tone)
-        const playTone = (freq: number, time: number, duration: number) => {
-          const osc = audioContext.createOscillator();
-          const gain = audioContext.createGain();
-          osc.connect(gain);
-          gain.connect(audioContext.destination);
-          osc.frequency.value = freq;
-          osc.type = "sine";
-          gain.gain.setValueAtTime(0, time);
-          gain.gain.linearRampToValueAtTime(0.3, time + 0.01);
-          gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
-          osc.start(time);
-          osc.stop(time + duration);
-        };
-        playTone(523.25, audioContext.currentTime, 0.1); // C5
-        playTone(659.25, audioContext.currentTime + 0.1, 0.15); // E5
-      }
-    } catch (error) {
-      // Silently fail if audio context is not available
-      console.log("Audio playback not available:", error);
-    }
-  };
 
   // Waveform icon SVG - individual bars that respond to audio levels
   const WaveformIcon = ({

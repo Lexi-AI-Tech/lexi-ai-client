@@ -1,9 +1,6 @@
 import React from "react";
 
-interface SidebarProps {
-  currentPage: "transcripts" | "settings";
-  onNavigate: (page: "transcripts" | "settings") => void;
-}
+import type { SidebarProps } from "../types";
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentPage,

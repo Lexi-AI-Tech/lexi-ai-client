@@ -15,7 +15,7 @@
 //! 3. **Speech-to-Text Transcription**: Sends audio to Lexi AI Server API endpoint
 //!    (server handles Groq's Whisper API integration internally)
 //! 4. **Text Injection**: Injects transcribed text into the currently active application
-//!    using clipboard + paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere)
+//!    using clipboard + paste keystroke via keyboard_simulator module (Cmd+V on macOS, Ctrl+V elsewhere)
 //! 5. **Pill Overlay Window**: Manages a small transparent overlay window that displays
 //!    recording status and floats above all windows
 //! 6. **Google OAuth Authentication**: Handles user authentication via Google OAuth 2.0
@@ -41,30 +41,40 @@
 use std::sync::{mpsc, Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, Manager, RunEvent};
+use tauri::{Emitter, Listener, Manager, RunEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
 // Module declarations for core functionality
+mod actions; // Voice actions triggered by action trigger phrase (e.g., "Hey Lexi")
+mod api_endpoints; // Centralized API endpoint definitions
 mod audio_processor; // Audio processing and transcription orchestration
 mod audio_recorder; // Audio capture from default microphone using cpal, converts to WAV format
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
 mod cursor_context; // Cursor context retrieval using macOS Accessibility API (AXUIElement)
-mod global_key_listener; // Global keyboard event monitoring via rdev with configurable hotkey support
+mod global_key_listener; // Unified hotkey management (rdev for Fn key, Tauri shortcuts for others)
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
+mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
+mod model_manager; // Model and executable management (download, list, resolve paths)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
+mod secure_storage; // Secure storage using OS keychain for JWT tokens
+mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod tts_service; // Text-to-speech service using ElevenLabs API
+mod utils; // Utility functions for common operations
+mod whisper; // Local Whisper model integration for offline transcription
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
-use global_key_listener::HotkeyConfig;
+use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
 use state::{
-    AuthTokenState, HotkeyRecordingState, HotkeyWatchState, LanguageState, TranscriptionTaskState,
+    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
 
@@ -75,13 +85,21 @@ use permissions::{
     request_screen_recording_permission,
 };
 
-use commands::auth::{get_pkce_verifier, set_auth_token, start_google_login};
-use commands::config::set_language;
+use commands::app_config::{get_app_config, update_app_config};
+use commands::auth::{
+    clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, start_google_login,
+    store_auth_data,
+};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
+use commands::model::{
+    download_model, get_executables_directory, get_installed_models, get_models_directory,
+    is_model_installed, is_whisper_executable_installed, list_available_models,
+};
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;
+use commands::utils::get_system_type;
 use commands::window::open_devtools;
 
 /// Command to control recording state
@@ -112,8 +130,83 @@ pub fn main() {
     #[cfg(debug_assertions)]
     let devtools = tauri_plugin_devtools::init();
 
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None::<Vec<&str>>,
+        ))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    let event_state = event.state();
+                    println!(
+                        "🔑 Global shortcut triggered: {:?}, state: {:?}",
+                        shortcut, event_state
+                    );
+
+                    // Get the recording channel from app state
+                    let app_handle = app.app_handle();
+                    let recording_state = app_handle.state::<RecordingChannelState>();
+
+                    // Clone the Arc to avoid lifetime issues
+                    let tx_arc = recording_state.tx.clone();
+                    let is_recording_arc = recording_state.is_recording.clone();
+
+                    // Determine command based on event state and current recording state
+                    let command = match event_state {
+                        tauri_plugin_global_shortcut::ShortcutState::Pressed => {
+                            // On press: check current state and toggle
+                            let is_currently_recording = {
+                                let guard = is_recording_arc.lock().ok();
+                                guard.map(|g| *g).unwrap_or(false)
+                            };
+
+                            if is_currently_recording {
+                                println!("🛑 Recording is active, sending Stop command");
+                                RecordingCommand::Stop
+                            } else {
+                                println!("🎙️  Recording is idle, sending Start command");
+                                RecordingCommand::Start
+                            }
+                        }
+                        tauri_plugin_global_shortcut::ShortcutState::Released => {
+                            // On release: only stop if currently recording (push-to-talk behavior)
+                            let is_currently_recording = {
+                                let guard = is_recording_arc.lock().ok();
+                                guard.map(|g| *g).unwrap_or(false)
+                            };
+
+                            if is_currently_recording {
+                                println!("🛑 Key released while recording, sending Stop command");
+                                RecordingCommand::Stop
+                            } else {
+                                // Not recording, ignore release event
+                                return;
+                            }
+                        }
+                    };
+
+                    let send_result = {
+                        let tx_guard = tx_arc.lock().ok();
+                        tx_guard.and_then(|guard| guard.as_ref().map(|tx| tx.send(command)))
+                    };
+
+                    match send_result {
+                        Some(Ok(_)) => {
+                            println!("✅ Sent {:?} command via global shortcut", command);
+                        }
+                        Some(Err(e)) => {
+                            eprintln!("❌ Failed to send recording command: {:?}", e);
+                        }
+                        None => {
+                            eprintln!("❌ Recording channel not available");
+                        }
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             #[cfg(target_os = "macos")]
             {
@@ -134,14 +227,10 @@ pub fn main() {
 
     // Add CrabNebula DevTools plugin (only in debug builds)
     #[cfg(debug_assertions)]
-    {
-        builder = builder.plugin(devtools);
-    }
+    let builder = builder.plugin(devtools);
 
     builder
         .manage(OAuthState::default())
-        .manage(AuthTokenState::default())
-        .manage(LanguageState::default())
         .manage(TranscriptionTaskState {
             task_handle: Mutex::new(None),
             cancel_tx: Mutex::new(None),
@@ -161,12 +250,24 @@ pub fn main() {
             open_devtools,
             start_google_login,
             get_pkce_verifier,
-            set_auth_token,
-            set_language,
             update_hotkey,
             get_current_hotkey,
             start_hotkey_recording,
-            stop_hotkey_recording
+            stop_hotkey_recording,
+            store_auth_data,
+            get_auth_data,
+            clear_auth_data,
+            has_auth_data,
+            get_app_config,
+            update_app_config,
+            get_system_type,
+            list_available_models,
+            get_installed_models,
+            is_model_installed,
+            get_models_directory,
+            get_executables_directory,
+            is_whisper_executable_installed,
+            download_model
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
@@ -181,6 +282,41 @@ pub fn main() {
 
             let app_handle = app.handle();
 
+            // Handle deep links
+            // Check if app was started via deep link
+            if let Ok(Some(start_urls)) = app.deep_link().get_current() {
+                println!("🔗 App started via deep link: {:?}", start_urls);
+                // Show and focus the main window when opened via deep link
+                show_and_focus_main_window(&app_handle);
+            }
+
+            // Listen for deep links when app is already running
+            let app_handle_clone = app_handle.clone();
+            app.deep_link().on_open_url(move |event| {
+                println!("🔗 Deep link received: {:?}", event.urls());
+                // Show and focus the main window when deep link is received
+                show_and_focus_main_window(&app_handle_clone);
+            });
+
+            // Preload Whisper model in background to reduce first transcription latency
+            // Only preload if model and executable are available (optional)
+            std::thread::spawn(move || {
+                // Check if model and executable exist before preloading
+                let model_exists = model_manager::model_exists("ggml-small-q5_1.bin")
+                    .unwrap_or(false);
+                let exe_exists = model_manager::whisper_executable_exists()
+                    .unwrap_or(false);
+
+                if model_exists && exe_exists {
+                    if let Err(e) = whisper::preload_model() {
+                        eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
+                        eprintln!("💡 First transcription may be slower");
+                    }
+                } else {
+                    println!("ℹ️  Whisper model or executable not found. Offline transcription will not be available until models are downloaded.");
+                }
+            });
+
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup
             if let Err(e) = pill::init_pill_window(app_handle.clone()) {
@@ -191,11 +327,21 @@ pub fn main() {
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
             let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
 
-            // Create watch channel with initial config (Function key default)
-            let initial_config = HotkeyConfig {
-                hotkey: "Fn".to_string(),
+            // Load hotkeys from Tauri Store (server provides defaults)
+            let initial_config = {
+                let app_handle_for_store = app_handle.clone();
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let config = get_app_config(app_handle_for_store).await
+                        .unwrap_or_else(|_| {
+                            println!("⚠️  Config not available, using empty hotkeys");
+                            crate::commands::app_config::AppConfig::default()
+                        });
+                    config.hotkeys.unwrap_or_default()
+                })
             };
-            let (config_tx, config_rx) = watch::channel(initial_config);
+            println!("🔑 Loaded hotkeys from store: {:?}", initial_config);
+            let (config_tx, config_rx) = watch::channel(initial_config.clone());
 
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));
@@ -203,12 +349,31 @@ pub fn main() {
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });
+            let recording_state_tracker = Arc::new(Mutex::new(false));
+            app.manage(RecordingChannelState {
+                tx: Arc::new(Mutex::new(Some(recording_tx.clone()))),
+                is_recording: recording_state_tracker.clone(),
+            });
 
-            // Start the global input listener (rdev) in a background thread
-            // Pass the channel sender and config receiver so it can trigger recording on hotkey press/release
-            global_key_listener::start_listener(
+            // Listen to recording events to update state tracker
+            let app_handle_for_events = app_handle.clone();
+            let recording_state_tracker_clone = recording_state_tracker.clone();
+            app_handle.listen("recording_started", move |_| {
+                if let Ok(mut state) = recording_state_tracker_clone.lock() {
+                    *state = true;
+                }
+            });
+            let recording_state_tracker_clone2 = recording_state_tracker.clone();
+            app_handle_for_events.listen("recording_stopped", move |_| {
+                if let Ok(mut state) = recording_state_tracker_clone2.lock() {
+                    *state = false;
+                }
+            });
+
+            // Start listeners (rdev always running, manager thread handles Tauri shortcuts)
+            start_listener(
                 app_handle.clone(),
-                recording_tx,
+                recording_tx.clone(),
                 config_rx,
                 recording_state_arc,
             );
@@ -331,12 +496,18 @@ pub fn main() {
         .on_page_load(|webview, _| {
             let window = webview.window();
             if window.label() == "main" {
-                println!("📄 Page loaded for main window, ensuring visibility...");
-                let app_handle = window.app_handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    show_and_focus_main_window(&app_handle);
-                });
+                // Only show/focus if window is not already visible to prevent reload loops
+                let is_visible = window.is_visible().unwrap_or(false);
+                if !is_visible {
+                    println!("📄 Page loaded for main window, ensuring visibility...");
+                    let app_handle = window.app_handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        show_and_focus_main_window(&app_handle);
+                    });
+                } else {
+                    println!("📄 Page loaded for main window (already visible, skipping show/focus)");
+                }
             }
         })
         .build(tauri::generate_context!())

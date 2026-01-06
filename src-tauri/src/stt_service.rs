@@ -14,7 +14,7 @@
 //! ## Request/Response Format
 //!
 //! - **Request**: Multipart form data with WAV audio file
-//! - **Response**: JSON object with `{"text": "transcribed text here"}`
+//! - **Response**: Plain text string containing the transcribed text
 //!
 //! ## Features
 //!
@@ -22,9 +22,11 @@
 //! - **Error Handling**: Comprehensive error messages for debugging
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
-use crate::config;
+use crate::api_endpoints::stt;
+use crate::whisper;
 use reqwest::multipart;
 use std::error::Error;
+use tauri::{AppHandle, Emitter};
 use tokio::sync::oneshot;
 
 /// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
@@ -50,7 +52,7 @@ impl SttService {
     /// This function:
     /// 1. Creates a multipart form request with the audio file
     /// 2. Sends the request to Lexi AI Server transcription endpoint
-    /// 3. Parses the JSON response to extract the transcribed text
+    /// 3. Returns the plain text response containing the transcribed text
     ///
     /// The request can be cancelled by aborting the tokio task, which will cause
     /// the HTTP request to be dropped and cancelled.
@@ -61,8 +63,12 @@ impl SttService {
     /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
     /// * `enhance_transcription` - Whether to enhance the transcription with AI
     /// * `transcribe_with_cursor_context` - Whether to use cursor context for transcription
+    /// * `focused_app` - Name of the currently focused application (required)
     /// * `base64_image` - Optional base64-encoded PNG screenshot to send with transcription
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
+    /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
+    /// * `offline_transcription` - Whether to use local Whisper model instead of server API
+    /// * `vocabulary` - Optional vocabulary array to use as initial prompt for offline transcription
     ///
     /// # Returns
     /// * `Ok(String)` - The transcribed text on success
@@ -74,99 +80,147 @@ impl SttService {
         language: String,
         enhance_transcription: bool,
         transcribe_with_cursor_context: bool,
+        focused_app: String,
         base64_image: Option<String>,
         cancel_rx: Option<oneshot::Receiver<()>>,
+        app_handle: Option<AppHandle>,
+        offline_transcription: bool,
+        vocabulary: Vec<String>,
     ) -> Result<String, Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
 
-        // Create a multipart form part for the audio file
-        // The server expects the audio file to be sent as a multipart form field
-        let part = multipart::Part::bytes(audio_data)
-            .file_name("audio.wav") // Filename hint for the server
-            .mime_str("audio/wav")?; // MIME type indicating WAV audio format
+        // Check if offline transcription is enabled
+        if offline_transcription {
+            println!("📦 Using offline transcription (local Whisper model)");
 
-        // Build the multipart form with the audio file
-        let mut form = multipart::Form::new().part("audio_file", part); // Attach the audio file
+            // Prepare vocabulary option
+            let vocabulary_option = if !vocabulary.is_empty() {
+                Some(vocabulary.clone())
+            } else {
+                None
+            };
 
-        // Add base64 image if provided
-        if let Some(image) = base64_image {
-            let image_part = multipart::Part::text(image).mime_str("text/plain")?;
-            form = form.part("base64_image", image_part);
-            println!("🔍 DEBUG: Added base64_image to multipart form");
-        }
+            // Run the synchronous whisper function in a blocking task
+            let audio_data_clone = audio_data.clone();
+            let language_clone = language.clone();
+            let vocabulary_clone = vocabulary_option;
 
-        println!("🔍 DEBUG: Sending request to Lexi AI Server...");
-
-        // Build the request
-        // Get API base URL from configuration
-        let api_base_url = config::api_base_url();
-
-        // Build URL with required parameters
-        let url = format!(
-            "{}/api/transcription/speech-to-text?language={}&enhance_transcription={}&transcribe_with_cursor_context={}",
-            api_base_url,
-            urlencoding::encode(&language),
-            enhance_transcription,
-            transcribe_with_cursor_context
-        );
-        let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
-
-        // Add authorization header if token is provided
-        if let Some(token) = &auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
-            println!(
-                "🔍 DEBUG: Added Authorization header (token length: {})",
-                token.len()
-            );
-        } else {
-            println!("🔍 DEBUG: No auth token provided - request will likely fail with 401");
-        }
-
-        // Send the request with cancellation support
-        // Use tokio::select! to race between the request and cancellation signal
-        let res = if let Some(cancel_rx) = cancel_rx {
-            tokio::select! {
-                result = request.send() => {
-                    match result {
-                        Ok(res) => res,
-                        Err(e) => return Err(Box::new(e)),
+            // Check for cancellation before starting
+            if let Some(cancel_rx) = cancel_rx {
+                // Use tokio::select to race between transcription and cancellation
+                tokio::select! {
+                    result = tokio::task::spawn_blocking(move || {
+                        whisper::transcribe_audio_data(audio_data_clone, language_clone, vocabulary_clone)
+                    }) => {
+                        match result {
+                            Ok(Ok(text)) => Ok(text),
+                            Ok(Err(e)) => Err(e.into()),
+                            Err(e) => Err(format!("Transcription task failed: {}", e).into()),
+                        }
+                    }
+                    _ = cancel_rx => {
+                        println!("🛑 Offline transcription cancelled");
+                        Err("Request cancelled".into())
                     }
                 }
-                _ = cancel_rx => {
-                    println!("🛑 HTTP request cancelled via cancellation signal");
-                    return Err("Request cancelled".into());
-                }
+            } else {
+                // No cancellation support, just run the blocking task
+                let vocabulary_for_blocking = if !vocabulary.is_empty() {
+                    Some(vocabulary)
+                } else {
+                    None
+                };
+                tokio::task::spawn_blocking(move || {
+                    whisper::transcribe_audio_data(audio_data, language, vocabulary_for_blocking)
+                })
+                .await
+                .map_err(|e| format!("Transcription task failed: {}", e))?
+                .map_err(|e| e.into())
             }
         } else {
-            // No cancellation support, just send normally
-            request.send().await?
-        };
+            // Continue with server API transcription
 
-        let status = res.status();
-        println!("🔍 DEBUG: Response status: {}", status);
+            // Create a multipart form part for the audio file
+            // The server expects the audio file to be sent as a multipart form field
+            let part = multipart::Part::bytes(audio_data)
+                .file_name("audio.wav") // Filename hint for the server
+                .mime_str("audio/wav")?; // MIME type indicating WAV audio format
 
-        // Check if the request was successful (status code 200-299)
-        if !status.is_success() {
-            // Read the error response body
-            let error_text = res.text().await?;
-            println!("🔍 DEBUG: Server Error response: {}", error_text);
-            return Err(format!("Server Error ({}): {}", status, error_text).into());
+            // Build the multipart form with the audio file
+            let mut form = multipart::Form::new().part("audio_file", part); // Attach the audio file
+
+            // Add base64 image if provided
+            if let Some(image) = base64_image {
+                let image_part = multipart::Part::text(image).mime_str("text/plain")?;
+                form = form.part("base64_image", image_part);
+                println!("🔍 DEBUG: Added base64_image to multipart form");
+            }
+
+            // Build the request URL using centralized endpoint
+            let url = stt::transcribe_url(
+                &language,
+                enhance_transcription,
+                transcribe_with_cursor_context,
+                &focused_app,
+            );
+            let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
+
+            // Add authorization header if token is provided
+            if let Some(token) = &auth_token {
+                request = request.header("Authorization", format!("Bearer {}", token));
+                println!(
+                    "🔍 DEBUG: Added Authorization header (token length: {})",
+                    token.len()
+                );
+            } else {
+                println!("🔍 DEBUG: No auth token provided - emitting login_required event");
+                // Emit login_required event to pill component if app_handle is available
+                if let Some(handle) = app_handle {
+                    handle.emit("login_required", ()).unwrap_or_else(|e| {
+                        eprintln!("Failed to emit login_required event: {}", e)
+                    });
+                }
+                return Err("Authentication required. Please log in to continue.".into());
+            }
+
+            // Send the request with cancellation support
+            // Use tokio::select! to race between the request and cancellation signal
+            let res = if let Some(cancel_rx) = cancel_rx {
+                tokio::select! {
+                    result = request.send() => {
+                        match result {
+                            Ok(res) => res,
+                            Err(e) => return Err(Box::new(e)),
+                        }
+                    }
+                    _ = cancel_rx => {
+                        println!("🛑 HTTP request cancelled via cancellation signal");
+                        return Err("Request cancelled".into());
+                    }
+                }
+            } else {
+                // No cancellation support, just send normally
+                request.send().await?
+            };
+
+            let status = res.status();
+            println!("🔍 DEBUG: Response status: {}", status);
+
+            // Check if the request was successful (status code 200-299)
+            if !status.is_success() {
+                // Read the error response body
+                let error_text = res.text().await?;
+                println!("🔍 DEBUG: Server Error response: {}", error_text);
+                return Err(format!("Server Error ({}): {}", status, error_text).into());
+            }
+
+            // Parse the plain text response
+            // The server returns plain text containing the transcribed text
+            let text = res.text().await?;
+            println!("🔍 DEBUG: Server response text: {}", text);
+
+            Ok(text)
         }
-
-        // Parse the JSON response
-        // The server returns a JSON object with a "text" field containing the transcription
-        let json: serde_json::Value = res.json().await?;
-        println!(
-            "🔍 DEBUG: Full server response: {}",
-            serde_json::to_string_pretty(&json).unwrap_or_default()
-        );
-
-        // Extract the transcribed text from the JSON response
-        // The response format is: { "text": "transcribed text here" }
-        let text = json["text"].as_str().unwrap_or("").to_string();
-        println!("🔍 DEBUG: Extracted text: {}", text);
-
-        Ok(text)
     }
 }

@@ -232,7 +232,7 @@ pub fn check_screen_recording_permission(_app: AppHandle) -> Result<bool, String
     // Screen Recording permission is checked by attempting to capture the screen
     // If permission is not granted, CGWindowListCreateImage will return null
     use crate::cursor_context::capture_current_screen;
-    
+
     // Try to capture a small area of the screen
     // If it returns Some, permission is granted; if None, permission is denied
     match capture_current_screen() {
@@ -253,9 +253,9 @@ pub fn check_screen_recording_permission(_app: AppHandle) -> Result<bool, String
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_screen_recording_permission(_app: AppHandle) -> Result<bool, String> {
+    use crate::cursor_context::capture_current_screen;
     use std::thread;
     use std::time::Duration;
-    use crate::cursor_context::capture_current_screen;
 
     // Spawn a thread to attempt screen capture, which triggers the permission dialog
     thread::spawn(move || {
