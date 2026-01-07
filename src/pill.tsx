@@ -12,7 +12,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/window";
 import { playSound } from "./lib/soundUtils";
-import "./index.css";
+// Note: Do NOT import index.css here - it adds opaque backgrounds that break transparency
 
 /**
  * Pill Component
@@ -36,11 +36,11 @@ const Pill: React.FC = () => {
   const [smoothedLevels, setSmoothedLevels] = useState<number[]>([]);
   const isRecordingRef = useRef(false);
 
-  // Smooth audio levels for better visual experience (faster response)
+  // Smooth audio levels for better visual experience
   useEffect(() => {
     if (audioLevels.length === 0) return;
 
-    const smoothing = 0.5; // Increased for faster response
+    const smoothing = 0.35; // Balanced for smooth yet responsive animation
     setSmoothedLevels((prev) => {
       if (prev.length !== audioLevels.length) {
         return audioLevels;
@@ -102,7 +102,7 @@ const Pill: React.FC = () => {
         const intensityVariation = Math.sin(elapsed * 2) * 0.15;
         const currentIntensity = Math.max(
           0.3,
-          Math.min(1, voiceIntensity + intensityVariation),
+          Math.min(1, voiceIntensity + intensityVariation)
         );
 
         const newLevels = Array(numBars)
@@ -126,7 +126,7 @@ const Pill: React.FC = () => {
               (wave1 + wave2 + wave3 + randomVariation) * currentIntensity;
             const level = Math.max(
               0.2,
-              Math.min(1, (combined + 1) * 0.35 + 0.3),
+              Math.min(1, (combined + 1) * 0.35 + 0.3)
             );
 
             return level;
@@ -181,7 +181,7 @@ const Pill: React.FC = () => {
             // Keep expanded size for processing
             const window = getCurrentWindow();
             await window.setSize(new LogicalSize(60, 40));
-          },
+          }
         );
 
         // Listen for transcription success
@@ -194,7 +194,7 @@ const Pill: React.FC = () => {
             await window.setSize(new LogicalSize(40, 6.6));
             // Play done sound
             playSound("done");
-          },
+          }
         );
 
         // Listen for transcription error
@@ -235,7 +235,7 @@ const Pill: React.FC = () => {
                       Math.sin(phase + timeOffset * freq) * 0.3;
                     const level = Math.max(
                       0.2,
-                      Math.min(1, normalizedVolume * 0.75 + waveOffset + 0.25),
+                      Math.min(1, normalizedVolume * 0.75 + waveOffset + 0.25)
                     );
                     return level;
                   });
@@ -250,7 +250,7 @@ const Pill: React.FC = () => {
           // Volume updates might not be available, that's okay - will use simulation
           console.log(
             "Volume update event not available, using simulation:",
-            error,
+            error
           );
         }
 
@@ -262,7 +262,7 @@ const Pill: React.FC = () => {
             // Resize window to thin rectangular size
             const window = getCurrentWindow();
             await window.setSize(new LogicalSize(40, 6.6));
-          },
+          }
         );
 
         // Listen for action error
@@ -303,7 +303,6 @@ const Pill: React.FC = () => {
       console.error("Failed to start dragging:", error);
     }
   };
-
 
   // Waveform icon SVG - individual bars that respond to audio levels
   const WaveformIcon = ({
@@ -362,7 +361,9 @@ const Pill: React.FC = () => {
               fill={color}
               rx={barWidth / 2}
               style={{
-                transition: hasAudio ? "height 0.1s ease-out" : "none",
+                transition: hasAudio
+                  ? "height 0.15s cubic-bezier(0.4, 0, 0.2, 1), y 0.15s cubic-bezier(0.4, 0, 0.2, 1)"
+                  : "none",
               }}
             />
           );
@@ -396,16 +397,13 @@ const Pill: React.FC = () => {
     </svg>
   );
 
-  // Get background color - transparent when recording/processing, gray when hovered or idle
+  // Get background color - black background for all states
   const getBackgroundColor = () => {
     if (isHovered) {
-      return "#6b7280"; // Gray-500 for hover state
+      return "rgba(0, 0, 0, 0.95)"; // Slightly lighter black on hover
     }
-    if (status === "idle") {
-      return "rgba(31, 41, 55, 0.4)"; // Transparent gray for idle
-    }
-    // Recording and processing: fully transparent
-    return "transparent";
+    // Consistent black background for all states
+    return "rgba(0, 0, 0, 0.9)";
   };
 
   // Build base style object
@@ -414,8 +412,8 @@ const Pill: React.FC = () => {
     alignItems: "center",
     justifyContent: "center",
     cursor: "move",
-    transition: "all 0.1s ease-out", // Super fast transition for responsiveness
-    transform: isHovered ? "scale(1.05)" : "scale(1)",
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", // Smooth, natural easing
+    transform: isHovered ? "scale(1.02)" : "scale(1)", // Subtle scale on hover
     transformOrigin: "center bottom", // Expand from bottom to top
     userSelect: "none",
     backgroundColor: getBackgroundColor(),
@@ -436,10 +434,10 @@ const Pill: React.FC = () => {
     baseStyle.maxWidth = "40px";
     baseStyle.maxHeight = "6.6px";
     baseStyle.borderRadius = "3.3px";
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.15)";
+    baseStyle.border = "1px solid rgba(255, 255, 255, 0.2)";
     baseStyle.boxShadow = isHovered
-      ? "0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)"
-      : "0 2px 4px -1px rgba(0, 0, 0, 0.1)";
+      ? "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)"
+      : "0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.2)";
   } else if (status === "recording") {
     // Recording: expand to bigger rounded rectangle with more width and height
     baseStyle.width = "60px";
@@ -449,10 +447,10 @@ const Pill: React.FC = () => {
     baseStyle.maxWidth = "60px";
     baseStyle.maxHeight = "40px";
     baseStyle.borderRadius = "20px"; // Rounded rectangle
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
+    baseStyle.border = "1px solid rgba(255, 255, 255, 0.15)";
     baseStyle.boxShadow = isHovered
-      ? "0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)"
-      : "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)";
+      ? "0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.4)"
+      : "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)";
   } else if (status === "processing") {
     // Processing: keep expanded size
     baseStyle.width = "60px";
@@ -462,10 +460,10 @@ const Pill: React.FC = () => {
     baseStyle.maxWidth = "60px";
     baseStyle.maxHeight = "40px";
     baseStyle.borderRadius = "20px"; // Rounded rectangle
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
+    baseStyle.border = "1px solid rgba(255, 255, 255, 0.15)";
     baseStyle.boxShadow = isHovered
-      ? "0 8px 16px -4px rgba(0, 0, 0, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.1)"
-      : "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)";
+      ? "0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.4)"
+      : "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)";
   }
 
   return (
@@ -523,16 +521,6 @@ const Pill: React.FC = () => {
  * Sets up the transparent background and centers the pill
  */
 const PillApp: React.FC = () => {
-  // Set body and html to transparent when component mounts
-  useEffect(() => {
-    document.body.style.background = "transparent";
-    document.body.style.margin = "0";
-    document.body.style.padding = "0";
-    document.documentElement.style.background = "transparent";
-    document.documentElement.style.margin = "0";
-    document.documentElement.style.padding = "0";
-  }, []);
-
   return (
     <div
       style={{
@@ -553,6 +541,7 @@ const PillApp: React.FC = () => {
         left: 0,
         right: 0,
         bottom: 0,
+        borderRadius: "20px", // Match the pill's maximum border radius
       }}
     >
       <Pill />
