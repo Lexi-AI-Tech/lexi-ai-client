@@ -29,7 +29,7 @@ import "./index.css";
  */
 const Pill: React.FC = () => {
   const [status, setStatus] = useState<"idle" | "recording" | "processing">(
-    "idle",
+    "idle"
   );
   const [isHovered, setIsHovered] = useState(false);
   const [audioLevels, setAudioLevels] = useState<number[]>([]);
@@ -566,7 +566,7 @@ if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
       <PillApp />
-    </React.StrictMode>,
+    </React.StrictMode>
   );
 } else {
   console.error("Root element not found");
