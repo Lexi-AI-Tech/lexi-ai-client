@@ -435,7 +435,9 @@ impl KeyStateTracker {
     /// Returns Some(command) only if this is a valid state transition
     /// Filters out duplicate events and ensures proper Start→Stop ordering
     fn process_event(&mut self, event_type: &EventType) -> Option<RecordingCommand> {
-        const MIN_STATE_DURATION: Duration = Duration::from_millis(50);
+        // Reduced from 50ms to 16ms (~1 frame at 60fps) for more responsive feel
+        // Still prevents double-triggering from hardware bounce
+        const MIN_STATE_DURATION: Duration = Duration::from_millis(16);
 
         match event_type {
             EventType::KeyPress(Key::Function) => {
@@ -617,13 +619,22 @@ pub fn start_listener(
                 };
                 println!("=== HOTKEY TRIGGER: {} ===", trigger_type);
 
-                // Query cursor context
-                if let Some(context) = crate::cursor_context::get_cursor_context() {
-                    println!(
-                        "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
-                        context.app_name, context.pid, context.selected_text
-                    );
+                // CRITICAL: Send recording command IMMEDIATELY for responsive UI
+                // This is the hot path - no blocking operations here
+                if let Err(e) = recording_tx_for_rdev.send(command) {
+                    eprintln!("Failed to send recording signal: {:?}", e);
                 }
+
+                // Query cursor context asynchronously (non-blocking)
+                // This runs in background and doesn't delay recording start
+                std::thread::spawn(|| {
+                    if let Some(context) = crate::cursor_context::get_cursor_context() {
+                        println!(
+                            "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
+                            context.app_name, context.pid, context.selected_text
+                        );
+                    }
+                });
 
                 println!(
                     "Hotkey {} - {} recording",
@@ -637,19 +648,9 @@ pub fn start_listener(
                     }
                 );
 
-                // Send to recording
-                if let Err(e) = recording_tx_for_rdev.send(command) {
-                    eprintln!("Failed to send recording signal: {:?}", e);
-                }
-
-                // Emit to frontend
-                let event_name = match command {
-                    RecordingCommand::Start => "recording_started",
-                    RecordingCommand::Stop => "recording_stopped",
-                };
-                if let Err(e) = app_for_rdev.emit(event_name, ()) {
-                    eprintln!("Failed to emit {} event: {:?}", event_name, e);
-                }
+                // NOTE: Don't emit recording_started/recording_stopped here anymore.
+                // The recording_thread.rs now handles this AFTER actual recording starts/stops.
+                // This prevents race conditions where UI updates before audio stream is ready.
             }
 
             // Emit all keyboard events for debug (commented out by default)

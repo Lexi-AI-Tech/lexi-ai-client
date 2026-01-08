@@ -40,7 +40,7 @@ export function HotkeySelector({
   };
 
   const [hotkeys, setHotkeys] = useState<Hotkey[]>(() =>
-    configToHotkeys(value),
+    configToHotkeys(value)
   );
   const [isRecording, setIsRecording] = useState(false);
   const [currentKeys, setCurrentKeys] = useState<Set<string>>(new Set());
@@ -53,11 +53,18 @@ export function HotkeySelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.hotkeys.join(",")]);
 
-  // Notify parent when hotkeys change
+  // Notify parent when hotkeys change (only if different from prop value)
   useEffect(() => {
     if (onChange) {
-      onChange(hotkeysToConfig(hotkeys));
+      const currentConfig = hotkeysToConfig(hotkeys);
+      const currentValue = currentConfig.hotkeys.join(",");
+      const propValue = value.hotkeys.join(",");
+      // Only call onChange if the local state differs from the prop
+      if (currentValue !== propValue) {
+        onChange(currentConfig);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hotkeys, onChange]);
 
   // Normalize key names for consistent display

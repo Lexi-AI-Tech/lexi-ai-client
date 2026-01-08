@@ -22,6 +22,7 @@ let tokens: AuthTokens | null = null;
 let isLoading: boolean = false;
 let error: string | null = null;
 let storageInitialized: boolean = false;
+let isRefreshing: boolean = false; // Guard to prevent concurrent refresh loops
 
 // Load from secure storage (OS keychain)
 const loadFromStorage = async () => {
@@ -62,15 +63,15 @@ const loadFromStorage = async () => {
               const refreshData = data.data || data;
 
               if (refreshData.access_token) {
+                // Default to 1 hour if expires_in not provided
+                const expiresIn = refreshData.expires_in || 3600;
                 tokens = {
                   ...tokens,
                   access_token: refreshData.access_token,
                   refresh_token:
                     refreshData.refresh_token || tokens.refresh_token,
-                  expires_in: refreshData.expires_in,
-                  expires_at: refreshData.expires_in
-                    ? Date.now() + refreshData.expires_in * 1000
-                    : tokens.expires_at,
+                  expires_in: expiresIn,
+                  expires_at: Date.now() + expiresIn * 1000,
                 };
                 isAuthenticated = true;
                 await saveToStorage();
@@ -199,6 +200,11 @@ export const authStore: AuthState = {
       return false;
     }
 
+    // Prevent concurrent refresh calls (avoids infinite loops)
+    if (isRefreshing) {
+      return false;
+    }
+
     const bufferTime = 5 * 60 * 1000; // 5 minutes
     const isExpiringSoon = tokens.expires_at < Date.now() + bufferTime;
 
@@ -207,6 +213,7 @@ export const authStore: AuthState = {
     }
 
     // Token is expired or expiring soon, refresh it
+    isRefreshing = true;
     console.log("🔄 Token expiring soon, refreshing proactively...");
     try {
       const device = await getDeviceInfo();
@@ -228,19 +235,20 @@ export const authStore: AuthState = {
         const refreshData = data.data || data;
 
         if (refreshData.access_token) {
+          // Default to 1 hour if expires_in not provided
+          const expiresIn = refreshData.expires_in || 3600;
           tokens = {
             ...tokens,
             access_token: refreshData.access_token,
             refresh_token: refreshData.refresh_token || tokens.refresh_token,
-            expires_in: refreshData.expires_in,
-            expires_at: refreshData.expires_in
-              ? Date.now() + refreshData.expires_in * 1000
-              : tokens.expires_at,
+            expires_in: expiresIn,
+            expires_at: Date.now() + expiresIn * 1000,
           };
           isAuthenticated = true;
           await saveToStorage();
           notifyListeners();
           console.log("✅ Token refreshed proactively");
+          isRefreshing = false;
           return true;
         }
       } else {
@@ -249,9 +257,11 @@ export const authStore: AuthState = {
     } catch (refreshError) {
       console.error("❌ Proactive token refresh failed:", refreshError);
       // Don't clear auth on proactive refresh failure - let it fail on actual API call
+      isRefreshing = false;
       return false;
     }
 
+    isRefreshing = false;
     return false;
   },
 };

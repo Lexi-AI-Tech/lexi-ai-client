@@ -10,9 +10,16 @@ import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom/client";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { LogicalSize } from "@tauri-apps/api/window";
-import { playSound } from "./lib/soundUtils";
+import { LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
+// import { playSound } from "./lib/soundUtils";
 // Note: Do NOT import index.css here - it adds opaque backgrounds that break transparency
+
+// Window size constants
+const IDLE_SIZE = { width: 40, height: 6.6 };
+const EXPANDED_SIZE = { width: 60, height: 40 }; // Recording state
+const PROCESSING_SIZE = { width: 80, height: 40 }; // Processing state (wider for bars + loader)
+// Height difference for position adjustment (to make pill grow upward)
+const HEIGHT_DIFF = EXPANDED_SIZE.height - IDLE_SIZE.height;
 
 /**
  * Pill Component
@@ -35,6 +42,8 @@ const Pill: React.FC = () => {
   const [audioLevels, setAudioLevels] = useState<number[]>([]);
   const [smoothedLevels, setSmoothedLevels] = useState<number[]>([]);
   const isRecordingRef = useRef(false);
+  const hasRealAudioRef = useRef(false); // Track if we're receiving real volume data
+  const lastVolumeTimeRef = useRef(0); // Track when we last received volume data
 
   // Smooth audio levels for better visual experience
   useEffect(() => {
@@ -58,94 +67,53 @@ const Pill: React.FC = () => {
     if (status !== "recording") {
       setAudioLevels([]);
       setSmoothedLevels([]);
+      hasRealAudioRef.current = false;
     }
   }, [status]);
 
-  // Simulate audio levels when recording (fallback if volume-update events aren't available)
+  // Initialize static bars when recording starts, and provide fallback animation
+  // Real audio data from volume-update events takes priority
   useEffect(() => {
     if (status !== "recording") {
       return;
     }
 
-    let animationFrameId: number;
-    let startTime = Date.now();
-    let lastVoiceChange = Date.now();
-    let isVoiceActive = false;
-    let voiceDuration = 0; // How long voice has been active/inactive
-    let voiceIntensity = 0; // Current voice intensity (0-1)
+    const numBars = 5; // Match WaveformIcon numBars
+    // Start with static idle bars at moderate height
+    setAudioLevels(Array(numBars).fill(0.35));
 
-    const simulateAudioLevels = () => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      const timeSinceLastChange = (Date.now() - lastVoiceChange) / 1000;
-      const numBars = 12;
-
-      // Simulate voice detection - randomly switch between voice and silence
-      // Voice periods: 0.5-3 seconds, Silence periods: 0.3-2 seconds
-      const shouldSwitch = isVoiceActive
-        ? timeSinceLastChange > 0.5 + Math.random() * 2.5 // Voice: 0.5-3s
-        : timeSinceLastChange > 0.3 + Math.random() * 1.7; // Silence: 0.3-2s
-
-      if (shouldSwitch) {
-        isVoiceActive = !isVoiceActive;
-        lastVoiceChange = Date.now();
-        voiceDuration = 0;
-        if (isVoiceActive) {
-          voiceIntensity = 0.4 + Math.random() * 0.6; // Random intensity 0.4-1.0
-        }
+    // Fallback: if we don't receive real audio data after 500ms, show gentle idle animation
+    const fallbackTimeout = setTimeout(() => {
+      if (!hasRealAudioRef.current) {
+        console.log("No real audio data received, using subtle idle animation");
       }
+    }, 500);
 
-      voiceDuration += 0.016; // ~60fps
-
-      if (isVoiceActive) {
-        // Voice is active - create realistic animated waveform
-        // Vary intensity slightly over time
-        const intensityVariation = Math.sin(elapsed * 2) * 0.15;
-        const currentIntensity = Math.max(
-          0.3,
-          Math.min(1, voiceIntensity + intensityVariation)
-        );
-
-        const newLevels = Array(numBars)
+    // Gentle idle pulse animation (only used when no voice detected)
+    let animationFrameId: number;
+    const idleAnimation = () => {
+      // Only run idle animation if we haven't received real audio recently
+      const timeSinceLastVolume = Date.now() - lastVolumeTimeRef.current;
+      if (timeSinceLastVolume > 150) {
+        // No recent audio data - show subtle idle bars with gentle breathing
+        const time = Date.now() * 0.001;
+        const idleLevels = Array(numBars)
           .fill(0)
           .map((_, i) => {
-            // Each bar has different characteristics for realism
-            const baseFreq = 3 + (i % 4) * 1.5; // Faster frequencies: 3-9 Hz
-            const phase = (i / numBars) * Math.PI * 2;
-            const timeOffset = elapsed * baseFreq;
-
-            // Create multiple overlapping waves for natural voice pattern
-            const wave1 = Math.sin(timeOffset + phase) * 0.5;
-            const wave2 = Math.sin(timeOffset * 2.1 + phase * 1.5) * 0.3;
-            const wave3 = Math.sin(timeOffset * 3.2 + phase * 0.8) * 0.2;
-
-            // Add some randomness for natural variation
-            const randomVariation = (Math.random() - 0.5) * 0.15;
-
-            // Combine waves and apply intensity
-            const combined =
-              (wave1 + wave2 + wave3 + randomVariation) * currentIntensity;
-            const level = Math.max(
-              0.2,
-              Math.min(1, (combined + 1) * 0.35 + 0.3)
-            );
-
-            return level;
+            // Gentle breathing effect for idle state
+            const phase = (i / numBars) * Math.PI;
+            const breath = Math.sin(time * 0.8 + phase) * 0.05;
+            return 0.35 + breath;
           });
-
-        setAudioLevels(newLevels);
-      } else {
-        // Silence - show static bars at moderate height
-        const staticLevels = Array(numBars).fill(0.3);
-        setAudioLevels(staticLevels);
+        setAudioLevels(idleLevels);
       }
-
-      animationFrameId = requestAnimationFrame(simulateAudioLevels);
+      animationFrameId = requestAnimationFrame(idleAnimation);
     };
 
-    // Start simulation
-    animationFrameId = requestAnimationFrame(simulateAudioLevels);
+    animationFrameId = requestAnimationFrame(idleAnimation);
 
     return () => {
+      clearTimeout(fallbackTimeout);
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
@@ -158,19 +126,55 @@ const Pill: React.FC = () => {
         // Listen for recording started
         const unlistenStarted = await listen("recording_started", async () => {
           setStatus("recording");
-          // Resize window to expanded size
-          const window = getCurrentWindow();
-          await window.setSize(new LogicalSize(60, 40));
+          // Play sound immediately for instant feedback (non-blocking)
+          // playSound("processing");
 
-          playSound("processing");
+          // Expand window upward: move up by height difference, then resize
+          const window = getCurrentWindow();
+          try {
+            // outerPosition returns PhysicalPosition, we need to convert to logical
+            const physicalPos = await window.outerPosition();
+            const scaleFactor = await window.scaleFactor();
+            const logicalX = physicalPos.x / scaleFactor;
+            const logicalY = physicalPos.y / scaleFactor;
+
+            // Move window UP so bottom edge stays in place while expanding
+            await window.setPosition(
+              new LogicalPosition(
+                logicalX - (EXPANDED_SIZE.width - IDLE_SIZE.width) / 2, // Center horizontally
+                logicalY - HEIGHT_DIFF // Move up
+              )
+            );
+            await window.setSize(
+              new LogicalSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height)
+            );
+          } catch (e) {
+            console.error("Failed to expand window:", e);
+          }
         });
 
         // Listen for recording stopped
         const unlistenStopped = await listen("recording_stopped", async () => {
           setStatus("processing");
-          // Keep expanded size for processing
+          // Expand width for processing (to fit bars + loader)
           const window = getCurrentWindow();
-          await window.setSize(new LogicalSize(60, 40));
+          try {
+            const physicalPos = await window.outerPosition();
+            const scaleFactor = await window.scaleFactor();
+            const logicalX = physicalPos.x / scaleFactor;
+            // Adjust position to keep centered while expanding width
+            await window.setPosition(
+              new LogicalPosition(
+                logicalX - (PROCESSING_SIZE.width - EXPANDED_SIZE.width) / 2,
+                physicalPos.y / scaleFactor
+              )
+            );
+            await window.setSize(
+              new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height)
+            );
+          } catch (e) {
+            console.error("Failed to expand to processing size:", e);
+          }
         });
 
         // Listen for processing start
@@ -178,9 +182,24 @@ const Pill: React.FC = () => {
           "processing_start",
           async () => {
             setStatus("processing");
-            // Keep expanded size for processing
+            // Expand width for processing (to fit bars + loader)
             const window = getCurrentWindow();
-            await window.setSize(new LogicalSize(60, 40));
+            try {
+              const physicalPos = await window.outerPosition();
+              const scaleFactor = await window.scaleFactor();
+              const logicalX = physicalPos.x / scaleFactor;
+              await window.setPosition(
+                new LogicalPosition(
+                  logicalX - (PROCESSING_SIZE.width - EXPANDED_SIZE.width) / 2,
+                  physicalPos.y / scaleFactor
+                )
+              );
+              await window.setSize(
+                new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height)
+              );
+            } catch (e) {
+              console.error("Failed to expand to processing size:", e);
+            }
           }
         );
 
@@ -189,20 +208,62 @@ const Pill: React.FC = () => {
           "transcription_success",
           async () => {
             setStatus("idle");
-            // Resize window to thin rectangular size
+            // Play done sound immediately for instant feedback
+            // playSound("done");
+
+            // Shrink window downward: resize first, then move down
             const window = getCurrentWindow();
-            await window.setSize(new LogicalSize(40, 6.6));
-            // Play done sound
-            playSound("done");
+            try {
+              // outerPosition returns PhysicalPosition, convert to logical
+              const physicalPos = await window.outerPosition();
+              const scaleFactor = await window.scaleFactor();
+              const logicalX = physicalPos.x / scaleFactor;
+              const logicalY = physicalPos.y / scaleFactor;
+
+              await window.setSize(
+                new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height)
+              );
+              // Move window DOWN so bottom edge stays in place while shrinking
+              // Use PROCESSING_SIZE since we're coming from processing state
+              await window.setPosition(
+                new LogicalPosition(
+                  logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
+                  logicalY + HEIGHT_DIFF
+                )
+              );
+            } catch (e) {
+              console.error("Failed to shrink window:", e);
+            }
           }
         );
 
         // Listen for transcription error
         const unlistenError = await listen("transcription_error", async () => {
           setStatus("idle");
-          // Resize window to thin rectangular size
+
+          // Shrink window downward: resize first, then move down
           const window = getCurrentWindow();
-          await window.setSize(new LogicalSize(40, 6.6));
+          try {
+            // outerPosition returns PhysicalPosition, convert to logical
+            const physicalPos = await window.outerPosition();
+            const scaleFactor = await window.scaleFactor();
+            const logicalX = physicalPos.x / scaleFactor;
+            const logicalY = physicalPos.y / scaleFactor;
+
+            await window.setSize(
+              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height)
+            );
+            // Move window DOWN so bottom edge stays in place while shrinking
+            // Use PROCESSING_SIZE since we're coming from processing state
+            await window.setPosition(
+              new LogicalPosition(
+                logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
+                logicalY + HEIGHT_DIFF
+              )
+            );
+          } catch (e) {
+            console.error("Failed to shrink window:", e);
+          }
         });
 
         // Listen for volume updates (audio levels) - real audio data takes priority
@@ -215,41 +276,46 @@ const Pill: React.FC = () => {
               volume !== undefined &&
               volume !== null
             ) {
+              // Mark that we're receiving real audio data
+              hasRealAudioRef.current = true;
+              lastVolumeTimeRef.current = Date.now();
+
               // Generate individual bar levels based on real volume
-              const numBars = 12;
+              const numBars = 5; // Match WaveformIcon numBars
               const normalizedVolume = Math.max(0, Math.min(1, volume));
 
-              // Only animate if there's actual sound (volume > threshold)
-              const isVoiceActive = normalizedVolume > 0.15;
+              // Voice detection threshold - adjust based on your mic sensitivity
+              const voiceThreshold = 0.08;
+              const isVoiceActive = normalizedVolume > voiceThreshold;
 
               if (isVoiceActive) {
-                // Voice detected - create fast, responsive waveform
-                const timeOffset = Date.now() * 0.015; // Faster animation
+                // Voice detected - create responsive animated waveform
+                const timeOffset = Date.now() * 0.015;
+                const intensity = Math.min(1, normalizedVolume * 1.8);
+
                 const newLevels = Array(numBars)
                   .fill(0)
                   .map((_, i) => {
-                    // Each bar responds differently with faster frequencies
                     const phase = (i / numBars) * Math.PI * 2;
-                    const freq = 4 + (i % 3) * 2; // Faster: 4-8 Hz
-                    const waveOffset =
-                      Math.sin(phase + timeOffset * freq) * 0.3;
+                    const freq = 2 + i * 0.8;
+                    const wave = Math.sin(phase + timeOffset * freq) * 0.15;
                     const level = Math.max(
-                      0.2,
-                      Math.min(1, normalizedVolume * 0.75 + waveOffset + 0.25)
+                      0.25,
+                      Math.min(1, intensity * 0.5 + wave + 0.3)
                     );
                     return level;
                   });
                 setAudioLevels(newLevels);
               } else {
-                // Silence - static bars at moderate height
-                setAudioLevels(Array(numBars).fill(0.3));
+                // No voice - idle bars at moderate height
+                setAudioLevels(Array(numBars).fill(0.35));
               }
             }
           });
         } catch (error) {
-          // Volume updates might not be available, that's okay - will use simulation
+          // Volume updates might not be available, that's okay - will use idle animation
           console.log(
-            "Volume update event not available, using simulation:",
+            "Volume update event not available, using idle animation:",
             error
           );
         }
@@ -259,18 +325,58 @@ const Pill: React.FC = () => {
           "action_success",
           async () => {
             setStatus("idle");
-            // Resize window to thin rectangular size
+
+            // Shrink window downward: resize first, then move down
             const window = getCurrentWindow();
-            await window.setSize(new LogicalSize(40, 6.6));
+            try {
+              // outerPosition returns PhysicalPosition, convert to logical
+              const physicalPos = await window.outerPosition();
+              const scaleFactor = await window.scaleFactor();
+              const logicalX = physicalPos.x / scaleFactor;
+              const logicalY = physicalPos.y / scaleFactor;
+
+              await window.setSize(
+                new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height)
+              );
+              // Use PROCESSING_SIZE since we're coming from processing state
+              await window.setPosition(
+                new LogicalPosition(
+                  logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
+                  logicalY + HEIGHT_DIFF
+                )
+              );
+            } catch (e) {
+              console.error("Failed to shrink window:", e);
+            }
           }
         );
 
         // Listen for action error
         const unlistenActionError = await listen("action_error", async () => {
           setStatus("idle");
-          // Resize window to thin rectangular size
+
+          // Shrink window downward: resize first, then move down
           const window = getCurrentWindow();
-          await window.setSize(new LogicalSize(40, 6.6));
+          try {
+            // outerPosition returns PhysicalPosition, convert to logical
+            const physicalPos = await window.outerPosition();
+            const scaleFactor = await window.scaleFactor();
+            const logicalX = physicalPos.x / scaleFactor;
+            const logicalY = physicalPos.y / scaleFactor;
+
+            await window.setSize(
+              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height)
+            );
+            // Use PROCESSING_SIZE since we're coming from processing state
+            await window.setPosition(
+              new LogicalPosition(
+                logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
+                logicalY + HEIGHT_DIFF
+              )
+            );
+          } catch (e) {
+            console.error("Failed to shrink window:", e);
+          }
         });
 
         // Cleanup function
@@ -314,28 +420,40 @@ const Pill: React.FC = () => {
     color?: string;
     audioLevels?: number[];
   }) => {
-    const barWidth = 2.5;
-    const barSpacing = 3;
-    const maxBarHeight = size * 0.8;
-    const minBarHeight = size * 0.15;
-    const numBars = 12;
-    const containerWidth = size * 0.98;
-    const containerHeight = size * 0.9;
+    // Configuration for balanced bars
+    const numBars = 5;
+    const barWidth = 2.8;
+    const barSpacing = 2;
+    const maxBarHeight = size * 0.75;
+    const minBarHeight = size * 0.22; // Moderate idle height
+    const containerWidth = size * 0.95;
+    const containerHeight = size * 0.85;
     const startX = (size - containerWidth) / 2;
     const startY = (size - containerHeight) / 2;
 
     // Use audio levels if available, otherwise use static default heights
+    // hasAudio is true when bars should be actively animating (voice detected)
     const hasAudio =
-      audioLevels.length > 0 && audioLevels.some((level) => level > 0.2);
-    const barHeights = hasAudio
-      ? audioLevels.map((level) => {
-          // Map audio level (0-1) to bar height
-          return minBarHeight + (maxBarHeight - minBarHeight) * level;
-        })
-      : // Static bars when silent
-        Array(numBars)
-          .fill(0)
-          .map(() => minBarHeight * 1.5);
+      audioLevels.length > 0 && audioLevels.some((level) => level > 0.25);
+
+    // Resample audio levels to match numBars if needed
+    const resampledLevels =
+      audioLevels.length > 0
+        ? Array(numBars)
+            .fill(0)
+            .map((_, i) => {
+              const sourceIndex = Math.floor(
+                (i / numBars) * audioLevels.length
+              );
+              return audioLevels[sourceIndex] || 0.3;
+            })
+        : Array(numBars).fill(0.35);
+
+    const barHeights = resampledLevels.map((level) => {
+      return (
+        minBarHeight + (maxBarHeight - minBarHeight) * Math.max(0.2, level)
+      );
+    });
 
     const totalBarsWidth = numBars * barWidth + (numBars - 1) * barSpacing;
     const barsStartX = startX + (containerWidth - totalBarsWidth) / 2;
@@ -452,12 +570,12 @@ const Pill: React.FC = () => {
       ? "0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.4)"
       : "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)";
   } else if (status === "processing") {
-    // Processing: keep expanded size
-    baseStyle.width = "60px";
+    // Processing: wider to fit bars + loader
+    baseStyle.width = "80px";
     baseStyle.height = "40px";
-    baseStyle.minWidth = "60px";
+    baseStyle.minWidth = "80px";
     baseStyle.minHeight = "40px";
-    baseStyle.maxWidth = "60px";
+    baseStyle.maxWidth = "80px";
     baseStyle.maxHeight = "40px";
     baseStyle.borderRadius = "20px"; // Rounded rectangle
     baseStyle.border = "1px solid rgba(255, 255, 255, 0.15)";
@@ -496,16 +614,16 @@ const Pill: React.FC = () => {
             <>
               {/* Static bars during processing */}
               <WaveformIcon
-                size={20}
+                size={22}
                 color="white"
                 audioLevels={[]} // Empty array will show static bars
               />
               {/* Loader next to bars */}
-              <LoaderIcon size={16} color="white" />
+              <LoaderIcon size={14} color="white" />
             </>
           ) : (
             <WaveformIcon
-              size={24}
+              size={26}
               color="white"
               audioLevels={smoothedLevels}
             />
