@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import {
-  checkOAuthStatus,
   logout as backendLogout,
   storePkceVerifier,
 } from "../../lib/apiClient";
+import { AUTH_ENDPOINTS, getWebSocketUrl } from "../../lib/apiEndpoints";
 import { useAuthStore, authStore } from "../../store/authStore";
 import type { GoogleLoginButtonProps } from "../../types";
 
@@ -26,10 +26,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   const [loading, setLocalLoading] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const oauthPollingRef = useRef<{
-    isPolling: boolean;
-    interval: NodeJS.Timeout | null;
-  }>({ isPolling: false, interval: null });
+  const websocketRef = useRef<WebSocket | null>(null);
 
   // Check auth store for tokens (auth store loads from secure storage)
   const checkStoredAuth = React.useCallback(() => {
@@ -160,6 +157,24 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     };
   }, [loading, checkStoredAuth]);
 
+  // Cleanup WebSocket connection on unmount
+  useEffect(() => {
+    return () => {
+      if (websocketRef.current) {
+        try {
+          websocketRef.current.close();
+        } catch (e) {
+          console.error("Error closing WebSocket on unmount:", e);
+        }
+        websocketRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const handleGoogleLogin = async () => {
     setLocalLoading(true);
     setLoading(true);
@@ -209,69 +224,52 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       console.log("Waiting for OAuth callback...");
 
-      // Poll backend for OAuth completion
-      // This works across different browser contexts
-      // Use ref to track polling state across async operations
-      oauthPollingRef.current.isPolling = true;
-      oauthPollingRef.current.interval = null;
+      // Connect to WebSocket for real-time OAuth completion notification
+      const wsUrl = getWebSocketUrl(AUTH_ENDPOINTS.websocketAuth(pkceData.state));
+      console.log("Connecting to WebSocket:", wsUrl);
 
-      // Track poll count - maximum 10 polls
-      let pollCount = 0;
-      const MAX_POLLS = 10;
+      const ws = new WebSocket(wsUrl);
+      websocketRef.current = ws;
 
-      const pollOAuthStatus = async (): Promise<boolean> => {
-        if (!oauthPollingRef.current.isPolling) {
-          console.log("Polling already stopped, skipping");
-          return true; // Already stopped
+      // Set up timeout for WebSocket connection (5 minutes)
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          console.log("OAuth timeout - closing WebSocket");
+          ws.close();
         }
-
-        // Increment poll count
-        pollCount++;
-        console.log(`OAuth status poll attempt ${pollCount}/${MAX_POLLS}`);
-
-        // Check if we've exceeded max polls
-        if (pollCount > MAX_POLLS) {
-          console.log("Maximum poll attempts reached, stopping");
-          oauthPollingRef.current.isPolling = false;
-          if (oauthPollingRef.current.interval) {
-            clearInterval(oauthPollingRef.current.interval);
-            oauthPollingRef.current.interval = null;
-          }
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
-          setLocalLoading(false);
-          setLoading(false);
-          setError("Login failed. Please try again.");
-          if (onError) {
-            onError("Login failed");
-          }
-          return true; // Stop polling
+        websocketRef.current = null;
+        setLocalLoading(false);
+        setLoading(false);
+        setError("Authentication timed out. Please try again.");
+        if (onError) {
+          onError("Authentication timed out");
         }
+      }, 5 * 60 * 1000); // 5 minutes
 
+      ws.onopen = () => {
+        console.log("WebSocket connected, waiting for OAuth completion");
+        // Optional: Send a ping to keep connection alive
+        // The server will respond with pong if needed
+      };
+
+      ws.onmessage = (event) => {
         try {
-          const status = await checkOAuthStatus(pkceData.state);
-          console.log("OAuth status check:", {
-            status: status.status,
-            hasAccessToken: !!status.access_token,
-            hasUser: !!status.user,
-            fullResponse: status,
-          });
+          const data = JSON.parse(event.data);
+          console.log("Received WebSocket message:", data);
 
-          if (
-            status.status === "completed" &&
-            status.access_token &&
-            status.user
-          ) {
-            console.log("✅ OAuth completed, tokens received from backend");
+          // Handle pong response (heartbeat)
+          if (data.type === "pong") {
+            return;
+          }
 
-            // Stop polling immediately BEFORE processing to prevent race conditions
-            oauthPollingRef.current.isPolling = false;
-            if (oauthPollingRef.current.interval) {
-              clearInterval(oauthPollingRef.current.interval);
-              oauthPollingRef.current.interval = null;
-            }
+          // Handle authentication completion
+          if (data.status === "completed" && data.access_token && data.user) {
+            console.log("✅ OAuth completed, tokens received via WebSocket");
+
+            // Clear timeout
             if (timeoutRef.current) {
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;
@@ -279,82 +277,84 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
             // Process tokens
             const authTokens = {
-              access_token: status.access_token,
-              refresh_token: status.refresh_token || "",
-              expires_in: status.expires_in,
-              expires_at: status.expires_in
-                ? Date.now() + status.expires_in * 1000
+              access_token: data.access_token,
+              refresh_token: data.refresh_token || "",
+              expires_in: data.expires_in,
+              expires_at: data.expires_in
+                ? Date.now() + data.expires_in * 1000
                 : undefined,
             };
 
             console.log("Setting auth data:", {
               hasAccessToken: !!authTokens.access_token,
               hasRefreshToken: !!authTokens.refresh_token,
-              userEmail: status.user?.email,
+              userEmail: data.user?.email,
             });
 
-            setAuthData(authTokens, status.user);
+            setAuthData(authTokens, data.user);
             setLoading(false);
             setLocalLoading(false);
 
+            // Close WebSocket connection
+            ws.close();
+            websocketRef.current = null;
+
             if (onSuccess) {
-              onSuccess(status.user);
+              onSuccess(data.user);
             }
-            return true; // Stop polling
-          } else if (status.status === "pending") {
-            // Still pending, continue polling
-            return false;
           } else {
-            // Unexpected status
-            console.warn("Unexpected OAuth status:", status);
-            return false;
+            console.warn("Unexpected WebSocket message:", data);
           }
         } catch (error) {
-          console.error("Error checking OAuth status:", error);
-          // Don't stop polling on error - might be temporary network issue
-          // But still count it as a poll attempt
-          return false;
+          console.error("Error parsing WebSocket message:", error);
         }
       };
 
-      // Poll immediately, then every 500ms
-      if (await pollOAuthStatus()) {
-        return; // Already completed or failed
-      }
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        // Don't set error immediately - might be temporary
+        // The timeout will handle it if connection doesn't recover
+      };
 
-      oauthPollingRef.current.interval = setInterval(async () => {
-        if (await pollOAuthStatus()) {
-          // Polling stopped, interval already cleared in pollOAuthStatus
+      ws.onclose = (event) => {
+        console.log("WebSocket closed:", {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+        });
+
+        // Clear timeout if connection closed normally
+        if (timeoutRef.current && event.wasClean) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
         }
-      }, 500);
 
-      // Set a timeout to stop polling after 5 minutes
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(
-        () => {
-          oauthPollingRef.current.isPolling = false;
-          if (oauthPollingRef.current.interval) {
-            clearInterval(oauthPollingRef.current.interval);
-            oauthPollingRef.current.interval = null;
-          }
-          console.log("OAuth timeout - no tokens detected");
-          setLocalLoading(false);
-          setLoading(false);
-          setError("Authentication timed out. Please try again.");
-          if (onError) {
-            onError("Authentication timed out");
-          }
-        },
-        5 * 60 * 1000,
-      ); // 5 minutes
+        websocketRef.current = null;
+
+        // Only set error if we're still loading (connection closed unexpectedly)
+        if (loading && event.code !== 1000) {
+          // 1000 is normal closure
+          console.log("WebSocket closed unexpectedly");
+          // Don't set error here - might be normal closure after success
+          // The timeout will handle actual failures
+        }
+      };
     } catch (error: any) {
       const errorMessage = error?.message || "Google login failed";
       console.error("Google Login Failed:", error);
       setError(errorMessage);
       setLocalLoading(false);
       setLoading(false);
+
+      // Cleanup WebSocket connection
+      if (websocketRef.current) {
+        try {
+          websocketRef.current.close();
+        } catch (e) {
+          console.error("Error closing WebSocket:", e);
+        }
+        websocketRef.current = null;
+      }
 
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
