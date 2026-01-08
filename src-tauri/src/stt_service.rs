@@ -62,9 +62,7 @@ impl SttService {
     /// * `auth_token` - Optional authentication token (Bearer token) for authenticated requests
     /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
     /// * `enhance_transcription` - Whether to enhance the transcription with AI
-    /// * `transcribe_with_cursor_context` - Whether to use cursor context for transcription
     /// * `focused_app` - Name of the currently focused application (required)
-    /// * `base64_image` - Optional base64-encoded PNG screenshot to send with transcription
     /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
     /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
     /// * `offline_transcription` - Whether to use local Whisper model instead of server API
@@ -79,9 +77,7 @@ impl SttService {
         auth_token: Option<String>,
         language: String,
         enhance_transcription: bool,
-        transcribe_with_cursor_context: bool,
         focused_app: String,
-        base64_image: Option<String>,
         cancel_rx: Option<oneshot::Receiver<()>>,
         app_handle: Option<AppHandle>,
         offline_transcription: bool,
@@ -148,20 +144,12 @@ impl SttService {
                 .mime_str("audio/wav")?; // MIME type indicating WAV audio format
 
             // Build the multipart form with the audio file
-            let mut form = multipart::Form::new().part("audio_file", part); // Attach the audio file
-
-            // Add base64 image if provided
-            if let Some(image) = base64_image {
-                let image_part = multipart::Part::text(image).mime_str("text/plain")?;
-                form = form.part("base64_image", image_part);
-                println!("🔍 DEBUG: Added base64_image to multipart form");
-            }
+            let form = multipart::Form::new().part("audio_file", part); // Attach the audio file
 
             // Build the request URL using centralized endpoint
             let url = stt::transcribe_url(
                 &language,
                 enhance_transcription,
-                transcribe_with_cursor_context,
                 &focused_app,
             );
             let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file

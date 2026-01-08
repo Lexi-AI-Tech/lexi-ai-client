@@ -67,7 +67,6 @@ pub async fn update_hotkey(
         hotkeys: Some(new_hotkeys.clone()),
         languages: current_config.languages,
         enhance_transcription: current_config.enhance_transcription,
-        transcribe_with_cursor_context: current_config.transcribe_with_cursor_context,
         launch_on_system_startup: current_config.launch_on_system_startup,
         vocabulary: current_config.vocabulary,
     };

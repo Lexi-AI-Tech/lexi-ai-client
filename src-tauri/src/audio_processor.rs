@@ -97,8 +97,6 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
         // Get transcription settings from app config
         let enhance_transcription = app_config.enhance_transcription.unwrap_or(false);
-        let transcribe_with_cursor_context =
-            app_config.transcribe_with_cursor_context.unwrap_or(false);
 
         // TODO: Implement this as on demand download feature on paid plans
         // offline_transcription is not in app config, keep as hardcoded for now
@@ -115,8 +113,8 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .collect();
 
         println!(
-            "⚙️  Transcription settings: enhance={}, cursor_context={}, offline={}, vocabulary_size={}",
-            enhance_transcription, transcribe_with_cursor_context, offline_transcription, vocabulary.len()
+            "⚙️  Transcription settings: enhance={}, offline={}, vocabulary_size={}",
+            enhance_transcription, offline_transcription, vocabulary.len()
         );
 
         // Get cursor context and print app name and selected text
@@ -125,22 +123,6 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .as_ref()
             .and_then(|ctx| ctx.app_name.clone())
             .unwrap_or_else(|| "Unknown".to_string());
-
-        // Capture screen and encode as base64 only if transcribe_with_cursor_context is true
-        let base64_image = if transcribe_with_cursor_context {
-            let captured_image = crate::cursor_context::capture_current_screen();
-            if let Some(ref image) = captured_image {
-                println!(
-                    "📸 Screen captured for transcription (length: {})",
-                    image.len()
-                );
-            } else {
-                println!("⚠️  Failed to capture screen for transcription");
-            }
-            captured_image
-        } else {
-            None
-        };
 
         // Initialize the STT service client and transcribe the audio
         // The cancellation receiver is passed to the service to allow cancelling the HTTP request
@@ -153,9 +135,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 auth_token,
                 language,
                 enhance_transcription,
-                transcribe_with_cursor_context,
                 focused_app,
-                base64_image,
                 Some(cancel_rx),
                 Some(app_handle_for_task.clone()),
                 offline_transcription,

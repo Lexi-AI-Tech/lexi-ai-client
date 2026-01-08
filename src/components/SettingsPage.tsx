@@ -29,10 +29,6 @@ export const SettingsPage: React.FC = () => {
   );
   const [selectedEnhanceTranscription, setSelectedEnhanceTranscription] =
     useState<boolean | null>(null);
-  const [
-    selectedTranscribeWithCursorContext,
-    setSelectedTranscribeWithCursorContext,
-  ] = useState<boolean | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +44,6 @@ export const SettingsPage: React.FC = () => {
   const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
   const autostartEnabled = config?.launch_on_system_startup;
   const enhanceTranscription = config?.enhance_transcription;
-  const transcribeWithCursorContext = config?.transcribe_with_cursor_context;
   const vocabulary = config?.vocabulary;
 
   // Load app config on mount
@@ -87,9 +82,6 @@ export const SettingsPage: React.FC = () => {
         setSelectedAutostart(loadedConfig.launch_on_system_startup ?? null);
         setSelectedEnhanceTranscription(
           loadedConfig.enhance_transcription ?? null,
-        );
-        setSelectedTranscribeWithCursorContext(
-          loadedConfig.transcribe_with_cursor_context ?? null,
         );
       } catch (err: any) {
         console.error("Failed to load app config:", err);
@@ -177,18 +169,11 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
 
-    const currentCursorContext = transcribeWithCursorContext ?? false;
-    const cursorContextChanged =
-      selectedTranscribeWithCursorContext !== null &&
-      selectedTranscribeWithCursorContext !== undefined &&
-      selectedTranscribeWithCursorContext !== currentCursorContext;
-
     if (
       !hotkeysChanged &&
       !languageChanged &&
       !autostartChanged &&
-      !enhanceChanged &&
-      !cursorContextChanged
+      !enhanceChanged
     ) {
       return; // No changes needed
     }
@@ -230,14 +215,6 @@ export const SettingsPage: React.FC = () => {
       if (enhanceChanged && selectedEnhanceTranscription !== null) {
         updates.enhance_transcription = selectedEnhanceTranscription;
       }
-      if (
-        cursorContextChanged &&
-        selectedTranscribeWithCursorContext !== null
-      ) {
-        updates.transcribe_with_cursor_context =
-          selectedTranscribeWithCursorContext;
-      }
-
       const updatedConfig = await updateConfig(updates);
 
       // Update selected values to match the saved config
@@ -256,14 +233,6 @@ export const SettingsPage: React.FC = () => {
       }
       if (enhanceChanged && updatedConfig.enhance_transcription !== undefined) {
         setSelectedEnhanceTranscription(updatedConfig.enhance_transcription);
-      }
-      if (
-        cursorContextChanged &&
-        updatedConfig.transcribe_with_cursor_context !== undefined
-      ) {
-        setSelectedTranscribeWithCursorContext(
-          updatedConfig.transcribe_with_cursor_context,
-        );
       }
 
       setSuccess(true);
@@ -304,18 +273,11 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== currentEnhance;
 
     // Compare cursor context
-    const currentCursorContext = transcribeWithCursorContext ?? false;
-    const cursorContextChanged =
-      selectedTranscribeWithCursorContext !== null &&
-      selectedTranscribeWithCursorContext !== undefined &&
-      selectedTranscribeWithCursorContext !== currentCursorContext;
-
     return (
       hotkeysChanged ||
       languageChanged ||
       autostartChanged ||
-      enhanceChanged ||
-      cursorContextChanged
+      enhanceChanged
     );
   };
 
@@ -328,14 +290,6 @@ export const SettingsPage: React.FC = () => {
     const currentValue =
       selectedEnhanceTranscription ?? enhanceTranscription ?? false;
     setSelectedEnhanceTranscription(!currentValue);
-  };
-
-  const handleToggleCursorContext = () => {
-    const currentValue =
-      selectedTranscribeWithCursorContext ??
-      transcribeWithCursorContext ??
-      false;
-    setSelectedTranscribeWithCursorContext(!currentValue);
   };
 
   const handleHotkeySelectorChange = (config: HotkeyConfig) => {
@@ -689,48 +643,6 @@ export const SettingsPage: React.FC = () => {
                   false) === true
               }
               onToggle={handleToggleEnhanceTranscription}
-              disabled={isLoading || isUpdating}
-            />
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px",
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "6px",
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#ffffff",
-                  marginBottom: "4px",
-                  fontWeight: 500,
-                }}
-              >
-                Transcribe with Cursor Context
-              </div>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.6)",
-                }}
-              >
-                Use surrounding text context to improve transcription accuracy
-              </div>
-            </div>
-            <ToggleSwitch
-              enabled={
-                (selectedTranscribeWithCursorContext ??
-                  transcribeWithCursorContext ??
-                  false) === true
-              }
-              onToggle={handleToggleCursorContext}
               disabled={isLoading || isUpdating}
             />
           </div>

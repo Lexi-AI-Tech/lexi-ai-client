@@ -39,8 +39,6 @@ pub struct AppConfig {
     pub hotkeys: Option<Vec<String>>,
     /// Whether to enhance transcriptions with LLM processing
     pub enhance_transcription: Option<bool>,
-    /// Whether to use cursor context when transcribing
-    pub transcribe_with_cursor_context: Option<bool>,
     /// Whether to launch application on system startup
     pub launch_on_system_startup: Option<bool>,
     /// Vocabulary dictionary for transcription (array of vocabulary items)
@@ -62,7 +60,6 @@ struct ServerAppConfigResponse {
     hotkeys: Vec<String>,
     languages: Vec<String>,
     enhance_transcription: bool,
-    transcribe_with_cursor_context: bool,
     launch_on_system_startup: bool,
     vocabulary: Vec<VocabularyItem>,
 }
@@ -127,7 +124,6 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
         languages: None,
         hotkeys: None,
         enhance_transcription: None,
-        transcribe_with_cursor_context: None,
         launch_on_system_startup: Some(true), // Enable autostart by default on first launch
         vocabulary: None,
     };
@@ -273,9 +269,6 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.enhance_transcription.is_some() {
         current.enhance_transcription = provided.enhance_transcription;
     }
-    if provided.transcribe_with_cursor_context.is_some() {
-        current.transcribe_with_cursor_context = provided.transcribe_with_cursor_context;
-    }
     if provided.launch_on_system_startup.is_some() {
         current.launch_on_system_startup = provided.launch_on_system_startup;
     }
@@ -307,7 +300,6 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         languages: Some(response.languages),
         hotkeys: Some(response.hotkeys),
         enhance_transcription: Some(response.enhance_transcription),
-        transcribe_with_cursor_context: Some(response.transcribe_with_cursor_context),
         launch_on_system_startup: Some(response.launch_on_system_startup),
         vocabulary: Some(response.vocabulary),
     }
@@ -351,12 +343,6 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
         body.insert(
             "enhance_transcription".to_string(),
             serde_json::to_value(enhance_transcription).unwrap(),
-        );
-    }
-    if let Some(transcribe_with_cursor_context) = config.transcribe_with_cursor_context {
-        body.insert(
-            "transcribe_with_cursor_context".to_string(),
-            serde_json::to_value(transcribe_with_cursor_context).unwrap(),
         );
     }
     if let Some(launch_on_system_startup) = config.launch_on_system_startup {
