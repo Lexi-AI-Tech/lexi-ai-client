@@ -80,16 +80,16 @@ async function refreshAccessToken(): Promise<string | null> {
       // Update tokens in auth store
       try {
         if (authStore.tokens && authStore.user) {
+          // Default to 1 hour if expires_in not provided
+          const expiresIn = data.expires_in || 3600;
           authStore.setAuthData(
             {
               ...authStore.tokens,
               access_token: data.access_token,
               refresh_token:
                 data.refresh_token || authStore.tokens.refresh_token,
-              expires_in: data.expires_in,
-              expires_at: data.expires_in
-                ? Date.now() + data.expires_in * 1000
-                : authStore.tokens.expires_at,
+              expires_in: expiresIn,
+              expires_at: Date.now() + expiresIn * 1000,
             },
             authStore.user,
           );

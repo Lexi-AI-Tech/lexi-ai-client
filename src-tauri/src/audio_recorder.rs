@@ -26,6 +26,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 
 /// AudioRecorder manages audio capture from the default input device
 ///
@@ -37,6 +38,7 @@ pub struct AudioRecorder {
     config: StreamConfig,             // Audio configuration (sample rate, channels, etc.)
     stream: Option<Stream>,           // Active audio stream (None when not recording)
     audio_data: Arc<Mutex<Vec<f32>>>, // Shared buffer storing captured audio samples
+    volume_tx: Option<Sender<f32>>,   // Optional channel for real-time volume updates
 }
 
 impl AudioRecorder {
@@ -67,7 +69,14 @@ impl AudioRecorder {
             config,
             stream: None,                                 // No active stream initially
             audio_data: Arc::new(Mutex::new(Vec::new())), // Empty audio buffer
+            volume_tx: None,                              // No volume callback by default
         }
+    }
+
+    /// Set a channel sender for real-time volume updates
+    /// Volume values are 0.0-1.0 (RMS normalized)
+    pub fn set_volume_sender(&mut self, tx: Sender<f32>) {
+        self.volume_tx = Some(tx);
     }
 
     /// Starts recording audio from the input device
@@ -89,6 +98,14 @@ impl AudioRecorder {
         let config = self.config.clone();
         let _channels = config.channels;
 
+        // Clone the volume sender for the callback
+        let volume_tx = self.volume_tx.clone();
+        
+        // For throttling volume updates (every ~50ms worth of samples)
+        let sample_rate = config.sample_rate.0 as usize;
+        let samples_per_update = sample_rate / 20; // ~50ms at given sample rate
+        let sample_counter = Arc::new(Mutex::new(0usize));
+
         // Build the input stream with callbacks
         let stream = self.device.build_input_stream(
             &config,
@@ -96,11 +113,31 @@ impl AudioRecorder {
             // It runs in a separate thread managed by cpal
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
                 // Lock the shared buffer and append the new audio samples
-                let mut audio_buffer = audio_data.lock().unwrap();
-                // Note: If the audio is stereo (2 channels), we append all samples.
-                // For mono conversion, you would need to mix down the channels here.
-                // For simplicity, we keep all samples as-is.
-                audio_buffer.extend_from_slice(data);
+                {
+                    let mut audio_buffer = audio_data.lock().unwrap();
+                    audio_buffer.extend_from_slice(data);
+                }
+
+                // Calculate and send volume level (throttled)
+                if let Some(ref tx) = volume_tx {
+                    let mut counter = sample_counter.lock().unwrap();
+                    *counter += data.len();
+                    
+                    if *counter >= samples_per_update {
+                        *counter = 0;
+                        
+                        // Calculate RMS (Root Mean Square) volume
+                        let sum_squares: f32 = data.iter().map(|s| s * s).sum();
+                        let rms = (sum_squares / data.len() as f32).sqrt();
+                        
+                        // Normalize to 0-1 range (typical voice RMS is 0.01-0.3)
+                        // Apply some amplification for better visual response
+                        let normalized = (rms * 5.0).min(1.0);
+                        
+                        // Send volume (ignore errors if receiver dropped)
+                        let _ = tx.send(normalized);
+                    }
+                }
             },
             // Error callback - called if there's an issue with the audio stream
             move |err| {

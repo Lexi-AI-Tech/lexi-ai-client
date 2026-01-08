@@ -72,7 +72,9 @@ pub fn spawn_recording_thread(
 ) {
     thread::spawn(move || {
         let mut ctx = RecordingContext::new();
-        const TIMEOUT_CHECK_INTERVAL: Duration = Duration::from_millis(200);
+        // Reduced from 200ms to 50ms for faster response to key presses
+        // This is the maximum latency for receiving a recording command
+        const TIMEOUT_CHECK_INTERVAL: Duration = Duration::from_millis(50);
         const STUCK_THRESHOLD: Duration = Duration::from_secs(8);
 
         loop {
@@ -120,7 +122,21 @@ pub fn spawn_recording_thread(
                         }
                     }
 
+                    // Create channel for real-time volume updates
+                    let (volume_tx, volume_rx) = mpsc::channel::<f32>();
+                    
+                    // Spawn thread to forward volume updates to frontend
+                    let app_handle_for_volume = app_handle.clone();
+                    thread::spawn(move || {
+                        while let Ok(volume) = volume_rx.recv() {
+                            // Emit volume update to frontend for waveform visualization
+                            let _ = app_handle_for_volume.emit("volume-update", volume);
+                        }
+                    });
+
                     let mut new_recorder = AudioRecorder::new();
+                    new_recorder.set_volume_sender(volume_tx);
+                    
                     match new_recorder.start_recording() {
                         Ok(_) => {
                             ctx.recorder = Some(new_recorder);
