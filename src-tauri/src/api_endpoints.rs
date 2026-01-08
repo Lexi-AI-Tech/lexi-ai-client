@@ -19,7 +19,6 @@ pub mod auth {
     pub const ME: &str = "/auth/me";
     pub const LOGOUT: &str = "/auth/logout";
     pub const OAUTH_VERIFIER: &str = "/auth/oauth/verifier";
-    pub const OAUTH_STATUS: &str = "/auth/oauth/status";
 
     /// Get OAuth callback URL (full URL with base)
     /// Returns localhost URL in development, production URL when custom-protocol feature is enabled
@@ -44,17 +43,6 @@ pub mod auth {
             state
         )
     }
-
-    /// Build OAuth status endpoint URL
-    pub fn oauth_status_url(state: &str) -> String {
-        format!(
-            "{}{}{}/{}",
-            config::api_base_url(),
-            super::API_V1_PREFIX,
-            OAUTH_STATUS,
-            state
-        )
-    }
 }
 
 /// Speech-to-Text (STT) endpoints
@@ -64,20 +52,14 @@ pub mod stt {
     pub const TRANSCRIBE: &str = "/stt/";
 
     /// Build transcribe endpoint URL with query parameters
-    pub fn transcribe_url(
-        language: &str,
-        enhance_stt_output: bool,
-        transcribe_with_cursor_context: bool,
-        focused_app: &str,
-    ) -> String {
+    pub fn transcribe_url(language: &str, enhance_stt_output: bool, focused_app: &str) -> String {
         format!(
-            "{}{}{}?language={}&enhance_stt_output={}&transcribe_with_cursor_context={}&focused_app={}",
+            "{}{}{}?language={}&enhance_stt_output={}&focused_app={}",
             config::api_base_url(),
             super::API_V1_PREFIX,
             TRANSCRIBE,
             urlencoding::encode(language),
             enhance_stt_output,
-            transcribe_with_cursor_context,
             urlencoding::encode(focused_app)
         )
     }

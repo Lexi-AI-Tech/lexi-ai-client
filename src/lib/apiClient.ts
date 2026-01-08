@@ -464,7 +464,6 @@ export async function getPkceVerifier(state: string): Promise<string> {
   }
 }
 
-
 // Transcript types are imported from ../types
 
 /**

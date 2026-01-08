@@ -124,7 +124,7 @@ pub fn spawn_recording_thread(
 
                     // Create channel for real-time volume updates
                     let (volume_tx, volume_rx) = mpsc::channel::<f32>();
-                    
+
                     // Spawn thread to forward volume updates to frontend
                     let app_handle_for_volume = app_handle.clone();
                     thread::spawn(move || {
@@ -136,7 +136,7 @@ pub fn spawn_recording_thread(
 
                     let mut new_recorder = AudioRecorder::new();
                     new_recorder.set_volume_sender(volume_tx);
-                    
+
                     match new_recorder.start_recording() {
                         Ok(_) => {
                             ctx.recorder = Some(new_recorder);

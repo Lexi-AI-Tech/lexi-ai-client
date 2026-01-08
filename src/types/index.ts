@@ -88,7 +88,6 @@ export interface AppConfig {
   hotkeys: string[];
   languages: LanguageCode[];
   enhance_transcription: boolean;
-  transcribe_with_cursor_context: boolean;
   launch_on_system_startup: boolean;
   vocabulary?: VocabularyItem[] | null;
 }
@@ -101,7 +100,6 @@ export interface AppConfigUpdateRequest {
   hotkeys?: string[];
   languages?: LanguageCode[];
   enhance_transcription?: boolean;
-  transcribe_with_cursor_context?: boolean;
   launch_on_system_startup?: boolean;
   vocabulary?: VocabularyItem[] | null;
 }
@@ -113,7 +111,6 @@ export interface TauriAppConfig {
   languages?: string[] | null;
   hotkeys?: string[] | null;
   enhance_transcription?: boolean | null;
-  transcribe_with_cursor_context?: boolean | null;
   launch_on_system_startup?: boolean | null;
   vocabulary?: VocabularyItem[] | null;
 }

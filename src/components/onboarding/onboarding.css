@@ -8,7 +8,9 @@
   width: 100vw;
   display: flex;
   background: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
+    sans-serif;
   color: #111827;
 }
 

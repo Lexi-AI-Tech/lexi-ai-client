@@ -191,13 +191,13 @@ export function PermissionsStep({ onNext }: { onNext: () => void }) {
     try {
       const micGranted = await invoke<boolean>("check_microphone_permission");
       const accGranted = await invoke<boolean>(
-        "check_accessibility_permission"
+        "check_accessibility_permission",
       );
       const inputGranted = await invoke<boolean>(
-        "check_input_monitoring_permission"
+        "check_input_monitoring_permission",
       );
       const screenGranted = await invoke<boolean>(
-        "check_screen_recording_permission"
+        "check_screen_recording_permission",
       );
 
       setMicrophone((prev) => ({ ...prev, granted: micGranted }));
