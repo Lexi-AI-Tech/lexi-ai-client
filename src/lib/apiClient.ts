@@ -464,42 +464,6 @@ export async function getPkceVerifier(state: string): Promise<string> {
   }
 }
 
-/**
- * Check OAuth authentication status for a given state.
- * Polls the backend to see if authentication completed.
- */
-export async function checkOAuthStatus(state: string): Promise<{
-  status: "pending" | "completed";
-  access_token?: string;
-  refresh_token?: string;
-  user?: {
-    email: string;
-    name: string;
-    picture?: string;
-  };
-  expires_in?: number;
-}> {
-  const response = await fetch(getApiUrl(AUTH_ENDPOINTS.oauthStatus(state)), {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ detail: "Unknown error" }));
-    throw new Error(
-      errorData.detail ||
-        errorData.error ||
-        `Failed to check OAuth status: ${response.status}`,
-    );
-  }
-
-  const data = await response.json();
-  return data;
-}
 
 // Transcript types are imported from ../types
 

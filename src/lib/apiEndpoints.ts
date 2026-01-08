@@ -27,9 +27,9 @@ export const AUTH_ENDPOINTS = {
   logout: `${API_V1_PREFIX}/auth/logout`,
   oauthVerifier: (state: string) =>
     `${API_V1_PREFIX}/auth/oauth/verifier/${encodeURIComponent(state)}`,
-  oauthStatus: (state: string) =>
-    `${API_V1_PREFIX}/auth/oauth/status/${encodeURIComponent(state)}`,
   storeOAuthVerifier: `${API_V1_PREFIX}/auth/oauth/verifier`,
+  websocketAuth: (state: string) =>
+    `${API_V1_PREFIX}/auth/ws/auth/${encodeURIComponent(state)}`,
 } as const;
 
 /**
@@ -78,4 +78,15 @@ export const TTS_ENDPOINTS = {
  */
 export function getApiUrl(endpoint: string): string {
   return `${API_BASE_URL}${endpoint}`;
+}
+
+/**
+ * Helper function to build WebSocket URL from endpoint
+ * Converts http:// to ws:// and https:// to wss://
+ */
+export function getWebSocketUrl(endpoint: string): string {
+  const baseUrl = API_BASE_URL;
+  const wsProtocol = baseUrl.startsWith("https") ? "wss" : "ws";
+  const wsBaseUrl = baseUrl.replace(/^https?/, wsProtocol);
+  return `${wsBaseUrl}${endpoint}`;
 }
