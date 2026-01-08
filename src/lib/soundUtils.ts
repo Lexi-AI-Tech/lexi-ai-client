@@ -1,6 +1,6 @@
 /**
  * Sound Utilities
- * 
+ *
  * Provides audio feedback for pill window state changes using Web Audio API.
  * All sounds are designed to be subtle and non-intrusive.
  */
@@ -9,7 +9,7 @@ export type SoundType = "processing" | "done";
 
 /**
  * Play sound effect using Web Audio API
- * 
+ *
  * @param type - The type of sound to play ("processing" or "done")
  */
 export function playSound(type: SoundType): void {
@@ -40,7 +40,7 @@ export function playSound(type: SoundType): void {
 function playProcessingSound(
   oscillator: OscillatorNode,
   gainNode: GainNode,
-  audioContext: AudioContext
+  audioContext: AudioContext,
 ): void {
   // Processing sound: gentle ascending tone
   oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
@@ -79,4 +79,3 @@ function playDoneSound(audioContext: AudioContext): void {
   playTone(523.25, audioContext.currentTime, 0.1); // C5
   playTone(659.25, audioContext.currentTime + 0.1, 0.15); // E5
 }
-

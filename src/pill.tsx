@@ -36,7 +36,7 @@ const HEIGHT_DIFF = EXPANDED_SIZE.height - IDLE_SIZE.height;
  */
 const Pill: React.FC = () => {
   const [status, setStatus] = useState<"idle" | "recording" | "processing">(
-    "idle"
+    "idle",
   );
   const [isHovered, setIsHovered] = useState(false);
   const [audioLevels, setAudioLevels] = useState<number[]>([]);
@@ -142,11 +142,11 @@ const Pill: React.FC = () => {
             await window.setPosition(
               new LogicalPosition(
                 logicalX - (EXPANDED_SIZE.width - IDLE_SIZE.width) / 2, // Center horizontally
-                logicalY - HEIGHT_DIFF // Move up
-              )
+                logicalY - HEIGHT_DIFF, // Move up
+              ),
             );
             await window.setSize(
-              new LogicalSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height)
+              new LogicalSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height),
             );
           } catch (e) {
             console.error("Failed to expand window:", e);
@@ -166,11 +166,11 @@ const Pill: React.FC = () => {
             await window.setPosition(
               new LogicalPosition(
                 logicalX - (PROCESSING_SIZE.width - EXPANDED_SIZE.width) / 2,
-                physicalPos.y / scaleFactor
-              )
+                physicalPos.y / scaleFactor,
+              ),
             );
             await window.setSize(
-              new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height)
+              new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
             );
           } catch (e) {
             console.error("Failed to expand to processing size:", e);
@@ -191,16 +191,16 @@ const Pill: React.FC = () => {
               await window.setPosition(
                 new LogicalPosition(
                   logicalX - (PROCESSING_SIZE.width - EXPANDED_SIZE.width) / 2,
-                  physicalPos.y / scaleFactor
-                )
+                  physicalPos.y / scaleFactor,
+                ),
               );
               await window.setSize(
-                new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height)
+                new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
               );
             } catch (e) {
               console.error("Failed to expand to processing size:", e);
             }
-          }
+          },
         );
 
         // Listen for transcription success
@@ -221,20 +221,20 @@ const Pill: React.FC = () => {
               const logicalY = physicalPos.y / scaleFactor;
 
               await window.setSize(
-                new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height)
+                new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
               );
               // Move window DOWN so bottom edge stays in place while shrinking
               // Use PROCESSING_SIZE since we're coming from processing state
               await window.setPosition(
                 new LogicalPosition(
                   logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
-                  logicalY + HEIGHT_DIFF
-                )
+                  logicalY + HEIGHT_DIFF,
+                ),
               );
             } catch (e) {
               console.error("Failed to shrink window:", e);
             }
-          }
+          },
         );
 
         // Listen for transcription error
@@ -251,15 +251,15 @@ const Pill: React.FC = () => {
             const logicalY = physicalPos.y / scaleFactor;
 
             await window.setSize(
-              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height)
+              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
             );
             // Move window DOWN so bottom edge stays in place while shrinking
             // Use PROCESSING_SIZE since we're coming from processing state
             await window.setPosition(
               new LogicalPosition(
                 logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
-                logicalY + HEIGHT_DIFF
-              )
+                logicalY + HEIGHT_DIFF,
+              ),
             );
           } catch (e) {
             console.error("Failed to shrink window:", e);
@@ -301,7 +301,7 @@ const Pill: React.FC = () => {
                     const wave = Math.sin(phase + timeOffset * freq) * 0.15;
                     const level = Math.max(
                       0.25,
-                      Math.min(1, intensity * 0.5 + wave + 0.3)
+                      Math.min(1, intensity * 0.5 + wave + 0.3),
                     );
                     return level;
                   });
@@ -316,7 +316,7 @@ const Pill: React.FC = () => {
           // Volume updates might not be available, that's okay - will use idle animation
           console.log(
             "Volume update event not available, using idle animation:",
-            error
+            error,
           );
         }
 
@@ -336,19 +336,19 @@ const Pill: React.FC = () => {
               const logicalY = physicalPos.y / scaleFactor;
 
               await window.setSize(
-                new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height)
+                new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
               );
               // Use PROCESSING_SIZE since we're coming from processing state
               await window.setPosition(
                 new LogicalPosition(
                   logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
-                  logicalY + HEIGHT_DIFF
-                )
+                  logicalY + HEIGHT_DIFF,
+                ),
               );
             } catch (e) {
               console.error("Failed to shrink window:", e);
             }
-          }
+          },
         );
 
         // Listen for action error
@@ -365,14 +365,14 @@ const Pill: React.FC = () => {
             const logicalY = physicalPos.y / scaleFactor;
 
             await window.setSize(
-              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height)
+              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
             );
             // Use PROCESSING_SIZE since we're coming from processing state
             await window.setPosition(
               new LogicalPosition(
                 logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
-                logicalY + HEIGHT_DIFF
-              )
+                logicalY + HEIGHT_DIFF,
+              ),
             );
           } catch (e) {
             console.error("Failed to shrink window:", e);
@@ -443,7 +443,7 @@ const Pill: React.FC = () => {
             .fill(0)
             .map((_, i) => {
               const sourceIndex = Math.floor(
-                (i / numBars) * audioLevels.length
+                (i / numBars) * audioLevels.length,
               );
               return audioLevels[sourceIndex] || 0.3;
             })
@@ -673,7 +673,7 @@ if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
       <PillApp />
-    </React.StrictMode>
+    </React.StrictMode>,
   );
 } else {
   console.error("Root element not found");

@@ -274,10 +274,7 @@ export const SettingsPage: React.FC = () => {
 
     // Compare cursor context
     return (
-      hotkeysChanged ||
-      languageChanged ||
-      autostartChanged ||
-      enhanceChanged
+      hotkeysChanged || languageChanged || autostartChanged || enhanceChanged
     );
   };
 

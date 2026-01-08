@@ -40,7 +40,7 @@ export function HotkeySelector({
   };
 
   const [hotkeys, setHotkeys] = useState<Hotkey[]>(() =>
-    configToHotkeys(value)
+    configToHotkeys(value),
   );
   const [isRecording, setIsRecording] = useState(false);
   const [currentKeys, setCurrentKeys] = useState<Set<string>>(new Set());

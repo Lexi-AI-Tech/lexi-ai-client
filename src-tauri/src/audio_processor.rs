@@ -114,7 +114,9 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
         println!(
             "⚙️  Transcription settings: enhance={}, offline={}, vocabulary_size={}",
-            enhance_transcription, offline_transcription, vocabulary.len()
+            enhance_transcription,
+            offline_transcription,
+            vocabulary.len()
         );
 
         // Get cursor context and print app name and selected text

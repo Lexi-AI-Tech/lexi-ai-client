@@ -7,12 +7,16 @@
     <title>Pill Overlay</title>
     <style>
       /* Critical: Ensure complete transparency for pill overlay window */
-      *, *::before, *::after {
+      *,
+      *::before,
+      *::after {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
       }
-      html, body, #root {
+      html,
+      body,
+      #root {
         margin: 0;
         padding: 0;
         background: transparent !important;
@@ -24,8 +28,12 @@
       }
       /* Spin animation for loader */
       @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
       }
     </style>
   </head>

@@ -147,11 +147,7 @@ impl SttService {
             let form = multipart::Form::new().part("audio_file", part); // Attach the audio file
 
             // Build the request URL using centralized endpoint
-            let url = stt::transcribe_url(
-                &language,
-                enhance_transcription,
-                &focused_app,
-            );
+            let url = stt::transcribe_url(&language, enhance_transcription, &focused_app);
             let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
 
             // Add authorization header if token is provided

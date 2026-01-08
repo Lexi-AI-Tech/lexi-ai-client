@@ -52,11 +52,7 @@ pub mod stt {
     pub const TRANSCRIBE: &str = "/stt/";
 
     /// Build transcribe endpoint URL with query parameters
-    pub fn transcribe_url(
-        language: &str,
-        enhance_stt_output: bool,
-        focused_app: &str,
-    ) -> String {
+    pub fn transcribe_url(language: &str, enhance_stt_output: bool, focused_app: &str) -> String {
         format!(
             "{}{}{}?language={}&enhance_stt_output={}&focused_app={}",
             config::api_base_url(),

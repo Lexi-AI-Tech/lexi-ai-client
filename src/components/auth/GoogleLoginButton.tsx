@@ -225,7 +225,9 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       console.log("Waiting for OAuth callback...");
 
       // Connect to WebSocket for real-time OAuth completion notification
-      const wsUrl = getWebSocketUrl(AUTH_ENDPOINTS.websocketAuth(pkceData.state));
+      const wsUrl = getWebSocketUrl(
+        AUTH_ENDPOINTS.websocketAuth(pkceData.state),
+      );
       console.log("Connecting to WebSocket:", wsUrl);
 
       const ws = new WebSocket(wsUrl);
@@ -235,19 +237,25 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      timeoutRef.current = setTimeout(() => {
-        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-          console.log("OAuth timeout - closing WebSocket");
-          ws.close();
-        }
-        websocketRef.current = null;
-        setLocalLoading(false);
-        setLoading(false);
-        setError("Authentication timed out. Please try again.");
-        if (onError) {
-          onError("Authentication timed out");
-        }
-      }, 5 * 60 * 1000); // 5 minutes
+      timeoutRef.current = setTimeout(
+        () => {
+          if (
+            ws.readyState === WebSocket.OPEN ||
+            ws.readyState === WebSocket.CONNECTING
+          ) {
+            console.log("OAuth timeout - closing WebSocket");
+            ws.close();
+          }
+          websocketRef.current = null;
+          setLocalLoading(false);
+          setLoading(false);
+          setError("Authentication timed out. Please try again.");
+          if (onError) {
+            onError("Authentication timed out");
+          }
+        },
+        5 * 60 * 1000,
+      ); // 5 minutes
 
       ws.onopen = () => {
         console.log("WebSocket connected, waiting for OAuth completion");
