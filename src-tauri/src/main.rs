@@ -95,8 +95,12 @@ use commands::hotkey::{
 };
 use commands::model::{
     // download_model, // COMMENTED OUT: Model downloading functionality
-    get_executables_directory, get_installed_models, get_models_directory,
-    is_model_installed, is_whisper_executable_installed, list_available_models,
+    get_executables_directory,
+    get_installed_models,
+    get_models_directory,
+    is_model_installed,
+    is_whisper_executable_installed,
+    list_available_models,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;

@@ -91,7 +91,7 @@ impl SttService {
         if offline_transcription {
             // COMMENTED OUT: Offline transcription using local Whisper model
             return Err("Offline transcription is currently disabled. Please use server-based transcription.".into());
-            
+
             // println!("📦 Using offline transcription (local Whisper model)");
 
             // // Prepare vocabulary option
@@ -147,11 +147,21 @@ impl SttService {
                 .file_name("audio.wav") // Filename hint for the server
                 .mime_str("audio/wav")?; // MIME type indicating WAV audio format
 
-            // Build the multipart form with the audio file
-            let form = multipart::Form::new().part("audio_file", part); // Attach the audio file
+            // Build the multipart form with all parameters
+            let mut form = multipart::Form::new()
+                .part("audio_file", part) // Attach the audio file
+                .text("language", language.clone())
+                .text("enhance_stt_output", enhance_transcription.to_string())
+                .text("focused_app", focused_app.clone());
+
+            // Add vocabulary as multiple form fields (FastAPI expects List[str] = Form(...))
+            // Each vocabulary word is sent as a separate form field with the same name
+            for word in &vocabulary {
+                form = form.text("vocabulary", word.clone());
+            }
 
             // Build the request URL using centralized endpoint
-            let url = stt::transcribe_url(&language, enhance_transcription, &focused_app);
+            let url = stt::transcribe_url();
             let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
 
             // Add authorization header if token is provided

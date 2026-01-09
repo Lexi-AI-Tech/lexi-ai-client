@@ -748,7 +748,8 @@ export const SettingsPage: React.FC = () => {
             padding: "8px 16px",
             fontSize: "11px",
             width: "100%",
-            opacity: isUpdatingHotkeys || !hasHotkeyChanges() || isLoading ? 0.5 : 1,
+            opacity:
+              isUpdatingHotkeys || !hasHotkeyChanges() || isLoading ? 0.5 : 1,
             cursor:
               isUpdatingHotkeys || !hasHotkeyChanges() || isLoading
                 ? "not-allowed"
