@@ -75,6 +75,7 @@ export interface AuthState {
 // ============================================================================
 
 export interface VocabularyItem {
+  id: string; // UUID as string (stored in JSONB)
   value: string;
   is_system_generated: boolean;
   hidden: boolean;
