@@ -8,11 +8,14 @@ import { useState } from "react";
 
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { SettingsPage } from "./components/SettingsPage";
+import { VocabularyPage } from "./components/VocabularyPage";
+import { ActionsPage } from "./components/ActionsPage";
+import { ShortcutsPage } from "./components/ShortcutsPage";
 import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { useOnboardingStore } from "./store/onboardingStore";
 
-type Page = "transcripts" | "settings";
+type Page = "transcripts" | "settings" | "vocabulary" | "actions" | "shortcuts";
 
 function App() {
   // Check if onboarding is completed
@@ -32,6 +35,9 @@ function App() {
         <div className="container">
           {currentPage === "transcripts" && <TranscriptsList />}
           {currentPage === "settings" && <SettingsPage />}
+          {currentPage === "vocabulary" && <VocabularyPage />}
+          {currentPage === "actions" && <ActionsPage />}
+          {currentPage === "shortcuts" && <ShortcutsPage />}
         </div>
       </div>
     </div>

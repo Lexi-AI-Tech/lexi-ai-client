@@ -11,6 +11,7 @@ import {
   AUTH_ENDPOINTS,
   TRANSCRIPT_ENDPOINTS,
   USER_ENDPOINTS,
+  ACTION_ENDPOINTS,
   getApiUrl,
 } from "./apiEndpoints";
 import type {
@@ -20,6 +21,11 @@ import type {
   PaginatedTranscriptsResponse,
   AppConfig,
   AppConfigUpdateRequest,
+  ActionHistory,
+  PaginatedActionHistoryResponse,
+  ActionTrigger,
+  ActionTriggerCreateRequest,
+  ActionTriggerUpdateRequest,
 } from "../types";
 
 /**
@@ -619,4 +625,194 @@ export async function updateAppConfig(
 
   const data: ApiResponse<AppConfig> = await response.json();
   return (data.data || data) as AppConfig;
+}
+
+// ============================================================================
+// Action History Functions
+// ============================================================================
+
+/**
+ * Get paginated action history
+ */
+export async function getActionHistory(
+  page: number = 1,
+  pageSize: number = 20,
+  orderBy: string = "created_at",
+  orderDirection: "asc" | "desc" = "desc",
+): Promise<PaginatedActionHistoryResponse> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: pageSize.toString(),
+    order_by: orderBy,
+    order_direction: orderDirection,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.history(params.toString())),
+    {
+      method: "GET",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to get action history: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<PaginatedActionHistoryResponse> = await response.json();
+  return (data.data || data) as PaginatedActionHistoryResponse;
+}
+
+/**
+ * Delete an action history entry
+ */
+export async function deleteActionHistory(actionId: string): Promise<void> {
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.deleteHistory(actionId)),
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to delete action history: ${response.status}`,
+    );
+  }
+}
+
+// ============================================================================
+// Action Trigger Functions
+// ============================================================================
+
+/**
+ * Get all action triggers for the current user
+ */
+export async function getActionTriggers(
+  includeInactive: boolean = false,
+): Promise<ActionTrigger[]> {
+  const params = new URLSearchParams();
+  if (includeInactive) {
+    params.append("include_inactive", "true");
+  }
+
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.triggers(params.toString())),
+    {
+      method: "GET",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to get action triggers: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<ActionTrigger[]> = await response.json();
+  return (data.data || data) as ActionTrigger[];
+}
+
+/**
+ * Create a new action trigger
+ */
+export async function createActionTrigger(
+  request: ActionTriggerCreateRequest,
+): Promise<ActionTrigger> {
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.createTrigger),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to create action trigger: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<ActionTrigger> = await response.json();
+  return (data.data || data) as ActionTrigger;
+}
+
+/**
+ * Update an action trigger
+ */
+export async function updateActionTrigger(
+  triggerId: string,
+  request: ActionTriggerUpdateRequest,
+): Promise<ActionTrigger> {
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.updateTrigger(triggerId)),
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to update action trigger: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<ActionTrigger> = await response.json();
+  return (data.data || data) as ActionTrigger;
+}
+
+/**
+ * Delete an action trigger
+ */
+export async function deleteActionTrigger(triggerId: string): Promise<void> {
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.deleteTrigger(triggerId)),
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to delete action trigger: ${response.status}`,
+    );
+  }
 }

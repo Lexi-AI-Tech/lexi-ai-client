@@ -64,6 +64,14 @@ export const USER_ENDPOINTS = {
  */
 export const ACTION_ENDPOINTS = {
   perform: `${API_V1_PREFIX}/actions/perform`,
+  history: (params?: string) =>
+    `${API_V1_PREFIX}/actions/history${params ? `?${params}` : ""}`,
+  deleteHistory: (id: string) => `${API_V1_PREFIX}/actions/history/${id}`,
+  triggers: (params?: string) =>
+    `${API_V1_PREFIX}/actions/triggers${params ? `?${params}` : ""}`,
+  createTrigger: `${API_V1_PREFIX}/actions/triggers`,
+  updateTrigger: (id: string) => `${API_V1_PREFIX}/actions/triggers/${id}`,
+  deleteTrigger: (id: string) => `${API_V1_PREFIX}/actions/triggers/${id}`,
 } as const;
 
 /**
