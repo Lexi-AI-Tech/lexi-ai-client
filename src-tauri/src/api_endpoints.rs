@@ -133,12 +133,7 @@ pub mod app_config {
                 GET,
                 p
             ),
-            None => format!(
-                "{}{}{}",
-                config::api_base_url(),
-                super::API_V1_PREFIX,
-                GET
-            ),
+            None => format!("{}{}{}", config::api_base_url(), super::API_V1_PREFIX, GET),
         }
     }
 
