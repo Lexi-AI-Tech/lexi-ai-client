@@ -91,29 +91,30 @@ pub fn is_whisper_executable_installed() -> Result<bool, String> {
     model_manager::whisper_executable_exists()
 }
 
-/// Downloads a model (placeholder for future implementation)
-///
-/// This is a placeholder command. In the future, this will:
-/// - Download the model from the provided URL
-/// - Show progress updates via events
-/// - Verify file integrity
-/// - Handle errors and retries
-///
-/// # Arguments
-/// * `model_id` - Identifier of the model to download
-/// * `download_url` - URL to download the model from
-///
-/// # Returns
-/// * `Result<String, String>` - Path to downloaded model or error message
-#[command]
-pub async fn download_model(model_id: String, download_url: String) -> Result<String, String> {
-    // Placeholder: This will be implemented in the future
-    // For now, return an error with instructions
-    let models_dir = model_manager::get_models_directory()?;
-    Err(format!(
-        "Model download is not yet implemented. Please download '{}' from {} and place it in: {}",
-        model_id,
-        download_url,
-        models_dir.display()
-    ))
-}
+// COMMENTED OUT: Model downloading functionality
+// /// Downloads a model (placeholder for future implementation)
+// ///
+// /// This is a placeholder command. In the future, this will:
+// /// - Download the model from the provided URL
+// /// - Show progress updates via events
+// /// - Verify file integrity
+// /// - Handle errors and retries
+// ///
+// /// # Arguments
+// /// * `model_id` - Identifier of the model to download
+// /// * `download_url` - URL to download the model from
+// ///
+// /// # Returns
+// /// * `Result<String, String>` - Path to downloaded model or error message
+// #[command]
+// pub async fn download_model(model_id: String, download_url: String) -> Result<String, String> {
+//     // Placeholder: This will be implemented in the future
+//     // For now, return an error with instructions
+//     let models_dir = model_manager::get_models_directory()?;
+//     Err(format!(
+//         "Model download is not yet implemented. Please download '{}' from {} and place it in: {}",
+//         model_id,
+//         download_url,
+//         models_dir.display()
+//     ))
+// }

@@ -94,7 +94,8 @@ use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
 use commands::model::{
-    download_model, get_executables_directory, get_installed_models, get_models_directory,
+    // download_model, // COMMENTED OUT: Model downloading functionality
+    get_executables_directory, get_installed_models, get_models_directory,
     is_model_installed, is_whisper_executable_installed, list_available_models,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
@@ -267,7 +268,7 @@ pub fn main() {
             get_models_directory,
             get_executables_directory,
             is_whisper_executable_installed,
-            download_model
+            // download_model // COMMENTED OUT: Model downloading functionality
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
@@ -298,24 +299,25 @@ pub fn main() {
                 show_and_focus_main_window(&app_handle_clone);
             });
 
+            // COMMENTED OUT: Model execution functionality
             // Preload Whisper model in background to reduce first transcription latency
             // Only preload if model and executable are available (optional)
-            std::thread::spawn(move || {
-                // Check if model and executable exist before preloading
-                let model_exists = model_manager::model_exists("ggml-small-q5_1.bin")
-                    .unwrap_or(false);
-                let exe_exists = model_manager::whisper_executable_exists()
-                    .unwrap_or(false);
+            // std::thread::spawn(move || {
+            //     // Check if model and executable exist before preloading
+            //     let model_exists = model_manager::model_exists("ggml-small-q5_1.bin")
+            //         .unwrap_or(false);
+            //     let exe_exists = model_manager::whisper_executable_exists()
+            //         .unwrap_or(false);
 
-                if model_exists && exe_exists {
-                    if let Err(e) = whisper::preload_model() {
-                        eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
-                        eprintln!("💡 First transcription may be slower");
-                    }
-                } else {
-                    println!("ℹ️  Whisper model or executable not found. Offline transcription will not be available until models are downloaded.");
-                }
-            });
+            //     if model_exists && exe_exists {
+            //         if let Err(e) = whisper::preload_model() {
+            //             eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
+            //             eprintln!("💡 First transcription may be slower");
+            //         }
+            //     } else {
+            //         println!("ℹ️  Whisper model or executable not found. Offline transcription will not be available until models are downloaded.");
+            //     }
+            // });
 
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup

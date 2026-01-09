@@ -71,29 +71,30 @@ export const ModelsSection: React.FC = () => {
     return `${mb.toFixed(1)} MB`;
   };
 
-  const handleDownload = async (model: ModelInfo) => {
-    if (!model.download_url) {
-      setError("Download URL not available for this model");
-      return;
-    }
+  // COMMENTED OUT: Model downloading functionality
+  // const handleDownload = async (model: ModelInfo) => {
+  //   if (!model.download_url) {
+  //     setError("Download URL not available for this model");
+  //     return;
+  //   }
 
-    try {
-      // Placeholder: This will be implemented in the future
-      const result = await invoke<string>("download_model", {
-        modelId: model.id,
-        downloadUrl: model.download_url,
-      });
-      alert(`Model download started: ${result}`);
-      // Reload model data after download
-      await loadModelData();
-    } catch (err: any) {
-      // For now, show instructions since download is not implemented
-      const message = err?.message || "Download failed";
-      alert(
-        `${message}\n\nPlease download the model manually from:\n${model.download_url}\n\nAnd place it in:\n${modelsDir}`,
-      );
-    }
-  };
+  //   try {
+  //     // Placeholder: This will be implemented in the future
+  //     const result = await invoke<string>("download_model", {
+  //       modelId: model.id,
+  //       downloadUrl: model.download_url,
+  //     });
+  //     alert(`Model download started: ${result}`);
+  //     // Reload model data after download
+  //     await loadModelData();
+  //   } catch (err: any) {
+  //     // For now, show instructions since download is not implemented
+  //     const message = err?.message || "Download failed";
+  //     alert(
+  //       `${message}\n\nPlease download the model manually from:\n${model.download_url}\n\nAnd place it in:\n${modelsDir}`,
+  //     );
+  //   }
+  // };
 
   if (isLoading) {
     return (
@@ -244,7 +245,11 @@ export const ModelsSection: React.FC = () => {
                 )}
               </div>
               <button
-                onClick={() => handleDownload(model)}
+                // onClick={() => handleDownload(model)}
+                onClick={() => {
+                  // COMMENTED OUT: Model downloading functionality
+                  alert("Model downloading is currently disabled.");
+                }}
                 disabled={isInstalled}
                 style={{
                   padding: "6px 12px",
