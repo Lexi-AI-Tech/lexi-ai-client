@@ -110,8 +110,6 @@ pub mod transcripts {
 
 /// User endpoints
 pub mod user {
-    use super::*;
-
     pub const PROFILE: &str = "/users/me";
     pub const STATS: &str = "/users/me/stats";
 }

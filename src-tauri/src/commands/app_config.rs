@@ -13,7 +13,7 @@ use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
-use crate::api_endpoints::{app_config, user};
+use crate::api_endpoints::app_config;
 use crate::commands::auth::get_auth_token;
 use crate::utils;
 
@@ -137,6 +137,7 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
         enhance_transcription: None,
         launch_on_system_startup: Some(true), // Enable autostart by default on first launch
         vocabulary: None,
+        action_triggers: None,
     };
 
     // Save minimal config to store
@@ -286,6 +287,9 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.vocabulary.is_some() {
         current.vocabulary = provided.vocabulary;
     }
+    if provided.action_triggers.is_some() {
+        current.action_triggers = provided.action_triggers;
+    }
 }
 
 /// Save config to Tauri Store
@@ -367,6 +371,12 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
         body.insert(
             "vocabulary".to_string(),
             serde_json::to_value(vocabulary).unwrap(),
+        );
+    }
+    if let Some(ref action_triggers) = config.action_triggers {
+        body.insert(
+            "action_triggers".to_string(),
+            serde_json::to_value(action_triggers).unwrap(),
         );
     }
 
