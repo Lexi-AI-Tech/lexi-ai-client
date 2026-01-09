@@ -11,6 +11,7 @@ import {
   AUTH_ENDPOINTS,
   TRANSCRIPT_ENDPOINTS,
   USER_ENDPOINTS,
+  APP_CONFIG_ENDPOINTS,
   ACTION_ENDPOINTS,
   getApiUrl,
 } from "./apiEndpoints";
@@ -574,7 +575,7 @@ export async function getAppConfig(
 ): Promise<AppConfig> {
   const params = new URLSearchParams({ system_type: systemType });
   const response = await authenticatedFetch(
-    getApiUrl(USER_ENDPOINTS.config(params.toString())),
+    getApiUrl(APP_CONFIG_ENDPOINTS.get(params.toString())),
     {
       method: "GET",
     },
@@ -602,7 +603,7 @@ export async function updateAppConfig(
   config: AppConfigUpdateRequest,
 ): Promise<AppConfig> {
   const response = await authenticatedFetch(
-    getApiUrl(USER_ENDPOINTS.config()),
+    getApiUrl(APP_CONFIG_ENDPOINTS.update),
     {
       method: "PUT",
       headers: {

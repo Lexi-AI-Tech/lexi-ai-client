@@ -55,8 +55,15 @@ export const TRANSCRIPT_ENDPOINTS = {
 export const USER_ENDPOINTS = {
   profile: `${API_V1_PREFIX}/users/me`,
   stats: `${API_V1_PREFIX}/users/me/stats`,
-  config: (params?: string) =>
-    `${API_V1_PREFIX}/users/me/config${params ? `?${params}` : ""}`,
+} as const;
+
+/**
+ * App Config endpoints
+ */
+export const APP_CONFIG_ENDPOINTS = {
+  get: (params?: string) =>
+    `${API_V1_PREFIX}/app-config${params ? `?${params}` : ""}`,
+  update: `${API_V1_PREFIX}/app-config`,
 } as const;
 
 /**

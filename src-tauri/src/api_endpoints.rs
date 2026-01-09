@@ -114,25 +114,42 @@ pub mod user {
 
     pub const PROFILE: &str = "/users/me";
     pub const STATS: &str = "/users/me/stats";
-    pub const CONFIG: &str = "/users/me/config";
+}
+
+/// App Config endpoints
+pub mod app_config {
+    use super::*;
+
+    pub const GET: &str = "/app-config";
+    pub const UPDATE: &str = "/app-config";
 
     /// Build config endpoint URL with optional query parameters
-    pub fn config_url(params: Option<&str>) -> String {
+    pub fn get_url(params: Option<&str>) -> String {
         match params {
             Some(p) => format!(
                 "{}{}{}?{}",
                 config::api_base_url(),
                 super::API_V1_PREFIX,
-                CONFIG,
+                GET,
                 p
             ),
             None => format!(
                 "{}{}{}",
                 config::api_base_url(),
                 super::API_V1_PREFIX,
-                CONFIG
+                GET
             ),
         }
+    }
+
+    /// Build config update endpoint URL
+    pub fn update_url() -> String {
+        format!(
+            "{}{}{}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            UPDATE
+        )
     }
 }
 
