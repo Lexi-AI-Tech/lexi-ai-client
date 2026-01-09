@@ -255,6 +255,22 @@ export interface ActionTriggerUpdateRequest {
   is_active?: boolean;
 }
 
+export interface Shortcut {
+  id: string;
+  shortcut: string;
+  value: string;
+}
+
+export interface ShortcutCreateRequest {
+  shortcut: string;
+  value: string;
+}
+
+export interface ShortcutUpdateRequest {
+  shortcut?: string;
+  value?: string;
+}
+
 export interface PermissionState {
   granted: boolean;
   checking: boolean;

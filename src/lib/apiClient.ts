@@ -27,6 +27,9 @@ import type {
   ActionTrigger,
   ActionTriggerCreateRequest,
   ActionTriggerUpdateRequest,
+  Shortcut,
+  ShortcutCreateRequest,
+  ShortcutUpdateRequest,
 } from "../types";
 
 /**
@@ -839,6 +842,151 @@ export async function deleteActionTrigger(
       errorData.error ||
         errorData.detail ||
         `Failed to delete action trigger: ${response.status}`,
+    );
+  }
+}
+
+// ============================================================================
+// Shortcuts Functions
+// ============================================================================
+
+/**
+ * Get all shortcuts for the current user from app config
+ */
+export async function getShortcuts(
+  systemType: SystemType = SystemType.MAC,
+): Promise<Shortcut[]> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.shortcuts(params.toString())),
+    {
+      method: "GET",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to get shortcuts: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<Shortcut[]> = await response.json();
+  return (data.data || data) as Shortcut[];
+}
+
+/**
+ * Create a new shortcut in app config
+ */
+export async function createShortcut(
+  request: ShortcutCreateRequest,
+  systemType: SystemType = SystemType.MAC,
+): Promise<Shortcut> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(`${ACTION_ENDPOINTS.createShortcut}?${params.toString()}`),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to create shortcut: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<Shortcut> = await response.json();
+  return (data.data || data) as Shortcut;
+}
+
+/**
+ * Update a shortcut in app config
+ */
+export async function updateShortcut(
+  shortcutId: string,
+  request: ShortcutUpdateRequest,
+  systemType: SystemType = SystemType.MAC,
+): Promise<Shortcut> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(
+      `${ACTION_ENDPOINTS.updateShortcut(shortcutId)}?${params.toString()}`,
+    ),
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to update shortcut: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<Shortcut> = await response.json();
+  return (data.data || data) as Shortcut;
+}
+
+/**
+ * Delete a shortcut from app config
+ */
+export async function deleteShortcut(
+  shortcutId: string,
+  systemType: SystemType = SystemType.MAC,
+): Promise<void> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(
+      `${ACTION_ENDPOINTS.deleteShortcut(shortcutId)}?${params.toString()}`,
+    ),
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to delete shortcut: ${response.status}`,
     );
   }
 }

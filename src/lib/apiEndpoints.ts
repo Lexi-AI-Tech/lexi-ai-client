@@ -79,6 +79,11 @@ export const ACTION_ENDPOINTS = {
   createTrigger: `${API_V1_PREFIX}/actions/triggers`,
   updateTrigger: (id: string) => `${API_V1_PREFIX}/actions/triggers/${id}`,
   deleteTrigger: (id: string) => `${API_V1_PREFIX}/actions/triggers/${id}`,
+  shortcuts: (params?: string) =>
+    `${API_V1_PREFIX}/actions/shortcuts${params ? `?${params}` : ""}`,
+  createShortcut: `${API_V1_PREFIX}/actions/shortcuts`,
+  updateShortcut: (id: string) => `${API_V1_PREFIX}/actions/shortcuts/${id}`,
+  deleteShortcut: (id: string) => `${API_V1_PREFIX}/actions/shortcuts/${id}`,
 } as const;
 
 /**
