@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 
 import type { HotkeyConfig } from "../types";
 
@@ -45,27 +45,46 @@ export function HotkeySelector({
   const [isRecording, setIsRecording] = useState(false);
   const [currentKeys, setCurrentKeys] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLDivElement>(null);
+  const lastPropValueRef = useRef<string>(JSON.stringify(value.hotkeys));
+  const lastNotifiedValueRef = useRef<string>(JSON.stringify(value.hotkeys));
 
-  // Update local state when value prop changes
+  // Memoize the value string for stable comparison
+  const valueString = useMemo(
+    () => JSON.stringify(value.hotkeys),
+    [value.hotkeys],
+  );
+
+  // Update local state when value prop changes (only if actually different)
   useEffect(() => {
-    const newHotkeys = configToHotkeys(value);
-    setHotkeys(newHotkeys);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value.hotkeys.join(",")]);
+    const currentValueString = JSON.stringify(value.hotkeys);
+    if (currentValueString !== lastPropValueRef.current) {
+      const newHotkeys = configToHotkeys(value);
+      setHotkeys(newHotkeys);
+      lastPropValueRef.current = currentValueString;
+      lastNotifiedValueRef.current = currentValueString; // Sync notification ref
+    }
+  }, [valueString, value]);
 
-  // Notify parent when hotkeys change (only if different from prop value)
+  // Notify parent when hotkeys change (only if different from both prop and last notified value)
   useEffect(() => {
     if (onChange) {
       const currentConfig = hotkeysToConfig(hotkeys);
-      const currentValue = currentConfig.hotkeys.join(",");
-      const propValue = value.hotkeys.join(",");
-      // Only call onChange if the local state differs from the prop
-      if (currentValue !== propValue) {
+      const currentValueString = JSON.stringify(currentConfig.hotkeys);
+      const propValueString = JSON.stringify(value.hotkeys);
+      
+      // Only call onChange if:
+      // 1. Current state differs from prop (user made a change)
+      // 2. Current state differs from last notified value (avoid duplicate calls)
+      if (
+        currentValueString !== propValueString &&
+        currentValueString !== lastNotifiedValueRef.current
+      ) {
+        lastNotifiedValueRef.current = currentValueString;
         onChange(currentConfig);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hotkeys, onChange]);
+  }, [hotkeys]);
 
   // Normalize key names for consistent display
   const normalizeKey = (key: string): string => {
