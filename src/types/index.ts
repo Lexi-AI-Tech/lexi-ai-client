@@ -227,8 +227,6 @@ export interface ActionHistory {
   app_name: string | null;
   selected_text: string | null;
   action_type: string;
-  action_result: string | null;
-  metadata: Record<string, any> | null;
   created_at: string;
   updated_at: string;
 }
