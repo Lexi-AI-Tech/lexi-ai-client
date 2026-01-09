@@ -115,7 +115,8 @@ export const VocabularyPage: React.FC = () => {
             fontSize: "14px",
           }}
         >
-          No vocabulary items yet. Vocabulary will appear here as you use the app.
+          No vocabulary items yet. Vocabulary will appear here as you use the
+          app.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -161,4 +162,3 @@ export const VocabularyPage: React.FC = () => {
     </div>
   );
 };
-

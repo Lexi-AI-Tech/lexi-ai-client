@@ -27,6 +27,14 @@ pub struct VocabularyItem {
     pub hidden: bool,
 }
 
+/// Action trigger structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionTrigger {
+    pub id: String,
+    pub trigger_phrase: String,
+    pub is_active: bool,
+}
+
 /// Application configuration structure
 ///
 /// Represents all application settings that are persisted in Tauri Store.
@@ -43,6 +51,8 @@ pub struct AppConfig {
     pub launch_on_system_startup: Option<bool>,
     /// Vocabulary dictionary for transcription (array of vocabulary items)
     pub vocabulary: Option<Vec<VocabularyItem>>,
+    /// Action triggers for voice commands (array of action trigger items)
+    pub action_triggers: Option<Vec<ActionTrigger>>,
 }
 
 // ============================================================================
@@ -62,6 +72,7 @@ struct ServerAppConfigResponse {
     enhance_transcription: bool,
     launch_on_system_startup: bool,
     vocabulary: Vec<VocabularyItem>,
+    action_triggers: Vec<ActionTrigger>,
 }
 
 /// Get the complete app configuration from Tauri Store or server
@@ -302,6 +313,7 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         enhance_transcription: Some(response.enhance_transcription),
         launch_on_system_startup: Some(response.launch_on_system_startup),
         vocabulary: Some(response.vocabulary),
+        action_triggers: Some(response.action_triggers),
     }
 }
 

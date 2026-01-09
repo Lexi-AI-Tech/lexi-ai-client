@@ -665,7 +665,8 @@ export async function getActionHistory(
     );
   }
 
-  const data: ApiResponse<PaginatedActionHistoryResponse> = await response.json();
+  const data: ApiResponse<PaginatedActionHistoryResponse> =
+    await response.json();
   return (data.data || data) as PaginatedActionHistoryResponse;
 }
 
@@ -782,7 +783,9 @@ export async function updateActionTrigger(
   });
 
   const response = await authenticatedFetch(
-    getApiUrl(`${ACTION_ENDPOINTS.updateTrigger(triggerId)}?${params.toString()}`),
+    getApiUrl(
+      `${ACTION_ENDPOINTS.updateTrigger(triggerId)}?${params.toString()}`,
+    ),
     {
       method: "PUT",
       headers: {
@@ -819,7 +822,9 @@ export async function deleteActionTrigger(
   });
 
   const response = await authenticatedFetch(
-    getApiUrl(`${ACTION_ENDPOINTS.deleteTrigger(triggerId)}?${params.toString()}`),
+    getApiUrl(
+      `${ACTION_ENDPOINTS.deleteTrigger(triggerId)}?${params.toString()}`,
+    ),
     {
       method: "DELETE",
     },

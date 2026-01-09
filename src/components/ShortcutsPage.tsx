@@ -360,4 +360,3 @@ export const ShortcutsPage: React.FC = () => {
     </div>
   );
 };
-

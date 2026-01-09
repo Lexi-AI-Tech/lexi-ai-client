@@ -224,7 +224,7 @@ export const ActionsPage: React.FC = () => {
               type="text"
               value={newTriggerPhrase}
               onChange={(e) => setNewTriggerPhrase(e.target.value)}
-              placeholder="e.g., 'Hey Lexi', 'Activate', etc."
+              placeholder="e.g., 'Activate', 'Start', etc."
               style={{
                 width: "100%",
                 padding: "8px 12px",
@@ -375,7 +375,9 @@ export const ActionsPage: React.FC = () => {
           </div>
         ) : (
           <>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            >
               {actionHistory.actions.map((action) => (
                 <div
                   key={action.id}
@@ -515,4 +517,3 @@ export const ActionsPage: React.FC = () => {
     </div>
   );
 };
-

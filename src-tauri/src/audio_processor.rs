@@ -163,41 +163,56 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
                 // Only process if transcription is not empty
                 if !transcription.trim().is_empty() {
-                    // Check if transcription starts with action trigger (e.g., "Hey Lexi")
-                    let action_result =
-                        if let Some(action_command) = check_action_trigger(&transcription) {
-                            // Action trigger detected - perform action and use its result
+                    // Get active action triggers from app config
+                    let active_triggers: Vec<String> = app_config
+                        .action_triggers
+                        .as_ref()
+                        .map(|triggers| {
+                            triggers
+                                .iter()
+                                .filter(|t| t.is_active)
+                                .map(|t| t.trigger_phrase.clone())
+                                .collect()
+                        })
+                        .unwrap_or_default();
+
+                    // Check if transcription starts with any action trigger
+                    let action_result = if let Some((trigger_phrase, action_command)) =
+                        check_action_trigger(&transcription, &active_triggers)
+                    {
+                        // Action trigger detected - perform action and use its result
+                        println!(
+                            "🎯 Action trigger detected: '{}' (matched: '{}') -> performing action: '{}'",
+                            transcription.trim(),
+                            trigger_phrase,
+                            action_command
+                        );
+                        let result = perform_action(
+                            &action_command,
+                            &app_handle_for_task,
+                            cursor_context.as_ref(),
+                        )
+                        .await;
+                        Some(result)
+                    } else {
+                        // No action trigger - check if transcription matches a shortcut command
+                        let text_to_inject =
+                            check_command(&transcription).unwrap_or_else(|| transcription.clone());
+
+                        if text_to_inject != transcription {
                             println!(
-                                "🎯 Action trigger detected: '{}' -> performing action: '{}'",
+                                "🔧 Command detected: '{}' -> '{}'",
                                 transcription.trim(),
-                                action_command
+                                text_to_inject
                             );
-                            let result = perform_action(
-                                &action_command,
-                                &app_handle_for_task,
-                                cursor_context.as_ref(),
-                            )
-                            .await;
-                            Some(result)
-                        } else {
-                            // No action trigger - check if transcription matches a shortcut command
-                            let text_to_inject = check_command(&transcription)
-                                .unwrap_or_else(|| transcription.clone());
+                        }
 
-                            if text_to_inject != transcription {
-                                println!(
-                                    "🔧 Command detected: '{}' -> '{}'",
-                                    transcription.trim(),
-                                    text_to_inject
-                                );
-                            }
-
-                            // For non-action transcriptions, create a text action response
-                            Some(ActionResponse {
-                                action_type: "text".to_string(),
-                                value: text_to_inject,
-                            })
-                        };
+                        // For non-action transcriptions, create a text action response
+                        Some(ActionResponse {
+                            action_type: "text".to_string(),
+                            value: text_to_inject,
+                        })
+                    };
 
                     if let Some(action_response) = action_result {
                         match action_response.action_type.as_str() {

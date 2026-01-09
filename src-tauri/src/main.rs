@@ -46,7 +46,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
 // Module declarations for core functionality
-mod actions; // Voice actions triggered by action trigger phrase (e.g., "Hey Lexi")
+mod actions; // Voice actions triggered by action trigger phrases from app config
 mod api_endpoints; // Centralized API endpoint definitions
 mod audio_processor; // Audio processing and transcription orchestration
 mod audio_recorder; // Audio capture from default microphone using cpal, converts to WAV format
