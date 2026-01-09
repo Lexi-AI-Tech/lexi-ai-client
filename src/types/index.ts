@@ -90,6 +90,7 @@ export interface AppConfig {
   enhance_transcription: boolean;
   launch_on_system_startup: boolean;
   vocabulary?: VocabularyItem[] | null;
+  action_triggers?: ActionTrigger[] | null;
 }
 
 /**
@@ -102,6 +103,7 @@ export interface AppConfigUpdateRequest {
   enhance_transcription?: boolean;
   launch_on_system_startup?: boolean;
   vocabulary?: VocabularyItem[] | null;
+  action_triggers?: ActionTrigger[] | null;
 }
 
 /**
@@ -233,11 +235,8 @@ export interface PaginatedActionHistoryResponse {
 
 export interface ActionTrigger {
   id: string;
-  user_id: string;
   trigger_phrase: string;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface ActionTriggerCreateRequest {

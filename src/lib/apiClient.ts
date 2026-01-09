@@ -697,12 +697,15 @@ export async function deleteActionHistory(actionId: string): Promise<void> {
 // ============================================================================
 
 /**
- * Get all action triggers for the current user
+ * Get all action triggers for the current user from app config
  */
 export async function getActionTriggers(
+  systemType: SystemType = SystemType.MAC,
   includeInactive: boolean = false,
 ): Promise<ActionTrigger[]> {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
   if (includeInactive) {
     params.append("include_inactive", "true");
   }
@@ -730,13 +733,18 @@ export async function getActionTriggers(
 }
 
 /**
- * Create a new action trigger
+ * Create a new action trigger in app config
  */
 export async function createActionTrigger(
   request: ActionTriggerCreateRequest,
+  systemType: SystemType = SystemType.MAC,
 ): Promise<ActionTrigger> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
   const response = await authenticatedFetch(
-    getApiUrl(ACTION_ENDPOINTS.createTrigger),
+    getApiUrl(`${ACTION_ENDPOINTS.createTrigger}?${params.toString()}`),
     {
       method: "POST",
       headers: {
@@ -762,14 +770,19 @@ export async function createActionTrigger(
 }
 
 /**
- * Update an action trigger
+ * Update an action trigger in app config
  */
 export async function updateActionTrigger(
   triggerId: string,
   request: ActionTriggerUpdateRequest,
+  systemType: SystemType = SystemType.MAC,
 ): Promise<ActionTrigger> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
   const response = await authenticatedFetch(
-    getApiUrl(ACTION_ENDPOINTS.updateTrigger(triggerId)),
+    getApiUrl(`${ACTION_ENDPOINTS.updateTrigger(triggerId)}?${params.toString()}`),
     {
       method: "PUT",
       headers: {
@@ -795,11 +808,18 @@ export async function updateActionTrigger(
 }
 
 /**
- * Delete an action trigger
+ * Delete an action trigger from app config
  */
-export async function deleteActionTrigger(triggerId: string): Promise<void> {
+export async function deleteActionTrigger(
+  triggerId: string,
+  systemType: SystemType = SystemType.MAC,
+): Promise<void> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
   const response = await authenticatedFetch(
-    getApiUrl(ACTION_ENDPOINTS.deleteTrigger(triggerId)),
+    getApiUrl(`${ACTION_ENDPOINTS.deleteTrigger(triggerId)}?${params.toString()}`),
     {
       method: "DELETE",
     },

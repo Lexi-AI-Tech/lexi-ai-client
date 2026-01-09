@@ -7,6 +7,7 @@ import {
   updateActionTrigger,
   deleteActionTrigger,
 } from "../lib/apiClient";
+import { SystemType } from "../lib/constants";
 import type {
   ActionHistory,
   PaginatedActionHistoryResponse,
@@ -48,7 +49,7 @@ export const ActionsPage: React.FC = () => {
   const loadTriggers = async () => {
     try {
       setIsLoadingTriggers(true);
-      const data = await getActionTriggers(true);
+      const data = await getActionTriggers(SystemType.MAC, true);
       setTriggers(data);
     } catch (err: any) {
       console.error("Failed to load triggers:", err);
@@ -86,10 +87,13 @@ export const ActionsPage: React.FC = () => {
 
     try {
       setError(null);
-      await createActionTrigger({
-        trigger_phrase: newTriggerPhrase.trim(),
-        is_active: true,
-      });
+      await createActionTrigger(
+        {
+          trigger_phrase: newTriggerPhrase.trim(),
+          is_active: true,
+        },
+        SystemType.MAC,
+      );
       setNewTriggerPhrase("");
       setShowCreateTrigger(false);
       await loadTriggers();
@@ -101,9 +105,13 @@ export const ActionsPage: React.FC = () => {
   const handleUpdateTrigger = async (trigger: ActionTrigger) => {
     try {
       setError(null);
-      await updateActionTrigger(trigger.id, {
-        is_active: !trigger.is_active,
-      });
+      await updateActionTrigger(
+        trigger.id,
+        {
+          is_active: !trigger.is_active,
+        },
+        SystemType.MAC,
+      );
       await loadTriggers();
       setEditingTrigger(null);
     } catch (err: any) {
@@ -118,7 +126,7 @@ export const ActionsPage: React.FC = () => {
 
     try {
       setError(null);
-      await deleteActionTrigger(triggerId);
+      await deleteActionTrigger(triggerId, SystemType.MAC);
       await loadTriggers();
     } catch (err: any) {
       setError(err?.message || "Failed to delete trigger");
