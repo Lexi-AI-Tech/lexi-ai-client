@@ -310,6 +310,28 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
             if (onSuccess) {
               onSuccess(data.user);
             }
+          } else if (data.status === "error") {
+            // Handle authentication error
+            console.error("❌ OAuth error received via WebSocket:", data.error);
+
+            // Clear timeout
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
+
+            const errorMsg = data.error || "Authentication failed";
+            setError(errorMsg);
+            setLoading(false);
+            setLocalLoading(false);
+
+            // Close WebSocket connection
+            ws.close();
+            websocketRef.current = null;
+
+            if (onError) {
+              onError(errorMsg);
+            }
           } else {
             console.warn("Unexpected WebSocket message:", data);
           }
