@@ -11,6 +11,9 @@ import {
   AUTH_ENDPOINTS,
   TRANSCRIPT_ENDPOINTS,
   USER_ENDPOINTS,
+  APP_CONFIG_ENDPOINTS,
+  ACTION_ENDPOINTS,
+  SHORTCUTS_ENDPOINTS,
   getApiUrl,
 } from "./apiEndpoints";
 import type {
@@ -20,6 +23,14 @@ import type {
   PaginatedTranscriptsResponse,
   AppConfig,
   AppConfigUpdateRequest,
+  ActionHistory,
+  PaginatedActionHistoryResponse,
+  ActionTrigger,
+  ActionTriggerCreateRequest,
+  ActionTriggerUpdateRequest,
+  Shortcut,
+  ShortcutCreateRequest,
+  ShortcutUpdateRequest,
 } from "../types";
 
 /**
@@ -568,7 +579,7 @@ export async function getAppConfig(
 ): Promise<AppConfig> {
   const params = new URLSearchParams({ system_type: systemType });
   const response = await authenticatedFetch(
-    getApiUrl(USER_ENDPOINTS.config(params.toString())),
+    getApiUrl(APP_CONFIG_ENDPOINTS.get(params.toString())),
     {
       method: "GET",
     },
@@ -596,7 +607,7 @@ export async function updateAppConfig(
   config: AppConfigUpdateRequest,
 ): Promise<AppConfig> {
   const response = await authenticatedFetch(
-    getApiUrl(USER_ENDPOINTS.config()),
+    getApiUrl(APP_CONFIG_ENDPOINTS.update),
     {
       method: "PUT",
       headers: {
@@ -619,4 +630,360 @@ export async function updateAppConfig(
 
   const data: ApiResponse<AppConfig> = await response.json();
   return (data.data || data) as AppConfig;
+}
+
+// ============================================================================
+// Action History Functions
+// ============================================================================
+
+/**
+ * Get paginated action history
+ */
+export async function getActionHistory(
+  page: number = 1,
+  pageSize: number = 20,
+  orderBy: string = "created_at",
+  orderDirection: "asc" | "desc" = "desc",
+): Promise<PaginatedActionHistoryResponse> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: pageSize.toString(),
+    order_by: orderBy,
+    order_direction: orderDirection,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.history(params.toString())),
+    {
+      method: "GET",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to get action history: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<PaginatedActionHistoryResponse> =
+    await response.json();
+  return (data.data || data) as PaginatedActionHistoryResponse;
+}
+
+/**
+ * Delete an action history entry
+ */
+export async function deleteActionHistory(actionId: string): Promise<void> {
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.deleteHistory(actionId)),
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to delete action history: ${response.status}`,
+    );
+  }
+}
+
+// ============================================================================
+// Action Trigger Functions
+// ============================================================================
+
+/**
+ * Get all action triggers for the current user from app config
+ */
+export async function getActionTriggers(
+  systemType: SystemType = SystemType.MAC,
+  includeInactive: boolean = false,
+): Promise<ActionTrigger[]> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+  if (includeInactive) {
+    params.append("include_inactive", "true");
+  }
+
+  const response = await authenticatedFetch(
+    getApiUrl(ACTION_ENDPOINTS.triggers(params.toString())),
+    {
+      method: "GET",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to get action triggers: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<ActionTrigger[]> = await response.json();
+  return (data.data || data) as ActionTrigger[];
+}
+
+/**
+ * Create a new action trigger in app config
+ */
+export async function createActionTrigger(
+  request: ActionTriggerCreateRequest,
+  systemType: SystemType = SystemType.MAC,
+): Promise<ActionTrigger> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(`${ACTION_ENDPOINTS.createTrigger}?${params.toString()}`),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to create action trigger: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<ActionTrigger> = await response.json();
+  return (data.data || data) as ActionTrigger;
+}
+
+/**
+ * Update an action trigger in app config
+ */
+export async function updateActionTrigger(
+  triggerId: string,
+  request: ActionTriggerUpdateRequest,
+  systemType: SystemType = SystemType.MAC,
+): Promise<ActionTrigger> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(
+      `${ACTION_ENDPOINTS.updateTrigger(triggerId)}?${params.toString()}`,
+    ),
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to update action trigger: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<ActionTrigger> = await response.json();
+  return (data.data || data) as ActionTrigger;
+}
+
+/**
+ * Delete an action trigger from app config
+ */
+export async function deleteActionTrigger(
+  triggerId: string,
+  systemType: SystemType = SystemType.MAC,
+): Promise<void> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(
+      `${ACTION_ENDPOINTS.deleteTrigger(triggerId)}?${params.toString()}`,
+    ),
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to delete action trigger: ${response.status}`,
+    );
+  }
+}
+
+// ============================================================================
+// Shortcuts Functions
+// ============================================================================
+
+/**
+ * Get all shortcuts for the current user from app config
+ */
+export async function getShortcuts(
+  systemType: SystemType = SystemType.MAC,
+): Promise<Shortcut[]> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(SHORTCUTS_ENDPOINTS.list(params.toString())),
+    {
+      method: "GET",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to get shortcuts: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<Shortcut[]> = await response.json();
+  return (data.data || data) as Shortcut[];
+}
+
+/**
+ * Create a new shortcut in app config
+ */
+export async function createShortcut(
+  request: ShortcutCreateRequest,
+  systemType: SystemType = SystemType.MAC,
+): Promise<Shortcut> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(`${SHORTCUTS_ENDPOINTS.create}?${params.toString()}`),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to create shortcut: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<Shortcut> = await response.json();
+  return (data.data || data) as Shortcut;
+}
+
+/**
+ * Update a shortcut in app config
+ */
+export async function updateShortcut(
+  shortcutId: string,
+  request: ShortcutUpdateRequest,
+  systemType: SystemType = SystemType.MAC,
+): Promise<Shortcut> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(`${SHORTCUTS_ENDPOINTS.update(shortcutId)}?${params.toString()}`),
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to update shortcut: ${response.status}`,
+    );
+  }
+
+  const data: ApiResponse<Shortcut> = await response.json();
+  return (data.data || data) as Shortcut;
+}
+
+/**
+ * Delete a shortcut from app config
+ */
+export async function deleteShortcut(
+  shortcutId: string,
+  systemType: SystemType = SystemType.MAC,
+): Promise<void> {
+  const params = new URLSearchParams({
+    system_type: systemType,
+  });
+
+  const response = await authenticatedFetch(
+    getApiUrl(`${SHORTCUTS_ENDPOINTS.delete(shortcutId)}?${params.toString()}`),
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new Error(
+      errorData.error ||
+        errorData.detail ||
+        `Failed to delete shortcut: ${response.status}`,
+    );
+  }
 }

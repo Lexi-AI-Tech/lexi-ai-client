@@ -23,7 +23,7 @@
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
 use crate::api_endpoints::stt;
-use crate::whisper;
+// use crate::whisper; // COMMENTED OUT: Model execution functionality
 use reqwest::multipart;
 use std::error::Error;
 use tauri::{AppHandle, Emitter};
@@ -86,54 +86,58 @@ impl SttService {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
 
+        // COMMENTED OUT: Model execution functionality
         // Check if offline transcription is enabled
         if offline_transcription {
-            println!("📦 Using offline transcription (local Whisper model)");
+            // COMMENTED OUT: Offline transcription using local Whisper model
+            return Err("Offline transcription is currently disabled. Please use server-based transcription.".into());
 
-            // Prepare vocabulary option
-            let vocabulary_option = if !vocabulary.is_empty() {
-                Some(vocabulary.clone())
-            } else {
-                None
-            };
+            // println!("📦 Using offline transcription (local Whisper model)");
 
-            // Run the synchronous whisper function in a blocking task
-            let audio_data_clone = audio_data.clone();
-            let language_clone = language.clone();
-            let vocabulary_clone = vocabulary_option;
+            // // Prepare vocabulary option
+            // let vocabulary_option = if !vocabulary.is_empty() {
+            //     Some(vocabulary.clone())
+            // } else {
+            //     None
+            // };
 
-            // Check for cancellation before starting
-            if let Some(cancel_rx) = cancel_rx {
-                // Use tokio::select to race between transcription and cancellation
-                tokio::select! {
-                    result = tokio::task::spawn_blocking(move || {
-                        whisper::transcribe_audio_data(audio_data_clone, language_clone, vocabulary_clone)
-                    }) => {
-                        match result {
-                            Ok(Ok(text)) => Ok(text),
-                            Ok(Err(e)) => Err(e.into()),
-                            Err(e) => Err(format!("Transcription task failed: {}", e).into()),
-                        }
-                    }
-                    _ = cancel_rx => {
-                        println!("🛑 Offline transcription cancelled");
-                        Err("Request cancelled".into())
-                    }
-                }
-            } else {
-                // No cancellation support, just run the blocking task
-                let vocabulary_for_blocking = if !vocabulary.is_empty() {
-                    Some(vocabulary)
-                } else {
-                    None
-                };
-                tokio::task::spawn_blocking(move || {
-                    whisper::transcribe_audio_data(audio_data, language, vocabulary_for_blocking)
-                })
-                .await
-                .map_err(|e| format!("Transcription task failed: {}", e))?
-                .map_err(|e| e.into())
-            }
+            // // Run the synchronous whisper function in a blocking task
+            // let audio_data_clone = audio_data.clone();
+            // let language_clone = language.clone();
+            // let vocabulary_clone = vocabulary_option;
+
+            // // Check for cancellation before starting
+            // if let Some(cancel_rx) = cancel_rx {
+            //     // Use tokio::select to race between transcription and cancellation
+            //     tokio::select! {
+            //         result = tokio::task::spawn_blocking(move || {
+            //             whisper::transcribe_audio_data(audio_data_clone, language_clone, vocabulary_clone)
+            //         }) => {
+            //             match result {
+            //                 Ok(Ok(text)) => Ok(text),
+            //                 Ok(Err(e)) => Err(e.into()),
+            //                 Err(e) => Err(format!("Transcription task failed: {}", e).into()),
+            //             }
+            //         }
+            //         _ = cancel_rx => {
+            //             println!("🛑 Offline transcription cancelled");
+            //             Err("Request cancelled".into())
+            //         }
+            //     }
+            // } else {
+            //     // No cancellation support, just run the blocking task
+            //     let vocabulary_for_blocking = if !vocabulary.is_empty() {
+            //         Some(vocabulary)
+            //     } else {
+            //         None
+            //     };
+            //     tokio::task::spawn_blocking(move || {
+            //         whisper::transcribe_audio_data(audio_data, language, vocabulary_for_blocking)
+            //     })
+            //     .await
+            //     .map_err(|e| format!("Transcription task failed: {}", e))?
+            //     .map_err(|e| e.into())
+            // }
         } else {
             // Continue with server API transcription
 
@@ -143,11 +147,21 @@ impl SttService {
                 .file_name("audio.wav") // Filename hint for the server
                 .mime_str("audio/wav")?; // MIME type indicating WAV audio format
 
-            // Build the multipart form with the audio file
-            let form = multipart::Form::new().part("audio_file", part); // Attach the audio file
+            // Build the multipart form with all parameters
+            let mut form = multipart::Form::new()
+                .part("audio_file", part) // Attach the audio file
+                .text("language", language.clone())
+                .text("enhance_stt_output", enhance_transcription.to_string())
+                .text("focused_app", focused_app.clone());
+
+            // Add vocabulary as multiple form fields (FastAPI expects List[str] = Form(...))
+            // Each vocabulary word is sent as a separate form field with the same name
+            for word in &vocabulary {
+                form = form.text("vocabulary", word.clone());
+            }
 
             // Build the request URL using centralized endpoint
-            let url = stt::transcribe_url(&language, enhance_transcription, &focused_app);
+            let url = stt::transcribe_url();
             let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
 
             // Add authorization header if token is provided

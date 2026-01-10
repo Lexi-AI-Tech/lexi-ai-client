@@ -30,7 +30,6 @@ Speech-to-text overlay app for macOS built with Tauri and React.
    The setup script automatically checks and configures all dependencies when you run `npm run dev` or `npm run build`.
    It will:
    - ✅ Check for Whisper binary and provide instructions if missing
-   - ✅ Download the Whisper model if missing (~181 MB)
 
    To run setup manually:
 
@@ -50,7 +49,6 @@ npm run dev
 This will automatically:
 
 - ✅ Check and setup Whisper binary (warns if missing)
-- ✅ Download Whisper model if missing (via `predev` script)
 - ✅ Start the frontend dev server
 - ✅ Launch the Tauri app
 
@@ -63,7 +61,6 @@ npm run build
 This will automatically:
 
 - ✅ Check and setup Whisper binary (warns if missing)
-- ✅ Download Whisper model if missing (via `prebuild` script)
 - ✅ Build the frontend
 - ✅ Build the Tauri app with bundled resources
 
@@ -71,7 +68,7 @@ This will automatically:
 
 The Whisper model file (`ggml-small-q5_1.bin`, ~180MB) is not stored in Git due to size limitations.
 
-**For development**: Complete setup (model + binary check) runs automatically via `scripts/setup.sh` when running `npm run dev` or `npm run build`
+**For development**: Models should be placed in the user data directory manually.
 
 **For production**: The model is bundled with the app via `tauri.conf.json` resources
 
@@ -88,8 +85,7 @@ lexi-ai-client/
 │   ├── bin/               # Whisper binary
 │   └── tauri.conf.json    # Tauri configuration
 └── scripts/               # Build scripts
-    ├── setup.sh          # Complete setup script (model + binary check)
-    └── download-model.sh  # Model download script
+    └── setup.sh          # Setup script (binary check)
 ```
 
 ## Troubleshooting

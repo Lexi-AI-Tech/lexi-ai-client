@@ -9,7 +9,6 @@
 //! - **Element Identification**: Uses Accessibility API to identify the UI element at cursor position
 //! - **Application Identification**: Traverses up the accessibility tree to find the application at cursor position
 //! - **Text Extraction**: Extracts selected text using clipboard copy method (Cmd+C/Ctrl+C)
-//! - **Screen Capture**: Captures the entire screen and returns it as a base64-encoded PNG string
 //!
 //! ## Implementation Details
 //!
@@ -18,16 +17,12 @@
 //! - Traverses accessibility hierarchy to find the application PID
 //! - Extracts selected text by simulating copy command via `keyboard_simulator` module
 //!   (Cmd+C on macOS, Ctrl+C on Windows/Linux) and reading from clipboard
-//! - Uses **Core Graphics** (`CGWindowListCreateImage()`) to capture screen
-//! - Encodes screenshots as base64-encoded PNG strings
 //!
 //! ## Permissions Required
 //!
 //! - **Accessibility** (macOS): Required for accessing application UI elements
 //!   - Users must grant this in System Preferences → Security & Privacy → Privacy → Accessibility
 //!   - The app will need to prompt for this permission
-//! - **Screen Recording** (macOS): Required for capturing screen content
-//!   - Users must grant this in System Preferences → Security & Privacy → Privacy → Screen Recording
 //!
 //! ## Platform Support
 //!
@@ -429,8 +424,11 @@ unsafe fn cf_string_to_string(cf_string: *const c_void) -> String {
 /// 3. Encodes the PNG data as base64 and logs it
 ///
 /// Returns the base64-encoded PNG string if successful, or None if capture fails.
-/// Requires Screen Recording permission on macOS.
+///
+/// NOTE: This function is currently disabled. Screen capturing feature has been removed.
+/// The function is kept for potential future use but is not called anywhere in the codebase.
 #[cfg(target_os = "macos")]
+#[allow(dead_code)]
 pub fn capture_current_screen() -> Option<String> {
     unsafe {
         objc::rc::autoreleasepool(|| {
@@ -530,9 +528,9 @@ pub fn capture_current_screen() -> Option<String> {
             // Encode to base64
             let base64_string = STANDARD.encode(png_slice);
 
-            // Log the base64 string
+            // Log the base64 string (function is disabled but kept for potential future use)
             println!(
-                "✅ Screen captured - Base64 encoded PNG (length: {}):",
+                "✅ Screen captured - Base64 encoded PNG (length: {}) [DISABLED]",
                 base64_string.len()
             );
 
@@ -549,6 +547,7 @@ pub fn get_cursor_context() -> Option<CursorContext> {
 
 /// Stub implementation for non-macOS platforms
 #[cfg(not(target_os = "macos"))]
+#[allow(dead_code)]
 pub fn capture_current_screen() -> Option<String> {
     None
 }

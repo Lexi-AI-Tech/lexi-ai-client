@@ -75,6 +75,7 @@ export interface AuthState {
 // ============================================================================
 
 export interface VocabularyItem {
+  id: string; // UUID as string (stored in JSONB)
   value: string;
   is_system_generated: boolean;
   hidden: boolean;
@@ -90,6 +91,7 @@ export interface AppConfig {
   enhance_transcription: boolean;
   launch_on_system_startup: boolean;
   vocabulary?: VocabularyItem[] | null;
+  action_triggers?: ActionTrigger[] | null;
 }
 
 /**
@@ -102,6 +104,7 @@ export interface AppConfigUpdateRequest {
   enhance_transcription?: boolean;
   launch_on_system_startup?: boolean;
   vocabulary?: VocabularyItem[] | null;
+  action_triggers?: ActionTrigger[] | null;
 }
 
 /**
@@ -202,8 +205,70 @@ export interface GoogleLoginButtonProps {
 }
 
 export interface SidebarProps {
-  currentPage: "transcripts" | "settings";
-  onNavigate: (page: "transcripts" | "settings") => void;
+  currentPage:
+    | "transcripts"
+    | "settings"
+    | "vocabulary"
+    | "actions"
+    | "shortcuts";
+  onNavigate: (
+    page: "transcripts" | "settings" | "vocabulary" | "actions" | "shortcuts",
+  ) => void;
+}
+
+// ============================================================================
+// Action Types
+// ============================================================================
+
+export interface ActionHistory {
+  id: string;
+  user_id: string;
+  action_command: string;
+  app_name: string | null;
+  selected_text: string | null;
+  action_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedActionHistoryResponse {
+  actions: ActionHistory[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface ActionTrigger {
+  id: string;
+  trigger_phrase: string;
+  is_active: boolean;
+}
+
+export interface ActionTriggerCreateRequest {
+  trigger_phrase: string;
+  is_active?: boolean;
+}
+
+export interface ActionTriggerUpdateRequest {
+  trigger_phrase?: string;
+  is_active?: boolean;
+}
+
+export interface Shortcut {
+  id: string;
+  shortcut: string;
+  value: string;
+}
+
+export interface ShortcutCreateRequest {
+  shortcut: string;
+  value: string;
+}
+
+export interface ShortcutUpdateRequest {
+  shortcut?: string;
+  value?: string;
 }
 
 export interface PermissionState {

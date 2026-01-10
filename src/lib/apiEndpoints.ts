@@ -55,8 +55,15 @@ export const TRANSCRIPT_ENDPOINTS = {
 export const USER_ENDPOINTS = {
   profile: `${API_V1_PREFIX}/users/me`,
   stats: `${API_V1_PREFIX}/users/me/stats`,
-  config: (params?: string) =>
-    `${API_V1_PREFIX}/users/me/config${params ? `?${params}` : ""}`,
+} as const;
+
+/**
+ * App Config endpoints
+ */
+export const APP_CONFIG_ENDPOINTS = {
+  get: (params?: string) =>
+    `${API_V1_PREFIX}/app-config${params ? `?${params}` : ""}`,
+  update: `${API_V1_PREFIX}/app-config`,
 } as const;
 
 /**
@@ -64,6 +71,25 @@ export const USER_ENDPOINTS = {
  */
 export const ACTION_ENDPOINTS = {
   perform: `${API_V1_PREFIX}/actions/perform`,
+  history: (params?: string) =>
+    `${API_V1_PREFIX}/actions/history${params ? `?${params}` : ""}`,
+  deleteHistory: (id: string) => `${API_V1_PREFIX}/actions/history/${id}`,
+  triggers: (params?: string) =>
+    `${API_V1_PREFIX}/actions/triggers${params ? `?${params}` : ""}`,
+  createTrigger: `${API_V1_PREFIX}/actions/triggers`,
+  updateTrigger: (id: string) => `${API_V1_PREFIX}/actions/triggers/${id}`,
+  deleteTrigger: (id: string) => `${API_V1_PREFIX}/actions/triggers/${id}`,
+} as const;
+
+/**
+ * Shortcuts endpoints
+ */
+export const SHORTCUTS_ENDPOINTS = {
+  list: (params?: string) =>
+    `${API_V1_PREFIX}/shortcuts${params ? `?${params}` : ""}`,
+  create: `${API_V1_PREFIX}/shortcuts`,
+  update: (id: string) => `${API_V1_PREFIX}/shortcuts/${id}`,
+  delete: (id: string) => `${API_V1_PREFIX}/shortcuts/${id}`,
 } as const;
 
 /**

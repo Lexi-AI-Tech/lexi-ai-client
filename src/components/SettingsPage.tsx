@@ -7,11 +7,11 @@ import {
   getAllLanguageCodes,
   getLanguageName,
 } from "../lib/constants";
-import type { HotkeyConfig, TauriAppConfig } from "../types";
+import type { TauriAppConfig, HotkeyConfig } from "../types";
 
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
-import { HotkeySelector } from "./HotkeySelector";
 import { ModelsSection } from "./ModelsSection";
+import { HotkeySelector } from "./HotkeySelector";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -33,18 +33,24 @@ export const SettingsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Hotkey state
   const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
     hotkeys: [],
   });
   const [selectedHotkeys, setSelectedHotkeys] = useState<HotkeyConfig>({
     hotkeys: [],
   });
+  const [isUpdatingHotkeys, setIsUpdatingHotkeys] = useState(false);
+  const [hotkeyError, setHotkeyError] = useState<string | null>(null);
+  const [hotkeySuccess, setHotkeySuccess] = useState(false);
 
   // Derived values from config - no defaults, rely entirely on backend
   const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
   const autostartEnabled = config?.launch_on_system_startup;
   const enhanceTranscription = config?.enhance_transcription;
   const vocabulary = config?.vocabulary;
+  const configHotkeys = config?.hotkeys || [];
 
   // Load app config on mount
   useEffect(() => {
@@ -53,19 +59,6 @@ export const SettingsPage: React.FC = () => {
       setError(null);
 
       try {
-        // Load hotkeys from Tauri Store
-        try {
-          const hotkeyJson = await invoke<string>("get_current_hotkey");
-          const hotkey: HotkeyConfig = JSON.parse(hotkeyJson);
-          if (hotkey.hotkeys.length > 3) {
-            hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
-          }
-          setCurrentHotkeys(hotkey);
-          setSelectedHotkeys(hotkey);
-        } catch (hotkeyErr) {
-          console.warn("Failed to load hotkeys:", hotkeyErr);
-        }
-
         const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
         setConfig(loadedConfig);
 
@@ -94,6 +87,35 @@ export const SettingsPage: React.FC = () => {
     loadConfig();
   }, []);
 
+  // Load hotkeys on mount
+  useEffect(() => {
+    const loadHotkeys = async () => {
+      try {
+        const hotkeyJson = await invoke<string>("get_current_hotkey");
+        const hotkey: HotkeyConfig = JSON.parse(hotkeyJson);
+        if (hotkey.hotkeys.length > 3) {
+          hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
+        }
+        setCurrentHotkeys(hotkey);
+        setSelectedHotkeys(hotkey);
+      } catch (hotkeyErr) {
+        console.warn("Failed to load hotkeys:", hotkeyErr);
+        // If hotkeys are in config, use those
+        if (configHotkeys.length > 0) {
+          const hotkey: HotkeyConfig = {
+            hotkeys: configHotkeys.slice(0, 3),
+          };
+          setCurrentHotkeys(hotkey);
+          setSelectedHotkeys(hotkey);
+        }
+      }
+    };
+
+    if (config) {
+      loadHotkeys();
+    }
+  }, [config, configHotkeys]);
+
   // Listen for hotkey updates from backend
   useEffect(() => {
     const setupListener = async () => {
@@ -105,12 +127,12 @@ export const SettingsPage: React.FC = () => {
           }
           setCurrentHotkeys(hotkey);
           setSelectedHotkeys(hotkey);
-          setSuccess(true);
-          setIsUpdating(false);
-          setError(null);
+          setHotkeySuccess(true);
+          setIsUpdatingHotkeys(false);
+          setHotkeyError(null);
 
           // Clear success message after 2 seconds
-          setTimeout(() => setSuccess(false), 2000);
+          setTimeout(() => setHotkeySuccess(false), 2000);
         } catch (err) {
           console.error("Failed to parse hotkey update:", err);
         }
@@ -149,9 +171,6 @@ export const SettingsPage: React.FC = () => {
 
   const handleSaveSettings = async () => {
     // Check if anything changed using the same logic as hasChanges
-    const hotkeysChanged =
-      JSON.stringify(selectedHotkeys.hotkeys) !==
-      JSON.stringify(currentHotkeys.hotkeys);
     const languageChanged =
       selectedLanguage !== null &&
       selectedLanguage !== undefined &&
@@ -169,12 +188,7 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
 
-    if (
-      !hotkeysChanged &&
-      !languageChanged &&
-      !autostartChanged &&
-      !enhanceChanged
-    ) {
+    if (!languageChanged && !autostartChanged && !enhanceChanged) {
       return; // No changes needed
     }
 
@@ -183,27 +197,6 @@ export const SettingsPage: React.FC = () => {
     setSuccess(false);
 
     try {
-      // Validate hotkeys if changed
-      if (hotkeysChanged) {
-        if (selectedHotkeys.hotkeys.length > 3) {
-          setError("Maximum of 3 hotkeys allowed");
-          setIsUpdating(false);
-          return;
-        }
-        if (selectedHotkeys.hotkeys.length === 0) {
-          setError("At least one hotkey is required");
-          setIsUpdating(false);
-          return;
-        }
-      }
-
-      // Update Rust backend if hotkeys changed
-      if (hotkeysChanged) {
-        const configJson = JSON.stringify(selectedHotkeys);
-        await invoke("update_hotkey", { configJson });
-        setCurrentHotkeys(selectedHotkeys);
-      }
-
       const updates: Partial<TauriAppConfig> = {};
 
       if (languageChanged && selectedLanguage !== null) {
@@ -245,11 +238,6 @@ export const SettingsPage: React.FC = () => {
   };
 
   const hasChanges = () => {
-    // Compare hotkeys
-    const hotkeysChanged =
-      JSON.stringify(selectedHotkeys.hotkeys) !==
-      JSON.stringify(currentHotkeys.hotkeys);
-
     // Compare language
     const languageChanged =
       selectedLanguage !== null &&
@@ -272,10 +260,7 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
 
-    // Compare cursor context
-    return (
-      hotkeysChanged || languageChanged || autostartChanged || enhanceChanged
-    );
+    return languageChanged || autostartChanged || enhanceChanged;
   };
 
   const handleToggleAutostart = () => {
@@ -287,6 +272,54 @@ export const SettingsPage: React.FC = () => {
     const currentValue =
       selectedEnhanceTranscription ?? enhanceTranscription ?? false;
     setSelectedEnhanceTranscription(!currentValue);
+  };
+
+  const handleSaveHotkeys = async () => {
+    const hotkeysChanged =
+      JSON.stringify(selectedHotkeys.hotkeys) !==
+      JSON.stringify(currentHotkeys.hotkeys);
+
+    if (!hotkeysChanged) {
+      return; // No changes needed
+    }
+
+    setIsUpdatingHotkeys(true);
+    setHotkeyError(null);
+    setHotkeySuccess(false);
+
+    try {
+      // Validate hotkeys
+      if (selectedHotkeys.hotkeys.length > 3) {
+        setHotkeyError("Maximum of 3 hotkeys allowed");
+        setIsUpdatingHotkeys(false);
+        return;
+      }
+      if (selectedHotkeys.hotkeys.length === 0) {
+        setHotkeyError("At least one hotkey is required");
+        setIsUpdatingHotkeys(false);
+        return;
+      }
+
+      // Update Rust backend
+      const configJson = JSON.stringify(selectedHotkeys);
+      await invoke("update_hotkey", { configJson });
+      setCurrentHotkeys(selectedHotkeys);
+
+      setHotkeySuccess(true);
+      setTimeout(() => setHotkeySuccess(false), 2000);
+    } catch (err: any) {
+      console.error("Failed to update hotkeys:", err);
+      setHotkeyError(err?.message || "Failed to update hotkeys");
+    } finally {
+      setIsUpdatingHotkeys(false);
+    }
+  };
+
+  const hasHotkeyChanges = () => {
+    return (
+      JSON.stringify(selectedHotkeys.hotkeys) !==
+      JSON.stringify(currentHotkeys.hotkeys)
+    );
   };
 
   const handleHotkeySelectorChange = (config: HotkeyConfig) => {
@@ -425,118 +458,6 @@ export const SettingsPage: React.FC = () => {
           Account
         </h3>
         <GoogleLoginButton />
-      </div>
-
-      <div>
-        <h3
-          style={{
-            margin: 0,
-            marginBottom: "16px",
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#ffffff",
-          }}
-        >
-          Hotkeys
-        </h3>
-
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-            marginBottom: "32px",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: "11px",
-                color: "rgba(255, 255, 255, 0.6)",
-                marginBottom: "8px",
-              }}
-            >
-              Current Hotkeys ({currentHotkeys.hotkeys.length}/3)
-            </div>
-            {currentHotkeys.hotkeys.length > 0 ? (
-              <div
-                style={{
-                  padding: "12px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "6px",
-                  marginBottom: "8px",
-                }}
-              >
-                {currentHotkeys.hotkeys.map((hotkey, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      fontSize: "11px",
-                      fontFamily:
-                        'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
-                      color: "rgba(255, 255, 255, 0.9)",
-                      padding: "4px 0",
-                    }}
-                  >
-                    {hotkey}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.4)",
-                  padding: "12px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "6px",
-                  marginBottom: "8px",
-                }}
-              >
-                No hotkeys configured
-              </div>
-            )}
-            <div
-              style={{
-                fontSize: "10px",
-                color: "rgba(255, 255, 255, 0.5)",
-                marginTop: "6px",
-              }}
-            >
-              Press any of these combinations to start/stop recording
-            </div>
-          </div>
-
-          <div>
-            <div
-              style={{
-                fontSize: "11px",
-                color: "rgba(255, 255, 255, 0.6)",
-                marginBottom: "8px",
-              }}
-            >
-              Configure Hotkeys
-            </div>
-            <HotkeySelector
-              value={selectedHotkeys}
-              onChange={handleHotkeySelectorChange}
-              maxHotkeys={3}
-              disabled={isUpdating}
-            />
-            <div
-              style={{
-                fontSize: "10px",
-                color: "rgba(255, 255, 255, 0.5)",
-                marginTop: "6px",
-              }}
-            >
-              Note: Fn key is handled separately and works on Mac. Other hotkeys
-              use Tauri global shortcuts.
-            </div>
-          </div>
-        </div>
       </div>
 
       <div>
@@ -702,63 +623,177 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {vocabulary && vocabulary.length > 0 && (
-        <div style={{ marginTop: "32px" }}>
-          <h3
-            style={{
-              margin: 0,
-              marginBottom: "16px",
-              fontSize: "18px",
-              fontWeight: 500,
-              color: "#ffffff",
-            }}
-          >
-            Vocabulary
-          </h3>
+      <div style={{ marginTop: "32px" }}>
+        <h3
+          style={{
+            margin: 0,
+            marginBottom: "16px",
+            fontSize: "18px",
+            fontWeight: 500,
+            color: "#ffffff",
+          }}
+        >
+          Hotkeys
+        </h3>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {vocabulary
-              .filter((item) => !item.hidden)
-              .map((item, index) => (
-                <div
-                  key={index}
-                  style={{
-                    padding: "12px",
-                    backgroundColor: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    borderRadius: "6px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "13px",
-                        color: "#ffffff",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {item.value}
-                    </div>
-                    {item.is_system_generated && (
-                      <div
-                        style={{
-                          fontSize: "10px",
-                          color: "rgba(255, 255, 255, 0.5)",
-                          marginTop: "4px",
-                        }}
-                      >
-                        System generated
-                      </div>
-                    )}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            marginBottom: "16px",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "rgba(255, 255, 255, 0.6)",
+                marginBottom: "8px",
+              }}
+            >
+              Current Hotkeys ({currentHotkeys.hotkeys.length}/3)
+            </div>
+            {currentHotkeys.hotkeys.length > 0 ? (
+              <div
+                style={{
+                  padding: "12px",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "6px",
+                  marginBottom: "8px",
+                }}
+              >
+                {currentHotkeys.hotkeys.map((hotkey, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      fontSize: "11px",
+                      fontFamily:
+                        'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                      color: "rgba(255, 255, 255, 0.9)",
+                      padding: "4px 0",
+                    }}
+                  >
+                    {hotkey}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            ) : (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "rgba(255, 255, 255, 0.4)",
+                  padding: "12px",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "6px",
+                  marginBottom: "8px",
+                }}
+              >
+                No hotkeys configured
+              </div>
+            )}
+            <div
+              style={{
+                fontSize: "10px",
+                color: "rgba(255, 255, 255, 0.5)",
+                marginTop: "6px",
+              }}
+            >
+              Press any of these combinations to start/stop recording
+            </div>
+          </div>
+
+          <div>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "rgba(255, 255, 255, 0.6)",
+                marginBottom: "8px",
+              }}
+            >
+              Configure Hotkeys
+            </div>
+            <HotkeySelector
+              value={selectedHotkeys}
+              onChange={handleHotkeySelectorChange}
+              maxHotkeys={3}
+              disabled={isUpdatingHotkeys}
+            />
+            <div
+              style={{
+                fontSize: "10px",
+                color: "rgba(255, 255, 255, 0.5)",
+                marginTop: "6px",
+              }}
+            >
+              Note: Fn key is handled separately and works on Mac. Other hotkeys
+              use Tauri global shortcuts.
+            </div>
           </div>
         </div>
-      )}
+
+        <button
+          className="transcript-btn"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
+              handleSaveHotkeys();
+            }
+          }}
+          disabled={isUpdatingHotkeys || !hasHotkeyChanges() || isLoading}
+          style={{
+            padding: "8px 16px",
+            fontSize: "11px",
+            width: "100%",
+            opacity:
+              isUpdatingHotkeys || !hasHotkeyChanges() || isLoading ? 0.5 : 1,
+            cursor:
+              isUpdatingHotkeys || !hasHotkeyChanges() || isLoading
+                ? "not-allowed"
+                : "pointer",
+            transition: "opacity 0.2s",
+            marginBottom: "12px",
+          }}
+        >
+          {isUpdatingHotkeys ? "Saving..." : "Save Hotkeys"}
+        </button>
+
+        {hotkeyError && (
+          <div
+            className="permission-message"
+            style={{
+              background: "rgba(255, 59, 48, 0.1)",
+              borderColor: "rgba(255, 59, 48, 0.2)",
+              color: "rgba(255, 59, 48, 0.9)",
+              fontSize: "11px",
+              padding: "8px",
+              marginBottom: "12px",
+            }}
+          >
+            {hotkeyError}
+          </div>
+        )}
+
+        {hotkeySuccess && (
+          <div
+            className="permission-message"
+            style={{
+              background: "rgba(52, 199, 89, 0.1)",
+              borderColor: "rgba(52, 199, 89, 0.2)",
+              color: "rgba(52, 199, 89, 0.9)",
+              fontSize: "11px",
+              padding: "8px",
+              marginBottom: "12px",
+            }}
+          >
+            Hotkeys saved successfully!
+          </div>
+        )}
+      </div>
+
       {/* 
       <div style={{ marginTop: "32px" }}>
         <ModelsSection />

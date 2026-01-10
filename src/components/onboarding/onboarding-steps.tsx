@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Mic, Keyboard, Sparkles, Check, Monitor, Eye } from "lucide-react";
+import { Mic, Keyboard, Sparkles, Check, Monitor } from "lucide-react";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -176,10 +176,6 @@ export function PermissionsStep({ onNext }: { onNext: () => void }) {
     granted: false,
     checking: false,
   });
-  const [screenRecording, setScreenRecording] = useState<PermissionState>({
-    granted: false,
-    checking: false,
-  });
 
   useEffect(() => {
     checkPermissions();
@@ -196,14 +192,10 @@ export function PermissionsStep({ onNext }: { onNext: () => void }) {
       const inputGranted = await invoke<boolean>(
         "check_input_monitoring_permission",
       );
-      const screenGranted = await invoke<boolean>(
-        "check_screen_recording_permission",
-      );
 
       setMicrophone((prev) => ({ ...prev, granted: micGranted }));
       setAccessibility((prev) => ({ ...prev, granted: accGranted }));
       setInputMonitoring((prev) => ({ ...prev, granted: inputGranted }));
-      setScreenRecording((prev) => ({ ...prev, granted: screenGranted }));
     } catch (error) {
       console.error("Failed to check permissions:", error);
     }
@@ -245,23 +237,10 @@ export function PermissionsStep({ onNext }: { onNext: () => void }) {
     }
   };
 
-  const requestScreenRecording = async () => {
-    setScreenRecording((prev) => ({ ...prev, checking: true }));
-    try {
-      await invoke<boolean>("request_screen_recording_permission");
-      setTimeout(checkPermissions, 1000);
-    } catch (error) {
-      console.error("Failed to request screen recording permission:", error);
-    } finally {
-      setScreenRecording((prev) => ({ ...prev, checking: false }));
-    }
-  };
-
   const allGranted =
     microphone.granted &&
     accessibility.granted &&
-    inputMonitoring.granted &&
-    screenRecording.granted;
+    inputMonitoring.granted;
 
   const permissions = [
     {
@@ -284,13 +263,6 @@ export function PermissionsStep({ onNext }: { onNext: () => void }) {
       desc: "For typing into apps",
       state: accessibility,
       request: requestAccessibility,
-    },
-    {
-      icon: Eye,
-      title: "Screen Recording",
-      desc: "For context awareness",
-      state: screenRecording,
-      request: requestScreenRecording,
     },
   ];
 

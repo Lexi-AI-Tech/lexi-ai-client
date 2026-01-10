@@ -13,7 +13,7 @@ use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
-use crate::api_endpoints::user;
+use crate::api_endpoints::app_config;
 use crate::commands::auth::get_auth_token;
 use crate::utils;
 
@@ -25,6 +25,14 @@ pub struct VocabularyItem {
     pub value: String,
     pub is_system_generated: bool,
     pub hidden: bool,
+}
+
+/// Action trigger structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionTrigger {
+    pub id: String,
+    pub trigger_phrase: String,
+    pub is_active: bool,
 }
 
 /// Application configuration structure
@@ -43,6 +51,8 @@ pub struct AppConfig {
     pub launch_on_system_startup: Option<bool>,
     /// Vocabulary dictionary for transcription (array of vocabulary items)
     pub vocabulary: Option<Vec<VocabularyItem>>,
+    /// Action triggers for voice commands (array of action trigger items)
+    pub action_triggers: Option<Vec<ActionTrigger>>,
 }
 
 // ============================================================================
@@ -62,6 +72,7 @@ struct ServerAppConfigResponse {
     enhance_transcription: bool,
     launch_on_system_startup: bool,
     vocabulary: Vec<VocabularyItem>,
+    action_triggers: Vec<ActionTrigger>,
 }
 
 /// Get the complete app configuration from Tauri Store or server
@@ -126,6 +137,7 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
         enhance_transcription: None,
         launch_on_system_startup: Some(true), // Enable autostart by default on first launch
         vocabulary: None,
+        action_triggers: None,
     };
 
     // Save minimal config to store
@@ -149,7 +161,7 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
         get_auth_token(app).ok_or_else(|| "Please sign in to sync your settings".to_string())?;
 
     let client = reqwest::Client::new();
-    let url = user::config_url(Some(&format!("system_type={}", utils::get_system_type())));
+    let url = app_config::get_url(Some(&format!("system_type={}", utils::get_system_type())));
 
     let response = client
         .get(&url)
@@ -275,6 +287,9 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.vocabulary.is_some() {
         current.vocabulary = provided.vocabulary;
     }
+    if provided.action_triggers.is_some() {
+        current.action_triggers = provided.action_triggers;
+    }
 }
 
 /// Save config to Tauri Store
@@ -302,6 +317,7 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         enhance_transcription: Some(response.enhance_transcription),
         launch_on_system_startup: Some(response.launch_on_system_startup),
         vocabulary: Some(response.vocabulary),
+        action_triggers: Some(response.action_triggers),
     }
 }
 
@@ -357,6 +373,12 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
             serde_json::to_value(vocabulary).unwrap(),
         );
     }
+    if let Some(ref action_triggers) = config.action_triggers {
+        body.insert(
+            "action_triggers".to_string(),
+            serde_json::to_value(action_triggers).unwrap(),
+        );
+    }
 
     body.insert(
         "system_type".to_string(),
@@ -377,7 +399,7 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
     };
 
     let client = reqwest::Client::new();
-    let url = user::config_url(None);
+    let url = app_config::update_url();
     let request_body = build_request_body(config);
 
     match client
