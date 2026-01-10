@@ -16,3 +16,8 @@ pub fn get_system_type() -> &'static str {
         "unknown"
     }
 }
+
+/// Get the device type as a string
+pub fn get_device_type() -> &'static str {
+    "desktop"
+}

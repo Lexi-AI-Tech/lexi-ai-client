@@ -5,7 +5,7 @@
  * This file serves as the single source of truth for type definitions.
  */
 
-import { SystemType, LanguageCode } from "../lib/constants";
+import { SystemType, DeviceType, LanguageCode } from "../lib/constants";
 
 // ============================================================================
 // API Types
@@ -86,7 +86,7 @@ export interface VocabularyItem {
  */
 export interface AppConfig {
   system_type: SystemType;
-  device_type: string;
+  device_type: DeviceType;
   hotkeys: string[];
   languages: LanguageCode[];
   enhance_transcription: boolean;
@@ -100,7 +100,7 @@ export interface AppConfig {
  */
 export interface AppConfigUpdateRequest {
   system_type?: SystemType;
-  device_type?: string;
+  device_type?: DeviceType;
   hotkeys?: string[];
   languages?: LanguageCode[];
   enhance_transcription?: boolean;

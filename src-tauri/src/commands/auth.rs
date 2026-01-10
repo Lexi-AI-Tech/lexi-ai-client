@@ -189,7 +189,7 @@ async fn refresh_access_token(
     let client = reqwest::Client::new();
     let url = auth::refresh_url();
 
-    let device_type = "desktop";
+    let device_type = utils::get_device_type();
     let system_type = utils::get_system_type();
 
     let request_body = json!({
