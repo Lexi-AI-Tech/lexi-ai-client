@@ -25,7 +25,7 @@ export const OnboardingFlow: React.FC = () => {
         return 0;
       case "permissions":
         return 1;
-      case "fn-key-test":
+      case "hotkey-test":
         return 2;
       case "microphone-test":
         return 3;
@@ -40,7 +40,7 @@ export const OnboardingFlow: React.FC = () => {
     const steps = [
       "welcome",
       "permissions",
-      "fn-key-test",
+      "hotkey-test",
       "microphone-test",
     ] as const;
     if (currentStepIndex < steps.length - 1) {

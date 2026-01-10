@@ -173,18 +173,19 @@ export interface NetworkStatus {
 export type OnboardingStep =
   | "welcome"
   | "permissions"
-  | "fn-key-test"
+  | "hotkey-test"
   | "microphone-test"
   | "home";
 
 export interface OnboardingState {
   currentStep: OnboardingStep;
   isCompleted: boolean;
-  setStep: (step: OnboardingStep) => void;
-  nextStep: () => void;
-  previousStep: () => void;
-  completeOnboarding: () => void;
-  resetOnboarding: () => void;
+  isInitialized?: boolean;
+  setStep: (step: OnboardingStep) => Promise<void>;
+  nextStep: () => Promise<void>;
+  previousStep: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
+  resetOnboarding: () => Promise<void>;
 }
 
 // ============================================================================

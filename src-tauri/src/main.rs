@@ -100,6 +100,10 @@ use websocket::{start_oauth_websocket, stop_oauth_websocket};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
+use commands::onboarding::{
+    complete_onboarding, get_onboarding_state, next_onboarding_step,
+    previous_onboarding_step, reset_onboarding, set_onboarding_step,
+};
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;
 use commands::utils::get_system_type;
@@ -279,6 +283,12 @@ pub fn main() {
             delete_shortcut,
             start_oauth_websocket,
             stop_oauth_websocket,
+            get_onboarding_state,
+            set_onboarding_step,
+            next_onboarding_step,
+            previous_onboarding_step,
+            complete_onboarding,
+            reset_onboarding,
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
