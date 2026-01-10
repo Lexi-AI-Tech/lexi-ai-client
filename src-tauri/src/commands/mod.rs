@@ -6,7 +6,6 @@
 pub mod app_config;
 pub mod auth;
 pub mod hotkey;
-pub mod model;
 pub mod pill;
 pub mod text;
 pub mod utils;

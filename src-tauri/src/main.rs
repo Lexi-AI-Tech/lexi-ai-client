@@ -56,7 +56,6 @@ mod cursor_context; // Cursor context retrieval using macOS Accessibility API (A
 mod global_key_listener; // Unified hotkey management (rdev for Fn key, Tauri shortcuts for others)
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
-mod model_manager; // Model and executable management (download, list, resolve paths)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
@@ -67,7 +66,6 @@ mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcrip
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
-mod whisper; // Local Whisper model integration for offline transcription
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use global_key_listener::start_listener;
@@ -92,14 +90,6 @@ use commands::auth::{
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
-};
-use commands::model::{
-    get_executables_directory,
-    get_installed_models,
-    get_models_directory,
-    is_model_installed,
-    // is_whisper_executable_installed, // COMMENTED OUT: Model executable checking functionality
-    list_available_models,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;
@@ -265,12 +255,6 @@ pub fn main() {
             get_app_config,
             update_app_config,
             get_system_type,
-            list_available_models,
-            get_installed_models,
-            is_model_installed,
-            get_models_directory,
-            get_executables_directory,
-            // is_whisper_executable_installed, // COMMENTED OUT: Model executable checking functionality
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
