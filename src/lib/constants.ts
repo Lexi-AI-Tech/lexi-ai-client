@@ -7,7 +7,7 @@
  */
 export enum SystemType {
   MAC = "mac",
-  // WINDOWS = "windows", // Not yet supported
+  WINDOWS = "windows",
 }
 
 /**

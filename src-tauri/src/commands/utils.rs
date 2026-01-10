@@ -6,7 +6,7 @@ use crate::utils;
 
 /// Get the current system type as a string
 ///
-/// Returns "mac" for macOS, "windows" for Windows, and "unknown" for other platforms.
+/// Returns "mac" for macOS, "windows" for Windows.
 /// This uses compile-time platform detection, which is more reliable than user agent parsing.
 ///
 #[tauri::command]

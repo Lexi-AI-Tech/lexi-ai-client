@@ -1,7 +1,8 @@
 //! Utility functions for common operations across the application.
 
 /// Get the current system type as a string
-/// Returns "mac" for macOS, "windows" for Windows, and "unknown" for other platforms
+/// Returns "mac" for macOS, "windows" for Windows
+/// Panics on unsupported platforms
 pub fn get_system_type() -> &'static str {
     #[cfg(target_os = "macos")]
     {
@@ -13,7 +14,7 @@ pub fn get_system_type() -> &'static str {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        "unknown"
+        panic!("Unsupported platform: Only macOS and Windows are supported")
     }
 }
 
