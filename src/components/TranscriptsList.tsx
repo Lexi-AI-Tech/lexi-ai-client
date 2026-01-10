@@ -46,7 +46,7 @@ export const TranscriptsList: React.FC = () => {
 
     try {
       const response = await invoke<{
-        items: Transcript[];
+        transcripts: Transcript[];
         total: number;
         page: number;
         page_size: number;
@@ -55,7 +55,7 @@ export const TranscriptsList: React.FC = () => {
         page,
         pageSize: 10,
       });
-      setTranscripts(response.items);
+      setTranscripts(response.transcripts);
       setTotalPages(response.total_pages);
       setTotal(response.total);
     } catch (err: any) {
