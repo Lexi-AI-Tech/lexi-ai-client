@@ -7,7 +7,15 @@
  */
 export enum SystemType {
   MAC = "mac",
-  // WINDOWS = "windows", // Not yet supported
+  WINDOWS = "windows",
+}
+
+/**
+ * Supported device types
+ */
+export enum DeviceType {
+  DESKTOP = "desktop",
+  MOBILE = "mobile",
 }
 
 /**
@@ -62,6 +70,20 @@ export function getAllSystemTypes(): string[] {
  */
 export function isValidSystemType(type: string): boolean {
   return Object.values(SystemType).includes(type as SystemType);
+}
+
+/**
+ * Get all device types as an array of strings
+ */
+export function getAllDeviceTypes(): string[] {
+  return Object.values(DeviceType);
+}
+
+/**
+ * Check if a device type is valid
+ */
+export function isValidDeviceType(type: string): boolean {
+  return Object.values(DeviceType).includes(type as DeviceType);
 }
 
 /**

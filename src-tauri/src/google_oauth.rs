@@ -26,11 +26,17 @@
 //! - **State Generation**: 32 random bytes, base64url-encoded
 //! - **Token Exchange**: Handled by Lexi AI Server (client retrieves verifier via `get_pkce_verifier` command)
 
-use crate::config;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::process::Command;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
+
+use crate::config;
+use crate::utils;
 
 /// OAuth state management for storing PKCE verifiers
 /// Maps OAuth state strings to their corresponding PKCE verifiers
@@ -51,9 +57,6 @@ pub struct PkceChallenge {
 /// Generates a cryptographically secure random string for PKCE verifier
 /// Returns a base64url-encoded string (43-128 characters)
 fn generate_pkce_verifier() -> String {
-    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-    use rand::Rng;
-
     let mut rng = rand::thread_rng();
     let bytes: Vec<u8> = (0..64).map(|_| rng.gen()).collect();
     URL_SAFE_NO_PAD.encode(&bytes)
@@ -62,9 +65,6 @@ fn generate_pkce_verifier() -> String {
 /// Generates PKCE challenge from verifier using SHA256
 /// Returns a base64url-encoded SHA256 hash of the verifier
 fn generate_pkce_challenge(verifier: &str) -> String {
-    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-    use sha2::{Digest, Sha256};
-
     let mut hasher = Sha256::new();
     hasher.update(verifier.as_bytes());
     let hash = hasher.finalize();
@@ -74,15 +74,13 @@ fn generate_pkce_challenge(verifier: &str) -> String {
 /// Generates a random state string for CSRF protection
 /// Returns a base64url-encoded random string
 fn generate_oauth_state() -> String {
-    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-    use rand::Rng;
-
     let mut rng = rand::thread_rng();
     let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
     URL_SAFE_NO_PAD.encode(&bytes)
 }
 
 /// Builds Google OAuth authorization URL with PKCE parameters
+/// Note: system_type and device_type are encoded in the state parameter (handled by caller)
 fn build_google_oauth_url(
     client_id: &str,
     redirect_uri: &str,
@@ -90,6 +88,7 @@ fn build_google_oauth_url(
     challenge: &str,
 ) -> String {
     let scopes = "openid email profile";
+    
     format!(
         "https://accounts.google.com/o/oauth2/v2/auth?\
         client_id={}&\
@@ -112,8 +111,6 @@ fn build_google_oauth_url(
 /// Opens the OAuth URL in the user's default browser
 /// Platform-specific implementation for macOS, Windows, and Linux
 fn open_browser(url: &str, app: AppHandle) {
-    use std::process::Command;
-
     let url_clone = url.to_string();
     tauri::async_runtime::spawn(async move {
         let result = {
@@ -151,10 +148,11 @@ fn open_browser(url: &str, app: AppHandle) {
 ///
 /// This command:
 /// 1. Generates PKCE challenge/verifier pair
-/// 2. Generates a random state for CSRF protection
-/// 3. Builds Google OAuth authorization URL
-/// 4. Opens the browser with the auth URL
-/// 5. Returns the PKCE challenge and auth URL to the frontend
+/// 2. Generates a random state for CSRF protection (includes system_type and device_type)
+/// 3. Stores the verifier in Redis via backend API
+/// 4. Builds Google OAuth authorization URL
+/// 5. Opens the browser with the auth URL
+/// 6. Returns the PKCE challenge and auth URL to the frontend
 #[tauri::command]
 pub async fn start_google_login(
     app: AppHandle,
@@ -165,13 +163,51 @@ pub async fn start_google_login(
     let verifier = generate_pkce_verifier();
     let challenge = generate_pkce_challenge(&verifier);
 
-    // Generate state for CSRF protection
-    let oauth_state = generate_oauth_state();
+    // Generate base state for CSRF protection
+    let base_state = generate_oauth_state();
+    
+    // Get system_type and device_type
+    let system_type = utils::get_system_type();
+    let device_type = utils::get_device_type();
+    
+    // Encode system_type and device_type in the state parameter
+    // Format: base64(base_state|system_type|device_type)
+    let state_with_metadata = format!("{}|{}|{}", base_state, system_type, device_type);
+    let oauth_state = URL_SAFE_NO_PAD.encode(state_with_metadata.as_bytes());
 
-    // Store verifier with state as key
+    // Store verifier with the full oauth_state as key (local state for get_pkce_verifier command)
     {
         let mut verifiers = state.verifiers.lock().unwrap();
         verifiers.insert(oauth_state.clone(), verifier.clone());
+    }
+
+    // Store verifier in Redis via backend API (so backend can retrieve it during callback)
+    let api_base_url = config::api_base_url();
+    let store_verifier_url = format!("{}/api/v1/auth/oauth/verifier", api_base_url);
+    
+    let client = reqwest::Client::new();
+    let store_result = client
+        .post(&store_verifier_url)
+        .json(&serde_json::json!({
+            "state": oauth_state,
+            "verifier": verifier
+        }))
+        .send()
+        .await;
+
+    match store_result {
+        Ok(response) => {
+            if !response.status().is_success() {
+                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                eprintln!("Failed to store verifier in Redis: {}", error_text);
+                return Err(format!("Failed to store verifier: {}", error_text));
+            }
+            println!("✅ Stored PKCE verifier in Redis for state: {}...", &oauth_state[..20]);
+        }
+        Err(e) => {
+            eprintln!("Failed to send verifier to backend: {}", e);
+            return Err(format!("Failed to store verifier: {}", e));
+        }
     }
 
     // Build Google OAuth URL with configured redirect URI
@@ -182,7 +218,7 @@ pub async fn start_google_login(
     open_browser(&auth_url, app.clone());
 
     // Note: OAuth callback is now handled by the UI route (/auth/google/callback)
-    // The verifier is stored in state and can be retrieved via get_pkce_verifier command
+    // The verifier is stored in both local state and Redis
     // No need to start a separate callback server
 
     Ok(PkceChallenge {

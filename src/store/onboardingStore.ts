@@ -2,61 +2,57 @@
  * Onboarding Store
  *
  * Manages the onboarding flow state for Lexi AI.
- * Stores the current step and completion status.
  */
 
+import { invoke } from "@tauri-apps/api/core";
+import React, { useEffect } from "react";
 import type { OnboardingStep, OnboardingState } from "../types";
 
-// Step order for navigation
-const STEP_ORDER: OnboardingStep[] = [
-  "welcome",
-  "permissions",
-  "fn-key-test",
-  "microphone-test",
-  "home",
-];
+interface RustOnboardingState {
+  current_step: string;
+  is_completed: boolean;
+}
 
-// Store state
 let currentStep: OnboardingStep = "welcome";
 let isCompleted: boolean = false;
+let storageInitialized: boolean = false;
 
-// Load from localStorage on initialization
-const loadFromStorage = () => {
+const loadFromStorage = async () => {
   try {
-    const stored = localStorage.getItem("lexi-onboarding");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      currentStep = parsed.currentStep || "welcome";
-      isCompleted = parsed.isCompleted || false;
-    }
+    const state = await invoke<RustOnboardingState>("get_onboarding_state");
+    currentStep = state.current_step as OnboardingStep;
+    isCompleted = state.is_completed;
+    storageInitialized = true;
+    notifyListeners();
   } catch (e) {
     console.error("Failed to load onboarding state:", e);
+    // Use defaults if loading fails
+    currentStep = "welcome";
+    isCompleted = false;
+    storageInitialized = true;
+    notifyListeners();
   }
 };
 
-// Save to localStorage
-const saveToStorage = () => {
-  try {
-    localStorage.setItem(
-      "lexi-onboarding",
-      JSON.stringify({
-        currentStep,
-        isCompleted,
-      }),
-    );
-  } catch (e) {
-    console.error("Failed to save onboarding state:", e);
-  }
-};
-
-// Initialize from storage
 loadFromStorage();
 
-// Listeners for state changes
 const listeners: Set<() => void> = new Set();
 
 const notifyListeners = () => {
   listeners.forEach((listener) => listener());
+};
+
+const normalizeStep = (step: string): OnboardingStep => {
+  switch (step) {
+    case "welcome":
+    case "permissions":
+    case "hotkey-test":
+    case "microphone-test":
+    case "home":
+      return step as OnboardingStep;
+    default:
+      return "welcome";
+  }
 };
 
 export const onboardingStore: OnboardingState = {
@@ -66,50 +62,80 @@ export const onboardingStore: OnboardingState = {
   get isCompleted() {
     return isCompleted;
   },
-  setStep: (step: OnboardingStep) => {
-    currentStep = step;
-    saveToStorage();
-    notifyListeners();
+  get isInitialized() {
+    return storageInitialized;
   },
-  nextStep: () => {
-    const currentIndex = STEP_ORDER.indexOf(currentStep);
-    if (currentIndex < STEP_ORDER.length - 1) {
-      currentStep = STEP_ORDER[currentIndex + 1];
-      saveToStorage();
+  setStep: async (step: OnboardingStep) => {
+    try {
+      const state = await invoke<RustOnboardingState>("set_onboarding_step", {
+        step,
+      });
+      currentStep = normalizeStep(state.current_step);
+      isCompleted = state.is_completed;
       notifyListeners();
+    } catch (e) {
+      console.error("Failed to set onboarding step:", e);
     }
   },
-  previousStep: () => {
-    const currentIndex = STEP_ORDER.indexOf(currentStep);
-    if (currentIndex > 0) {
-      currentStep = STEP_ORDER[currentIndex - 1];
-      saveToStorage();
+  nextStep: async () => {
+    try {
+      const state = await invoke<RustOnboardingState>("next_onboarding_step");
+      currentStep = normalizeStep(state.current_step);
+      isCompleted = state.is_completed;
       notifyListeners();
+    } catch (e) {
+      console.error("Failed to move to next step:", e);
     }
   },
-  completeOnboarding: () => {
-    isCompleted = true;
-    currentStep = "home";
-    saveToStorage();
-    notifyListeners();
+  previousStep: async () => {
+    try {
+      const state = await invoke<RustOnboardingState>(
+        "previous_onboarding_step",
+      );
+      currentStep = normalizeStep(state.current_step);
+      isCompleted = state.is_completed;
+      notifyListeners();
+    } catch (e) {
+      console.error("Failed to move to previous step:", e);
+    }
   },
-  resetOnboarding: () => {
-    currentStep = "welcome";
-    isCompleted = false;
-    saveToStorage();
-    notifyListeners();
+  completeOnboarding: async () => {
+    try {
+      const state = await invoke<RustOnboardingState>("complete_onboarding");
+      currentStep = normalizeStep(state.current_step);
+      isCompleted = state.is_completed;
+      notifyListeners();
+    } catch (e) {
+      console.error("Failed to complete onboarding:", e);
+    }
+  },
+  resetOnboarding: async () => {
+    try {
+      const state = await invoke<RustOnboardingState>("reset_onboarding");
+      currentStep = normalizeStep(state.current_step);
+      isCompleted = state.is_completed;
+      notifyListeners();
+    } catch (e) {
+      console.error("Failed to reset onboarding:", e);
+    }
   },
 };
 
-// Import React for the hook
-import React from "react";
-
-// React hook to subscribe to store changes
 export const useOnboardingStore = () => {
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
 
+  useEffect(() => {
+    if (!storageInitialized) {
+      loadFromStorage().then(() => {
+        forceUpdate();
+      });
+    }
+  }, []);
+
   React.useEffect(() => {
-    const listener = () => forceUpdate();
+    const listener = () => {
+      forceUpdate();
+    };
     listeners.add(listener);
     return () => {
       listeners.delete(listener);

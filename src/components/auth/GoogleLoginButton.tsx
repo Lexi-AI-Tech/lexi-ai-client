@@ -1,11 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-
-import {
-  logout as backendLogout,
-  storePkceVerifier,
-} from "../../lib/apiClient";
-import { AUTH_ENDPOINTS, getWebSocketUrl } from "../../lib/apiEndpoints";
+import { listen } from "@tauri-apps/api/event";
 import { useAuthStore, authStore } from "../../store/authStore";
 import type { GoogleLoginButtonProps } from "../../types";
 
@@ -25,12 +20,13 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   } = useAuthStore();
   const [loading, setLocalLoading] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const websocketRef = useRef<WebSocket | null>(null);
 
   // Check auth store for tokens (auth store loads from secure storage)
-  const checkStoredAuth = React.useCallback(() => {
+  const checkStoredAuth = React.useCallback(async () => {
     try {
+      // Force reload from secure storage to get latest state from Rust backend
+      await authStore.checkAuth();
+
       // Wait for auth store to initialize
       if (!authStore.isInitialized) {
         return false;
@@ -46,12 +42,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         setAuthData(authStore.tokens, authStore.user);
         setLoading(false);
         setLocalLoading(false);
-
-        // Clear timeout if it exists
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
 
         if (onSuccess) {
           onSuccess(authStore.user);
@@ -81,7 +71,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           access_token,
           refresh_token,
           expires_in,
-          expires_at: expires_in ? Date.now() + expires_in * 1000 : undefined,
+          expires_at: undefined,
         };
 
         setAuthData(authTokens, authUser);
@@ -125,28 +115,31 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     console.log("Starting to poll auth store, loading:", loading);
 
     // Check immediately
-    if (checkStoredAuth()) {
-      console.log("Auth found immediately, stopping");
-      return; // Already found, no need to poll
-    }
-
-    // Clear any existing interval
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-    }
-
-    // Poll every 200ms (more frequent) until we find tokens
-    console.log("Starting polling interval");
-    pollIntervalRef.current = setInterval(() => {
-      console.log("Polling auth store...");
-      if (checkStoredAuth()) {
-        console.log("Auth found via polling, stopping");
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
+    checkStoredAuth().then((found) => {
+      if (found) {
+        console.log("Auth found immediately, stopping");
+        return; // Already found, no need to poll
       }
-    }, 200); // Check every 200ms for faster detection
+
+      // Clear any existing interval
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+
+      // Poll every 200ms (more frequent) until we find tokens
+      console.log("Starting polling interval");
+      pollIntervalRef.current = setInterval(async () => {
+        console.log("Polling auth store...");
+        const found = await checkStoredAuth();
+        if (found) {
+          console.log("Auth found via polling, stopping");
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+        }
+      }, 200); // Check every 200ms for faster detection
+    });
 
     return () => {
       console.log("Cleaning up polling");
@@ -157,21 +150,87 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     };
   }, [loading, checkStoredAuth]);
 
+  // Listen for OAuth events
+  useEffect(() => {
+    let unlistenFunctions: (() => void)[] = [];
+    let isMounted = true;
+
+    const setupEventListeners = async () => {
+      // Listen for OAuth completion
+      const oauthCompletedUnlisten = await listen<{
+        email: string;
+        name: string;
+        picture?: string;
+      }>("oauth-completed", async (event) => {
+        if (!isMounted) return;
+        console.log("✅ OAuth completed event received:", event.payload);
+
+        // Reload auth data from secure storage
+        await checkStoredAuth();
+
+        setLoading(false);
+        setLocalLoading(false);
+
+        if (onSuccess) {
+          onSuccess(event.payload);
+        }
+      });
+
+      // Listen for OAuth errors
+      const oauthErrorUnlisten = await listen<string>("oauth-error", (event) => {
+        if (!isMounted) return;
+        console.error("❌ OAuth error event received:", event.payload);
+
+        const errorMsg = event.payload || "Authentication failed";
+        setError(errorMsg);
+        setLoading(false);
+        setLocalLoading(false);
+
+        if (onError) {
+          onError(errorMsg);
+        }
+      });
+
+      // Listen for OAuth timeout
+      const oauthTimeoutUnlisten = await listen<string>("oauth-timeout", () => {
+        if (!isMounted) return;
+        console.log("⏱️  OAuth timeout event received");
+
+        setError("Authentication timed out. Please try again.");
+        setLoading(false);
+        setLocalLoading(false);
+
+        if (onError) {
+          onError("Authentication timed out");
+        }
+      });
+
+      if (isMounted) {
+        unlistenFunctions = [
+          oauthCompletedUnlisten,
+          oauthErrorUnlisten,
+          oauthTimeoutUnlisten,
+        ];
+      } else {
+        // Component unmounted before listeners were set up, clean up immediately
+        oauthCompletedUnlisten();
+        oauthErrorUnlisten();
+        oauthTimeoutUnlisten();
+      }
+    };
+
+    setupEventListeners().catch(console.error);
+
+    return () => {
+      isMounted = false;
+      unlistenFunctions.forEach((unlisten) => unlisten());
+    };
+  }, [checkStoredAuth, onSuccess, onError, setError, setLoading]);
+
   // Cleanup WebSocket connection on unmount
   useEffect(() => {
     return () => {
-      if (websocketRef.current) {
-        try {
-          websocketRef.current.close();
-        } catch (e) {
-          console.error("Error closing WebSocket on unmount:", e);
-        }
-        websocketRef.current = null;
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      invoke("stop_oauth_websocket").catch(console.error);
     };
   }, []);
 
@@ -187,11 +246,11 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       if (!clientId) {
         throw new Error(
           "Google OAuth credentials not configured. " +
-            "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
+          "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
         );
       }
 
-      // Start OAuth flow with PKCE via Rust backend
+      // Start OAuth flow with PKCE
       // This generates PKCE challenge/verifier, builds auth URL, and opens browser
       // The browser will redirect to the callback page
       const pkceData = await invoke<{
@@ -208,145 +267,17 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         authUrl: pkceData.auth_url,
       });
 
-      // Store verifier on backend (Redis) so callback page can retrieve it
-      // This works even when callback opens in external browser
-      try {
-        await storePkceVerifier(pkceData.state, pkceData.verifier);
-        console.log("Stored PKCE verifier on backend (Redis):", {
-          state: pkceData.state,
-          stateLength: pkceData.state.length,
-          verifierLength: pkceData.verifier.length,
-        });
-      } catch (error) {
-        console.error("Failed to store verifier on backend:", error);
-        throw new Error("Failed to store OAuth verifier. Please try again.");
-      }
+      console.log("PKCE verifier stored:", {
+        state: pkceData.state,
+        stateLength: pkceData.state.length,
+        verifierLength: pkceData.verifier.length,
+      });
 
       console.log("Waiting for OAuth callback...");
 
-      // Connect to WebSocket for real-time OAuth completion notification
-      const wsUrl = getWebSocketUrl(
-        AUTH_ENDPOINTS.websocketAuth(pkceData.state),
-      );
-      console.log("Connecting to WebSocket:", wsUrl);
-
-      const ws = new WebSocket(wsUrl);
-      websocketRef.current = ws;
-
-      // Set up timeout for WebSocket connection (5 minutes)
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(
-        () => {
-          if (
-            ws.readyState === WebSocket.OPEN ||
-            ws.readyState === WebSocket.CONNECTING
-          ) {
-            console.log("OAuth timeout - closing WebSocket");
-            ws.close();
-          }
-          websocketRef.current = null;
-          setLocalLoading(false);
-          setLoading(false);
-          setError("Authentication timed out. Please try again.");
-          if (onError) {
-            onError("Authentication timed out");
-          }
-        },
-        5 * 60 * 1000,
-      ); // 5 minutes
-
-      ws.onopen = () => {
-        console.log("WebSocket connected, waiting for OAuth completion");
-        // Optional: Send a ping to keep connection alive
-        // The server will respond with pong if needed
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("Received WebSocket message:", data);
-
-          // Handle pong response (heartbeat)
-          if (data.type === "pong") {
-            return;
-          }
-
-          // Handle authentication completion
-          if (data.status === "completed" && data.access_token && data.user) {
-            console.log("✅ OAuth completed, tokens received via WebSocket");
-
-            // Clear timeout
-            if (timeoutRef.current) {
-              clearTimeout(timeoutRef.current);
-              timeoutRef.current = null;
-            }
-
-            // Process tokens
-            const authTokens = {
-              access_token: data.access_token,
-              refresh_token: data.refresh_token || "",
-              expires_in: data.expires_in,
-              expires_at: data.expires_in
-                ? Date.now() + data.expires_in * 1000
-                : undefined,
-            };
-
-            console.log("Setting auth data:", {
-              hasAccessToken: !!authTokens.access_token,
-              hasRefreshToken: !!authTokens.refresh_token,
-              userEmail: data.user?.email,
-            });
-
-            setAuthData(authTokens, data.user);
-            setLoading(false);
-            setLocalLoading(false);
-
-            // Close WebSocket connection
-            ws.close();
-            websocketRef.current = null;
-
-            if (onSuccess) {
-              onSuccess(data.user);
-            }
-          } else {
-            console.warn("Unexpected WebSocket message:", data);
-          }
-        } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        // Don't set error immediately - might be temporary
-        // The timeout will handle it if connection doesn't recover
-      };
-
-      ws.onclose = (event) => {
-        console.log("WebSocket closed:", {
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean,
-        });
-
-        // Clear timeout if connection closed normally
-        if (timeoutRef.current && event.wasClean) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-
-        websocketRef.current = null;
-
-        // Only set error if we're still loading (connection closed unexpectedly)
-        if (loading && event.code !== 1000) {
-          // 1000 is normal closure
-          console.log("WebSocket closed unexpectedly");
-          // Don't set error here - might be normal closure after success
-          // The timeout will handle actual failures
-        }
-      };
+      // Start WebSocket connection
+      await invoke("start_oauth_websocket", { state: pkceData.state });
+      console.log("WebSocket connection started, waiting for OAuth completion");
     } catch (error: any) {
       const errorMessage = error?.message || "Google login failed";
       console.error("Google Login Failed:", error);
@@ -354,20 +285,8 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       setLocalLoading(false);
       setLoading(false);
 
-      // Cleanup WebSocket connection
-      if (websocketRef.current) {
-        try {
-          websocketRef.current.close();
-        } catch (e) {
-          console.error("Error closing WebSocket:", e);
-        }
-        websocketRef.current = null;
-      }
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      // Stop WebSocket connection on error
+      await invoke("stop_oauth_websocket").catch(console.error);
 
       if (onError) {
         onError(errorMessage);
@@ -381,7 +300,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       setLoading(true);
 
       // Logout from backend first (revokes all sessions)
-      await backendLogout();
+      await invoke("logout");
 
       // Clear local auth state
       clearAuth();

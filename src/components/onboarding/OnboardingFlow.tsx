@@ -12,20 +12,18 @@ import "./onboarding.css";
 import Logo from "../../assets/light_mode_without_text.png";
 
 const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];
-const STEP_KEYS = ["welcome", "permissions", "setup", "tryit"] as const;
 
 export const OnboardingFlow: React.FC = () => {
-  const { currentStep, setStep, completeOnboarding } = useOnboardingStore();
+  const { currentStep, nextStep, completeOnboarding } = useOnboardingStore();
   const [hotkey, setHotkey] = useState<string | null>(null);
 
-  // Map old step names to new indices
   const getStepIndex = () => {
     switch (currentStep) {
       case "welcome":
         return 0;
       case "permissions":
         return 1;
-      case "fn-key-test":
+      case "hotkey-test":
         return 2;
       case "microphone-test":
         return 3;
@@ -35,22 +33,6 @@ export const OnboardingFlow: React.FC = () => {
   };
 
   const currentStepIndex = getStepIndex();
-
-  const nextStep = () => {
-    const steps = [
-      "welcome",
-      "permissions",
-      "fn-key-test",
-      "microphone-test",
-    ] as const;
-    if (currentStepIndex < steps.length - 1) {
-      setStep(steps[currentStepIndex + 1]);
-    }
-  };
-
-  const handleComplete = () => {
-    completeOnboarding();
-  };
 
   return (
     <div className="onboarding-container">
@@ -90,7 +72,7 @@ export const OnboardingFlow: React.FC = () => {
               {currentStepIndex === 3 && (
                 <TryItStep
                   key="tryit"
-                  onComplete={handleComplete}
+                  onComplete={completeOnboarding}
                   hotkey={hotkey}
                 />
               )}

@@ -6,17 +6,11 @@
  */
 
 import React, { useCallback, useEffect, useState } from "react";
-
-import {
-  deleteTranscript,
-  getTranscripts,
-  type PaginatedTranscriptsResponse,
-  type Transcript,
-} from "../lib/apiClient";
+import { invoke } from "@tauri-apps/api/core";
+import type { Transcript } from "../types";
 import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { useAuthStore } from "../store/authStore";
-
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
 export const TranscriptsList: React.FC = () => {
@@ -51,10 +45,16 @@ export const TranscriptsList: React.FC = () => {
     setError(null);
 
     try {
-      const response: PaginatedTranscriptsResponse = await getTranscripts(
+      const response = await invoke<{
+        transcripts: Transcript[];
+        total: number;
+        page: number;
+        page_size: number;
+        total_pages: number;
+      }>("get_transcripts", {
         page,
-        10,
-      );
+        pageSize: 10,
+      });
       setTranscripts(response.transcripts);
       setTotalPages(response.total_pages);
       setTotal(response.total);
@@ -175,7 +175,7 @@ export const TranscriptsList: React.FC = () => {
 
     setDeletingId(transcriptId);
     try {
-      await deleteTranscript(transcriptId);
+      await invoke("delete_transcript", { transcriptId });
       // Refresh the list
       await fetchTranscripts();
     } catch (err: any) {
@@ -186,25 +186,34 @@ export const TranscriptsList: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+  // Format dates for all transcripts
+  const [formattedDates, setFormattedDates] = useState<Record<number, string>>({});
 
-    if (diffMins < 1) {
-      return "Just now";
-    } else if (diffMins < 60) {
-      return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    } else if (diffDays < 7) {
-      return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
-    } else {
-      return date.toLocaleDateString();
+  useEffect(() => {
+    const formatAllDates = async () => {
+      const formatted: Record<number, string> = {};
+      for (const transcript of transcripts) {
+        try {
+          const formattedDate = await invoke<string>("format_date_relative", {
+            dateString: transcript.created_at,
+          });
+          formatted[transcript.id] = formattedDate;
+        } catch (error) {
+          console.error("Failed to format date:", error);
+          // Fallback to simple date string
+          formatted[transcript.id] = new Date(transcript.created_at).toLocaleDateString();
+        }
+      }
+      setFormattedDates(formatted);
+    };
+
+    if (transcripts.length > 0) {
+      formatAllDates();
     }
+  }, [transcripts]);
+
+  const formatDate = (transcriptId: number): string => {
+    return formattedDates[transcriptId] || "Loading...";
   };
 
   const getStatusColor = (status: string): string => {
@@ -452,7 +461,7 @@ export const TranscriptsList: React.FC = () => {
                         color: "rgba(255, 255, 255, 0.5)",
                       }}
                     >
-                      {formatDate(transcript.created_at)}
+                      {formatDate(transcript.id)}
                     </span>
                   </div>
                 </div>

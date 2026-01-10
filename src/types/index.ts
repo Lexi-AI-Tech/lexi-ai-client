@@ -5,7 +5,7 @@
  * This file serves as the single source of truth for type definitions.
  */
 
-import { SystemType, LanguageCode } from "../lib/constants";
+import { SystemType, DeviceType, LanguageCode } from "../lib/constants";
 
 // ============================================================================
 // API Types
@@ -68,6 +68,7 @@ export interface AuthState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   refreshTokenIfNeeded: () => Promise<boolean>;
+  checkAuth: () => Promise<void>;
 }
 
 // ============================================================================
@@ -86,6 +87,7 @@ export interface VocabularyItem {
  */
 export interface AppConfig {
   system_type: SystemType;
+  device_type: DeviceType;
   hotkeys: string[];
   languages: LanguageCode[];
   enhance_transcription: boolean;
@@ -99,6 +101,7 @@ export interface AppConfig {
  */
 export interface AppConfigUpdateRequest {
   system_type?: SystemType;
+  device_type?: DeviceType;
   hotkeys?: string[];
   languages?: LanguageCode[];
   enhance_transcription?: boolean;
@@ -151,16 +154,6 @@ export interface PaginatedTranscriptsResponse {
 }
 
 // ============================================================================
-// Device & System Types
-// ============================================================================
-
-export interface DeviceInfo {
-  device_name: string;
-  device_type: string;
-  system_type: "mac" | "windows" | "unknown";
-}
-
-// ============================================================================
 // UI Component Types
 // ============================================================================
 
@@ -181,18 +174,19 @@ export interface NetworkStatus {
 export type OnboardingStep =
   | "welcome"
   | "permissions"
-  | "fn-key-test"
+  | "hotkey-test"
   | "microphone-test"
   | "home";
 
 export interface OnboardingState {
   currentStep: OnboardingStep;
   isCompleted: boolean;
-  setStep: (step: OnboardingStep) => void;
-  nextStep: () => void;
-  previousStep: () => void;
-  completeOnboarding: () => void;
-  resetOnboarding: () => void;
+  isInitialized?: boolean;
+  setStep: (step: OnboardingStep) => Promise<void>;
+  nextStep: () => Promise<void>;
+  previousStep: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
+  resetOnboarding: () => Promise<void>;
 }
 
 // ============================================================================
@@ -206,11 +200,11 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-    | "transcripts"
-    | "settings"
-    | "vocabulary"
-    | "actions"
-    | "shortcuts";
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts";
   onNavigate: (
     page: "transcripts" | "settings" | "vocabulary" | "actions" | "shortcuts",
   ) => void;

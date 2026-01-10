@@ -14,7 +14,7 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
 use crate::api_endpoints::app_config;
-use crate::commands::auth::get_auth_token;
+use crate::commands::auth::get_auth_token_async;
 use crate::utils;
 
 const STORE_FILE: &str = ".app-config.dat";
@@ -67,6 +67,7 @@ pub struct AppConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ServerAppConfigResponse {
     system_type: String,
+    device_type: Option<String>,
     hotkeys: Vec<String>,
     languages: Vec<String>,
     enhance_transcription: bool,
@@ -158,7 +159,7 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
 /// This bypasses the local store and always fetches fresh config from server
 pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> {
     let auth_token =
-        get_auth_token(app).ok_or_else(|| "Please sign in to sync your settings".to_string())?;
+        get_auth_token_async(app).await.ok_or_else(|| "Please sign in to sync your settings".to_string())?;
 
     let client = reqwest::Client::new();
     let url = app_config::get_url(Some(&format!("system_type={}", utils::get_system_type())));
@@ -390,7 +391,7 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
 
 /// Sync app configuration to cloud API (best-effort, failures are logged)
 async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
-    let auth_token = match get_auth_token(app) {
+    let auth_token = match get_auth_token_async(app).await {
         Some(token) => token,
         None => {
             println!("⚠️  No auth token available, skipping cloud sync");

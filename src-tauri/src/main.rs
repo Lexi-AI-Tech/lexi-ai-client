@@ -66,6 +66,7 @@ mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcrip
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
+mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use global_key_listener::start_listener;
@@ -82,17 +83,30 @@ use permissions::{
     request_microphone_permission,
 };
 
+use commands::actions::{
+    create_action_trigger, delete_action_history, delete_action_trigger, get_action_history,
+    get_action_triggers, update_action_trigger,
+};
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
-    clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, start_google_login,
-    store_auth_data,
+    clear_auth_data, get_auth_data, get_current_user, get_pkce_verifier, has_auth_data, logout,
+    start_google_login, store_auth_data,
 };
+use commands::shortcuts::{
+    create_shortcut, delete_shortcut, get_shortcuts, update_shortcut,
+};
+use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
+use websocket::{start_oauth_websocket, stop_oauth_websocket};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
+use commands::onboarding::{
+    complete_onboarding, get_onboarding_state, next_onboarding_step,
+    previous_onboarding_step, reset_onboarding, set_onboarding_step,
+};
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;
-use commands::utils::get_system_type;
+use commands::utils::{format_date_relative, format_date_time, get_system_type};
 use commands::window::open_devtools;
 
 /// Command to control recording state
@@ -249,9 +263,34 @@ pub fn main() {
             get_auth_data,
             clear_auth_data,
             has_auth_data,
+            get_current_user,
+            logout,
             get_app_config,
             update_app_config,
             get_system_type,
+            format_date_relative,
+            format_date_time,
+            get_transcripts,
+            get_transcript,
+            delete_transcript,
+            get_action_history,
+            delete_action_history,
+            get_action_triggers,
+            create_action_trigger,
+            update_action_trigger,
+            delete_action_trigger,
+            get_shortcuts,
+            create_shortcut,
+            update_shortcut,
+            delete_shortcut,
+            start_oauth_websocket,
+            stop_oauth_websocket,
+            get_onboarding_state,
+            set_onboarding_step,
+            next_onboarding_step,
+            previous_onboarding_step,
+            complete_onboarding,
+            reset_onboarding,
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS

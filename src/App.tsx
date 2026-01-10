@@ -19,8 +19,27 @@ type Page = "transcripts" | "settings" | "vocabulary" | "actions" | "shortcuts";
 
 function App() {
   // Check if onboarding is completed
-  const { isCompleted } = useOnboardingStore();
+  const { isCompleted, isInitialized } = useOnboardingStore();
   const [currentPage, setCurrentPage] = useState<Page>("transcripts");
+
+  // Wait for onboarding state to initialize before deciding what to show
+  if (!isInitialized) {
+    return (
+      <div className="app">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100vh",
+            color: "rgba(255, 255, 255, 0.6)",
+          }}
+        >
+          Loading...
+        </div>
+      </div>
+    );
+  }
 
   // If onboarding is not completed, show onboarding flow
   if (!isCompleted) {

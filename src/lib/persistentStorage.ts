@@ -3,10 +3,6 @@
  *
  * Provides a unified storage interface that uses Tauri Store in production
  * and falls back to localStorage for development/web environments.
- *
- * NOTE: This is no longer used for auth data. Auth tokens are now stored
- * securely in OS keychain via secureStorage.ts. This utility may be used
- * for other non-sensitive data if needed.
  */
 
 let storeInstance: any = null;
@@ -140,7 +136,6 @@ export async function removeStorageItem(key: string): Promise<void> {
 
 /**
  * Synchronous version for cases where async is not feasible
- * Note: This will only work with localStorage, not Tauri Store
  */
 export function getStorageItemSync(key: string): string | null {
   try {
