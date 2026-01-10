@@ -20,11 +20,6 @@
 //!    - Triggered by: Using System Events or Accessibility API
 //!    - System Location: Privacy & Security → Accessibility
 //!
-//! 4. **Screen Recording Permission**
-//!    - Required for: Capturing screen content for context-aware transcription
-//!    - Triggered by: Using CGWindowListCreateImage to capture screen
-//!    - System Location: Privacy & Security → Screen Recording
-//!
 //! ## Platform Support
 //!
 //! - **macOS**: Full permission checking and requesting support
@@ -222,61 +217,5 @@ pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String>
 #[tauri::command]
 #[cfg(not(target_os = "macos"))]
 pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
-    Ok(true)
-}
-
-/// Check Screen Recording permission on macOS
-#[tauri::command]
-#[cfg(target_os = "macos")]
-pub fn check_screen_recording_permission(_app: AppHandle) -> Result<bool, String> {
-    // Screen Recording permission is checked by attempting to capture the screen
-    // If permission is not granted, CGWindowListCreateImage will return null
-    use crate::cursor_context::capture_current_screen;
-
-    // Try to capture a small area of the screen
-    // If it returns Some, permission is granted; if None, permission is denied
-    match capture_current_screen() {
-        Some(_) => Ok(true),
-        None => Ok(false),
-    }
-}
-
-/// Check Screen Recording permission (non-macOS platforms)
-#[tauri::command]
-#[cfg(not(target_os = "macos"))]
-pub fn check_screen_recording_permission(_app: AppHandle) -> Result<bool, String> {
-    Ok(true)
-}
-
-/// Request Screen Recording permission on macOS
-/// This will trigger the system permission dialog by attempting to capture the screen
-#[tauri::command]
-#[cfg(target_os = "macos")]
-pub fn request_screen_recording_permission(_app: AppHandle) -> Result<bool, String> {
-    use crate::cursor_context::capture_current_screen;
-    use std::thread;
-    use std::time::Duration;
-
-    // Spawn a thread to attempt screen capture, which triggers the permission dialog
-    thread::spawn(move || {
-        thread::sleep(Duration::from_millis(100));
-
-        // Try to capture the screen, which will trigger the Screen Recording permission dialog
-        // We do this in a separate thread to avoid blocking
-        // If permission is denied, this will return None, but that's okay - we just want to trigger the dialog
-        let _ = std::panic::catch_unwind(|| {
-            let _ = capture_current_screen();
-            println!("Screen Recording permission dialog should have appeared");
-        });
-    });
-
-    // Return immediately - the permission dialog will appear asynchronously
-    Ok(true)
-}
-
-/// Request Screen Recording permission (non-macOS platforms)
-#[tauri::command]
-#[cfg(not(target_os = "macos"))]
-pub fn request_screen_recording_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }

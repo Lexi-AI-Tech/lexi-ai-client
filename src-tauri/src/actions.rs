@@ -196,8 +196,8 @@ pub fn check_action_trigger(transcription: &str, triggers: &[String]) -> Option<
 ///
 /// This function:
 /// 1. Gets the current app name from the provided cursor context
-/// 2. Captures a fresh screenshot of the current screen
-/// 3. Sends the action command, app name, and screenshot to the server
+/// 2. Gets the selected text from the cursor context (if available)
+/// 3. Sends the action command, app name, and selected text to the server
 /// 4. Returns the action response with action_type and value
 ///
 /// # Arguments

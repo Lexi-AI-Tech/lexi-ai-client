@@ -78,9 +78,8 @@ use window::show_and_focus_main_window;
 
 use permissions::{
     check_accessibility_permission, check_input_monitoring_permission, check_microphone_permission,
-    check_screen_recording_permission, request_accessibility_permission,
-    request_input_monitoring_permission, request_microphone_permission,
-    request_screen_recording_permission,
+    request_accessibility_permission, request_input_monitoring_permission,
+    request_microphone_permission,
 };
 
 use commands::app_config::{get_app_config, update_app_config};
@@ -233,11 +232,9 @@ pub fn main() {
             request_microphone_permission,
             request_input_monitoring_permission,
             request_accessibility_permission,
-            request_screen_recording_permission,
             check_microphone_permission,
             check_input_monitoring_permission,
             check_accessibility_permission,
-            check_screen_recording_permission,
             inject_text,
             show_pill_window,
             toggle_pill_window,
