@@ -26,11 +26,17 @@
 //! - **State Generation**: 32 random bytes, base64url-encoded
 //! - **Token Exchange**: Handled by Lexi AI Server (client retrieves verifier via `get_pkce_verifier` command)
 
-use crate::config;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::process::Command;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
+
+use crate::config;
+use crate::utils;
 
 /// OAuth state management for storing PKCE verifiers
 /// Maps OAuth state strings to their corresponding PKCE verifiers
@@ -51,9 +57,6 @@ pub struct PkceChallenge {
 /// Generates a cryptographically secure random string for PKCE verifier
 /// Returns a base64url-encoded string (43-128 characters)
 fn generate_pkce_verifier() -> String {
-    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-    use rand::Rng;
-
     let mut rng = rand::thread_rng();
     let bytes: Vec<u8> = (0..64).map(|_| rng.gen()).collect();
     URL_SAFE_NO_PAD.encode(&bytes)
@@ -62,9 +65,6 @@ fn generate_pkce_verifier() -> String {
 /// Generates PKCE challenge from verifier using SHA256
 /// Returns a base64url-encoded SHA256 hash of the verifier
 fn generate_pkce_challenge(verifier: &str) -> String {
-    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-    use sha2::{Digest, Sha256};
-
     let mut hasher = Sha256::new();
     hasher.update(verifier.as_bytes());
     let hash = hasher.finalize();
@@ -74,15 +74,13 @@ fn generate_pkce_challenge(verifier: &str) -> String {
 /// Generates a random state string for CSRF protection
 /// Returns a base64url-encoded random string
 fn generate_oauth_state() -> String {
-    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-    use rand::Rng;
-
     let mut rng = rand::thread_rng();
     let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
     URL_SAFE_NO_PAD.encode(&bytes)
 }
 
 /// Builds Google OAuth authorization URL with PKCE parameters
+/// Appends system_type and device_type to the redirect_uri so they're preserved in the callback
 fn build_google_oauth_url(
     client_id: &str,
     redirect_uri: &str,
@@ -90,6 +88,23 @@ fn build_google_oauth_url(
     challenge: &str,
 ) -> String {
     let scopes = "openid email profile";
+    
+    // Get system_type and device_type from the client
+    let system_type = utils::get_system_type();
+    let device_type = utils::get_device_type();
+    
+    // Append system_type and device_type to redirect_uri as query parameters
+    // Google will preserve these parameters when redirecting back
+    // URL encode the parameter values
+    let system_type_encoded = urlencoding::encode(system_type);
+    let device_type_encoded = urlencoding::encode(device_type);
+    
+    let redirect_uri_with_params = if redirect_uri.contains('?') {
+        format!("{}&system_type={}&device_type={}", redirect_uri, system_type_encoded, device_type_encoded)
+    } else {
+        format!("{}?system_type={}&device_type={}", redirect_uri, system_type_encoded, device_type_encoded)
+    };
+    
     format!(
         "https://accounts.google.com/o/oauth2/v2/auth?\
         client_id={}&\
@@ -102,7 +117,7 @@ fn build_google_oauth_url(
         access_type=offline&\
         prompt=consent",
         urlencoding::encode(client_id),
-        urlencoding::encode(redirect_uri),
+        urlencoding::encode(&redirect_uri_with_params),
         urlencoding::encode(scopes),
         urlencoding::encode(state),
         urlencoding::encode(challenge)
@@ -112,8 +127,6 @@ fn build_google_oauth_url(
 /// Opens the OAuth URL in the user's default browser
 /// Platform-specific implementation for macOS, Windows, and Linux
 fn open_browser(url: &str, app: AppHandle) {
-    use std::process::Command;
-
     let url_clone = url.to_string();
     tauri::async_runtime::spawn(async move {
         let result = {
