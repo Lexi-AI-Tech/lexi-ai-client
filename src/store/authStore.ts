@@ -133,6 +133,9 @@ export const authStore: AuthState = {
     // No-op: Token refresh is handled automatically
     return false;
   },
+  checkAuth: async () => {
+    await loadFromStorage();
+  },
 };
 
 // React hook to subscribe to store changes

@@ -68,6 +68,7 @@ export interface AuthState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   refreshTokenIfNeeded: () => Promise<boolean>;
+  checkAuth: () => Promise<void>;
 }
 
 // ============================================================================
@@ -199,11 +200,11 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-    | "transcripts"
-    | "settings"
-    | "vocabulary"
-    | "actions"
-    | "shortcuts";
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts";
   onNavigate: (
     page: "transcripts" | "settings" | "vocabulary" | "actions" | "shortcuts",
   ) => void;

@@ -22,8 +22,11 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check auth store for tokens (auth store loads from secure storage)
-  const checkStoredAuth = React.useCallback(() => {
+  const checkStoredAuth = React.useCallback(async () => {
     try {
+      // Force reload from secure storage to get latest state from Rust backend
+      await authStore.checkAuth();
+
       // Wait for auth store to initialize
       if (!authStore.isInitialized) {
         return false;
@@ -112,28 +115,31 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     console.log("Starting to poll auth store, loading:", loading);
 
     // Check immediately
-    if (checkStoredAuth()) {
-      console.log("Auth found immediately, stopping");
-      return; // Already found, no need to poll
-    }
-
-    // Clear any existing interval
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-    }
-
-    // Poll every 200ms (more frequent) until we find tokens
-    console.log("Starting polling interval");
-    pollIntervalRef.current = setInterval(() => {
-      console.log("Polling auth store...");
-      if (checkStoredAuth()) {
-        console.log("Auth found via polling, stopping");
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
+    checkStoredAuth().then((found) => {
+      if (found) {
+        console.log("Auth found immediately, stopping");
+        return; // Already found, no need to poll
       }
-    }, 200); // Check every 200ms for faster detection
+
+      // Clear any existing interval
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+
+      // Poll every 200ms (more frequent) until we find tokens
+      console.log("Starting polling interval");
+      pollIntervalRef.current = setInterval(async () => {
+        console.log("Polling auth store...");
+        const found = await checkStoredAuth();
+        if (found) {
+          console.log("Auth found via polling, stopping");
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+        }
+      }, 200); // Check every 200ms for faster detection
+    });
 
     return () => {
       console.log("Cleaning up polling");
@@ -155,13 +161,13 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         email: string;
         name: string;
         picture?: string;
-      }>("oauth-completed", (event) => {
+      }>("oauth-completed", async (event) => {
         if (!isMounted) return;
         console.log("✅ OAuth completed event received:", event.payload);
-        
+
         // Reload auth data from secure storage
-        checkStoredAuth();
-        
+        await checkStoredAuth();
+
         setLoading(false);
         setLocalLoading(false);
 
@@ -174,7 +180,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       const oauthErrorUnlisten = await listen<string>("oauth-error", (event) => {
         if (!isMounted) return;
         console.error("❌ OAuth error event received:", event.payload);
-        
+
         const errorMsg = event.payload || "Authentication failed";
         setError(errorMsg);
         setLoading(false);
@@ -189,7 +195,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       const oauthTimeoutUnlisten = await listen<string>("oauth-timeout", () => {
         if (!isMounted) return;
         console.log("⏱️  OAuth timeout event received");
-        
+
         setError("Authentication timed out. Please try again.");
         setLoading(false);
         setLocalLoading(false);
@@ -240,7 +246,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       if (!clientId) {
         throw new Error(
           "Google OAuth credentials not configured. " +
-            "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
+          "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
         );
       }
 
