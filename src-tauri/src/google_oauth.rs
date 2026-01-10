@@ -80,7 +80,7 @@ fn generate_oauth_state() -> String {
 }
 
 /// Builds Google OAuth authorization URL with PKCE parameters
-/// Appends system_type and device_type to the redirect_uri so they're preserved in the callback
+/// Note: system_type and device_type are encoded in the state parameter (handled by caller)
 fn build_google_oauth_url(
     client_id: &str,
     redirect_uri: &str,
@@ -88,22 +88,6 @@ fn build_google_oauth_url(
     challenge: &str,
 ) -> String {
     let scopes = "openid email profile";
-    
-    // Get system_type and device_type from the client
-    let system_type = utils::get_system_type();
-    let device_type = utils::get_device_type();
-    
-    // Append system_type and device_type to redirect_uri as query parameters
-    // Google will preserve these parameters when redirecting back
-    // URL encode the parameter values
-    let system_type_encoded = urlencoding::encode(system_type);
-    let device_type_encoded = urlencoding::encode(device_type);
-    
-    let redirect_uri_with_params = if redirect_uri.contains('?') {
-        format!("{}&system_type={}&device_type={}", redirect_uri, system_type_encoded, device_type_encoded)
-    } else {
-        format!("{}?system_type={}&device_type={}", redirect_uri, system_type_encoded, device_type_encoded)
-    };
     
     format!(
         "https://accounts.google.com/o/oauth2/v2/auth?\
@@ -117,7 +101,7 @@ fn build_google_oauth_url(
         access_type=offline&\
         prompt=consent",
         urlencoding::encode(client_id),
-        urlencoding::encode(&redirect_uri_with_params),
+        urlencoding::encode(redirect_uri),
         urlencoding::encode(scopes),
         urlencoding::encode(state),
         urlencoding::encode(challenge)
@@ -164,7 +148,7 @@ fn open_browser(url: &str, app: AppHandle) {
 ///
 /// This command:
 /// 1. Generates PKCE challenge/verifier pair
-/// 2. Generates a random state for CSRF protection
+/// 2. Generates a random state for CSRF protection (includes system_type and device_type)
 /// 3. Builds Google OAuth authorization URL
 /// 4. Opens the browser with the auth URL
 /// 5. Returns the PKCE challenge and auth URL to the frontend
@@ -178,10 +162,19 @@ pub async fn start_google_login(
     let verifier = generate_pkce_verifier();
     let challenge = generate_pkce_challenge(&verifier);
 
-    // Generate state for CSRF protection
-    let oauth_state = generate_oauth_state();
+    // Generate base state for CSRF protection
+    let base_state = generate_oauth_state();
+    
+    // Get system_type and device_type
+    let system_type = utils::get_system_type();
+    let device_type = utils::get_device_type();
+    
+    // Encode system_type and device_type in the state parameter
+    // Format: base64(base_state|system_type|device_type)
+    let state_with_metadata = format!("{}|{}|{}", base_state, system_type, device_type);
+    let oauth_state = URL_SAFE_NO_PAD.encode(state_with_metadata.as_bytes());
 
-    // Store verifier with state as key
+    // Store verifier with the full oauth_state as key
     {
         let mut verifiers = state.verifiers.lock().unwrap();
         verifiers.insert(oauth_state.clone(), verifier.clone());
