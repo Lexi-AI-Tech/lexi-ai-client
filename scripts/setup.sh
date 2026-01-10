@@ -89,9 +89,9 @@ fi
 echo ""
 
 # Note: Models are no longer bundled with the app
-# Users can download models through the Settings UI
+# Users need to manually place models in the user data directory
 echo -e "${BLUE}Note: Models are no longer bundled with the app${NC}"
-echo -e "${YELLOW}📦 Models can be downloaded through the Settings page in the app${NC}"
+echo -e "${YELLOW}📦 Models should be placed in the user data directory${NC}"
 echo -e "${YELLOW}   Models will be stored in the user data directory${NC}"
 
 echo ""

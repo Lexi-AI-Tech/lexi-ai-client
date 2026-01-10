@@ -187,13 +187,12 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                             trigger_phrase,
                             action_command
                         );
-                        let result = perform_action(
+                        perform_action(
                             &action_command,
                             &app_handle_for_task,
                             cursor_context.as_ref(),
                         )
-                        .await;
-                        Some(result)
+                        .await
                     } else {
                         // No action trigger - check if transcription matches a shortcut command
                         let text_to_inject =

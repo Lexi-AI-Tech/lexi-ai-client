@@ -207,12 +207,12 @@ pub fn check_action_trigger(transcription: &str, triggers: &[String]) -> Option<
 /// * `cursor_context` - Optional cursor context (contains app name and selected text)
 ///
 /// # Returns
-/// * `ActionResponse` - The action response with action_type and value
+/// * `Option<ActionResponse>` - The action response with action_type and value, or None if the action failed
 pub async fn perform_action(
     action_command: &str,
     app_handle: &AppHandle,
     cursor_context: Option<&CursorContext>,
-) -> ActionResponse {
+) -> Option<ActionResponse> {
     let action_start = Instant::now();
     println!("🎯 Performing action: '{}'", action_command);
 
@@ -233,35 +233,31 @@ pub async fn perform_action(
         println!("📝 No text selected");
     }
 
-    // Capture screenshot for action
-    let base64_image = crate::cursor_context::capture_current_screen();
-    if let Some(ref image) = base64_image {
-        println!("📸 Screen captured for action (length: {})", image.len());
-    } else {
-        println!("⚠️  Failed to capture screen for action");
-    }
-
     // Get authentication token from secure storage
     let auth_token = get_auth_token(&app_handle);
 
     if auth_token.is_none() {
+        let error_msg = "Authentication required. Please log in.";
         eprintln!("⚠️  Warning: No authentication token available. Action will fail.");
+        let action_duration = action_start.elapsed();
+        eprintln!(
+            "❌ Action failed after {:.2}s: {}",
+            action_duration.as_secs_f64(),
+            error_msg
+        );
         // Notify frontend that action processing has completed (with error)
         app_handle
-            .emit("action_error", "Authentication required. Please log in.")
+            .emit("action_error", error_msg)
             .unwrap_or_default();
-        return ActionResponse {
-            action_type: "text".to_string(),
-            value: "Action failed: Authentication required. Please log in.".to_string(),
-        };
+        // Return None to indicate failure
+        return None;
     }
 
     // Send action request to server
-    let result = match send_action_request(
+    match send_action_request(
         action_command,
         &app_name,
         selected_text,
-        base64_image,
         auth_token,
     )
     .await
@@ -277,7 +273,7 @@ pub async fn perform_action(
             app_handle
                 .emit("action_success", &action_response.value)
                 .unwrap_or_default();
-            action_response
+            Some(action_response)
         }
         Err(e) => {
             let action_duration = action_start.elapsed();
@@ -291,14 +287,10 @@ pub async fn perform_action(
             app_handle
                 .emit("action_error", error_msg.as_str())
                 .unwrap_or_default();
-            ActionResponse {
-                action_type: "text".to_string(),
-                value: error_msg,
-            }
+            // Return None to indicate failure
+            None
         }
-    };
-
-    result
+    }
 }
 
 /// Sends an action request to the Lexi AI Server
@@ -307,7 +299,6 @@ pub async fn perform_action(
 /// * `action_command` - The action command to execute
 /// * `app_name` - Name of the currently focused application
 /// * `selected_text` - Optional selected text that the action can operate on
-/// * `base64_image` - Optional base64-encoded PNG screenshot
 /// * `auth_token` - Authentication token for the request
 ///
 /// # Returns
@@ -317,7 +308,6 @@ async fn send_action_request(
     action_command: &str,
     app_name: &str,
     selected_text: Option<String>,
-    base64_image: Option<String>,
     auth_token: Option<String>,
 ) -> Result<ActionResponse, Box<dyn Error>> {
     let client = reqwest::Client::new();
@@ -330,12 +320,6 @@ async fn send_action_request(
     // Add selected text if provided
     if let Some(text) = selected_text {
         form = form.text("selected_text", text);
-    }
-
-    // Add base64 image if provided
-    if let Some(image) = base64_image {
-        let image_part = multipart::Part::text(image).mime_str("text/plain")?;
-        form = form.part("base64_image", image_part);
     }
 
     // Build the request URL using centralized endpoint

@@ -1,25 +1,14 @@
 //! Model Management Module
 //!
-//! This module handles downloading, managing, and resolving paths for Whisper models.
+//! This module handles managing and resolving paths for Whisper models.
 //! Models are stored in a user-accessible directory instead of being bundled with the app.
 //!
 //! ## Architecture
 //!
 //! - Models are stored in a platform-specific user data directory
-//! - Users can download models on-demand through the UI
 //! - The module provides functions to check model availability and resolve paths
-//!
-//! ## Future Implementation
-//!
-//! This module contains placeholders for:
-//! - Downloading models from remote sources
-//! - Listing available models
-//! - Managing model versions
-//! - Verifying model integrity
 
 use std::path::PathBuf;
-
-// COMMENTED OUT: Model downloading functionality
 // /// Gets the base directory where models should be stored
 // ///
 // /// Returns a platform-specific path:
@@ -285,39 +274,39 @@ use std::path::PathBuf;
 // Stub implementations to allow compilation while model functionality is disabled
 /// Gets the base directory where models should be stored
 /// NOTE: Model functionality is disabled - returns error
-pub fn get_models_directory() -> Result<PathBuf, String> {
-    Err("Model functionality is disabled".to_string())
-}
+// pub fn get_models_directory() -> Result<PathBuf, String> {
+//     Err("Model functionality is disabled".to_string())
+// }
 
 /// Gets the directory where executables (like whisper binary) should be stored
 /// NOTE: Model functionality is disabled - returns error
-pub fn get_executables_directory() -> Result<PathBuf, String> {
-    Err("Model functionality is disabled".to_string())
-}
+// pub fn get_executables_directory() -> Result<PathBuf, String> {
+//     Err("Model functionality is disabled".to_string())
+// }
 
 /// Resolves the path to a specific model file
 /// NOTE: Model functionality is disabled - returns error
-pub fn resolve_model_path(_model_name: &str) -> Result<PathBuf, String> {
-    Err("Model functionality is disabled".to_string())
-}
+// pub fn resolve_model_path(_model_name: &str) -> Result<PathBuf, String> {
+//     Err("Model functionality is disabled".to_string())
+// }
 
 /// Checks if a model file exists
 /// NOTE: Model functionality is disabled - returns false
-pub fn model_exists(_model_name: &str) -> Result<bool, String> {
-    Ok(false)
-}
+// pub fn model_exists(_model_name: &str) -> Result<bool, String> {
+//     Ok(false)
+// }
 
 /// Resolves the path to the whisper executable
 /// NOTE: Model functionality is disabled - returns error
-pub fn resolve_whisper_executable_path() -> Result<PathBuf, String> {
-    Err("Model functionality is disabled".to_string())
-}
+// pub fn resolve_whisper_executable_path() -> Result<PathBuf, String> {
+//     Err("Model functionality is disabled".to_string())
+// }
 
 /// Checks if the whisper executable exists
 /// NOTE: Model functionality is disabled - returns false
-pub fn whisper_executable_exists() -> Result<bool, String> {
-    Ok(false)
-}
+// pub fn whisper_executable_exists() -> Result<bool, String> {
+//     Ok(false)
+// }
 
 /// Information about an available model
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -330,8 +319,6 @@ pub struct ModelInfo {
     pub size: Option<u64>,
     /// Whether the model is currently downloaded
     pub is_downloaded: bool,
-    /// Download URL for the model (placeholder for future implementation)
-    pub download_url: Option<String>,
 }
 
 /// Lists all available models
@@ -345,29 +332,3 @@ pub fn list_available_models() -> Vec<ModelInfo> {
 pub fn get_installed_models() -> Result<Vec<ModelInfo>, String> {
     Ok(vec![])
 }
-
-// COMMENTED OUT: Model downloading functionality
-// /// Downloads a model from a remote URL (placeholder for future implementation)
-// ///
-// /// This is a placeholder function. In the future, this will:
-// /// 1. Download the model from the provided URL
-// /// 2. Show progress updates
-// /// 3. Verify the downloaded file integrity
-// /// 4. Handle errors and retries
-// ///
-// /// # Arguments
-// /// * `model_id` - Identifier of the model to download
-// /// * `download_url` - URL to download the model from
-// /// * `progress_callback` - Optional callback for progress updates (placeholder)
-// ///
-// /// # Returns
-// /// * `Ok(PathBuf)` - Path to the downloaded model file
-// /// * `Err(String)` - Error message if download fails
-// pub async fn download_model(
-//     _model_id: &str,
-//     _download_url: &str,
-//     _progress_callback: Option<Box<dyn Fn(u64, u64) + Send + Sync>>,
-// ) -> Result<PathBuf, String> {
-//     // Placeholder: This will be implemented in the future
-//     Err("Model download is not yet implemented. Please download models manually and place them in the models directory.".to_string())
-// }

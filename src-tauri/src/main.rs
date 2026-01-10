@@ -94,12 +94,11 @@ use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
 use commands::model::{
-    // download_model, // COMMENTED OUT: Model downloading functionality
     get_executables_directory,
     get_installed_models,
     get_models_directory,
     is_model_installed,
-    is_whisper_executable_installed,
+    // is_whisper_executable_installed, // COMMENTED OUT: Model executable checking functionality
     list_available_models,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
@@ -271,8 +270,7 @@ pub fn main() {
             is_model_installed,
             get_models_directory,
             get_executables_directory,
-            is_whisper_executable_installed,
-            // download_model // COMMENTED OUT: Model downloading functionality
+            // is_whisper_executable_installed, // COMMENTED OUT: Model executable checking functionality
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS

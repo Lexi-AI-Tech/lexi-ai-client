@@ -1,11 +1,10 @@
 /**
  * ModelsSection Component
  *
- * Placeholder component for managing Whisper models.
+ * Component for managing Whisper models.
  * This component allows users to:
  * - View available models
  * - Check which models are installed
- * - Download models (placeholder for future implementation)
  */
 
 import React, { useEffect, useState } from "react";
@@ -16,7 +15,6 @@ interface ModelInfo {
   name: string;
   size: number | null;
   is_downloaded: boolean;
-  download_url: string | null;
 }
 
 export const ModelsSection: React.FC = () => {
@@ -71,31 +69,6 @@ export const ModelsSection: React.FC = () => {
     return `${mb.toFixed(1)} MB`;
   };
 
-  // COMMENTED OUT: Model downloading functionality
-  // const handleDownload = async (model: ModelInfo) => {
-  //   if (!model.download_url) {
-  //     setError("Download URL not available for this model");
-  //     return;
-  //   }
-
-  //   try {
-  //     // Placeholder: This will be implemented in the future
-  //     const result = await invoke<string>("download_model", {
-  //       modelId: model.id,
-  //       downloadUrl: model.download_url,
-  //     });
-  //     alert(`Model download started: ${result}`);
-  //     // Reload model data after download
-  //     await loadModelData();
-  //   } catch (err: any) {
-  //     // For now, show instructions since download is not implemented
-  //     const message = err?.message || "Download failed";
-  //     alert(
-  //       `${message}\n\nPlease download the model manually from:\n${model.download_url}\n\nAnd place it in:\n${modelsDir}`,
-  //     );
-  //   }
-  // };
-
   if (isLoading) {
     return (
       <div
@@ -131,8 +104,7 @@ export const ModelsSection: React.FC = () => {
           lineHeight: "1.5",
         }}
       >
-        Download Whisper models to enable offline transcription. Models are
-        stored in your user data directory.
+        Whisper models can be placed in your user data directory to enable offline transcription.
       </div>
 
       {/* Executable Status */}
@@ -244,32 +216,24 @@ export const ModelsSection: React.FC = () => {
                   </div>
                 )}
               </div>
-              <button
-                // onClick={() => handleDownload(model)}
-                onClick={() => {
-                  // COMMENTED OUT: Model downloading functionality
-                  alert("Model downloading is currently disabled.");
-                }}
-                disabled={isInstalled}
+              <div
                 style={{
                   padding: "6px 12px",
                   fontSize: "11px",
                   backgroundColor: isInstalled
-                    ? "rgba(255, 255, 255, 0.1)"
-                    : "rgba(0, 122, 255, 0.2)",
+                    ? "rgba(52, 199, 89, 0.2)"
+                    : "rgba(255, 255, 255, 0.1)",
                   border: `1px solid ${
                     isInstalled
-                      ? "rgba(255, 255, 255, 0.2)"
-                      : "rgba(0, 122, 255, 0.4)"
+                      ? "rgba(52, 199, 89, 0.3)"
+                      : "rgba(255, 255, 255, 0.2)"
                   }`,
                   borderRadius: "4px",
-                  color: isInstalled ? "rgba(255, 255, 255, 0.5)" : "#ffffff",
-                  cursor: isInstalled ? "not-allowed" : "pointer",
-                  opacity: isInstalled ? 0.5 : 1,
+                  color: isInstalled ? "rgba(52, 199, 89, 0.9)" : "rgba(255, 255, 255, 0.5)",
                 }}
               >
-                {isInstalled ? "Installed" : "Download"}
-              </button>
+                {isInstalled ? "✓ Installed" : "Not Installed"}
+              </div>
             </div>
           );
         })}

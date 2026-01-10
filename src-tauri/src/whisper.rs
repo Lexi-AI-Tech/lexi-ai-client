@@ -1,13 +1,13 @@
 //! Whisper.cpp Integration Module
 //!
 //! This module provides local speech-to-text transcription using whisper.cpp binary.
-//! It handles path resolution for user-downloaded resources and executes the whisper.cpp
+//! It handles path resolution for user-provided resources and executes the whisper.cpp
 //! binary to transcribe audio files.
 //!
 //! ## Architecture
 //!
 //! - Uses external whisper.cpp binary stored in user data directory
-//! - Uses models stored in user data directory (downloaded on-demand)
+//! - Uses models stored in user data directory
 //! - Requires pre-recorded audio file in WAV format (16 kHz, mono, 16-bit PCM)
 //! - Returns plain text transcription
 //!
@@ -18,7 +18,7 @@
 //! - Linux: `~/.local/share/lexi-ai/`
 //! - Windows: `%APPDATA%\lexi-ai\`
 //!
-//! Users can download models through the UI. The default model is `ggml-small-q5_1.bin`.
+//! The default model is `ggml-small-q5_1.bin`.
 
 use crate::model_manager;
 use std::path::PathBuf;
@@ -28,105 +28,105 @@ use std::path::PathBuf;
 /// Resolves the paths to the whisper binary and model file
 ///
 /// Searches in the following order:
-/// 1. User data directory (primary location for downloaded models/executables)
+/// 1. User data directory (primary location for models/executables)
 /// 2. Development paths (only in debug mode, for local testing)
 ///
 /// # Returns
 /// * `Ok((PathBuf, PathBuf))` - Tuple of (whisper_bin_path, model_path)
 /// * `Err(String)` - Error message if paths cannot be resolved
-pub fn resolve_whisper_paths() -> Result<(PathBuf, PathBuf), String> {
-    // Default model name (can be made configurable in the future)
-    let default_model = "ggml-small-q5_1.bin";
+// pub fn resolve_whisper_paths() -> Result<(PathBuf, PathBuf), String> {
+//     // Default model name (can be made configurable in the future)
+//     let default_model = "ggml-small-q5_1.bin";
 
-    // Try to get whisper executable from user data directory
-    let whisper_bin = match model_manager::resolve_whisper_executable_path() {
-        Ok(path) if path.exists() => path,
-        _ => {
-            // Fallback to development paths in debug mode
-            #[cfg(debug_assertions)]
-            {
-                if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-                    let dev_path = PathBuf::from(manifest_dir).join("bin").join("whisper");
-                    #[cfg(target_os = "windows")]
-                    let dev_path = dev_path.with_extension("exe");
-                    if dev_path.exists() {
-                        dev_path
-                    } else {
-                        return Err(format!(
-                            "Whisper executable not found. Please download it and place it in: {}",
-                            model_manager::get_executables_directory()
-                                .unwrap_or_else(|_| PathBuf::from("user-data/bin"))
-                                .display()
-                        ));
-                    }
-                } else {
-                    return Err(format!(
-                        "Whisper executable not found. Please download it and place it in: {}",
-                        model_manager::get_executables_directory()
-                            .unwrap_or_else(|_| PathBuf::from("user-data/bin"))
-                            .display()
-                    ));
-                }
-            }
-            #[cfg(not(debug_assertions))]
-            {
-                return Err(format!(
-                    "Whisper executable not found. Please download it and place it in: {}",
-                    model_manager::get_executables_directory()
-                        .unwrap_or_else(|_| PathBuf::from("user-data/bin"))
-                        .display()
-                ));
-            }
-        }
-    };
+//     // Try to get whisper executable from user data directory
+//     let whisper_bin = match model_manager::resolve_whisper_executable_path() {
+//         Ok(path) if path.exists() => path,
+//         _ => {
+//             // Fallback to development paths in debug mode
+//             #[cfg(debug_assertions)]
+//             {
+//                 if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+//                     let dev_path = PathBuf::from(manifest_dir).join("bin").join("whisper");
+//                     #[cfg(target_os = "windows")]
+//                     let dev_path = dev_path.with_extension("exe");
+//                     if dev_path.exists() {
+//                         dev_path
+//                     } else {
+//                         return Err(format!(
+//                             "Whisper executable not found. Please download it and place it in: {}",
+//                             model_manager::get_executables_directory()
+//                                 .unwrap_or_else(|_| PathBuf::from("user-data/bin"))
+//                                 .display()
+//                         ));
+//                     }
+//                 } else {
+//                     return Err(format!(
+//                         "Whisper executable not found. Please download it and place it in: {}",
+//                         model_manager::get_executables_directory()
+//                             .unwrap_or_else(|_| PathBuf::from("user-data/bin"))
+//                             .display()
+//                     ));
+//                 }
+//             }
+//             #[cfg(not(debug_assertions))]
+//             {
+//                 return Err(format!(
+//                     "Whisper executable not found. Please download it and place it in: {}",
+//                     model_manager::get_executables_directory()
+//                         .unwrap_or_else(|_| PathBuf::from("user-data/bin"))
+//                         .display()
+//                 ));
+//             }
+//         }
+//     };
 
-    // Try to get model from user data directory
-    let model = match model_manager::resolve_model_path(default_model) {
-        Ok(path) if path.exists() => path,
-        _ => {
-            // Fallback to development paths in debug mode
-            #[cfg(debug_assertions)]
-            {
-                if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-                    let dev_path = PathBuf::from(manifest_dir)
-                        .join("models")
-                        .join(default_model);
-                    if dev_path.exists() {
-                        dev_path
-                    } else {
-                        return Err(format!(
-                            "Model '{}' not found. Please download it through the Settings page or place it in: {}",
-                            default_model,
-                            model_manager::get_models_directory()
-                                .unwrap_or_else(|_| PathBuf::from("user-data/models"))
-                                .display()
-                        ));
-                    }
-                } else {
-                    return Err(format!(
-                        "Model '{}' not found. Please download it through the Settings page or place it in: {}",
-                        default_model,
-                        model_manager::get_models_directory()
-                            .unwrap_or_else(|_| PathBuf::from("user-data/models"))
-                            .display()
-                    ));
-                }
-            }
-            #[cfg(not(debug_assertions))]
-            {
-                return Err(format!(
-                    "Model '{}' not found. Please download it through the Settings page or place it in: {}",
-                    default_model,
-                    model_manager::get_models_directory()
-                        .unwrap_or_else(|_| PathBuf::from("user-data/models"))
-                        .display()
-                ));
-            }
-        }
-    };
+//     // Try to get model from user data directory
+//     let model = match model_manager::resolve_model_path(default_model) {
+//         Ok(path) if path.exists() => path,
+//         _ => {
+//             // Fallback to development paths in debug mode
+//             #[cfg(debug_assertions)]
+//             {
+//                 if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+//                     let dev_path = PathBuf::from(manifest_dir)
+//                         .join("models")
+//                         .join(default_model);
+//                     if dev_path.exists() {
+//                         dev_path
+//                     } else {
+//                         return Err(format!(
+//                             "Model '{}' not found. Please download it through the Settings page or place it in: {}",
+//                             default_model,
+//                             model_manager::get_models_directory()
+//                                 .unwrap_or_else(|_| PathBuf::from("user-data/models"))
+//                                 .display()
+//                         ));
+//                     }
+//                 } else {
+//                     return Err(format!(
+//                         "Model '{}' not found. Please download it through the Settings page or place it in: {}",
+//                         default_model,
+//                         model_manager::get_models_directory()
+//                             .unwrap_or_else(|_| PathBuf::from("user-data/models"))
+//                             .display()
+//                     ));
+//                 }
+//             }
+//             #[cfg(not(debug_assertions))]
+//             {
+//                 return Err(format!(
+//                     "Model '{}' not found. Please download it through the Settings page or place it in: {}",
+//                     default_model,
+//                     model_manager::get_models_directory()
+//                         .unwrap_or_else(|_| PathBuf::from("user-data/models"))
+//                         .display()
+//                 ));
+//             }
+//         }
+//     };
 
-    Ok((whisper_bin, model))
-}
+//     Ok((whisper_bin, model))
+// }
 
 // COMMENTED OUT: Model execution functionality
 // /// Preloads the Whisper model by verifying paths exist
