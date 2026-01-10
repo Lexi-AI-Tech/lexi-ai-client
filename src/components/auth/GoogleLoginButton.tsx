@@ -1,11 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-import {
-  logout as backendLogout,
-  storePkceVerifier,
-} from "../../lib/apiClient";
-import { AUTH_ENDPOINTS, getWebSocketUrl } from "../../lib/apiEndpoints";
+// OAuth and logout are now handled via Tauri commands
+
+// Helper function for WebSocket URL (temporary until we fully migrate)
+const getWebSocketUrl = (endpoint: string): string => {
+  const baseUrl =
+    import.meta.env.MODE === "development"
+      ? "http://localhost:1230"
+      : "https://lexi-ai-server.onrender.com";
+  const wsProtocol = baseUrl.startsWith("https") ? "wss" : "ws";
+  const wsBaseUrl = baseUrl.replace(/^https?/, wsProtocol);
+  return `${wsBaseUrl}${endpoint}`;
+};
 import { useAuthStore, authStore } from "../../store/authStore";
 import type { GoogleLoginButtonProps } from "../../types";
 
@@ -211,8 +218,8 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       // Store verifier on backend (Redis) so callback page can retrieve it
       // This works even when callback opens in external browser
       try {
-        await storePkceVerifier(pkceData.state, pkceData.verifier);
-        console.log("Stored PKCE verifier on backend (Redis):", {
+        // PKCE verifier is now stored in Rust state via start_google_login
+        console.log("PKCE verifier stored in Rust state:", {
           state: pkceData.state,
           stateLength: pkceData.state.length,
           verifierLength: pkceData.verifier.length,
@@ -226,7 +233,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       // Connect to WebSocket for real-time OAuth completion notification
       const wsUrl = getWebSocketUrl(
-        AUTH_ENDPOINTS.websocketAuth(pkceData.state),
+        `/api/v1/auth/ws/auth/${encodeURIComponent(pkceData.state)}`,
       );
       console.log("Connecting to WebSocket:", wsUrl);
 
@@ -403,7 +410,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       setLoading(true);
 
       // Logout from backend first (revokes all sessions)
-      await backendLogout();
+      await invoke("logout");
 
       // Clear local auth state
       clearAuth();

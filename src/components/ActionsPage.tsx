@@ -1,12 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  getActionHistory,
-  deleteActionHistory,
-  getActionTriggers,
-  createActionTrigger,
-  updateActionTrigger,
-  deleteActionTrigger,
-} from "../lib/apiClient";
+import { invoke } from "@tauri-apps/api/core";
 import { SystemType } from "../lib/constants";
 import type {
   ActionHistory,
@@ -35,7 +28,10 @@ export const ActionsPage: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await getActionHistory(page, pageSize);
+      const data = await invoke<PaginatedActionHistoryResponse>("get_action_history", {
+        page,
+        pageSize,
+      });
       setActionHistory(data);
     } catch (err: any) {
       console.error("Failed to load action history:", err);
@@ -49,7 +45,10 @@ export const ActionsPage: React.FC = () => {
   const loadTriggers = async () => {
     try {
       setIsLoadingTriggers(true);
-      const data = await getActionTriggers(SystemType.MAC, true);
+      const data = await invoke<ActionTrigger[]>("get_action_triggers", {
+        systemType: SystemType.MAC,
+        includeInactive: true,
+      });
       setTriggers(data);
     } catch (err: any) {
       console.error("Failed to load triggers:", err);
@@ -72,7 +71,7 @@ export const ActionsPage: React.FC = () => {
     }
 
     try {
-      await deleteActionHistory(actionId);
+      await invoke("delete_action_history", { actionId });
       await loadActionHistory();
     } catch (err: any) {
       setError(err?.message || "Failed to delete action");
@@ -87,13 +86,13 @@ export const ActionsPage: React.FC = () => {
 
     try {
       setError(null);
-      await createActionTrigger(
-        {
-          trigger_phrase: newTriggerPhrase.trim(),
-          is_active: true,
+      await invoke<ActionTrigger>("create_action_trigger", {
+        request: {
+          phrase: newTriggerPhrase.trim(),
+          isActive: true,
         },
-        SystemType.MAC,
-      );
+        systemType: SystemType.MAC,
+      });
       setNewTriggerPhrase("");
       setShowCreateTrigger(false);
       await loadTriggers();
@@ -105,13 +104,13 @@ export const ActionsPage: React.FC = () => {
   const handleUpdateTrigger = async (trigger: ActionTrigger) => {
     try {
       setError(null);
-      await updateActionTrigger(
-        trigger.id,
-        {
-          is_active: !trigger.is_active,
+      await invoke<ActionTrigger>("update_action_trigger", {
+        triggerId: trigger.id,
+        request: {
+          isActive: !trigger.is_active,
         },
-        SystemType.MAC,
-      );
+        systemType: SystemType.MAC,
+      });
       await loadTriggers();
       setEditingTrigger(null);
     } catch (err: any) {
@@ -126,7 +125,10 @@ export const ActionsPage: React.FC = () => {
 
     try {
       setError(null);
-      await deleteActionTrigger(triggerId, SystemType.MAC);
+      await invoke("delete_action_trigger", {
+        triggerId,
+        systemType: SystemType.MAC,
+      });
       await loadTriggers();
     } catch (err: any) {
       setError(err?.message || "Failed to delete trigger");
@@ -416,20 +418,6 @@ export const ActionsPage: React.FC = () => {
                           }}
                         >
                           App: {action.app_name}
-                        </div>
-                      )}
-                      {action.action_result && (
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "rgba(255, 255, 255, 0.7)",
-                            marginTop: "8px",
-                            padding: "8px",
-                            backgroundColor: "rgba(255, 255, 255, 0.03)",
-                            borderRadius: "4px",
-                          }}
-                        >
-                          {action.action_result}
                         </div>
                       )}
                     </div>

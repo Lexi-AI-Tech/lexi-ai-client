@@ -7,12 +7,8 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 
-import {
-  deleteTranscript,
-  getTranscripts,
-  type PaginatedTranscriptsResponse,
-  type Transcript,
-} from "../lib/apiClient";
+import { invoke } from "@tauri-apps/api/core";
+import type { Transcript } from "../types";
 import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { useAuthStore } from "../store/authStore";
@@ -51,11 +47,17 @@ export const TranscriptsList: React.FC = () => {
     setError(null);
 
     try {
-      const response: PaginatedTranscriptsResponse = await getTranscripts(
+      const response = await invoke<{
+        items: Transcript[];
+        total: number;
+        page: number;
+        page_size: number;
+        total_pages: number;
+      }>("get_transcripts", {
         page,
-        10,
-      );
-      setTranscripts(response.transcripts);
+        pageSize: 10,
+      });
+      setTranscripts(response.items);
       setTotalPages(response.total_pages);
       setTotal(response.total);
     } catch (err: any) {
@@ -175,7 +177,7 @@ export const TranscriptsList: React.FC = () => {
 
     setDeletingId(transcriptId);
     try {
-      await deleteTranscript(transcriptId);
+      await invoke("delete_transcript", { transcriptId });
       // Refresh the list
       await fetchTranscripts();
     } catch (err: any) {

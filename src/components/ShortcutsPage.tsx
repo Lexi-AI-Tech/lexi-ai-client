@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  getShortcuts,
-  createShortcut,
-  updateShortcut,
-  deleteShortcut,
-} from "../lib/apiClient";
+import { invoke } from "@tauri-apps/api/core";
 import { SystemType } from "../lib/constants";
 import type { Shortcut } from "../types";
 
@@ -22,7 +17,9 @@ export const ShortcutsPage: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await getShortcuts(SystemType.MAC);
+      const data = await invoke<Shortcut[]>("get_shortcuts", {
+        systemType: SystemType.MAC,
+      });
       setShortcuts(data);
     } catch (err: any) {
       console.error("Failed to load shortcuts:", err);
@@ -44,13 +41,13 @@ export const ShortcutsPage: React.FC = () => {
 
     try {
       setError(null);
-      await createShortcut(
-        {
+      await invoke<Shortcut>("create_shortcut", {
+        request: {
           shortcut: newShortcut.trim(),
           value: newValue.trim(),
         },
-        SystemType.MAC,
-      );
+        systemType: SystemType.MAC,
+      });
       setNewShortcut("");
       setNewValue("");
       setShowCreateShortcut(false);
@@ -73,14 +70,14 @@ export const ShortcutsPage: React.FC = () => {
 
     try {
       setError(null);
-      await updateShortcut(
-        shortcut.id,
-        {
+      await invoke<Shortcut>("update_shortcut", {
+        shortcutId: shortcut.id,
+        request: {
           shortcut: editingShortcut.shortcut,
           value: editingShortcut.value,
         },
-        SystemType.MAC,
-      );
+        systemType: SystemType.MAC,
+      });
       await loadShortcuts();
       setEditingShortcut(null);
     } catch (err: any) {
@@ -95,7 +92,10 @@ export const ShortcutsPage: React.FC = () => {
 
     try {
       setError(null);
-      await deleteShortcut(shortcutId, SystemType.MAC);
+      await invoke("delete_shortcut", {
+        shortcutId,
+        systemType: SystemType.MAC,
+      });
       await loadShortcuts();
     } catch (err: any) {
       setError(err?.message || "Failed to delete shortcut");

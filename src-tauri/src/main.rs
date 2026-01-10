@@ -82,11 +82,19 @@ use permissions::{
     request_microphone_permission,
 };
 
+use commands::actions::{
+    create_action_trigger, delete_action_history, delete_action_trigger, get_action_history,
+    get_action_triggers, update_action_trigger,
+};
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
-    clear_auth_data, get_auth_data, get_pkce_verifier, has_auth_data, start_google_login,
-    store_auth_data,
+    clear_auth_data, get_auth_data, get_current_user, get_pkce_verifier, has_auth_data, logout,
+    start_google_login, store_auth_data,
 };
+use commands::shortcuts::{
+    create_shortcut, delete_shortcut, get_shortcuts, update_shortcut,
+};
+use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
@@ -249,9 +257,24 @@ pub fn main() {
             get_auth_data,
             clear_auth_data,
             has_auth_data,
+            get_current_user,
+            logout,
             get_app_config,
             update_app_config,
             get_system_type,
+            get_transcripts,
+            get_transcript,
+            delete_transcript,
+            get_action_history,
+            delete_action_history,
+            get_action_triggers,
+            create_action_trigger,
+            update_action_trigger,
+            delete_action_trigger,
+            get_shortcuts,
+            create_shortcut,
+            update_shortcut,
+            delete_shortcut,
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS

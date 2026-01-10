@@ -354,3 +354,83 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
 // Re-export OAuth commands
 pub use google_oauth::get_pkce_verifier;
 pub use google_oauth::start_google_login;
+
+// ============================================================================
+// User Info Commands
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserInfo {
+    pub email: String,
+    pub name: Option<String>,
+    pub picture: Option<String>,
+}
+
+/// Get current user information from backend
+#[tauri::command]
+pub async fn get_current_user(app: AppHandle) -> Result<UserInfo, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .ok_or_else(|| "Authentication required".to_string())?;
+
+    let url = format!("{}/api/v1/auth/me", crate::config::api_base_url());
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Server error ({}): {}", status, error_text));
+    }
+
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let user_data = if data.get("data").is_some() {
+        &data["data"]
+    } else {
+        &data
+    };
+
+    serde_json::from_value(user_data.clone())
+        .map_err(|e| format!("Failed to deserialize response: {}", e))
+}
+
+/// Logout from backend
+#[tauri::command]
+pub async fn logout(app: AppHandle) -> Result<(), String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .ok_or_else(|| "Authentication required".to_string())?;
+
+    let url = format!("{}/api/v1/auth/logout", crate::config::api_base_url());
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    // Even if logout fails on backend, we'll clear local auth
+    if !response.status().is_success() {
+        eprintln!("⚠️  Backend logout failed, clearing local auth anyway");
+    }
+
+    // Clear local auth data
+    secure_storage::clear_auth_data(&app)?;
+
+    Ok(())
+}

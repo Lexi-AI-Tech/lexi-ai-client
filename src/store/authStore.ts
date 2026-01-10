@@ -6,13 +6,12 @@
  * Uses OS keychain for secure storage (macOS Keychain, Windows Credential Manager, Linux Secret Service).
  */
 
-import { getDeviceInfo } from "../lib/deviceInfo";
 import {
   storeAuthDataSecure,
   getAuthDataSecure,
   clearAuthDataSecure,
 } from "../lib/secureStorage";
-import { AUTH_ENDPOINTS, getApiUrl } from "../lib/apiEndpoints";
+// Token refresh is now handled automatically by Rust backend
 import type { AuthUser, AuthTokens, AuthState } from "../types";
 
 // Store state
@@ -39,62 +38,9 @@ const loadFromStorage = async () => {
         expires_in: secureData.expires_in,
       };
 
-      // Check if tokens are expired and try to refresh
-      if (tokens?.expires_at && tokens.expires_at < Date.now()) {
-        if (tokens?.refresh_token) {
-          console.log("🔄 Access token expired, attempting to refresh...");
-          try {
-            const device = await getDeviceInfo();
-
-            const response = await fetch(getApiUrl(AUTH_ENDPOINTS.refresh), {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                refresh_token: tokens.refresh_token,
-                device_name: device.device_name,
-                device_type: device.device_type,
-              }),
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-              const refreshData = data.data || data;
-
-              if (refreshData.access_token) {
-                // Default to 1 hour if expires_in not provided
-                const expiresIn = refreshData.expires_in || 3600;
-                tokens = {
-                  ...tokens,
-                  access_token: refreshData.access_token,
-                  refresh_token:
-                    refreshData.refresh_token || tokens.refresh_token,
-                  expires_in: expiresIn,
-                  expires_at: Date.now() + expiresIn * 1000,
-                };
-                isAuthenticated = true;
-                await saveToStorage();
-                console.log("✅ Token refreshed successfully");
-              }
-            } else {
-              throw new Error(`Token refresh failed: ${response.status}`);
-            }
-          } catch (refreshError) {
-            console.error("❌ Token refresh failed:", refreshError);
-            isAuthenticated = false;
-            user = null;
-            tokens = null;
-            await saveToStorage();
-          }
-        } else {
-          console.log("⚠️ Access token expired and no refresh token available");
-          isAuthenticated = false;
-          user = null;
-          tokens = null;
-          await saveToStorage();
-        }
-      }
+      // Token refresh is now handled automatically by Rust backend
+      // when tokens are retrieved via get_auth_token_async
+      // No need to refresh here - Rust will handle it when needed
 
       storageInitialized = true;
       notifyListeners();
@@ -195,73 +141,9 @@ export const authStore: AuthState = {
     notifyListeners();
   },
   refreshTokenIfNeeded: async () => {
-    // Check if token is expired or expiring soon (within 5 minutes)
-    if (!tokens?.expires_at || !tokens?.refresh_token) {
-      return false;
-    }
-
-    // Prevent concurrent refresh calls (avoids infinite loops)
-    if (isRefreshing) {
-      return false;
-    }
-
-    const bufferTime = 5 * 60 * 1000; // 5 minutes
-    const isExpiringSoon = tokens.expires_at < Date.now() + bufferTime;
-
-    if (!isExpiringSoon) {
-      return false; // Token is still valid
-    }
-
-    // Token is expired or expiring soon, refresh it
-    isRefreshing = true;
-    console.log("🔄 Token expiring soon, refreshing proactively...");
-    try {
-      const device = await getDeviceInfo();
-
-      const response = await fetch(getApiUrl(AUTH_ENDPOINTS.refresh), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          refresh_token: tokens.refresh_token,
-          device_name: device.device_name,
-          device_type: device.device_type,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const refreshData = data.data || data;
-
-        if (refreshData.access_token) {
-          // Default to 1 hour if expires_in not provided
-          const expiresIn = refreshData.expires_in || 3600;
-          tokens = {
-            ...tokens,
-            access_token: refreshData.access_token,
-            refresh_token: refreshData.refresh_token || tokens.refresh_token,
-            expires_in: expiresIn,
-            expires_at: Date.now() + expiresIn * 1000,
-          };
-          isAuthenticated = true;
-          await saveToStorage();
-          notifyListeners();
-          console.log("✅ Token refreshed proactively");
-          isRefreshing = false;
-          return true;
-        }
-      } else {
-        throw new Error(`Token refresh failed: ${response.status}`);
-      }
-    } catch (refreshError) {
-      console.error("❌ Proactive token refresh failed:", refreshError);
-      // Don't clear auth on proactive refresh failure - let it fail on actual API call
-      isRefreshing = false;
-      return false;
-    }
-
-    isRefreshing = false;
+    // Token refresh is now handled automatically by Rust backend
+    // when tokens are retrieved via get_auth_token_async
+    // This function is kept for backward compatibility but does nothing
     return false;
   },
 };
