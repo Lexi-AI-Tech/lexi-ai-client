@@ -184,24 +184,17 @@ async fn refresh_access_token(
     use reqwest;
     use serde_json::json;
 
+    use crate::commands::utils;
+
     let client = reqwest::Client::new();
     let url = auth::refresh_url();
 
-    // Get device info (simplified - you may want to enhance this)
-    let device_name = std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| "Unknown".to_string());
-    let device_type = if cfg!(target_os = "macos") {
-        "macos"
-    } else if cfg!(target_os = "windows") {
-        "windows"
-    } else {
-        "linux"
-    };
+    let device_type = "desktop";
+    let system_type = utils::get_system_type();
 
     let request_body = json!({
         "refresh_token": refresh_token,
-        "device_name": device_name,
+        "system_type": system_type,
         "device_type": device_type,
     });
 

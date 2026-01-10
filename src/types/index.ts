@@ -86,6 +86,7 @@ export interface VocabularyItem {
  */
 export interface AppConfig {
   system_type: SystemType;
+  device_type: string;
   hotkeys: string[];
   languages: LanguageCode[];
   enhance_transcription: boolean;
@@ -99,6 +100,7 @@ export interface AppConfig {
  */
 export interface AppConfigUpdateRequest {
   system_type?: SystemType;
+  device_type?: string;
   hotkeys?: string[];
   languages?: LanguageCode[];
   enhance_transcription?: boolean;
@@ -155,7 +157,6 @@ export interface PaginatedTranscriptsResponse {
 // ============================================================================
 
 export interface DeviceInfo {
-  device_name: string;
   device_type: string;
   system_type: "mac" | "windows" | "unknown";
 }

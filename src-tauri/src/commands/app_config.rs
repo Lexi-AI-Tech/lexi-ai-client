@@ -67,6 +67,7 @@ pub struct AppConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ServerAppConfigResponse {
     system_type: String,
+    device_type: Option<String>,
     hotkeys: Vec<String>,
     languages: Vec<String>,
     enhance_transcription: bool,
