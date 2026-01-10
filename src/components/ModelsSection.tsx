@@ -28,7 +28,8 @@ export const ModelsSection: React.FC = () => {
           lineHeight: "1.5",
         }}
       >
-        Local model functionality has been removed. The app now uses cloud-based transcription only.
+        Local model functionality has been removed. The app now uses cloud-based
+        transcription only.
       </div>
     </div>
   );

@@ -41,8 +41,6 @@ pub mod stt {
     }
 }
 
-
-
 /// App Config endpoints
 pub mod app_config {
     use super::*;
@@ -108,4 +106,3 @@ pub mod tts {
         )
     }
 }
-

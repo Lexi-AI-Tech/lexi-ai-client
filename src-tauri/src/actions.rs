@@ -254,14 +254,7 @@ pub async fn perform_action(
     }
 
     // Send action request to server
-    match send_action_request(
-        action_command,
-        &app_name,
-        selected_text,
-        auth_token,
-    )
-    .await
-    {
+    match send_action_request(action_command, &app_name, selected_text, auth_token).await {
         Ok(action_response) => {
             let action_duration = action_start.elapsed();
             println!(
