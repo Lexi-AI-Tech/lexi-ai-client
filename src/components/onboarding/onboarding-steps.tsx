@@ -6,11 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useOnboardingStore } from "../../store/onboardingStore";
 import { useAuthStore } from "../../store/authStore";
 import { GoogleLoginButton } from "../auth/GoogleLoginButton";
-import {
-  clearAllStorage,
-  clearAuthStorage,
-  clearOnboardingStorage,
-} from "../../lib/storageUtils";
+import { clearAuthStorage } from "../../lib/storageUtils";
 
 const stepVariants = {
   initial: { opacity: 0, x: 10 },
@@ -29,7 +25,6 @@ export function WelcomeStep({ onNext }: { onNext: () => void | Promise<void> }) 
     if (
       confirm("Clear all app data? This will log you out and reset onboarding.")
     ) {
-      clearAllStorage();
       clearAuth();
       await resetOnboarding();
       setShowDebugMenu(false);
@@ -49,7 +44,6 @@ export function WelcomeStep({ onNext }: { onNext: () => void | Promise<void> }) 
 
   const handleClearOnboarding = async () => {
     if (confirm("Reset onboarding? You will need to go through setup again.")) {
-      clearOnboardingStorage();
       await resetOnboarding();
       setShowDebugMenu(false);
       alert("Onboarding reset!");
