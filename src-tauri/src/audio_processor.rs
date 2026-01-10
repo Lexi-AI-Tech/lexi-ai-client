@@ -254,6 +254,46 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                                     }
                                 }
                             }
+                            "text_and_voice" => {
+                                // Hybrid action: Inject text AND Read it
+                                println!("🗣️📝 Hybrid action detected - injecting and reading text");
+
+                                // 1. Start TTS (async but do it first so user hears feedback while text types)
+                                let tts_service = TtsService::new(app_handle_for_task.clone());
+                                let tts_handle = tts_service.speak(&action_response.value, None);
+
+                                // 2. Inject text
+                                let injector = TextInjector::new();
+                                match injector.inject_text(&action_response.value) {
+                                    Ok(_) => {
+                                        app_handle_for_task
+                                            .emit("injection_success", ())
+                                            .unwrap_or_default();
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to inject text: {}", e);
+                                        app_handle_for_task
+                                            .emit("injection_error", e.to_string())
+                                            .unwrap_or_default();
+                                    }
+                                }
+
+                                // 3. Wait for TTS to finish (optional, but good for error handling)
+                                match tts_handle.await {
+                                    Ok(_) => {
+                                        println!("✅ Text-to-speech completed successfully");
+                                        app_handle_for_task
+                                            .emit("tts_success", ())
+                                            .unwrap_or_default();
+                                    }
+                                    Err(e) => {
+                                        eprintln!("❌ Failed to convert text to speech: {}", e);
+                                        app_handle_for_task
+                                            .emit("tts_error", e.to_string())
+                                            .unwrap_or_default();
+                                    }
+                                }
+                            }
                             _ => {
                                 eprintln!(
                                     "⚠️  Unknown action type: {}",
