@@ -30,8 +30,8 @@ const HEIGHT_DIFF = EXPANDED_SIZE.height - IDLE_SIZE.height;
  */
 
 /**
- * Note: Pill window positioning is handled in the Rust setup hook
- * (main.rs setup function) to ensure it's positioned before becoming visible.
+ * Note: Pill window positioning is handled in the setup hook
+ * to ensure it's positioned before becoming visible.
  * This prevents the visible repositioning issue.
  */
 const Pill: React.FC = () => {

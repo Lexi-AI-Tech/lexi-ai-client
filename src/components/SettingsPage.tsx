@@ -300,7 +300,7 @@ export const SettingsPage: React.FC = () => {
         return;
       }
 
-      // Update Rust backend
+      // Update hotkey configuration
       const configJson = JSON.stringify(selectedHotkeys);
       await invoke("update_hotkey", { configJson });
       setCurrentHotkeys(selectedHotkeys);

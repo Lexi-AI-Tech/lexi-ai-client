@@ -43,14 +43,13 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
     deviceName = "Tauri App";
   }
 
-  // Detect system type using Rust utility
   const systemType = await invoke<string>("get_system_type");
   if (
     systemType !== "mac" &&
     systemType !== "windows" &&
     systemType !== "unknown"
   ) {
-    throw new Error(`Invalid system type returned from Rust: ${systemType}`);
+    throw new Error(`Invalid system type: ${systemType}`);
   }
 
   return {

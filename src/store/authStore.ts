@@ -136,7 +136,7 @@ export const authStore: AuthState = {
     notifyListeners();
   },
   refreshTokenIfNeeded: async () => {
-    // No-op: Token refresh is handled automatically by Rust backend
+    // No-op: Token refresh is handled automatically
     return false;
   },
 };

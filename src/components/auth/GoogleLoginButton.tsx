@@ -144,7 +144,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     };
   }, [loading, checkStoredAuth]);
 
-  // Listen for OAuth events from Rust WebSocket
+  // Listen for OAuth events
   useEffect(() => {
     let unlistenFunctions: (() => void)[] = [];
     let isMounted = true;
@@ -159,7 +159,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         if (!isMounted) return;
         console.log("✅ OAuth completed event received:", event.payload);
         
-        // Reload auth data from secure storage (Rust already stored it)
+        // Reload auth data from secure storage
         checkStoredAuth();
         
         setLoading(false);
@@ -244,7 +244,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         );
       }
 
-      // Start OAuth flow with PKCE via Rust backend
+      // Start OAuth flow with PKCE
       // This generates PKCE challenge/verifier, builds auth URL, and opens browser
       // The browser will redirect to the callback page
       const pkceData = await invoke<{
@@ -261,8 +261,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         authUrl: pkceData.auth_url,
       });
 
-      // PKCE verifier is stored in Rust state via start_google_login
-      console.log("PKCE verifier stored in Rust state:", {
+      console.log("PKCE verifier stored:", {
         state: pkceData.state,
         stateLength: pkceData.state.length,
         verifierLength: pkceData.verifier.length,
@@ -270,7 +269,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       console.log("Waiting for OAuth callback...");
 
-      // Start WebSocket connection via Rust backend
+      // Start WebSocket connection
       await invoke("start_oauth_websocket", { state: pkceData.state });
       console.log("WebSocket connection started, waiting for OAuth completion");
     } catch (error: any) {
