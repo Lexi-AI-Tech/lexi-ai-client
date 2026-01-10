@@ -14,6 +14,7 @@
 use crate::commands::app_config;
 use crate::google_oauth;
 use crate::secure_storage::{self, AuthData, UserData};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
@@ -42,13 +43,48 @@ pub struct UserDataRequest {
     pub picture: Option<String>,
 }
 
-// Conversion implementations for cleaner code
+pub(crate) fn get_jwt_exp_claim(token: &str) -> Option<u64> {
+    let parts: Vec<&str> = token.split('.').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    
+    let payload = parts[1];
+    let padding = (4 - payload.len() % 4) % 4;
+    let padded = format!("{}{}", payload, "=".repeat(padding));
+    
+    if let Ok(decoded) = URL_SAFE_NO_PAD.decode(&padded) {
+        if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
+            if let Some(exp) = json.get("exp").and_then(|v| v.as_u64()) {
+                return Some(exp);
+            }
+        }
+    }
+    None
+}
+
 impl From<AuthDataRequest> for AuthData {
     fn from(request: AuthDataRequest) -> Self {
+        let expires_at = if request.expires_at.is_none() {
+            if let Some(exp) = get_jwt_exp_claim(&request.access_token) {
+                Some(exp)
+            } else if let Some(expires_in) = request.expires_in {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                Some(now + expires_in)
+            } else {
+                None
+            }
+        } else {
+            request.expires_at
+        };
+
         Self {
             access_token: request.access_token,
             refresh_token: request.refresh_token,
-            expires_at: request.expires_at,
+            expires_at,
             expires_in: request.expires_in,
             user: request.user.map(Into::into),
         }
@@ -224,19 +260,23 @@ async fn refresh_access_token(
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.to_string());
 
-                            // Calculate expires_at from expires_in
+                            let expires_at = get_jwt_exp_claim(access_token)
+                                .or_else(|| {
+                                    token_data
+                                        .get("expires_in")
+                                        .and_then(|v| v.as_u64())
+                                        .map(|expires_in| {
+                                            std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .unwrap()
+                                                .as_secs()
+                                                + expires_in
+                                        })
+                                });
+                            
                             let expires_in = token_data
                                 .get("expires_in")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(3600); // Default to 1 hour
-                            
-                            let expires_at = Some(
-                                std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_secs()
-                                    + expires_in,
-                            );
+                                .and_then(|v| v.as_u64());
 
                             // Get existing user data to preserve it
                             let existing_auth = secure_storage::get_auth_data(app)?;
@@ -247,7 +287,7 @@ async fn refresh_access_token(
                                 access_token: access_token.to_string(),
                                 refresh_token: refresh_token_new,
                                 expires_at,
-                                expires_in: Some(expires_in),
+                                expires_in,
                                 user,
                             };
 

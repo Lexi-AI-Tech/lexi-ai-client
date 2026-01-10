@@ -2,7 +2,6 @@
  * Storage Utilities
  *
  * Helper functions for managing localStorage (non-auth data)
- * Note: Auth data is now stored in OS keychain via secure storage
  */
 
 import { clearAuthDataSecure, getAuthDataSecure } from "./secureStorage";
@@ -48,7 +47,6 @@ export function clearOnboardingStorage(): void {
 
 /**
  * Get all Lexi AI storage keys and their values (for debugging)
- * Note: Auth data is stored in OS keychain, not localStorage
  */
 export async function getAllStorage(): Promise<Record<string, any>> {
   const storage: Record<string, any> = {};

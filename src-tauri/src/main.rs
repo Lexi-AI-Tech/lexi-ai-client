@@ -106,7 +106,7 @@ use commands::onboarding::{
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::text::inject_text;
-use commands::utils::get_system_type;
+use commands::utils::{format_date_relative, format_date_time, get_system_type};
 use commands::window::open_devtools;
 
 /// Command to control recording state
@@ -268,6 +268,8 @@ pub fn main() {
             get_app_config,
             update_app_config,
             get_system_type,
+            format_date_relative,
+            format_date_time,
             get_transcripts,
             get_transcript,
             delete_transcript,

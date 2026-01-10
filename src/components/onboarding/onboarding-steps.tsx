@@ -19,19 +19,19 @@ const stepVariants = {
 };
 
 // Step 1: Welcome
-export function WelcomeStep({ onNext }: { onNext: () => void }) {
+export function WelcomeStep({ onNext }: { onNext: () => void | Promise<void> }) {
   const { isAuthenticated, error } = useAuthStore();
   const { resetOnboarding } = useOnboardingStore();
   const { clearAuth } = useAuthStore();
   const [showDebugMenu, setShowDebugMenu] = useState(false);
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (
       confirm("Clear all app data? This will log you out and reset onboarding.")
     ) {
       clearAllStorage();
       clearAuth();
-      resetOnboarding();
+      await resetOnboarding();
       setShowDebugMenu(false);
       alert("All data cleared! Page will refresh.");
       window.location.reload();
@@ -47,10 +47,10 @@ export function WelcomeStep({ onNext }: { onNext: () => void }) {
     }
   };
 
-  const handleClearOnboarding = () => {
+  const handleClearOnboarding = async () => {
     if (confirm("Reset onboarding? You will need to go through setup again.")) {
       clearOnboardingStorage();
-      resetOnboarding();
+      await resetOnboarding();
       setShowDebugMenu(false);
       alert("Onboarding reset!");
     }
@@ -163,7 +163,7 @@ interface PermissionState {
   checking: boolean;
 }
 
-export function PermissionsStep({ onNext }: { onNext: () => void }) {
+export function PermissionsStep({ onNext }: { onNext: () => void | Promise<void> }) {
   const [microphone, setMicrophone] = useState<PermissionState>({
     granted: false,
     checking: false,
@@ -328,7 +328,7 @@ export function SetupStep({
   hotkey,
   setHotkey,
 }: {
-  onNext: () => void;
+  onNext: () => void | Promise<void>;
   hotkey: string | null;
   setHotkey: (k: string) => void;
 }) {
@@ -404,7 +404,7 @@ export function TryItStep({
   onComplete,
   hotkey,
 }: {
-  onComplete: () => void;
+  onComplete: () => void | Promise<void>;
   hotkey: string | null;
 }) {
   const [isListening, setIsListening] = useState(false);

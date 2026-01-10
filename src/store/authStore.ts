@@ -105,12 +105,6 @@ export const authStore: AuthState = {
     isAuthenticated = true;
     error = null;
 
-    // Calculate expires_at if not provided
-    if (!tokens.expires_at && tokens.expires_in) {
-      tokens.expires_at = Date.now() + tokens.expires_in * 1000;
-    }
-
-    // Save to secure storage (async, but don't block)
     saveToStorage().catch((err) => {
       console.error("Failed to save auth data:", err);
     });

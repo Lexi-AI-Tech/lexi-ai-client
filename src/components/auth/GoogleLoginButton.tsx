@@ -68,7 +68,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           access_token,
           refresh_token,
           expires_in,
-          expires_at: expires_in ? Date.now() + expires_in * 1000 : undefined,
+          expires_at: undefined,
         };
 
         setAuthData(authTokens, authUser);

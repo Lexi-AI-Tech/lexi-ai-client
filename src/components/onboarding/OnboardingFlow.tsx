@@ -12,7 +12,6 @@ import "./onboarding.css";
 import Logo from "../../assets/light_mode_without_text.png";
 
 const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];
-const STEP_KEYS = ["welcome", "permissions", "setup", "tryit"] as const;
 
 export const OnboardingFlow: React.FC = () => {
   const { currentStep, setStep, completeOnboarding } = useOnboardingStore();
@@ -36,7 +35,7 @@ export const OnboardingFlow: React.FC = () => {
 
   const currentStepIndex = getStepIndex();
 
-  const nextStep = () => {
+  const nextStep = async () => {
     const steps = [
       "welcome",
       "permissions",
@@ -44,12 +43,12 @@ export const OnboardingFlow: React.FC = () => {
       "microphone-test",
     ] as const;
     if (currentStepIndex < steps.length - 1) {
-      setStep(steps[currentStepIndex + 1]);
+      await setStep(steps[currentStepIndex + 1]);
     }
   };
 
-  const handleComplete = () => {
-    completeOnboarding();
+  const handleComplete = async () => {
+    await completeOnboarding();
   };
 
   return (

@@ -135,9 +135,36 @@ export const ActionsPage: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
+  // Format dates for all actions
+  const [formattedDates, setFormattedDates] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const formatAllDates = async () => {
+      if (!actionHistory) return;
+      
+      const formatted: Record<string, string> = {};
+      for (const action of actionHistory.actions) {
+        try {
+          const formattedDate = await invoke<string>("format_date_time", {
+            dateString: action.created_at,
+          });
+          formatted[action.id] = formattedDate;
+        } catch (error) {
+          console.error("Failed to format date:", error);
+          // Fallback to simple date string
+          formatted[action.id] = new Date(action.created_at).toLocaleString();
+        }
+      }
+      setFormattedDates(formatted);
+    };
+
+    if (actionHistory && actionHistory.actions.length > 0) {
+      formatAllDates();
+    }
+  }, [actionHistory]);
+
+  const formatDate = (actionId: string): string => {
+    return formattedDates[actionId] || "Loading...";
   };
 
   return (
@@ -441,7 +468,7 @@ export const ActionsPage: React.FC = () => {
                       marginTop: "8px",
                     }}
                   >
-                    {formatDate(action.created_at)} • Type: {action.action_type}
+                    {formatDate(action.id)} • Type: {action.action_type}
                   </div>
                 </div>
               ))}

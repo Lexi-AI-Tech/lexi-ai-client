@@ -135,22 +135,23 @@ pub async fn start_oauth_websocket(
                                                 if let (Some(access_token), Some(user)) = (data.access_token, data.user) {
                                                     println!("✅ OAuth completed, tokens received via WebSocket");
                                                     
-                                                    // Calculate expires_at from expires_in
-                                                    let expires_in = data.expires_in.unwrap_or(3600);
-                                                    let expires_at = Some(
-                                                        std::time::SystemTime::now()
-                                                            .duration_since(std::time::UNIX_EPOCH)
-                                                            .unwrap()
-                                                            .as_secs()
-                                                            + expires_in,
-                                                    );
+                                                    let expires_at = crate::commands::auth::get_jwt_exp_claim(&access_token)
+                                                        .or_else(|| {
+                                                            data.expires_in.map(|expires_in| {
+                                                                std::time::SystemTime::now()
+                                                                    .duration_since(std::time::UNIX_EPOCH)
+                                                                    .unwrap()
+                                                                    .as_secs()
+                                                                    + expires_in
+                                                            })
+                                                        });
 
                                                     // Store auth data
                                                     let auth_data = AuthData {
                                                         access_token: access_token.clone(),
                                                         refresh_token: data.refresh_token,
                                                         expires_at,
-                                                        expires_in: Some(expires_in),
+                                                        expires_in: data.expires_in,
                                                         user: Some(user.clone()),
                                                     };
 
