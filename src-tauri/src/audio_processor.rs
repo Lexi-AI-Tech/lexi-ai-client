@@ -10,7 +10,7 @@
 
 use crate::actions::{check_action_trigger, perform_action, ActionResponse};
 use crate::commands::app_config::get_app_config;
-use crate::commands::auth::get_auth_token;
+use crate::commands::auth::get_auth_token_async;
 use crate::shortcuts::check_command;
 use crate::state::TranscriptionTaskState;
 use crate::stt_service::SttService;
@@ -65,8 +65,8 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .emit("processing_start", ())
             .unwrap_or_default();
 
-        // Get authentication token from secure storage
-        let auth_token = get_auth_token(&app_handle_for_task);
+        // Get authentication token from secure storage (with automatic refresh if needed)
+        let auth_token = get_auth_token_async(&app_handle_for_task).await;
 
         if auth_token.is_none() {
             let error_msg = "User unauthenticated. Please log in.";

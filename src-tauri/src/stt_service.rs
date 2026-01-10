@@ -23,6 +23,7 @@
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
 use crate::api_endpoints::stt;
+use crate::commands::auth::get_auth_token_async;
 // use crate::whisper; // COMMENTED OUT: Model execution functionality
 use reqwest::multipart;
 use std::error::Error;
@@ -141,49 +142,52 @@ impl SttService {
         } else {
             // Continue with server API transcription
 
-            // Create a multipart form part for the audio file
-            // The server expects the audio file to be sent as a multipart form field
-            let part = multipart::Part::bytes(audio_data)
-                .file_name("audio.wav") // Filename hint for the server
-                .mime_str("audio/wav")?; // MIME type indicating WAV audio format
+            // Helper function to build the multipart form
+            let build_form = |audio_data: &[u8]| -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
+                let part = multipart::Part::bytes(audio_data.to_vec())
+                    .file_name("audio.wav")
+                    .mime_str("audio/wav")?;
 
-            // Build the multipart form with all parameters
-            let mut form = multipart::Form::new()
-                .part("audio_file", part) // Attach the audio file
-                .text("language", language.clone())
-                .text("enhance_stt_output", enhance_transcription.to_string())
-                .text("focused_app", focused_app.clone());
+                let mut form = multipart::Form::new()
+                    .part("audio_file", part)
+                    .text("language", language.clone())
+                    .text("enhance_stt_output", enhance_transcription.to_string())
+                    .text("focused_app", focused_app.clone());
 
-            // Add vocabulary as multiple form fields (FastAPI expects List[str] = Form(...))
-            // Each vocabulary word is sent as a separate form field with the same name
-            for word in &vocabulary {
-                form = form.text("vocabulary", word.clone());
-            }
+                for word in &vocabulary {
+                    form = form.text("vocabulary", word.clone());
+                }
 
-            // Build the request URL using centralized endpoint
-            let url = stt::transcribe_url();
-            let mut request = self.client.post(&url).multipart(form); // Attach the multipart form with audio file
+                Ok(form)
+            };
 
-            // Add authorization header if token is provided
-            if let Some(token) = &auth_token {
-                request = request.header("Authorization", format!("Bearer {}", token));
-                println!(
-                    "🔍 DEBUG: Added Authorization header (token length: {})",
-                    token.len()
-                );
+            // Check if we have a token
+            let mut current_token = if let Some(token) = auth_token {
+                token
             } else {
                 println!("🔍 DEBUG: No auth token provided - emitting login_required event");
-                // Emit login_required event to pill component if app_handle is available
                 if let Some(handle) = app_handle {
                     handle.emit("login_required", ()).unwrap_or_else(|e| {
                         eprintln!("Failed to emit login_required event: {}", e)
                     });
                 }
                 return Err("Authentication required. Please log in to continue.".into());
-            }
+            };
 
-            // Send the request with cancellation support
-            // Use tokio::select! to race between the request and cancellation signal
+            println!(
+                "🔍 DEBUG: Added Authorization header (token length: {})",
+                current_token.len()
+            );
+
+            // Build the form
+            let form = build_form(&audio_data)?;
+
+            // Build the request URL
+            let url = stt::transcribe_url();
+            let mut request = self.client.post(&url).multipart(form);
+            request = request.header("Authorization", format!("Bearer {}", current_token));
+
+            // Send the initial request with cancellation support
             let res = if let Some(cancel_rx) = cancel_rx {
                 tokio::select! {
                     result = request.send() => {
@@ -198,7 +202,6 @@ impl SttService {
                     }
                 }
             } else {
-                // No cancellation support, just send normally
                 request.send().await?
             };
 
@@ -210,7 +213,56 @@ impl SttService {
                 // Read the error response body
                 let error_text = res.text().await?;
                 println!("🔍 DEBUG: Server Error response: {}", error_text);
-                return Err(format!("Server Error ({}): {}", status, error_text).into());
+
+                // If we got a 401 Unauthorized, try to refresh the token and retry once
+                if status == reqwest::StatusCode::UNAUTHORIZED {
+                    println!("🔄 Received 401 Unauthorized, attempting token refresh...");
+                    
+                    // Try to refresh the token if we have an app handle
+                    if let Some(handle) = app_handle {
+                        if let Some(new_token) = get_auth_token_async(&handle).await {
+                            println!("✅ Token refreshed, retrying transcription request...");
+                            current_token = new_token;
+                            
+                            // Rebuild the form for retry
+                            let retry_form = build_form(&audio_data)?;
+                            
+                            // Build retry request
+                            let mut retry_request = self.client.post(&url).multipart(retry_form);
+                            retry_request = retry_request.header("Authorization", format!("Bearer {}", current_token));
+                            
+                            // Retry the request (without cancellation support for retry)
+                            let retry_res = retry_request.send().await?;
+
+                            let retry_status = retry_res.status();
+                            println!("🔍 DEBUG: Retry response status: {}", retry_status);
+
+                            if retry_status.is_success() {
+                                // Parse the plain text response
+                                let text = retry_res.text().await?;
+                                println!("🔍 DEBUG: Server response text: {}", text);
+                                return Ok(text);
+                            } else {
+                                let retry_error_text = retry_res.text().await?;
+                                println!("🔍 DEBUG: Retry Server Error response: {}", retry_error_text);
+                                return Err(format!("Server Error ({}): {}", retry_status, retry_error_text).into());
+                            }
+                        } else {
+                            println!("⚠️  Token refresh failed, user needs to re-authenticate");
+                            // Emit login_required event
+                            handle.emit("login_required", ()).unwrap_or_else(|e| {
+                                eprintln!("Failed to emit login_required event: {}", e)
+                            });
+                            return Err("Authentication failed. Please log in again.".into());
+                        }
+                    } else {
+                        // No app handle, can't refresh token
+                        return Err(format!("Server Error ({}): {}", status, error_text).into());
+                    }
+                } else {
+                    // Not a 401 error, return the error as-is
+                    return Err(format!("Server Error ({}): {}", status, error_text).into());
+                }
             }
 
             // Parse the plain text response

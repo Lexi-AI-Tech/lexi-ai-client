@@ -165,28 +165,187 @@ pub async fn has_auth_data(app: AppHandle) -> Result<bool, String> {
 // Internal Helper Functions
 // ============================================================================
 
+/// Refresh the access token using the refresh token
+///
+/// This function calls the backend refresh endpoint to get a new access token.
+/// It updates the stored auth data with the new tokens.
+///
+/// # Arguments
+/// * `app` - The Tauri AppHandle to access secure storage
+/// * `refresh_token` - The refresh token to use for refreshing
+///
+/// # Returns
+/// * `Result<Option<String>, String>` - The new access token if successful, None if refresh failed, Err if error occurred
+async fn refresh_access_token(
+    app: &AppHandle,
+    refresh_token: &str,
+) -> Result<Option<String>, String> {
+    use crate::api_endpoints::auth;
+    use reqwest;
+    use serde_json::json;
+
+    let client = reqwest::Client::new();
+    let url = auth::refresh_url();
+
+    // Get device info (simplified - you may want to enhance this)
+    let device_name = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| "Unknown".to_string());
+    let device_type = if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        "linux"
+    };
+
+    let request_body = json!({
+        "refresh_token": refresh_token,
+        "device_name": device_name,
+        "device_type": device_type,
+    });
+
+    println!("🔄 Attempting to refresh access token...");
+
+    match client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+    {
+        Ok(response) => {
+            if response.status().is_success() {
+                match response.json::<serde_json::Value>().await {
+                    Ok(data) => {
+                        // Handle both direct response and wrapped response
+                        let token_data = if data.get("data").is_some() {
+                            &data["data"]
+                        } else {
+                            &data
+                        };
+
+                        if let Some(access_token) = token_data.get("access_token").and_then(|v| v.as_str()) {
+                            let refresh_token_new = token_data
+                                .get("refresh_token")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+
+                            // Calculate expires_at from expires_in
+                            let expires_in = token_data
+                                .get("expires_in")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(3600); // Default to 1 hour
+                            
+                            let expires_at = Some(
+                                std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_secs()
+                                    + expires_in,
+                            );
+
+                            // Get existing user data to preserve it
+                            let existing_auth = secure_storage::get_auth_data(app)?;
+                            let user = existing_auth.and_then(|a| a.user);
+
+                            // Update stored auth data
+                            let new_auth_data = secure_storage::AuthData {
+                                access_token: access_token.to_string(),
+                                refresh_token: refresh_token_new,
+                                expires_at,
+                                expires_in: Some(expires_in),
+                                user,
+                            };
+
+                            secure_storage::store_auth_data(app, &new_auth_data)?;
+                            println!("✅ Access token refreshed successfully");
+                            Ok(Some(access_token.to_string()))
+                        } else {
+                            eprintln!("⚠️  Refresh response missing access_token");
+                            Ok(None)
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to parse refresh response: {}", e);
+                        Ok(None)
+                    }
+                }
+            } else {
+                let status = response.status();
+                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                eprintln!("⚠️  Token refresh failed: {} - {}", status, error_text);
+                Ok(None)
+            }
+        }
+        Err(e) => {
+            eprintln!("⚠️  Token refresh request failed: {}", e);
+            Err(format!("Token refresh request failed: {}", e))
+        }
+    }
+}
+
 /// Get the current authentication token (helper for internal Rust code)
 ///
-/// Convenience function that reads from secure storage and returns just the access token.
-/// For full auth data, use `get_auth_data()` instead. This is used internally by Rust code
-/// that only needs the token for API requests.
+/// This function checks if the token is expired or expiring soon (within 5 minutes),
+/// and automatically refreshes it if needed. For full auth data, use `get_auth_data()` instead.
 ///
 /// # Arguments
 /// * `app` - The Tauri AppHandle to access secure storage
 ///
 /// # Returns
 /// * `Option<String>` - The current access token if available, None otherwise
-pub fn get_auth_token(app: &AppHandle) -> Option<String> {
-    // Read directly from secure storage
-    match secure_storage::get_auth_data(app) {
-        Ok(Some(auth_data)) => Some(auth_data.access_token),
-        Ok(None) => None,
+pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
+    // Read auth data from secure storage
+    let auth_data = match secure_storage::get_auth_data(app) {
+        Ok(Some(data)) => data,
+        Ok(None) => return None,
         Err(e) => {
             eprintln!("⚠️  Failed to read auth token from secure storage: {}", e);
-            None
+            return None;
+        }
+    };
+
+    // Check if token is expired or expiring soon (within 5 minutes)
+    let buffer_time = 5 * 60; // 5 minutes in seconds
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let needs_refresh = if let Some(expires_at) = auth_data.expires_at {
+        expires_at <= now + buffer_time
+    } else {
+        // If expires_at is not set, assume token might be expired and try to refresh
+        // This is a safety measure for tokens stored before expires_at was tracked
+        true
+    };
+
+    if needs_refresh {
+        if let Some(refresh_token) = &auth_data.refresh_token {
+            println!("🔄 Token expired or expiring soon, refreshing...");
+            match refresh_access_token(app, refresh_token).await {
+                Ok(Some(new_token)) => return Some(new_token),
+                Ok(None) => {
+                    eprintln!("⚠️  Token refresh returned None");
+                    // Fall through to return existing token (might still work)
+                }
+                Err(e) => {
+                    eprintln!("⚠️  Token refresh failed: {}", e);
+                    // Fall through to return existing token (might still work)
+                }
+            }
+        } else {
+            eprintln!("⚠️  Token expired but no refresh token available");
+            // Return None to force re-authentication
+            return None;
         }
     }
+
+    // Token is still valid, return it
+    Some(auth_data.access_token)
 }
+
 
 // ============================================================================
 // OAuth Commands

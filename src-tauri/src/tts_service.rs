@@ -4,7 +4,7 @@
 //! It converts text to speech and plays the audio output.
 
 use crate::api_endpoints::tts;
-use crate::commands::auth::get_auth_token;
+use crate::commands::auth::get_auth_token_async;
 use reqwest::multipart;
 use std::error::Error;
 use std::fs;
@@ -45,8 +45,8 @@ impl TtsService {
 
         println!("🔊 Converting text to speech: '{}'", text);
 
-        // Get authentication token
-        let auth_token = get_auth_token(&self.app_handle);
+        // Get authentication token (with automatic refresh if needed)
+        let auth_token = get_auth_token_async(&self.app_handle).await;
         if auth_token.is_none() {
             return Err("Authentication required. Please log in.".into());
         }

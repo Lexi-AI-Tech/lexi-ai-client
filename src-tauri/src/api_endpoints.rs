@@ -10,6 +10,10 @@ const API_V1_PREFIX: &str = "/api/v1";
 
 /// Authentication endpoints
 pub mod auth {
+    use super::*;
+
+    pub const REFRESH: &str = "/auth/refresh";
+
     /// Get OAuth callback URL (full URL with base)
     /// Returns localhost URL in development, production URL when custom-protocol feature is enabled
     pub fn oauth_callback_url() -> &'static str {
@@ -21,6 +25,16 @@ pub mod auth {
         {
             "http://localhost:1230/api/v1/auth/google/callback"
         }
+    }
+
+    /// Build refresh token endpoint URL
+    pub fn refresh_url() -> String {
+        format!(
+            "{}{}{}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            REFRESH
+        )
     }
 }
 

@@ -13,7 +13,7 @@
 //!   original transcription
 
 use crate::api_endpoints::action;
-use crate::commands::auth::get_auth_token;
+use crate::commands::auth::get_auth_token_async;
 use crate::cursor_context::CursorContext;
 use reqwest::multipart;
 use serde::{Deserialize, Serialize};
@@ -233,8 +233,8 @@ pub async fn perform_action(
         println!("📝 No text selected");
     }
 
-    // Get authentication token from secure storage
-    let auth_token = get_auth_token(&app_handle);
+    // Get authentication token from secure storage (with automatic refresh if needed)
+    let auth_token = get_auth_token_async(&app_handle).await;
 
     if auth_token.is_none() {
         let error_msg = "Authentication required. Please log in.";
