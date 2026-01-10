@@ -149,9 +149,10 @@ fn open_browser(url: &str, app: AppHandle) {
 /// This command:
 /// 1. Generates PKCE challenge/verifier pair
 /// 2. Generates a random state for CSRF protection (includes system_type and device_type)
-/// 3. Builds Google OAuth authorization URL
-/// 4. Opens the browser with the auth URL
-/// 5. Returns the PKCE challenge and auth URL to the frontend
+/// 3. Stores the verifier in Redis via backend API
+/// 4. Builds Google OAuth authorization URL
+/// 5. Opens the browser with the auth URL
+/// 6. Returns the PKCE challenge and auth URL to the frontend
 #[tauri::command]
 pub async fn start_google_login(
     app: AppHandle,
@@ -174,10 +175,39 @@ pub async fn start_google_login(
     let state_with_metadata = format!("{}|{}|{}", base_state, system_type, device_type);
     let oauth_state = URL_SAFE_NO_PAD.encode(state_with_metadata.as_bytes());
 
-    // Store verifier with the full oauth_state as key
+    // Store verifier with the full oauth_state as key (local state for get_pkce_verifier command)
     {
         let mut verifiers = state.verifiers.lock().unwrap();
         verifiers.insert(oauth_state.clone(), verifier.clone());
+    }
+
+    // Store verifier in Redis via backend API (so backend can retrieve it during callback)
+    let api_base_url = config::api_base_url();
+    let store_verifier_url = format!("{}/api/v1/auth/oauth/verifier", api_base_url);
+    
+    let client = reqwest::Client::new();
+    let store_result = client
+        .post(&store_verifier_url)
+        .json(&serde_json::json!({
+            "state": oauth_state,
+            "verifier": verifier
+        }))
+        .send()
+        .await;
+
+    match store_result {
+        Ok(response) => {
+            if !response.status().is_success() {
+                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                eprintln!("Failed to store verifier in Redis: {}", error_text);
+                return Err(format!("Failed to store verifier: {}", error_text));
+            }
+            println!("✅ Stored PKCE verifier in Redis for state: {}...", &oauth_state[..20]);
+        }
+        Err(e) => {
+            eprintln!("Failed to send verifier to backend: {}", e);
+            return Err(format!("Failed to store verifier: {}", e));
+        }
     }
 
     // Build Google OAuth URL with configured redirect URI
@@ -188,7 +218,7 @@ pub async fn start_google_login(
     open_browser(&auth_url, app.clone());
 
     // Note: OAuth callback is now handled by the UI route (/auth/google/callback)
-    // The verifier is stored in state and can be retrieved via get_pkce_verifier command
+    // The verifier is stored in both local state and Redis
     // No need to start a separate callback server
 
     Ok(PkceChallenge {
