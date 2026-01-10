@@ -6,12 +6,12 @@
  * Uses OS keychain for secure storage (macOS Keychain, Windows Credential Manager, Linux Secret Service).
  */
 
+import React from "react";
 import {
   storeAuthDataSecure,
   getAuthDataSecure,
   clearAuthDataSecure,
 } from "../lib/secureStorage";
-// Token refresh is now handled automatically by Rust backend
 import type { AuthUser, AuthTokens, AuthState } from "../types";
 
 // Store state
@@ -21,7 +21,6 @@ let tokens: AuthTokens | null = null;
 let isLoading: boolean = false;
 let error: string | null = null;
 let storageInitialized: boolean = false;
-let isRefreshing: boolean = false; // Guard to prevent concurrent refresh loops
 
 // Load from secure storage (OS keychain)
 const loadFromStorage = async () => {
@@ -37,10 +36,6 @@ const loadFromStorage = async () => {
         expires_at: secureData.expires_at,
         expires_in: secureData.expires_in,
       };
-
-      // Token refresh is now handled automatically by Rust backend
-      // when tokens are retrieved via get_auth_token_async
-      // No need to refresh here - Rust will handle it when needed
 
       storageInitialized = true;
       notifyListeners();
@@ -141,15 +136,10 @@ export const authStore: AuthState = {
     notifyListeners();
   },
   refreshTokenIfNeeded: async () => {
-    // Token refresh is now handled automatically by Rust backend
-    // when tokens are retrieved via get_auth_token_async
-    // This function is kept for backward compatibility but does nothing
+    // No-op: Token refresh is handled automatically by Rust backend
     return false;
   },
 };
-
-// Import React for the hook
-import React from "react";
 
 // React hook to subscribe to store changes
 export const useAuthStore = () => {
@@ -159,15 +149,8 @@ export const useAuthStore = () => {
     const listener = () => forceUpdate();
     listeners.add(listener);
 
-    // Listen for auth expiration events from API client
-    const handleAuthExpired = () => {
-      authStore.clearAuth();
-    };
-    window.addEventListener("auth-expired", handleAuthExpired);
-
     return () => {
       listeners.delete(listener);
-      window.removeEventListener("auth-expired", handleAuthExpired);
     };
   }, []);
 

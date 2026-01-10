@@ -66,6 +66,7 @@ mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcrip
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
+mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use global_key_listener::start_listener;
@@ -95,6 +96,7 @@ use commands::shortcuts::{
     create_shortcut, delete_shortcut, get_shortcuts, update_shortcut,
 };
 use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
+use websocket::{start_oauth_websocket, stop_oauth_websocket};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
@@ -275,6 +277,8 @@ pub fn main() {
             create_shortcut,
             update_shortcut,
             delete_shortcut,
+            start_oauth_websocket,
+            stop_oauth_websocket,
         ])
         .setup(move |app| {
             // CRITICAL FIX FOR MACOS FLOATING WINDOWS
