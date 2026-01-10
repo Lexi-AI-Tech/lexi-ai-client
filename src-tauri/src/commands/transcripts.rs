@@ -17,7 +17,7 @@ pub struct Transcript {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PaginatedTranscriptsResponse {
-    pub items: Vec<Transcript>,
+    pub transcripts: Vec<Transcript>,
     pub total: i32,
     pub page: i32,
     pub page_size: i32,

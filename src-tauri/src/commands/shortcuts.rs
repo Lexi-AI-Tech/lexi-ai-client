@@ -12,10 +12,6 @@ pub struct Shortcut {
     #[serde(rename = "shortcut")]
     pub phrase: String,
     pub value: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_active: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub system_type: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

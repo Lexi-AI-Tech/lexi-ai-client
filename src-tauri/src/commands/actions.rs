@@ -9,14 +9,18 @@ use tauri::AppHandle;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActionHistory {
     pub id: String,
+    pub user_id: String,
+    pub action_command: String,
+    pub app_name: Option<String>,
+    pub selected_text: Option<String>,
     pub action_type: String,
-    pub value: String,
     pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PaginatedActionHistoryResponse {
-    pub items: Vec<ActionHistory>,
+    pub actions: Vec<ActionHistory>,
     pub total: i32,
     pub page: i32,
     pub page_size: i32,
@@ -26,20 +30,19 @@ pub struct PaginatedActionHistoryResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActionTrigger {
     pub id: String,
-    pub phrase: String,
+    pub trigger_phrase: String,
     pub is_active: bool,
-    pub system_type: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActionTriggerCreateRequest {
-    pub phrase: String,
+    pub trigger_phrase: String,
     pub is_active: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActionTriggerUpdateRequest {
-    pub phrase: Option<String>,
+    pub trigger_phrase: Option<String>,
     pub is_active: Option<bool>,
 }
 
