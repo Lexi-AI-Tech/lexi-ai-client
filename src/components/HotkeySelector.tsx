@@ -71,7 +71,7 @@ export function HotkeySelector({
       const currentConfig = hotkeysToConfig(hotkeys);
       const currentValueString = JSON.stringify(currentConfig.hotkeys);
       const propValueString = JSON.stringify(value.hotkeys);
-      
+
       // Only call onChange if:
       // 1. Current state differs from prop (user made a change)
       // 2. Current state differs from last notified value (avoid duplicate calls)

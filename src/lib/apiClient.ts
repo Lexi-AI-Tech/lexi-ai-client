@@ -13,6 +13,7 @@ import {
   USER_ENDPOINTS,
   APP_CONFIG_ENDPOINTS,
   ACTION_ENDPOINTS,
+  SHORTCUTS_ENDPOINTS,
   getApiUrl,
 } from "./apiEndpoints";
 import type {
@@ -861,7 +862,7 @@ export async function getShortcuts(
   });
 
   const response = await authenticatedFetch(
-    getApiUrl(ACTION_ENDPOINTS.shortcuts(params.toString())),
+    getApiUrl(SHORTCUTS_ENDPOINTS.list(params.toString())),
     {
       method: "GET",
     },
@@ -894,7 +895,7 @@ export async function createShortcut(
   });
 
   const response = await authenticatedFetch(
-    getApiUrl(`${ACTION_ENDPOINTS.createShortcut}?${params.toString()}`),
+    getApiUrl(`${SHORTCUTS_ENDPOINTS.create}?${params.toString()}`),
     {
       method: "POST",
       headers: {
@@ -932,9 +933,7 @@ export async function updateShortcut(
   });
 
   const response = await authenticatedFetch(
-    getApiUrl(
-      `${ACTION_ENDPOINTS.updateShortcut(shortcutId)}?${params.toString()}`,
-    ),
+    getApiUrl(`${SHORTCUTS_ENDPOINTS.update(shortcutId)}?${params.toString()}`),
     {
       method: "PUT",
       headers: {
@@ -971,9 +970,7 @@ export async function deleteShortcut(
   });
 
   const response = await authenticatedFetch(
-    getApiUrl(
-      `${ACTION_ENDPOINTS.deleteShortcut(shortcutId)}?${params.toString()}`,
-    ),
+    getApiUrl(`${SHORTCUTS_ENDPOINTS.delete(shortcutId)}?${params.toString()}`),
     {
       method: "DELETE",
     },
