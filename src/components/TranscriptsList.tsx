@@ -6,13 +6,11 @@
  */
 
 import React, { useCallback, useEffect, useState } from "react";
-
 import { invoke } from "@tauri-apps/api/core";
 import type { Transcript } from "../types";
 import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { useAuthStore } from "../store/authStore";
-
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
 export const TranscriptsList: React.FC = () => {

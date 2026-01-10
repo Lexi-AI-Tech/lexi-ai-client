@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SystemType } from "../lib/constants";
 import type {
-  ActionHistory,
   PaginatedActionHistoryResponse,
   ActionTrigger,
 } from "../types";

@@ -1,12 +1,12 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Mic, Keyboard, Sparkles, Check, Monitor } from "lucide-react";
-import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useOnboardingStore } from "../../store/onboardingStore";
 import { useAuthStore } from "../../store/authStore";
-import { GoogleLoginButton } from "../auth/GoogleLoginButton";
 import { clearAuthStorage } from "../../lib/storageUtils";
+import { GoogleLoginButton } from "../auth/GoogleLoginButton";
 
 const stepVariants = {
   initial: { opacity: 0, x: 10 },

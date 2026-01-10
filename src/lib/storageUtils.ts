@@ -6,7 +6,6 @@
 
 import { clearAuthDataSecure } from "./secureStorage";
 
-
 /**
  * Clear only authentication data from secure storage
  */
