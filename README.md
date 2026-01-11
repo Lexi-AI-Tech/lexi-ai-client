@@ -25,20 +25,7 @@ Speech-to-text overlay app for macOS built with Tauri and React.
    npm install
    ```
 
-3. **Run setup** (automatically done during dev/build, or manually):
-
-   The setup script automatically checks and configures all dependencies when you run `npm run dev` or `npm run build`.
-   It will:
-   - ✅ Check for Whisper binary and provide instructions if missing
-
-   To run setup manually:
-
-   ```bash
-   npm run setup
-   ```
-
-   **Note**: The Whisper binary must be built manually (see `src-tauri/bin/README.md` for instructions).
-   The setup script will warn you if it's missing but won't block development.
+**Note**: The Whisper binary must be built manually (see `src-tauri/bin/README.md` for instructions).
 
 ## Development
 
@@ -46,23 +33,11 @@ Speech-to-text overlay app for macOS built with Tauri and React.
 npm run dev
 ```
 
-This will automatically:
-
-- ✅ Check and setup Whisper binary (warns if missing)
-- ✅ Start the frontend dev server
-- ✅ Launch the Tauri app
-
 ## Building
 
 ```bash
 npm run build
 ```
-
-This will automatically:
-
-- ✅ Check and setup Whisper binary (warns if missing)
-- ✅ Build the frontend
-- ✅ Build the Tauri app with bundled resources
 
 ## Model Distribution
 
@@ -84,8 +59,7 @@ lexi-ai-client/
 │   ├── models/            # Whisper model (not in Git)
 │   ├── bin/               # Whisper binary
 │   └── tauri.conf.json    # Tauri configuration
-└── scripts/               # Build scripts
-    └── setup.sh          # Setup script (binary check)
+└── public/                # Static assets
 ```
 
 ## Troubleshooting

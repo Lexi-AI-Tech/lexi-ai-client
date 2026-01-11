@@ -23,7 +23,7 @@ pub mod auth {
         }
         #[cfg(not(feature = "custom-protocol"))]
         {
-            "http://localhost:1230/api/v1/auth/google/callback"
+            "http://localhost:3000/api/v1/auth/google/callback"
         }
     }
 

@@ -51,10 +51,7 @@ pub(crate) fn get_jwt_exp_claim(token: &str) -> Option<u64> {
     }
 
     let payload = parts[1];
-    let padding = (4 - payload.len() % 4) % 4;
-    let padded = format!("{}{}", payload, "=".repeat(padding));
-
-    if let Ok(decoded) = URL_SAFE_NO_PAD.decode(&padded) {
+    if let Ok(decoded) = URL_SAFE_NO_PAD.decode(payload) {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
             if let Some(exp) = json.get("exp").and_then(|v| v.as_u64()) {
                 return Some(exp);

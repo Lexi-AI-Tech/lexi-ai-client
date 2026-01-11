@@ -2,7 +2,7 @@
 //!
 //! This module provides centralized configuration values for the application.
 //! Configuration values are automatically selected based on build mode:
-//! - **Development mode**: Uses local server at `http://localhost:1230`
+//! - **Development mode**: Uses local server at `http://localhost:3000`
 //! - **Production mode** (when `custom-protocol` feature is enabled): Uses production server at `https://lexi-ai-server.onrender.com`
 
 /// Get the API base URL for the Lexi AI Server
@@ -14,7 +14,7 @@ pub fn api_base_url() -> &'static str {
     }
     #[cfg(not(feature = "custom-protocol"))]
     {
-        "http://localhost:1230"
+        "http://localhost:3000"
     }
 }
 
