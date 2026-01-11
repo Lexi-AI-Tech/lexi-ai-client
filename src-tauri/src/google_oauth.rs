@@ -88,7 +88,7 @@ fn build_google_oauth_url(
     challenge: &str,
 ) -> String {
     let scopes = "openid email profile";
-    
+
     format!(
         "https://accounts.google.com/o/oauth2/v2/auth?\
         client_id={}&\
@@ -165,11 +165,11 @@ pub async fn start_google_login(
 
     // Generate base state for CSRF protection
     let base_state = generate_oauth_state();
-    
+
     // Get system_type and device_type
     let system_type = utils::get_system_type();
     let device_type = utils::get_device_type();
-    
+
     // Encode system_type and device_type in the state parameter
     // Format: base64(base_state|system_type|device_type)
     let state_with_metadata = format!("{}|{}|{}", base_state, system_type, device_type);
@@ -184,7 +184,7 @@ pub async fn start_google_login(
     // Store verifier in Redis via backend API (so backend can retrieve it during callback)
     let api_base_url = config::api_base_url();
     let store_verifier_url = format!("{}/api/v1/auth/oauth/verifier", api_base_url);
-    
+
     let client = reqwest::Client::new();
     let store_result = client
         .post(&store_verifier_url)
@@ -198,11 +198,17 @@ pub async fn start_google_login(
     match store_result {
         Ok(response) => {
             if !response.status().is_success() {
-                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                let error_text = response
+                    .text()
+                    .await
+                    .unwrap_or_else(|_| "Unknown error".to_string());
                 eprintln!("Failed to store verifier in Redis: {}", error_text);
                 return Err(format!("Failed to store verifier: {}", error_text));
             }
-            println!("✅ Stored PKCE verifier in Redis for state: {}...", &oauth_state[..20]);
+            println!(
+                "✅ Stored PKCE verifier in Redis for state: {}...",
+                &oauth_state[..20]
+            );
         }
         Err(e) => {
             eprintln!("Failed to send verifier to backend: {}", e);

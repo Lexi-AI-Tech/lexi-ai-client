@@ -49,10 +49,7 @@ fn get_websocket_state() -> &'static Arc<Mutex<Option<WebSocketState>>> {
 /// # Returns
 /// * `Result<(), String>` - Ok if connection started successfully
 #[tauri::command]
-pub async fn start_oauth_websocket(
-    app: AppHandle,
-    state: String,
-) -> Result<(), String> {
+pub async fn start_oauth_websocket(app: AppHandle, state: String) -> Result<(), String> {
     // Check if there's already an active connection
     {
         let ws_state = get_websocket_state().lock().unwrap();
@@ -63,7 +60,9 @@ pub async fn start_oauth_websocket(
 
     // Build WebSocket URL
     let base_url = crate::config::api_base_url();
-    let ws_base_url = base_url.replace("https://", "wss://").replace("http://", "ws://");
+    let ws_base_url = base_url
+        .replace("https://", "wss://")
+        .replace("http://", "ws://");
     let ws_url = format!(
         "{}/api/v1/auth/ws/auth/{}",
         ws_base_url,
@@ -122,7 +121,7 @@ pub async fn start_oauth_websocket(
                             match msg {
                                 Some(Ok(Message::Text(text))) => {
                                     println!("📨 Received WebSocket message: {}", text);
-                                    
+
                                     match serde_json::from_str::<WebSocketMessage>(&text) {
                                         Ok(data) => {
                                             // Handle pong response (heartbeat)
@@ -134,7 +133,7 @@ pub async fn start_oauth_websocket(
                                             if data.status.as_deref() == Some("completed") {
                                                 if let (Some(access_token), Some(user)) = (data.access_token, data.user) {
                                                     println!("✅ OAuth completed, tokens received via WebSocket");
-                                                    
+
                                                     let expires_at = crate::commands::auth::get_jwt_exp_claim(&access_token)
                                                         .or_else(|| {
                                                             data.expires_in.map(|expires_in| {
@@ -175,7 +174,7 @@ pub async fn start_oauth_websocket(
                                                 // Handle authentication error
                                                 let error_msg = data.error.unwrap_or_else(|| "Authentication failed".to_string());
                                                 println!("❌ OAuth error received via WebSocket: {}", error_msg);
-                                                
+
                                                 app_clone
                                                     .emit("oauth-error", &error_msg)
                                                     .unwrap_or_default();
@@ -221,7 +220,10 @@ pub async fn start_oauth_websocket(
             Err(e) => {
                 eprintln!("❌ Failed to connect to WebSocket: {}", e);
                 app_clone
-                    .emit("oauth-error", &format!("Failed to connect to WebSocket: {}", e))
+                    .emit(
+                        "oauth-error",
+                        &format!("Failed to connect to WebSocket: {}", e),
+                    )
                     .unwrap_or_default();
             }
         }
@@ -243,7 +245,7 @@ pub async fn start_oauth_websocket(
 #[tauri::command]
 pub async fn stop_oauth_websocket() -> Result<(), String> {
     let mut ws_state = get_websocket_state().lock().unwrap();
-    
+
     if let Some(state) = ws_state.take() {
         if let Some(cancel_tx) = state.cancel_tx {
             let _ = cancel_tx.send(());

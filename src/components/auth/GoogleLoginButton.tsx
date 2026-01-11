@@ -177,19 +177,22 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       });
 
       // Listen for OAuth errors
-      const oauthErrorUnlisten = await listen<string>("oauth-error", (event) => {
-        if (!isMounted) return;
-        console.error("❌ OAuth error event received:", event.payload);
+      const oauthErrorUnlisten = await listen<string>(
+        "oauth-error",
+        (event) => {
+          if (!isMounted) return;
+          console.error("❌ OAuth error event received:", event.payload);
 
-        const errorMsg = event.payload || "Authentication failed";
-        setError(errorMsg);
-        setLoading(false);
-        setLocalLoading(false);
+          const errorMsg = event.payload || "Authentication failed";
+          setError(errorMsg);
+          setLoading(false);
+          setLocalLoading(false);
 
-        if (onError) {
-          onError(errorMsg);
-        }
-      });
+          if (onError) {
+            onError(errorMsg);
+          }
+        },
+      );
 
       // Listen for OAuth timeout
       const oauthTimeoutUnlisten = await listen<string>("oauth-timeout", () => {
@@ -246,7 +249,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       if (!clientId) {
         throw new Error(
           "Google OAuth credentials not configured. " +
-          "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
+            "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
         );
       }
 

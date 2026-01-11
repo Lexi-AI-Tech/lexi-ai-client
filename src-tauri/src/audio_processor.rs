@@ -256,7 +256,9 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                             }
                             "text_and_voice" => {
                                 // Hybrid action: Inject text AND Read it
-                                println!("🗣️📝 Hybrid action detected - injecting and reading text");
+                                println!(
+                                    "🗣️📝 Hybrid action detected - injecting and reading text"
+                                );
 
                                 // 1. Start TTS (async but do it first so user hears feedback while text types)
                                 let tts_service = TtsService::new(app_handle_for_task.clone());

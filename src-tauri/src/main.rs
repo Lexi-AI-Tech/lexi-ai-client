@@ -92,22 +92,20 @@ use commands::auth::{
     clear_auth_data, get_auth_data, get_current_user, get_pkce_verifier, has_auth_data, logout,
     start_google_login, store_auth_data,
 };
-use commands::shortcuts::{
-    create_shortcut, delete_shortcut, get_shortcuts, update_shortcut,
-};
-use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
-use websocket::{start_oauth_websocket, stop_oauth_websocket};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
 use commands::onboarding::{
-    complete_onboarding, get_onboarding_state, next_onboarding_step,
-    previous_onboarding_step, reset_onboarding, set_onboarding_step,
+    complete_onboarding, get_onboarding_state, next_onboarding_step, previous_onboarding_step,
+    reset_onboarding, set_onboarding_step,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
+use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
+use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
 use commands::utils::{format_date_relative, format_date_time, get_system_type};
 use commands::window::open_devtools;
+use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
 /// Command to control recording state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

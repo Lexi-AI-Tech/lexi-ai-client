@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SystemType } from "../lib/constants";
-import type {
-  PaginatedActionHistoryResponse,
-  ActionTrigger,
-} from "../types";
+import type { PaginatedActionHistoryResponse, ActionTrigger } from "../types";
 
 export const ActionsPage: React.FC = () => {
   const [actionHistory, setActionHistory] =
@@ -27,10 +24,13 @@ export const ActionsPage: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await invoke<PaginatedActionHistoryResponse>("get_action_history", {
-        page,
-        pageSize,
-      });
+      const data = await invoke<PaginatedActionHistoryResponse>(
+        "get_action_history",
+        {
+          page,
+          pageSize,
+        },
+      );
       setActionHistory(data);
     } catch (err: any) {
       console.error("Failed to load action history:", err);
@@ -135,12 +135,14 @@ export const ActionsPage: React.FC = () => {
   };
 
   // Format dates for all actions
-  const [formattedDates, setFormattedDates] = useState<Record<string, string>>({});
+  const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
+    {},
+  );
 
   useEffect(() => {
     const formatAllDates = async () => {
       if (!actionHistory) return;
-      
+
       const formatted: Record<string, string> = {};
       for (const action of actionHistory.actions) {
         try {

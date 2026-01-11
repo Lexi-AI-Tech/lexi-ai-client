@@ -158,8 +158,9 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
 /// Fetch app configuration from server and save to local store
 /// This bypasses the local store and always fetches fresh config from server
 pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> {
-    let auth_token =
-        get_auth_token_async(app).await.ok_or_else(|| "Please sign in to sync your settings".to_string())?;
+    let auth_token = get_auth_token_async(app)
+        .await
+        .ok_or_else(|| "Please sign in to sync your settings".to_string())?;
 
     let client = reqwest::Client::new();
     let url = app_config::get_url(Some(&format!("system_type={}", utils::get_system_type())));

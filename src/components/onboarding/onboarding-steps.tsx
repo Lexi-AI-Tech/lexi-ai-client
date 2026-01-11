@@ -15,7 +15,11 @@ const stepVariants = {
 };
 
 // Step 1: Welcome
-export function WelcomeStep({ onNext }: { onNext: () => void | Promise<void> }) {
+export function WelcomeStep({
+  onNext,
+}: {
+  onNext: () => void | Promise<void>;
+}) {
   const { isAuthenticated, error } = useAuthStore();
   const { resetOnboarding } = useOnboardingStore();
   const { clearAuth } = useAuthStore();
@@ -157,7 +161,11 @@ interface PermissionState {
   checking: boolean;
 }
 
-export function PermissionsStep({ onNext }: { onNext: () => void | Promise<void> }) {
+export function PermissionsStep({
+  onNext,
+}: {
+  onNext: () => void | Promise<void>;
+}) {
   const [microphone, setMicrophone] = useState<PermissionState>({
     granted: false,
     checking: false,
@@ -232,9 +240,7 @@ export function PermissionsStep({ onNext }: { onNext: () => void | Promise<void>
   };
 
   const allGranted =
-    microphone.granted &&
-    accessibility.granted &&
-    inputMonitoring.granted;
+    microphone.granted && accessibility.granted && inputMonitoring.granted;
 
   const permissions = [
     {

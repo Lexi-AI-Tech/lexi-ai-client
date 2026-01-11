@@ -48,11 +48,11 @@ pub(crate) fn get_jwt_exp_claim(token: &str) -> Option<u64> {
     if parts.len() != 3 {
         return None;
     }
-    
+
     let payload = parts[1];
     let padding = (4 - payload.len() % 4) % 4;
     let padded = format!("{}{}", payload, "=".repeat(padding));
-    
+
     if let Ok(decoded) = URL_SAFE_NO_PAD.decode(&padded) {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
             if let Some(exp) = json.get("exp").and_then(|v| v.as_u64()) {
@@ -254,29 +254,27 @@ async fn refresh_access_token(
                             &data
                         };
 
-                        if let Some(access_token) = token_data.get("access_token").and_then(|v| v.as_str()) {
+                        if let Some(access_token) =
+                            token_data.get("access_token").and_then(|v| v.as_str())
+                        {
                             let refresh_token_new = token_data
                                 .get("refresh_token")
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.to_string());
 
-                            let expires_at = get_jwt_exp_claim(access_token)
-                                .or_else(|| {
-                                    token_data
-                                        .get("expires_in")
-                                        .and_then(|v| v.as_u64())
-                                        .map(|expires_in| {
-                                            std::time::SystemTime::now()
-                                                .duration_since(std::time::UNIX_EPOCH)
-                                                .unwrap()
-                                                .as_secs()
-                                                + expires_in
-                                        })
-                                });
-                            
-                            let expires_in = token_data
-                                .get("expires_in")
-                                .and_then(|v| v.as_u64());
+                            let expires_at = get_jwt_exp_claim(access_token).or_else(|| {
+                                token_data.get("expires_in").and_then(|v| v.as_u64()).map(
+                                    |expires_in| {
+                                        std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap()
+                                            .as_secs()
+                                            + expires_in
+                                    },
+                                )
+                            });
+
+                            let expires_in = token_data.get("expires_in").and_then(|v| v.as_u64());
 
                             // Get existing user data to preserve it
                             let existing_auth = secure_storage::get_auth_data(app)?;
@@ -306,7 +304,10 @@ async fn refresh_access_token(
                 }
             } else {
                 let status = response.status();
-                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                let error_text = response
+                    .text()
+                    .await
+                    .unwrap_or_else(|_| "Unknown error".to_string());
                 eprintln!("⚠️  Token refresh failed: {} - {}", status, error_text);
                 Ok(None)
             }
@@ -378,7 +379,6 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
     // Token is still valid, return it
     Some(auth_data.access_token)
 }
-
 
 // ============================================================================
 // OAuth Commands

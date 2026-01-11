@@ -143,23 +143,24 @@ impl SttService {
             // Continue with server API transcription
 
             // Helper function to build the multipart form
-            let build_form = |audio_data: &[u8]| -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
-                let part = multipart::Part::bytes(audio_data.to_vec())
-                    .file_name("audio.wav")
-                    .mime_str("audio/wav")?;
+            let build_form =
+                |audio_data: &[u8]| -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
+                    let part = multipart::Part::bytes(audio_data.to_vec())
+                        .file_name("audio.wav")
+                        .mime_str("audio/wav")?;
 
-                let mut form = multipart::Form::new()
-                    .part("audio_file", part)
-                    .text("language", language.clone())
-                    .text("enhance_stt_output", enhance_transcription.to_string())
-                    .text("focused_app", focused_app.clone());
+                    let mut form = multipart::Form::new()
+                        .part("audio_file", part)
+                        .text("language", language.clone())
+                        .text("enhance_stt_output", enhance_transcription.to_string())
+                        .text("focused_app", focused_app.clone());
 
-                for word in &vocabulary {
-                    form = form.text("vocabulary", word.clone());
-                }
+                    for word in &vocabulary {
+                        form = form.text("vocabulary", word.clone());
+                    }
 
-                Ok(form)
-            };
+                    Ok(form)
+                };
 
             // Check if we have a token
             let mut current_token = if let Some(token) = auth_token {
@@ -217,20 +218,21 @@ impl SttService {
                 // If we got a 401 Unauthorized, try to refresh the token and retry once
                 if status == reqwest::StatusCode::UNAUTHORIZED {
                     println!("🔄 Received 401 Unauthorized, attempting token refresh...");
-                    
+
                     // Try to refresh the token if we have an app handle
                     if let Some(handle) = app_handle {
                         if let Some(new_token) = get_auth_token_async(&handle).await {
                             println!("✅ Token refreshed, retrying transcription request...");
                             current_token = new_token;
-                            
+
                             // Rebuild the form for retry
                             let retry_form = build_form(&audio_data)?;
-                            
+
                             // Build retry request
                             let mut retry_request = self.client.post(&url).multipart(retry_form);
-                            retry_request = retry_request.header("Authorization", format!("Bearer {}", current_token));
-                            
+                            retry_request = retry_request
+                                .header("Authorization", format!("Bearer {}", current_token));
+
                             // Retry the request (without cancellation support for retry)
                             let retry_res = retry_request.send().await?;
 
@@ -244,8 +246,15 @@ impl SttService {
                                 return Ok(text);
                             } else {
                                 let retry_error_text = retry_res.text().await?;
-                                println!("🔍 DEBUG: Retry Server Error response: {}", retry_error_text);
-                                return Err(format!("Server Error ({}): {}", retry_status, retry_error_text).into());
+                                println!(
+                                    "🔍 DEBUG: Retry Server Error response: {}",
+                                    retry_error_text
+                                );
+                                return Err(format!(
+                                    "Server Error ({}): {}",
+                                    retry_status, retry_error_text
+                                )
+                                .into());
                             }
                         } else {
                             println!("⚠️  Token refresh failed, user needs to re-authenticate");

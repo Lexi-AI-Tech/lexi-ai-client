@@ -187,7 +187,9 @@ export const TranscriptsList: React.FC = () => {
   };
 
   // Format dates for all transcripts
-  const [formattedDates, setFormattedDates] = useState<Record<number, string>>({});
+  const [formattedDates, setFormattedDates] = useState<Record<number, string>>(
+    {},
+  );
 
   useEffect(() => {
     const formatAllDates = async () => {
@@ -201,7 +203,9 @@ export const TranscriptsList: React.FC = () => {
         } catch (error) {
           console.error("Failed to format date:", error);
           // Fallback to simple date string
-          formatted[transcript.id] = new Date(transcript.created_at).toLocaleDateString();
+          formatted[transcript.id] = new Date(
+            transcript.created_at,
+          ).toLocaleDateString();
         }
       }
       setFormattedDates(formatted);

@@ -58,13 +58,25 @@ pub fn format_date_relative(date_string: String) -> Result<String, String> {
         Ok("Just now".to_string())
     } else if diff_mins < 60 {
         let mins = diff_mins as i64;
-        Ok(format!("{} minute{} ago", mins, if mins > 1 { "s" } else { "" }))
+        Ok(format!(
+            "{} minute{} ago",
+            mins,
+            if mins > 1 { "s" } else { "" }
+        ))
     } else if diff_hours < 24 {
         let hours = diff_hours as i64;
-        Ok(format!("{} hour{} ago", hours, if hours > 1 { "s" } else { "" }))
+        Ok(format!(
+            "{} hour{} ago",
+            hours,
+            if hours > 1 { "s" } else { "" }
+        ))
     } else if diff_days < 7 {
         let days = diff_days as i64;
-        Ok(format!("{} day{} ago", days, if days > 1 { "s" } else { "" }))
+        Ok(format!(
+            "{} day{} ago",
+            days,
+            if days > 1 { "s" } else { "" }
+        ))
     } else {
         // Format as date for older items
         Ok(date_utc.format("%b %d, %Y").to_string())

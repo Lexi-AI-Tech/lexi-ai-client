@@ -69,18 +69,19 @@ pub fn get_onboarding_state(app: AppHandle) -> Result<OnboardingState, String> {
         .map_err(|e| format!("Failed to access onboarding storage: {}", e))?;
 
     match store.get("state") {
-        Some(state_value) => {
-            match serde_json::from_value::<OnboardingState>(state_value.clone()) {
-                Ok(state) => {
-                    println!("✅ Loaded onboarding state from store");
-                    Ok(state)
-                }
-                Err(e) => {
-                    println!("⚠️  Failed to deserialize onboarding state: {}, using default", e);
-                    Ok(OnboardingState::default())
-                }
+        Some(state_value) => match serde_json::from_value::<OnboardingState>(state_value.clone()) {
+            Ok(state) => {
+                println!("✅ Loaded onboarding state from store");
+                Ok(state)
             }
-        }
+            Err(e) => {
+                println!(
+                    "⚠️  Failed to deserialize onboarding state: {}, using default",
+                    e
+                );
+                Ok(OnboardingState::default())
+            }
+        },
         None => {
             println!("📝 No onboarding state found, using default");
             Ok(OnboardingState::default())
@@ -98,10 +99,7 @@ pub fn get_onboarding_state(app: AppHandle) -> Result<OnboardingState, String> {
 /// # Returns
 /// * `OnboardingState` - Updated onboarding state
 #[tauri::command]
-pub fn set_onboarding_step(
-    app: AppHandle,
-    step: String,
-) -> Result<OnboardingState, String> {
+pub fn set_onboarding_step(app: AppHandle, step: String) -> Result<OnboardingState, String> {
     let onboarding_step = match step.as_str() {
         "welcome" => OnboardingStep::Welcome,
         "permissions" => OnboardingStep::Permissions,
@@ -196,10 +194,7 @@ pub fn reset_onboarding(app: AppHandle) -> Result<OnboardingState, String> {
 }
 
 /// Save onboarding state to Tauri Store
-fn save_onboarding_state(
-    app: &AppHandle,
-    state: &OnboardingState,
-) -> Result<(), String> {
+fn save_onboarding_state(app: &AppHandle, state: &OnboardingState) -> Result<(), String> {
     let store = app
         .store(STORE_FILE)
         .map_err(|e| format!("Failed to access onboarding storage: {}", e))?;

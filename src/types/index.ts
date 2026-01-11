@@ -200,11 +200,11 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-  | "transcripts"
-  | "settings"
-  | "vocabulary"
-  | "actions"
-  | "shortcuts";
+    | "transcripts"
+    | "settings"
+    | "vocabulary"
+    | "actions"
+    | "shortcuts";
   onNavigate: (
     page: "transcripts" | "settings" | "vocabulary" | "actions" | "shortcuts",
   ) => void;
