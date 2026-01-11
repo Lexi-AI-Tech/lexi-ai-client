@@ -78,9 +78,10 @@ export const TranscriptsList: React.FC = () => {
         errorMessage.includes("ECONNREFUSED");
 
       if (isAuthError) {
-        // Auth error - clear transcripts and let the login prompt show
+        // Auth error - clear transcripts and log out to show login button
         setTranscripts([]);
         setError(null);
+        authStore.clearAuth();
       } else if (isNetworkError) {
         // Network error - don't show error on initial load, just log it
         // User can retry manually if needed
