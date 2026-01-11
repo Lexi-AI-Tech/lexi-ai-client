@@ -38,6 +38,7 @@ pub struct AuthDataRequest {
 /// User data structure for authentication (frontend interface)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserDataRequest {
+    pub id: String,
     pub email: String,
     pub name: String,
     pub picture: Option<String>,
@@ -106,6 +107,7 @@ impl From<AuthData> for AuthDataRequest {
 impl From<UserDataRequest> for UserData {
     fn from(request: UserDataRequest) -> Self {
         Self {
+            id: request.id,
             email: request.email,
             name: request.name,
             picture: request.picture,
@@ -116,6 +118,7 @@ impl From<UserDataRequest> for UserData {
 impl From<UserData> for UserDataRequest {
     fn from(data: UserData) -> Self {
         Self {
+            id: data.id,
             email: data.email,
             name: data.name,
             picture: data.picture,
@@ -394,6 +397,7 @@ pub use google_oauth::start_google_login;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserInfo {
+    pub id: String,
     pub email: String,
     pub name: Option<String>,
     pub picture: Option<String>,

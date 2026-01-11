@@ -23,10 +23,10 @@ export interface AuthResponse {
   access_token: string;
   refresh_token: string;
   user: {
+    id: string;
     email: string;
     name: string;
     picture?: string;
-    id?: string;
   };
   expires_in?: number;
 }
@@ -36,6 +36,7 @@ export interface AuthResponse {
 // ============================================================================
 
 export interface AuthUser {
+  id: string;
   email: string;
   name: string;
   picture?: string;
@@ -92,8 +93,9 @@ export interface AppConfig {
   languages: LanguageCode[];
   enhance_transcription: boolean;
   launch_on_system_startup: boolean;
-  vocabulary?: VocabularyItem[] | null;
-  action_triggers?: ActionTrigger[] | null;
+  vocabulary: VocabularyItem[];
+  action_triggers: ActionTrigger[];
+  shortcuts: Shortcut[];
 }
 
 /**
@@ -108,6 +110,7 @@ export interface AppConfigUpdateRequest {
   launch_on_system_startup?: boolean;
   vocabulary?: VocabularyItem[] | null;
   action_triggers?: ActionTrigger[] | null;
+  shortcuts?: Shortcut[] | null;
 }
 
 /**
@@ -127,8 +130,8 @@ export interface TauriAppConfig {
 
 export interface Transcript {
   id: string;
-  user_id: number;
-  original_text: string | null;
+  user_id: string;
+  original_text: string;
   original_text_word_count: number;
   original_text_character_count: number;
   is_enhanced: boolean;
@@ -140,7 +143,6 @@ export interface Transcript {
   provider: string | null;
   asr_model: string | null;
   status: string;
-  error_message: string | null;
   created_at: string;
   updated_at: string;
 }

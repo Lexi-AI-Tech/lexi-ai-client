@@ -9,10 +9,21 @@ use tauri::AppHandle;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Transcript {
     pub id: String,
-    pub text: String,
+    pub user_id: String,
+    pub original_text: String,
+    pub original_text_word_count: i32,
+    pub original_text_character_count: i32,
+    pub is_enhanced: bool,
+    pub enhanced_text: Option<String>,
+    pub enhanced_text_word_count: Option<i32>,
+    pub enhanced_text_character_count: Option<i32>,
+    pub audio_file_url: Option<String>,
+    pub audio_file_size: Option<i32>,
+    pub provider: Option<String>,
+    pub asr_model: Option<String>,
     pub status: String,
     pub created_at: String,
-    pub updated_at: Option<String>,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
