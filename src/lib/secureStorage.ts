@@ -33,6 +33,7 @@ export async function storeAuthDataSecure(data: AuthData): Promise<void> {
         expires_in: data.expires_in || null,
         user: data.user
           ? {
+              id: data.user.id,
               email: data.user.email,
               name: data.user.name,
               picture: data.user.picture || null,

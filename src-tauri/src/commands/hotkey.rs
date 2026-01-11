@@ -70,6 +70,7 @@ pub async fn update_hotkey(
         launch_on_system_startup: current_config.launch_on_system_startup,
         vocabulary: current_config.vocabulary,
         action_triggers: current_config.action_triggers,
+        shortcuts: current_config.shortcuts,
     };
 
     update_app_config(app.clone(), app_config_update)

@@ -22,7 +22,7 @@ export const TranscriptsList: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Clear error on mount to prevent stale error messages
   useEffect(() => {
@@ -78,9 +78,10 @@ export const TranscriptsList: React.FC = () => {
         errorMessage.includes("ECONNREFUSED");
 
       if (isAuthError) {
-        // Auth error - clear transcripts and let the login prompt show
+        // Auth error - clear transcripts and log out to show login button
         setTranscripts([]);
         setError(null);
+        authStore.clearAuth();
       } else if (isNetworkError) {
         // Network error - don't show error on initial load, just log it
         // User can retry manually if needed
@@ -168,7 +169,7 @@ export const TranscriptsList: React.FC = () => {
     fetchTranscripts,
   ]);
 
-  const handleDelete = async (transcriptId: number) => {
+  const handleDelete = async (transcriptId: string) => {
     if (!confirm("Are you sure you want to delete this transcript?")) {
       return;
     }
@@ -187,13 +188,13 @@ export const TranscriptsList: React.FC = () => {
   };
 
   // Format dates for all transcripts
-  const [formattedDates, setFormattedDates] = useState<Record<number, string>>(
+  const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
     {},
   );
 
   useEffect(() => {
     const formatAllDates = async () => {
-      const formatted: Record<number, string> = {};
+      const formatted: Record<string, string> = {};
       for (const transcript of transcripts) {
         try {
           const formattedDate = await invoke<string>("format_date_relative", {
@@ -216,7 +217,7 @@ export const TranscriptsList: React.FC = () => {
     }
   }, [transcripts]);
 
-  const formatDate = (transcriptId: number): string => {
+  const formatDate = (transcriptId: string): string => {
     return formattedDates[transcriptId] || "Loading...";
   };
 

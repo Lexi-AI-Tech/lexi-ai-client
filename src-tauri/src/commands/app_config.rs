@@ -15,6 +15,7 @@ use tauri_plugin_store::StoreExt;
 
 use crate::api_endpoints::app_config;
 use crate::commands::auth::get_auth_token_async;
+use crate::commands::shortcuts::Shortcut;
 use crate::utils;
 
 const STORE_FILE: &str = ".app-config.dat";
@@ -22,6 +23,7 @@ const STORE_FILE: &str = ".app-config.dat";
 /// Vocabulary item structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VocabularyItem {
+    pub id: Option<String>,
     pub value: String,
     pub is_system_generated: bool,
     pub hidden: bool,
@@ -53,6 +55,8 @@ pub struct AppConfig {
     pub vocabulary: Option<Vec<VocabularyItem>>,
     /// Action triggers for voice commands (array of action trigger items)
     pub action_triggers: Option<Vec<ActionTrigger>>,
+    /// Shortcuts for text expansion (array of shortcut items)
+    pub shortcuts: Option<Vec<Shortcut>>,
 }
 
 // ============================================================================
@@ -66,14 +70,15 @@ pub struct AppConfig {
 /// Server response structure for app config
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ServerAppConfigResponse {
-    system_type: String,
-    device_type: Option<String>,
-    hotkeys: Vec<String>,
-    languages: Vec<String>,
-    enhance_transcription: bool,
-    launch_on_system_startup: bool,
-    vocabulary: Vec<VocabularyItem>,
-    action_triggers: Vec<ActionTrigger>,
+    pub system_type: String,
+    pub device_type: String,
+    pub hotkeys: Vec<String>,
+    pub languages: Vec<String>,
+    pub enhance_transcription: bool,
+    pub launch_on_system_startup: bool,
+    pub vocabulary: Vec<VocabularyItem>,
+    pub action_triggers: Vec<ActionTrigger>,
+    pub shortcuts: Vec<Shortcut>,
 }
 
 /// Get the complete app configuration from Tauri Store or server
@@ -139,6 +144,7 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
         launch_on_system_startup: Some(true), // Enable autostart by default on first launch
         vocabulary: None,
         action_triggers: None,
+        shortcuts: None,
     };
 
     // Save minimal config to store
@@ -292,6 +298,9 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.action_triggers.is_some() {
         current.action_triggers = provided.action_triggers;
     }
+    if provided.shortcuts.is_some() {
+        current.shortcuts = provided.shortcuts;
+    }
 }
 
 /// Save config to Tauri Store
@@ -320,6 +329,7 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         launch_on_system_startup: Some(response.launch_on_system_startup),
         vocabulary: Some(response.vocabulary),
         action_triggers: Some(response.action_triggers),
+        shortcuts: Some(response.shortcuts),
     }
 }
 
@@ -379,6 +389,12 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
         body.insert(
             "action_triggers".to_string(),
             serde_json::to_value(action_triggers).unwrap(),
+        );
+    }
+    if let Some(ref shortcuts) = config.shortcuts {
+        body.insert(
+            "shortcuts".to_string(),
+            serde_json::to_value(shortcuts).unwrap(),
         );
     }
 

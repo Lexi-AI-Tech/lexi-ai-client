@@ -6,7 +6,7 @@ use crate::commands::auth::get_auth_token_async;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Shortcut {
     pub id: String,
     #[serde(rename = "shortcut")]
