@@ -126,7 +126,7 @@ export interface TauriAppConfig {
 // ============================================================================
 
 export interface Transcript {
-  id: number;
+  id: string;
   user_id: number;
   original_text: string | null;
   original_text_word_count: number;
@@ -200,11 +200,11 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-    | "transcripts"
-    | "settings"
-    | "vocabulary"
-    | "actions"
-    | "shortcuts";
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts";
   onNavigate: (
     page: "transcripts" | "settings" | "vocabulary" | "actions" | "shortcuts",
   ) => void;

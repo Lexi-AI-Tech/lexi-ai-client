@@ -8,7 +8,7 @@ use tauri::AppHandle;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Transcript {
-    pub id: i32,
+    pub id: String,
     pub text: String,
     pub status: String,
     pub created_at: String,
@@ -101,7 +101,7 @@ pub async fn get_transcripts(
 
 /// Get a specific transcript by ID
 #[tauri::command]
-pub async fn get_transcript(app: AppHandle, transcript_id: i32) -> Result<Transcript, String> {
+pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Transcript, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
@@ -147,7 +147,7 @@ pub async fn get_transcript(app: AppHandle, transcript_id: i32) -> Result<Transc
 
 /// Delete a transcript by ID
 #[tauri::command]
-pub async fn delete_transcript(app: AppHandle, transcript_id: i32) -> Result<(), String> {
+pub async fn delete_transcript(app: AppHandle, transcript_id: String) -> Result<(), String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
