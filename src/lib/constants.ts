@@ -52,41 +52,6 @@ export function getAllLanguageCodes(): string[] {
 }
 
 /**
- * Check if a language code is valid
- */
-export function isValidLanguageCode(code: string): boolean {
-  return Object.values(LanguageCode).includes(code as LanguageCode);
-}
-
-/**
- * Get all system types as an array of strings
- */
-export function getAllSystemTypes(): string[] {
-  return Object.values(SystemType);
-}
-
-/**
- * Check if a system type is valid
- */
-export function isValidSystemType(type: string): boolean {
-  return Object.values(SystemType).includes(type as SystemType);
-}
-
-/**
- * Get all device types as an array of strings
- */
-export function getAllDeviceTypes(): string[] {
-  return Object.values(DeviceType);
-}
-
-/**
- * Check if a device type is valid
- */
-export function isValidDeviceType(type: string): boolean {
-  return Object.values(DeviceType).includes(type as DeviceType);
-}
-
-/**
  * Language display names mapping
  */
 export const LANGUAGE_NAMES: Record<LanguageCode, string> = {
@@ -118,3 +83,4 @@ export const LANGUAGE_NAMES: Record<LanguageCode, string> = {
 export function getLanguageName(code: string): string {
   return LANGUAGE_NAMES[code as LanguageCode] || code;
 }
+
