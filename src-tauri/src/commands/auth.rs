@@ -321,8 +321,12 @@ async fn refresh_access_token(
 
 /// Get the current authentication token (helper for internal Rust code)
 ///
-/// This function checks if the token is expired or expiring soon (within 5 minutes),
-/// and automatically refreshes it if needed. For full auth data, use `get_auth_data()` instead.
+/// Refresh strategy:
+/// - If token is EXPIRED: Block and refresh first, then return new token
+/// - If token expires within 5 minutes: Return current token, spawn background refresh
+/// - If token is valid (>5 min): Return token as-is
+///
+/// This ensures API calls never block for refresh unless absolutely necessary.
 ///
 /// # Arguments
 /// * `app` - The Tauri AppHandle to access secure storage
@@ -340,43 +344,62 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
         }
     };
 
-    // Check if token is expired or expiring soon (within 5 minutes)
-    let buffer_time = 5 * 60; // 5 minutes in seconds
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
 
-    let needs_refresh = if let Some(expires_at) = auth_data.expires_at {
-        expires_at <= now + buffer_time
+    let buffer_time = 5 * 60; // 5 minutes in seconds
+
+    // Determine token state
+    let (is_expired, needs_background_refresh) = if let Some(expires_at) = auth_data.expires_at {
+        let is_expired = expires_at <= now;
+        let expires_soon = expires_at <= now + buffer_time;
+        (is_expired, expires_soon && !is_expired)
     } else {
-        // If expires_at is not set, assume token might be expired and try to refresh
-        // This is a safety measure for tokens stored before expires_at was tracked
-        true
+        // No expires_at set - assume expired to be safe
+        (true, false)
     };
 
-    if needs_refresh {
+    // Case 1: Token is EXPIRED - must refresh before returning
+    if is_expired {
+        println!("🔴 Token expired, refreshing before API call...");
         if let Some(refresh_token) = &auth_data.refresh_token {
-            println!("🔄 Token expired or expiring soon, refreshing...");
             match refresh_access_token(app, refresh_token).await {
-                Ok(Some(new_token)) => return Some(new_token),
-                Ok(None) => {
-                    eprintln!("⚠️  Token refresh returned None");
-                    // Fall through to return existing token (might still work)
+                Ok(Some(new_token)) => {
+                    println!("✅ Token refreshed (was expired)");
+                    return Some(new_token);
                 }
-                Err(e) => {
-                    eprintln!("⚠️  Token refresh failed: {}", e);
-                    // Fall through to return existing token (might still work)
+                Ok(None) | Err(_) => {
+                    eprintln!("⚠️  Token refresh failed, user needs to re-authenticate");
+                    return None; // Force re-auth
                 }
             }
         } else {
             eprintln!("⚠️  Token expired but no refresh token available");
-            // Return None to force re-authentication
             return None;
         }
     }
 
-    // Token is still valid, return it
+    // Case 2: Token expires soon (<5 min) - return current token, refresh in background
+    if needs_background_refresh {
+        println!("🟡 Token expires soon, spawning background refresh...");
+        if let Some(refresh_token) = auth_data.refresh_token.clone() {
+            let app_clone = app.clone();
+            // Spawn background task - don't block API call
+            tokio::spawn(async move {
+                match refresh_access_token(&app_clone, &refresh_token).await {
+                    Ok(Some(_)) => println!("✅ Background token refresh completed"),
+                    Ok(None) => println!("⚠️  Background token refresh returned None"),
+                    Err(e) => eprintln!("⚠️  Background token refresh failed: {}", e),
+                }
+            });
+        }
+        // Return current token immediately (still valid)
+        return Some(auth_data.access_token);
+    }
+
+    // Case 3: Token is valid (>5 min to expiry) - return as-is
     Some(auth_data.access_token)
 }
 

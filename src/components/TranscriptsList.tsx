@@ -78,23 +78,10 @@ export const TranscriptsList: React.FC = () => {
         errorMessage.includes("ECONNREFUSED");
 
       if (isAuthError) {
-        // Auth error - try to refresh token first before clearing
-        console.log("🔄 Auth error detected, attempting token refresh...");
-        try {
-          const refreshed = await invoke<boolean>("refresh_auth_token");
-          if (refreshed) {
-            console.log("✅ Token refreshed, retrying fetch...");
-            // Retry fetch after successful refresh
-            await fetchTranscripts();
-            return;
-          } else {
-            console.log("⚠️ Token refresh failed, clearing auth");
-          }
-        } catch (refreshErr) {
-          console.error("Token refresh error:", refreshErr);
-        } finally {
-          authStore.clearAuth();
-        }
+        // Auth error - Rust backend already tried to refresh token via get_auth_token_async()
+        // If we still got 401, the refresh failed or tokens are invalid
+        console.log("🔴 Auth error after Rust-side refresh attempt, clearing auth");
+        authStore.clearAuth();
         setTranscripts([]);
         setError(null);
       } else if (isNetworkError) {
