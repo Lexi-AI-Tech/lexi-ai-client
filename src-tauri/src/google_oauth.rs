@@ -35,6 +35,7 @@ use std::process::Command;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 
+use crate::api_endpoints;
 use crate::config;
 use crate::utils;
 
@@ -217,8 +218,8 @@ pub async fn start_google_login(
     }
 
     // Build Google OAuth URL with configured redirect URI
-    let redirect_uri = config::oauth_redirect_uri();
-    let auth_url = build_google_oauth_url(&client_id, redirect_uri, &oauth_state, &challenge);
+    let redirect_uri = api_endpoints::auth::oauth_callback_url();
+    let auth_url = build_google_oauth_url(&client_id, &redirect_uri, &oauth_state, &challenge);
 
     // Open browser
     open_browser(&auth_url, app.clone());
