@@ -15,7 +15,6 @@ pub mod auth {
     pub const REFRESH: &str = "/auth/refresh";
     pub const OAUTH_GOOGLE_CALLBACK: &str = "/auth/google/callback";
 
-
     /// Get OAuth callback URL (full URL with base)
     pub fn oauth_callback_url() -> String {
         format!(

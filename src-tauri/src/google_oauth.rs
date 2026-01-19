@@ -35,9 +35,9 @@ use std::process::Command;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 
+use crate::api_endpoints;
 use crate::config;
 use crate::utils;
-use crate::api_endpoints;
 
 /// OAuth state management for storing PKCE verifiers
 /// Maps OAuth state strings to their corresponding PKCE verifiers
