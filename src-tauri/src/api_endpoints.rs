@@ -13,18 +13,17 @@ pub mod auth {
     use super::*;
 
     pub const REFRESH: &str = "/auth/refresh";
+    pub const OAUTH_GOOGLE_CALLBACK: &str = "/auth/google/callback";
+
 
     /// Get OAuth callback URL (full URL with base)
-    /// Returns localhost URL in development, production URL when custom-protocol feature is enabled
-    pub fn oauth_callback_url() -> &'static str {
-        #[cfg(feature = "custom-protocol")]
-        {
-            "https://lexi-ai-server.onrender.com/api/v1/auth/google/callback"
-        }
-        #[cfg(not(feature = "custom-protocol"))]
-        {
-            "http://localhost:3000/api/v1/auth/google/callback"
-        }
+    pub fn oauth_callback_url() -> String {
+        format!(
+            "{}{}{}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            OAUTH_GOOGLE_CALLBACK
+        )
     }
 
     /// Build refresh token endpoint URL
@@ -42,7 +41,7 @@ pub mod auth {
 pub mod stt {
     use super::*;
 
-    pub const TRANSCRIBE: &str = "/stt/";
+    pub const TRANSCRIBE: &str = "/stt";
 
     /// Build transcribe endpoint URL (no query parameters, all data in form body)
     pub fn transcribe_url() -> String {

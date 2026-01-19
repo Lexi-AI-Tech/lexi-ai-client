@@ -14,15 +14,7 @@ pub fn api_base_url() -> &'static str {
     }
     #[cfg(not(feature = "custom-protocol"))]
     {
-        "http://localhost:3000"
+        "https://dev-server.speaklexi.com"
+        // "http://localhost:3000"
     }
-}
-
-/// Get the OAuth redirect URI for the callback server
-/// This points to the backend callback endpoint
-/// Returns localhost URL in development, production URL when custom-protocol feature is enabled
-///
-/// Note: This function now delegates to the centralized endpoint in api_endpoints module
-pub fn oauth_redirect_uri() -> &'static str {
-    crate::api_endpoints::auth::oauth_callback_url()
 }
