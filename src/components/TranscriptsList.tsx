@@ -78,10 +78,12 @@ export const TranscriptsList: React.FC = () => {
         errorMessage.includes("ECONNREFUSED");
 
       if (isAuthError) {
-        // Auth error - clear transcripts and log out to show login button
+        // Auth error - Rust backend already tried to refresh token via get_auth_token_async()
+        // If we still got 401, the refresh failed or tokens are invalid
+        console.log("🔴 Auth error after Rust-side refresh attempt, clearing auth");
+        authStore.clearAuth();
         setTranscripts([]);
         setError(null);
-        authStore.clearAuth();
       } else if (isNetworkError) {
         // Network error - don't show error on initial load, just log it
         // User can retry manually if needed

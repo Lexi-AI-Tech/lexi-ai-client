@@ -1,18 +1,18 @@
 /**
  * Storage Utilities
  *
- * Helper functions for managing localStorage (non-auth data)
+ * Helper functions for managing storage
  */
 
-import { clearAuthDataSecure } from "./secureStorage";
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * Clear only authentication data from secure storage
  */
 export async function clearAuthStorage(): Promise<void> {
   try {
-    await clearAuthDataSecure();
-    console.log("✅ Auth storage cleared from secure storage");
+    await invoke("clear_auth_data");
+    console.log("✅ Auth storage cleared");
   } catch (e) {
     console.error("Failed to clear auth storage:", e);
     throw e;

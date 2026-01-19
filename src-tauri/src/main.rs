@@ -90,7 +90,7 @@ use commands::actions::{
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
     clear_auth_data, get_auth_data, get_current_user, get_pkce_verifier, has_auth_data, logout,
-    start_google_login, store_auth_data,
+    refresh_auth_token, start_google_login, store_auth_data,
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
@@ -263,6 +263,7 @@ pub fn main() {
             has_auth_data,
             get_current_user,
             logout,
+            refresh_auth_token,
             get_app_config,
             update_app_config,
             get_system_type,
@@ -317,6 +318,18 @@ pub fn main() {
                 println!("🔗 Deep link received: {:?}", event.urls());
                 // Show and focus the main window when deep link is received
                 show_and_focus_main_window(&app_handle_clone);
+            });
+
+            // Refresh auth token on app startup (background task)
+            // This ensures tokens are fresh before the user interacts with the app
+            let app_handle_for_auth = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                use commands::auth::get_auth_token_async;
+                println!("🔑 Checking auth token on startup...");
+                match get_auth_token_async(&app_handle_for_auth).await {
+                    Some(_) => println!("✅ Auth token valid on startup"),
+                    None => println!("ℹ️  No valid auth token - user needs to login"),
+                }
             });
 
             // COMMENTED OUT: Model execution functionality
