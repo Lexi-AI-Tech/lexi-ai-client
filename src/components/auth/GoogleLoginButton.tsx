@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAuthStore, authStore } from "../../store/authStore";
@@ -14,143 +14,12 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     clearAuth,
     setLoading,
     setError,
-    setAuthData,
     user,
     isAuthenticated,
   } = useAuthStore();
   const [loading, setLocalLoading] = useState(false);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Check auth store for tokens (auth store loads from secure storage)
-  const checkStoredAuth = React.useCallback(async () => {
-    try {
-      // Force reload from secure storage to get latest state from Rust backend
-      await authStore.checkAuth();
-
-      // Wait for auth store to initialize
-      if (!authStore.isInitialized) {
-        return false;
-      }
-
-      if (
-        authStore.isAuthenticated &&
-        authStore.tokens?.access_token &&
-        authStore.user
-      ) {
-        console.log("✅ Found stored auth in auth store, using it");
-        // Found stored auth, use it
-        setAuthData(authStore.tokens, authStore.user);
-        setLoading(false);
-        setLocalLoading(false);
-
-        if (onSuccess) {
-          onSuccess(authStore.user);
-        }
-        return true;
-      }
-    } catch (e) {
-      console.error("Error checking stored auth:", e);
-    }
-    return false;
-  }, [setAuthData, setLoading, onSuccess]);
-
-  // Listen for OAuth callback messages from the callback page
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      console.log("Received postMessage:", event.data);
-      // Only accept messages from our backend
-      if (event.data?.type === "oauth-success") {
-        const {
-          access_token,
-          refresh_token,
-          user: authUser,
-          expires_in,
-        } = event.data;
-
-        const authTokens = {
-          access_token,
-          refresh_token,
-          expires_in,
-          expires_at: undefined,
-        };
-
-        setAuthData(authTokens, authUser);
-        setLoading(false);
-        setLocalLoading(false);
-
-        if (onSuccess) {
-          onSuccess(authUser);
-        }
-      } else if (event.data?.type === "oauth-error") {
-        const errorMsg = event.data.error || "Authentication failed";
-        setError(errorMsg);
-        setLoading(false);
-        setLocalLoading(false);
-
-        if (onError) {
-          onError(errorMsg);
-        }
-      }
-    };
-
-    // Listen for postMessage (when opened from web)
-    window.addEventListener("message", handleMessage);
-
-    return () => {
-      window.removeEventListener("message", handleMessage);
-    };
-  }, [setAuthData, setError, setLoading, onSuccess, onError, checkStoredAuth]);
-
-  // Poll auth store when loading (auth store loads from secure storage)
-  useEffect(() => {
-    if (!loading) {
-      // Stop polling when not loading
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-      return;
-    }
-
-    console.log("Starting to poll auth store, loading:", loading);
-
-    // Check immediately
-    checkStoredAuth().then((found) => {
-      if (found) {
-        console.log("Auth found immediately, stopping");
-        return; // Already found, no need to poll
-      }
-
-      // Clear any existing interval
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-
-      // Poll every 200ms (more frequent) until we find tokens
-      console.log("Starting polling interval");
-      pollIntervalRef.current = setInterval(async () => {
-        console.log("Polling auth store...");
-        const found = await checkStoredAuth();
-        if (found) {
-          console.log("Auth found via polling, stopping");
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-          }
-        }
-      }, 200); // Check every 200ms for faster detection
-    });
-
-    return () => {
-      console.log("Cleaning up polling");
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    };
-  }, [loading, checkStoredAuth]);
-
-  // Listen for OAuth events
+  // Listen for OAuth events from Rust backend
   useEffect(() => {
     let unlistenFunctions: (() => void)[] = [];
     let isMounted = true;
@@ -158,6 +27,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     const setupEventListeners = async () => {
       // Listen for OAuth completion
       const oauthCompletedUnlisten = await listen<{
+        id: string;
         email: string;
         name: string;
         picture?: string;
@@ -165,8 +35,8 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         if (!isMounted) return;
         console.log("✅ OAuth completed event received:", event.payload);
 
-        // Reload auth data from secure storage
-        await checkStoredAuth();
+        // Reload auth state from Rust backend (already stored by WebSocket handler)
+        await authStore.checkAuth();
 
         setLoading(false);
         setLocalLoading(false);
@@ -215,7 +85,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           oauthTimeoutUnlisten,
         ];
       } else {
-        // Component unmounted before listeners were set up, clean up immediately
         oauthCompletedUnlisten();
         oauthErrorUnlisten();
         oauthTimeoutUnlisten();
@@ -228,7 +97,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       isMounted = false;
       unlistenFunctions.forEach((unlisten) => unlisten());
     };
-  }, [checkStoredAuth, onSuccess, onError, setError, setLoading]);
+  }, [onSuccess, onError, setError, setLoading]);
 
   // Cleanup WebSocket connection on unmount
   useEffect(() => {
@@ -243,19 +112,16 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     setError(null);
 
     try {
-      // Get client ID from environment
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
       if (!clientId) {
         throw new Error(
           "Google OAuth credentials not configured. " +
-            "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
+          "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
         );
       }
 
-      // Start OAuth flow with PKCE
-      // This generates PKCE challenge/verifier, builds auth URL, and opens browser
-      // The browser will redirect to the callback page
+      // Start OAuth flow - Rust handles everything
       const pkceData = await invoke<{
         challenge: string;
         verifier: string;
@@ -263,24 +129,11 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         auth_url: string;
       }>("start_google_login", { clientId });
 
-      console.log("PKCE challenge generated, browser opened:", {
-        state: pkceData.state,
-        stateLength: pkceData.state.length,
-        verifierLength: pkceData.verifier.length,
-        authUrl: pkceData.auth_url,
-      });
+      console.log("OAuth started, state:", pkceData.state.slice(0, 10) + "...");
 
-      console.log("PKCE verifier stored:", {
-        state: pkceData.state,
-        stateLength: pkceData.state.length,
-        verifierLength: pkceData.verifier.length,
-      });
-
-      console.log("Waiting for OAuth callback...");
-
-      // Start WebSocket connection
+      // Start WebSocket connection to receive OAuth result
       await invoke("start_oauth_websocket", { state: pkceData.state });
-      console.log("WebSocket connection started, waiting for OAuth completion");
+      console.log("WebSocket connection started");
     } catch (error: any) {
       const errorMessage = error?.message || "Google login failed";
       console.error("Google Login Failed:", error);
@@ -288,7 +141,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       setLocalLoading(false);
       setLoading(false);
 
-      // Stop WebSocket connection on error
       await invoke("stop_oauth_websocket").catch(console.error);
 
       if (onError) {
@@ -302,16 +154,13 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       setLocalLoading(true);
       setLoading(true);
 
-      // Logout from backend first (revokes all sessions)
+      // Logout from backend (revokes sessions) and clear local state
       await invoke("logout");
-
-      // Clear local auth state
       clearAuth();
 
       console.log("✅ Logout successful");
     } catch (error) {
       console.error("Logout Failed:", error);
-
       clearAuth();
     } finally {
       setLocalLoading(false);
