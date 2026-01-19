@@ -381,6 +381,46 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
 }
 
 // ============================================================================
+// Token Refresh Command (for Frontend)
+// ============================================================================
+
+/// Refresh the authentication token
+///
+/// This command is callable from the frontend (TypeScript) to trigger a token refresh.
+/// It reads the refresh token from secure storage and calls the backend to get new tokens.
+///
+/// # Returns
+/// * `Ok(true)` - Token was successfully refreshed
+/// * `Ok(false)` - No refresh token available or refresh failed
+/// * `Err(String)` - Error occurred during refresh
+#[tauri::command]
+pub async fn refresh_auth_token(app: AppHandle) -> Result<bool, String> {
+    let auth_data = match secure_storage::get_auth_data(&app)? {
+        Some(data) => data,
+        None => return Ok(false), // No auth data, nothing to refresh
+    };
+
+    if let Some(refresh_token) = &auth_data.refresh_token {
+        match refresh_access_token(&app, refresh_token).await {
+            Ok(Some(_)) => {
+                println!("✅ Token refreshed via frontend command");
+                Ok(true)
+            }
+            Ok(None) => {
+                println!("⚠️  Token refresh returned None");
+                Ok(false)
+            }
+            Err(e) => {
+                eprintln!("⚠️  Token refresh failed: {}", e);
+                Err(e)
+            }
+        }
+    } else {
+        Ok(false) // No refresh token available
+    }
+}
+
+// ============================================================================
 // OAuth Commands
 // ============================================================================
 

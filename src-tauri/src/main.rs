@@ -90,7 +90,7 @@ use commands::actions::{
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
     clear_auth_data, get_auth_data, get_current_user, get_pkce_verifier, has_auth_data, logout,
-    start_google_login, store_auth_data,
+    refresh_auth_token, start_google_login, store_auth_data,
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
@@ -263,6 +263,7 @@ pub fn main() {
             has_auth_data,
             get_current_user,
             logout,
+            refresh_auth_token,
             get_app_config,
             update_app_config,
             get_system_type,
