@@ -320,6 +320,18 @@ pub fn main() {
                 show_and_focus_main_window(&app_handle_clone);
             });
 
+            // Refresh auth token on app startup (background task)
+            // This ensures tokens are fresh before the user interacts with the app
+            let app_handle_for_auth = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                use commands::auth::get_auth_token_async;
+                println!("🔑 Checking auth token on startup...");
+                match get_auth_token_async(&app_handle_for_auth).await {
+                    Some(_) => println!("✅ Auth token valid on startup"),
+                    None => println!("ℹ️  No valid auth token - user needs to login"),
+                }
+            });
+
             // COMMENTED OUT: Model execution functionality
             // Preload Whisper model in background to reduce first transcription latency
             // Only preload if model and executable are available (optional)

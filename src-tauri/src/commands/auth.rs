@@ -349,7 +349,7 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
         .unwrap()
         .as_secs();
 
-    let buffer_time = 5 * 60; // 5 minutes in seconds
+    let buffer_time = 15 * 60; // 15 minutes in seconds
 
     // Determine token state
     let (is_expired, needs_background_refresh) = if let Some(expires_at) = auth_data.expires_at {
@@ -381,7 +381,7 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
         }
     }
 
-    // Case 2: Token expires soon (<5 min) - return current token, refresh in background
+    // Case 2: Token expires soon (<15 min) - return current token, refresh in background
     if needs_background_refresh {
         println!("🟡 Token expires soon, spawning background refresh...");
         if let Some(refresh_token) = auth_data.refresh_token.clone() {
@@ -399,7 +399,7 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
         return Some(auth_data.access_token);
     }
 
-    // Case 3: Token is valid (>5 min to expiry) - return as-is
+    // Case 3: Token is valid (>15 min to expiry) - return as-is
     Some(auth_data.access_token)
 }
 
