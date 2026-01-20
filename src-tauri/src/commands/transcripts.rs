@@ -4,7 +4,7 @@
 
 use crate::commands::auth::get_auth_token_async;
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Transcript {
@@ -45,9 +45,15 @@ pub async fn get_transcripts(
     order_by: Option<String>,
     order_direction: Option<String>,
 ) -> Result<PaginatedTranscriptsResponse, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .ok_or_else(|| "Authentication required".to_string())?;
+    let auth_token = match get_auth_token_async(&app).await {
+        Some(token) => token,
+        None => {
+            // Token refresh failed - emit event to notify frontend
+            app.emit("auth_expired", ())
+                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            return Err("Authentication required".to_string());
+        }
+    };
 
     let page = page.unwrap_or(1);
     let page_size = page_size.unwrap_or(20);
@@ -113,9 +119,15 @@ pub async fn get_transcripts(
 /// Get a specific transcript by ID
 #[tauri::command]
 pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Transcript, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .ok_or_else(|| "Authentication required".to_string())?;
+    let auth_token = match get_auth_token_async(&app).await {
+        Some(token) => token,
+        None => {
+            // Token refresh failed - emit event to notify frontend
+            app.emit("auth_expired", ())
+                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            return Err("Authentication required".to_string());
+        }
+    };
 
     let url = format!(
         "{}/api/v1/transcripts/{}",
@@ -159,9 +171,15 @@ pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Tra
 /// Delete a transcript by ID
 #[tauri::command]
 pub async fn delete_transcript(app: AppHandle, transcript_id: String) -> Result<(), String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .ok_or_else(|| "Authentication required".to_string())?;
+    let auth_token = match get_auth_token_async(&app).await {
+        Some(token) => token,
+        None => {
+            // Token refresh failed - emit event to notify frontend
+            app.emit("auth_expired", ())
+                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            return Err("Authentication required".to_string());
+        }
+    };
 
     let url = format!(
         "{}/api/v1/transcripts/{}",

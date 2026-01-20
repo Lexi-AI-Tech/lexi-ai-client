@@ -9,7 +9,7 @@
 //! - `update_app_config` - Update app configuration (automatically syncs autostart and cloud)
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
@@ -164,9 +164,15 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
 /// Fetch app configuration from server and save to local store
 /// This bypasses the local store and always fetches fresh config from server
 pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> {
-    let auth_token = get_auth_token_async(app)
-        .await
-        .ok_or_else(|| "Please sign in to sync your settings".to_string())?;
+    let auth_token = match get_auth_token_async(app).await {
+        Some(token) => token,
+        None => {
+            // Token refresh failed - emit event to notify frontend
+            app.emit("auth_expired", ())
+                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            return Err("Please sign in to sync your settings".to_string());
+        }
+    };
 
     let client = reqwest::Client::new();
     let url = app_config::get_url(Some(&format!("system_type={}", utils::get_system_type())));

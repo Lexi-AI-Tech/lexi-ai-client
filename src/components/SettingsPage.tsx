@@ -10,8 +10,8 @@ import {
 import type { TauriAppConfig, HotkeyConfig } from "../types";
 
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
-import { ModelsSection } from "./ModelsSection";
 import { HotkeySelector } from "./HotkeySelector";
+import { useAuthStore } from "../store/authStore";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -20,6 +20,7 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
 }));
 
 export const SettingsPage: React.FC = () => {
+  const authStore = useAuthStore();
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(
     null,
@@ -392,6 +393,52 @@ export const SettingsPage: React.FC = () => {
           }}
         >
           Loading settings...
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  // This prevents showing cached config when user is logged out
+  if (!authStore.isAuthenticated) {
+    return (
+      <div className="settings-page">
+        <h2
+          style={{
+            margin: 0,
+            marginBottom: "32px",
+            fontSize: "24px",
+            fontWeight: 600,
+            color: "#ffffff",
+          }}
+        >
+          Settings
+        </h2>
+        <div style={{ marginBottom: "32px" }}>
+          <h3
+            style={{
+              margin: 0,
+              marginBottom: "16px",
+              fontSize: "18px",
+              fontWeight: 500,
+              color: "#ffffff",
+            }}
+          >
+            Account
+          </h3>
+          <div style={{ textAlign: "center", padding: "16px 0" }}>
+            <p className="permission-text" style={{ marginBottom: "16px" }}>
+              Sign in to access your settings
+            </p>
+            <GoogleLoginButton
+              onSuccess={() => {
+                // Settings will be loaded automatically via useEffect
+              }}
+              onError={(err) => {
+                setError(err || "Authentication failed");
+              }}
+            />
+          </div>
         </div>
       </div>
     );

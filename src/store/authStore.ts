@@ -12,6 +12,7 @@
 
 import React from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { AuthUser, AuthTokens, AuthState, AuthData } from "../types";
 
 // Store state (in-memory only)
@@ -54,6 +55,25 @@ const initializeFromRust = async () => {
 
 // Initialize on module load
 initializeFromRust();
+
+// Listen for auth_expired events from Rust backend
+// This is emitted when token refresh fails (after attempting refresh)
+listen("auth_expired", () => {
+  console.log("🔴 Auth expired event received, clearing auth state");
+  isAuthenticated = false;
+  user = null;
+  tokens = null;
+  error = null;
+
+  // Clear from Rust backend
+  invoke("clear_auth_data").catch((err: any) => {
+    console.error("Failed to clear auth data:", err);
+  });
+
+  notifyListeners();
+}).catch((err: any) => {
+  console.error("Failed to setup auth_expired listener:", err);
+});
 
 export const authStore: AuthState = {
   get isAuthenticated() {
