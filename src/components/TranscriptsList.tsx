@@ -80,10 +80,14 @@ export const TranscriptsList: React.FC = () => {
       if (isAuthError) {
         // Auth error - Rust backend already tried to refresh token via get_auth_token_async()
         // If we still got 401, the refresh failed or tokens are invalid
-        console.log("🔴 Auth error after Rust-side refresh attempt, clearing auth");
+        // The backend will emit auth_expired event, which authStore will handle
+        // Don't show error - just let the UI transition to login state
+        console.log(
+          "🔴 Auth error after Rust-side refresh attempt, clearing auth",
+        );
         authStore.clearAuth();
         setTranscripts([]);
-        setError(null);
+        setError(null); // No error message - silent logout
       } else if (isNetworkError) {
         // Network error - don't show error on initial load, just log it
         // User can retry manually if needed
