@@ -3,7 +3,7 @@
  *
  * Manages authentication state for Lexi AI.
  * This is a pure in-memory state manager - all storage is handled by Rust backend.
- * 
+ *
  * Storage operations:
  * - Startup: Calls Rust get_auth_data to load persisted state
  * - Login: Rust WebSocket stores auth, React just updates in-memory state

@@ -10,13 +10,8 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onSuccess,
   onError,
 }) => {
-  const {
-    clearAuth,
-    setLoading,
-    setError,
-    user,
-    isAuthenticated,
-  } = useAuthStore();
+  const { clearAuth, setLoading, setError, user, isAuthenticated } =
+    useAuthStore();
   const [loading, setLocalLoading] = useState(false);
 
   // Listen for OAuth events from Rust backend
@@ -117,7 +112,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       if (!clientId) {
         throw new Error(
           "Google OAuth credentials not configured. " +
-          "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
+            "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
         );
       }
 
