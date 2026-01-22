@@ -44,7 +44,7 @@
         "minWidth": 350,
         "minHeight": 400,
         "alwaysOnTop": false,
-        "skipTaskbar": true,
+        "skipTaskbar": false,
         "decorations": true,
         "transparent": false,
         "url": "index.html",
@@ -57,7 +57,10 @@
   },
   "plugins": {
     "deep-link": {
-      "schemes": ["lexi-ai", "lexi"]
+      "schemes": [
+        "lexi-ai",
+        "lexi"
+      ]
     }
   }
 }

@@ -135,7 +135,15 @@ pub fn main() {
     #[cfg(debug_assertions)]
     let devtools = tauri_plugin_devtools::init();
 
-    let builder = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // Add tauri-nspanel plugin on macOS for advanced NSPanel features
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    let builder = builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_autostart::init(
@@ -213,10 +221,6 @@ pub fn main() {
                 .build(),
         )
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            #[cfg(target_os = "macos")]
-            {
-                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            }
             println!("🔄 Second instance launch detected (e.g., from Spotlight or app icon)");
             show_and_focus_main_window(&app.app_handle());
 
@@ -292,14 +296,13 @@ pub fn main() {
             reset_onboarding,
         ])
         .setup(move |app| {
-            // CRITICAL FIX FOR MACOS FLOATING WINDOWS
-            // This policy allows the app to have accessory windows (like the pill)
-            // that float above all spaces and do not clutter the Dock/App Switcher.
-            // Must be set before getting the app handle to avoid borrow checker issues.
+            // SET MACOS TO REGULAR APP MODE
+            // The app appears in the Dock as a normal application
+            // The pill window will use NSPanel to float above all windows
             #[cfg(target_os = "macos")]
             {
-                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-                println!("🍎 Set macOS activation policy to Accessory (app will not appear in Dock)");
+                app.set_activation_policy(tauri::ActivationPolicy::Regular);
+                println!("🍎 Set macOS activation policy to Regular (app will appear in Dock)");
             }
 
             let app_handle = app.handle();
@@ -501,12 +504,6 @@ pub fn main() {
                 tauri::WindowEvent::Focused(focused) => {
                     if window.label() == "main" && *focused {
                         println!("🔍 Main window received focus event");
-                        #[cfg(target_os = "macos")]
-                        {
-                            let _ = window
-                                .app_handle()
-                                .set_activation_policy(tauri::ActivationPolicy::Accessory);
-                        }
                         let is_visible = window.is_visible().unwrap_or(false);
                         if !is_visible {
                             show_and_focus_main_window(&window.app_handle());
@@ -516,15 +513,7 @@ pub fn main() {
                         }
                     }
                 }
-                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
-                    // Re-apply activation policy on window interactions to ensure Dock stays hidden
-                    #[cfg(target_os = "macos")]
-                    if window.label() == "main" {
-                        let _ = window
-                            .app_handle()
-                            .set_activation_policy(tauri::ActivationPolicy::Accessory);
-                    }
-                }
+
                 _ => {}
             }
         })
