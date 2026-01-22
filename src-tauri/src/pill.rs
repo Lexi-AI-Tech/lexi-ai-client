@@ -9,27 +9,35 @@
 //!
 //! - **Size**: 200x50 pixels (fixed, non-resizable)
 //! - **Position**: Bottom center of primary monitor, above taskbar/dock
-//! - **Always on Top**: Floats above all other windows
+//! - **Always on Top**: Floats above all other windows including fullscreen apps
 //! - **Visible on All Workspaces**: Appears across all macOS spaces/desktops
 //! - **Transparent**: No window decorations, fully transparent background
 //! - **Skip Taskbar**: Doesn't appear in Dock or app switcher
 //! - **Non-Focusable**: Doesn't steal focus from active application
 //!
-//! ## Window Lifecycle
+//! ## NSPanel Implementation (macOS)
 //!
-//! 1. **Initialization**: Window is created at app startup via `init_pill_window()`
-//! 2. **Recording Start**: Window is shown when recording begins
-//! 3. **Recording Stop**: Window is hidden when recording ends
-//! 4. **Positioning**: Window position is calculated responsively based on screen size
-//!
-//! ## Implementation Details
-//!
-//! The window is created dynamically in Rust using Tauri's `WebviewWindowBuilder` for
-//! better control over window properties. Permanent properties (always_on_top,
-//! visible_on_all_workspaces) are set immediately after window creation to ensure
-//! they are applied correctly by the OS window manager.
+//! On macOS, the window is converted to an NSPanel for better fullscreen app support:
+//! - **ScreenSaver Level**: Floats above fullscreen apps
+//! - **CanJoinAllSpaces**: Appears on all virtual desktops
+//! - **FullScreenAuxiliary**: Works alongside fullscreen applications
+//! - **IgnoresCycle**: Excluded from Cmd+Tab app cycling
+//! - **NonactivatingPanel**: Doesn't activate when shown
 
-use tauri::{AppHandle, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, LogicalPosition, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
+};
+
+// Define NSPanel type for overlay on macOS
+#[cfg(target_os = "macos")]
+tauri_nspanel::tauri_panel! {
+    panel!(PillPanel {
+        config: {
+            can_become_key_window: false,
+            is_floating_panel: true
+        }
+    })
+}
 
 /// Calculate the bottom position of the primary monitor, just above the taskbar/dock
 ///
@@ -68,10 +76,10 @@ fn calculate_bottom_position(app: &AppHandle) -> Result<(f64, f64), String> {
     Ok((x, y))
 }
 
-/// Create the pill overlay window dynamically
+/// Create the pill overlay window dynamically using NSPanel on macOS
 ///
 /// This function creates the pill window with all necessary properties.
-/// The window is created on-demand rather than at app startup.
+/// On macOS, the window is converted to NSPanel for better fullscreen app behavior.
 ///
 /// # Arguments
 /// * `app` - The Tauri app handle
@@ -88,7 +96,7 @@ fn create_pill_window(app: &AppHandle) -> Result<(), String> {
     let pill_height = 6.6;
 
     // Create the window builder
-    let pill_builder = WebviewWindowBuilder::new(app, "pill", WebviewUrl::App("pill.html".into()))
+    let pill_window = WebviewWindowBuilder::new(app, "pill", WebviewUrl::App("pill.html".into()))
         .title("Pill")
         .inner_size(pill_width, pill_height)
         .resizable(false)
@@ -101,26 +109,61 @@ fn create_pill_window(app: &AppHandle) -> Result<(), String> {
         .skip_taskbar(true)
         .position(position_x, position_y)
         .visible(false) // Start hidden, will be shown when needed
-        .focused(false); // Don't steal focus
-
-    // Build the window
-    let pill_window = pill_builder
+        .focused(false)
+        .focusable(false)
         .build()
         .map_err(|e| format!("Failed to create pill window: {}", e))?;
 
-    // CRITICAL: Set visible on all workspaces immediately after creation
-    // This is the most reliable place to set permanent window behavior.
-    // Setting it before the window is shown ensures the OS window manager
-    // applies the property correctly, especially on macOS.
-    pill_window
-        .set_visible_on_all_workspaces(true)
-        .map_err(|e| format!("Failed to set visible on all workspaces: {}", e))?;
+    // Position it near the bottom center
+    if let Ok(Some(monitor)) = pill_window.primary_monitor() {
+        let screen_size = monitor.size();
+        let screen_width = screen_size.width as f64;
+        let x = (screen_width - pill_width) / 2.0;
+        pill_window
+            .set_position(PhysicalPosition::new(x as i32, 40))
+            .ok();
+    }
 
-    // Also ensure always on top is set immediately after creation
-    // This ensures the property is applied before the window is shown
-    pill_window
-        .set_always_on_top(true)
-        .map_err(|e| format!("Failed to set always on top: {}", e))?;
+    // On macOS, convert to NSPanel for better fullscreen app behavior
+    #[cfg(target_os = "macos")]
+    {
+        use tauri_nspanel::{CollectionBehavior, PanelLevel, WebviewWindowExt};
+        match pill_window.to_panel::<PillPanel>() {
+            Ok(panel) => {
+                // Configure panel to float above fullscreen apps
+                panel.set_level(PanelLevel::ScreenSaver.value());
+                panel.set_floating_panel(true);
+
+                // Set collection behavior to appear on all spaces including fullscreen
+                // - can_join_all_spaces: appears on all Spaces (virtual desktops)
+                // - full_screen_auxiliary: works alongside fullscreen apps
+                // - ignores_cycle: excluded from Cmd+Tab app cycling
+                let behavior = CollectionBehavior::new()
+                    .can_join_all_spaces()
+                    .full_screen_auxiliary()
+                    .ignores_cycle();
+                panel.set_collection_behavior(behavior.value());
+
+                // Set style mask to non-activating panel
+                let style = tauri_nspanel::StyleMask::empty().nonactivating_panel();
+                panel.set_style_mask(style.value());
+
+                // Force the panel to re-register with the window server after setting behaviors
+                // A hide/show cycle is more reliable than order_front_regardless alone
+                // This mimics what happens when dragging the window - the window server
+                // re-evaluates and properly applies the collection behavior
+                panel.hide();
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                panel.show();
+                panel.order_front_regardless();
+
+                println!("✅ Pill window converted to NSPanel with fullscreen support");
+            }
+            Err(e) => {
+                eprintln!("Failed to convert pill window to NSPanel: {:?}", e);
+            }
+        }
+    }
 
     println!(
         "Pill window created successfully at ({}, {})",
@@ -157,8 +200,7 @@ fn ensure_pill_window_exists(app: &AppHandle) -> Result<(), String> {
 ///
 /// This function ensures the pill window exists and positions it at the bottom center of the screen,
 /// just above the taskbar/dock. The window is created dynamically if it doesn't exist.
-/// Permanent window properties (visible_on_all_workspaces, always_on_top) are set
-/// during window creation in create_pill_window, so we only need to handle positioning and visibility here.
+/// On macOS, it uses NSPanel for better fullscreen app support.
 ///
 /// # Arguments
 /// * `app` - The Tauri app handle
@@ -167,7 +209,7 @@ fn ensure_pill_window_exists(app: &AppHandle) -> Result<(), String> {
 /// * `Ok(())` - Successfully positioned and showed the window
 /// * `Err(String)` - An error message if the operation failed
 pub fn init_pill_window(app: AppHandle) -> Result<(), String> {
-    // 1. Ensure the window exists (creates it with all floating properties)
+    // 1. Ensure the window exists (creates it with NSPanel on macOS)
     ensure_pill_window_exists(&app)?;
 
     if let Some(pill_window) = app.get_webview_window("pill") {
@@ -178,8 +220,6 @@ pub fn init_pill_window(app: AppHandle) -> Result<(), String> {
             .map_err(|e| format!("Failed to position pill window: {}", e))?;
 
         // 3. Show the window at startup
-        // Permanent properties (visible_on_all_workspaces, always_on_top) are already
-        // set during window creation in create_pill_window, so no need to set them again
         pill_window
             .show()
             .map_err(|e| format!("Failed to show pill window: {}", e))?;
@@ -193,7 +233,6 @@ pub fn init_pill_window(app: AppHandle) -> Result<(), String> {
 /// Show and position the pill overlay window
 ///
 /// This command shows the pill window (creating it if necessary) and positions it at the specified coordinates.
-/// Permanent window properties are set during creation, so we only handle positioning and visibility here.
 ///
 /// # Arguments
 /// * `app` - The Tauri app handle
@@ -204,7 +243,7 @@ pub fn init_pill_window(app: AppHandle) -> Result<(), String> {
 /// * `Ok(())` - Successfully showed and positioned the window
 /// * `Err(String)` - An error message if the operation failed
 pub fn show_pill_window(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
-    // Ensure the window exists (this sets permanent properties during creation)
+    // Ensure the window exists
     ensure_pill_window_exists(&app)?;
 
     if let Some(pill_window) = app.get_webview_window("pill") {
@@ -216,9 +255,6 @@ pub fn show_pill_window(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
         pill_window
             .show()
             .map_err(|e| format!("Failed to show pill window: {}", e))?;
-
-        // No need to call set_visible_on_all_workspaces/set_always_on_top here
-        // as they are handled in create_pill_window during window creation
 
         Ok(())
     } else {
@@ -261,9 +297,6 @@ pub fn toggle_pill_window(app: AppHandle) -> Result<(), String> {
             pill_window
                 .show()
                 .map_err(|e| format!("Failed to show pill window: {}", e))?;
-
-            // No need to call set_visible_on_all_workspaces/set_always_on_top here
-            // as they are handled in create_pill_window during window creation
         }
 
         Ok(())

@@ -39,8 +39,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::{mpsc, Arc, Mutex};
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Listener, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
@@ -64,6 +62,7 @@ mod shortcuts; // Voice command shortcuts that replace transcriptions with prede
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod tray; // System tray icon creation and event handling
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
@@ -117,8 +116,8 @@ pub enum RecordingCommand {
 /// Main entry point for the Tauri application
 ///
 /// Sets up the application with the following:
-/// 1. Configures macOS activation policy to Accessory (app doesn't appear in Dock)
-/// 2. Initializes and positions the pill overlay window at startup
+/// 1. Uses default Regular activation policy (app appears in Dock like normal macOS app)
+/// 2. Initializes pill overlay window with NSPanel for floating above fullscreen apps
 /// 3. Starts global keyboard listener in background thread (rdev) to monitor Function key
 /// 4. Spawns dedicated recording thread that responds to Function key press/release signals
 /// 5. Configures window close behavior to hide instead of close (keeps app running for hotkeys)
@@ -135,7 +134,15 @@ pub fn main() {
     #[cfg(debug_assertions)]
     let devtools = tauri_plugin_devtools::init();
 
-    let builder = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // Add tauri-nspanel plugin on macOS for advanced NSPanel features
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    let builder = builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_autostart::init(
@@ -213,10 +220,6 @@ pub fn main() {
                 .build(),
         )
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            #[cfg(target_os = "macos")]
-            {
-                let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            }
             println!("🔄 Second instance launch detected (e.g., from Spotlight or app icon)");
             show_and_focus_main_window(&app.app_handle());
 
@@ -292,15 +295,8 @@ pub fn main() {
             reset_onboarding,
         ])
         .setup(move |app| {
-            // CRITICAL FIX FOR MACOS FLOATING WINDOWS
-            // This policy allows the app to have accessory windows (like the pill)
-            // that float above all spaces and do not clutter the Dock/App Switcher.
-            // Must be set before getting the app handle to avoid borrow checker issues.
-            #[cfg(target_os = "macos")]
-            {
-                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-                println!("🍎 Set macOS activation policy to Accessory (app will not appear in Dock)");
-            }
+            // Create system tray first to avoid borrow checker issues
+            tray::init_system_tray(app)?;
 
             let app_handle = app.handle();
 
@@ -331,26 +327,6 @@ pub fn main() {
                     None => println!("ℹ️  No valid auth token - user needs to login"),
                 }
             });
-
-            // COMMENTED OUT: Model execution functionality
-            // Preload Whisper model in background to reduce first transcription latency
-            // Only preload if model and executable are available (optional)
-            // std::thread::spawn(move || {
-            //     // Check if model and executable exist before preloading
-            //     let model_exists = model_manager::model_exists("ggml-small-q5_1.bin")
-            //         .unwrap_or(false);
-            //     let exe_exists = model_manager::whisper_executable_exists()
-            //         .unwrap_or(false);
-
-            //     if model_exists && exe_exists {
-            //         if let Err(e) = whisper::preload_model() {
-            //             eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
-            //             eprintln!("💡 First transcription may be slower");
-            //         }
-            //     } else {
-            //         println!("ℹ️  Whisper model or executable not found. Offline transcription will not be available until models are downloaded.");
-            //     }
-            // });
 
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup
@@ -413,64 +389,6 @@ pub fn main() {
                 recording_state_arc,
             );
 
-            // Create system tray with menu
-            let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
-
-            // Get the default window icon for the tray
-            let tray_icon = app.default_window_icon().ok_or_else(|| {
-                eprintln!("⚠️  Warning: Default window icon not found, tray icon may not display correctly");
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Default window icon not available",
-                )
-            })?;
-
-            // Create the tray icon
-            let _tray = TrayIconBuilder::with_id("main")
-                .icon(tray_icon.clone())
-                .tooltip("Lexi AI")
-                .menu(&tray_menu)
-                .on_menu_event(move |app, event| {
-                    let event_id = event.id.as_ref().to_string();
-                    println!("📋 Tray menu event: {}", event_id);
-
-                    if event_id == "show" {
-                        show_and_focus_main_window(&app);
-                    } else if event_id == "quit" {
-                        println!("👋 Quitting application");
-                        app.exit(0);
-                    }
-                })
-                .on_tray_icon_event(|tray, event| {
-                    // Handle left-click on tray icon to show/hide window
-                    if let TrayIconEvent::Click {
-                        button: tauri::tray::MouseButton::Left,
-                        button_state: tauri::tray::MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let is_visible = window.is_visible().unwrap_or(false);
-                            if is_visible {
-                                println!("🔄 Hiding window via tray click");
-                                if let Err(e) = window.hide() {
-                                    eprintln!("❌ Failed to hide window: {}", e);
-                                } else {
-                                    println!("✅ Window hidden via tray click");
-                                }
-                            } else {
-                                show_and_focus_main_window(&app);
-                            }
-                        }
-                    }
-                })
-                .build(app)?;
-
-            println!("🎯 System tray created successfully");
-
             #[cfg(desktop)]
             {
                 // Spawn the dedicated recording thread
@@ -501,12 +419,6 @@ pub fn main() {
                 tauri::WindowEvent::Focused(focused) => {
                     if window.label() == "main" && *focused {
                         println!("🔍 Main window received focus event");
-                        #[cfg(target_os = "macos")]
-                        {
-                            let _ = window
-                                .app_handle()
-                                .set_activation_policy(tauri::ActivationPolicy::Accessory);
-                        }
                         let is_visible = window.is_visible().unwrap_or(false);
                         if !is_visible {
                             show_and_focus_main_window(&window.app_handle());
@@ -516,15 +428,7 @@ pub fn main() {
                         }
                     }
                 }
-                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
-                    // Re-apply activation policy on window interactions to ensure Dock stays hidden
-                    #[cfg(target_os = "macos")]
-                    if window.label() == "main" {
-                        let _ = window
-                            .app_handle()
-                            .set_activation_policy(tauri::ActivationPolicy::Accessory);
-                    }
-                }
+
                 _ => {}
             }
         })

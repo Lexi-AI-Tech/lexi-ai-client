@@ -39,24 +39,13 @@ npm run dev
 npm run build
 ```
 
-## Model Distribution
-
-The Whisper model file (`ggml-small-q5_1.bin`, ~180MB) is not stored in Git due to size limitations.
-
-**For development**: Models should be placed in the user data directory manually.
-
-**For production**: The model is bundled with the app via `tauri.conf.json` resources
-
-See `src-tauri/models/MODEL_DISTRIBUTION_STRATEGIES.md` for detailed strategies on handling the model file.
-
 ## Project Structure
 
 ```
 lexi-ai-client/
-├── src/                    # React frontend
+├── src/                   # React frontend
 ├── src-tauri/             # Rust backend
 │   ├── src/               # Rust source code
-│   ├── models/            # Whisper model (not in Git)
 │   ├── bin/               # Whisper binary
 │   └── tauri.conf.json    # Tauri configuration
 └── public/                # Static assets
@@ -91,14 +80,12 @@ rm -rf ~/Library/Application\ Support/com.lexi.ai/
 
 After deleting the config file, restart the app and it will fetch fresh configuration from the server with default values.
 
-## Features
+### Run the Built App with Logs
 
-- 🎤 Local speech-to-text using Whisper.cpp
-- ⌨️ Global hotkey support
-- 📝 Automatic text injection
-- 🔐 Google OAuth authentication
-- 🎨 Modern React UI
+To run the built app from the command line and see logs:
 
-## License
+```bash
+"/Applications/Lexi AI.app/Contents/MacOS/lexi-ai"
+```
 
-[Your License Here]
+This is useful for debugging issues in the production build, as all debug output will appear in the terminal.

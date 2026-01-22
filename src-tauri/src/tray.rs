@@ -1,0 +1,129 @@
+//! System Tray Module
+//!
+//! This module handles the creation and management of the system tray icon
+//! for the Lexi AI application.
+//!
+//! ## Tray Features
+//!
+//! - **Show App**: Click to show/hide the main window
+//! - **Quit**: Exit the application
+//! - **Left-click**: Toggle main window visibility
+//!
+//! ## Usage
+//!
+//! ```rust
+//! use crate::tray::init_system_tray;
+//!
+//! // In your setup function:
+//! init_system_tray(app)?;
+//! ```
+
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::{App, AppHandle, Manager};
+
+use crate::window::show_and_focus_main_window;
+
+/// Initialize the system tray icon with menu items and event handlers
+///
+/// Creates a system tray icon with the following features:
+/// - Menu items: "Show App" and "Quit"
+/// - Left-click to toggle main window visibility
+/// - Menu event handlers for show and quit actions
+///
+/// # Arguments
+/// * `app` - The Tauri app instance
+///
+/// # Returns
+/// * `Ok(())` - Successfully created the tray icon
+/// * `Err(tauri::Error)` - Failed to create the tray icon
+///
+/// # Example
+/// ```rust
+/// init_system_tray(app)?;
+/// ```
+pub fn init_system_tray(app: &mut App) -> Result<(), tauri::Error> {
+    // Create system tray menu items
+    let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+    // Get the default window icon for the tray
+    let tray_icon = app.default_window_icon().ok_or_else(|| {
+        eprintln!(
+            "⚠️  Warning: Default window icon not found, tray icon may not display correctly"
+        );
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Default window icon not available",
+        )
+    })?;
+
+    // Create the tray icon with event handlers
+    let _tray = TrayIconBuilder::with_id("main")
+        .icon(tray_icon.clone())
+        .tooltip("Lexi AI")
+        .menu(&tray_menu)
+        .on_menu_event(handle_tray_menu_event)
+        .on_tray_icon_event(handle_tray_icon_event)
+        .build(app)?;
+
+    println!("🎯 System tray created successfully");
+
+    Ok(())
+}
+
+/// Handle tray menu events (Show App, Quit)
+///
+/// # Arguments
+/// * `app` - The app handle
+/// * `event` - The menu event
+fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
+    let event_id = event.id.as_ref().to_string();
+    println!("📋 Tray menu event: {}", event_id);
+
+    match event_id.as_str() {
+        "show" => {
+            show_and_focus_main_window(app);
+        }
+        "quit" => {
+            println!("👋 Quitting application");
+            app.exit(0);
+        }
+        _ => {
+            println!("❓ Unknown tray menu event: {}", event_id);
+        }
+    }
+}
+
+/// Handle tray icon click events
+///
+/// Left-click on the tray icon toggles the main window visibility
+///
+/// # Arguments
+/// * `tray` - The tray icon handle
+/// * `event` - The tray icon event
+fn handle_tray_icon_event(tray: &tauri::tray::TrayIcon, event: TrayIconEvent) {
+    // Handle left-click on tray icon to show/hide window
+    if let TrayIconEvent::Click {
+        button: tauri::tray::MouseButton::Left,
+        button_state: tauri::tray::MouseButtonState::Up,
+        ..
+    } = event
+    {
+        let app = tray.app_handle();
+        if let Some(window) = app.get_webview_window("main") {
+            let is_visible = window.is_visible().unwrap_or(false);
+            if is_visible {
+                println!("🔄 Hiding window via tray click");
+                if let Err(e) = window.hide() {
+                    eprintln!("❌ Failed to hide window: {}", e);
+                } else {
+                    println!("✅ Window hidden via tray click");
+                }
+            } else {
+                show_and_focus_main_window(&app);
+            }
+        }
+    }
+}
