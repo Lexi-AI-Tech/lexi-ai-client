@@ -57,10 +57,7 @@
   },
   "plugins": {
     "deep-link": {
-      "schemes": [
-        "lexi-ai",
-        "lexi"
-      ]
+      "schemes": ["lexi-ai", "lexi"]
     }
   }
 }
