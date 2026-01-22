@@ -39,8 +39,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::{mpsc, Arc, Mutex};
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Listener, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
@@ -64,6 +62,7 @@ mod shortcuts; // Voice command shortcuts that replace transcriptions with prede
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod tray; // System tray icon creation and event handling
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
@@ -296,6 +295,9 @@ pub fn main() {
             reset_onboarding,
         ])
         .setup(move |app| {
+            // Create system tray first to avoid borrow checker issues
+            tray::init_system_tray(app)?;
+
             let app_handle = app.handle();
 
             // Handle deep links
@@ -386,64 +388,6 @@ pub fn main() {
                 config_rx,
                 recording_state_arc,
             );
-
-            // Create system tray with menu
-            let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
-
-            // Get the default window icon for the tray
-            let tray_icon = app.default_window_icon().ok_or_else(|| {
-                eprintln!("⚠️  Warning: Default window icon not found, tray icon may not display correctly");
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Default window icon not available",
-                )
-            })?;
-
-            // Create the tray icon
-            let _tray = TrayIconBuilder::with_id("main")
-                .icon(tray_icon.clone())
-                .tooltip("Lexi AI")
-                .menu(&tray_menu)
-                .on_menu_event(move |app, event| {
-                    let event_id = event.id.as_ref().to_string();
-                    println!("📋 Tray menu event: {}", event_id);
-
-                    if event_id == "show" {
-                        show_and_focus_main_window(&app);
-                    } else if event_id == "quit" {
-                        println!("👋 Quitting application");
-                        app.exit(0);
-                    }
-                })
-                .on_tray_icon_event(|tray, event| {
-                    // Handle left-click on tray icon to show/hide window
-                    if let TrayIconEvent::Click {
-                        button: tauri::tray::MouseButton::Left,
-                        button_state: tauri::tray::MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let is_visible = window.is_visible().unwrap_or(false);
-                            if is_visible {
-                                println!("🔄 Hiding window via tray click");
-                                if let Err(e) = window.hide() {
-                                    eprintln!("❌ Failed to hide window: {}", e);
-                                } else {
-                                    println!("✅ Window hidden via tray click");
-                                }
-                            } else {
-                                show_and_focus_main_window(&app);
-                            }
-                        }
-                    }
-                })
-                .build(app)?;
-
-            println!("🎯 System tray created successfully");
 
             #[cfg(desktop)]
             {
