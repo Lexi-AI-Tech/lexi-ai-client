@@ -116,8 +116,8 @@ pub enum RecordingCommand {
 /// Main entry point for the Tauri application
 ///
 /// Sets up the application with the following:
-/// 1. Configures macOS activation policy to Accessory (app doesn't appear in Dock)
-/// 2. Initializes and positions the pill overlay window at startup
+/// 1. Uses default Regular activation policy (app appears in Dock like normal macOS app)
+/// 2. Initializes pill overlay window with NSPanel for floating above fullscreen apps
 /// 3. Starts global keyboard listener in background thread (rdev) to monitor Function key
 /// 4. Spawns dedicated recording thread that responds to Function key press/release signals
 /// 5. Configures window close behavior to hide instead of close (keeps app running for hotkeys)

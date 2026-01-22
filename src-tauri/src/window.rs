@@ -5,7 +5,7 @@
 
 use tauri::{AppHandle, Manager};
 
-/// Forces macOS app activation to bring windows to front (for Accessory mode).
+/// Forces macOS app activation to bring windows to front.
 ///
 /// Call this BEFORE window.show() or set_focus() on relaunches to ensure
 /// the window appears above other applications.
@@ -45,9 +45,7 @@ pub fn show_and_focus_main_window(app: &AppHandle) -> bool {
     if let Some(window) = app.get_webview_window("main") {
         #[cfg(target_os = "macos")]
         {
-            // Re-apply Accessory policy first (keeps no Dock icon)
-            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            // Force activation
+            // Force activation to bring window to front
             activate_app_ignoring_others();
         }
 
