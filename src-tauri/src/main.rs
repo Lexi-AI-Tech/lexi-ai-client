@@ -296,15 +296,6 @@ pub fn main() {
             reset_onboarding,
         ])
         .setup(move |app| {
-            // SET MACOS TO REGULAR APP MODE
-            // The app appears in the Dock as a normal application
-            // The pill window will use NSPanel to float above all windows
-            #[cfg(target_os = "macos")]
-            {
-                app.set_activation_policy(tauri::ActivationPolicy::Regular);
-                println!("🍎 Set macOS activation policy to Regular (app will appear in Dock)");
-            }
-
             let app_handle = app.handle();
 
             // Handle deep links
@@ -334,26 +325,6 @@ pub fn main() {
                     None => println!("ℹ️  No valid auth token - user needs to login"),
                 }
             });
-
-            // COMMENTED OUT: Model execution functionality
-            // Preload Whisper model in background to reduce first transcription latency
-            // Only preload if model and executable are available (optional)
-            // std::thread::spawn(move || {
-            //     // Check if model and executable exist before preloading
-            //     let model_exists = model_manager::model_exists("ggml-small-q5_1.bin")
-            //         .unwrap_or(false);
-            //     let exe_exists = model_manager::whisper_executable_exists()
-            //         .unwrap_or(false);
-
-            //     if model_exists && exe_exists {
-            //         if let Err(e) = whisper::preload_model() {
-            //             eprintln!("⚠️  Warning: Failed to preload Whisper model: {}", e);
-            //             eprintln!("💡 First transcription may be slower");
-            //         }
-            //     } else {
-            //         println!("ℹ️  Whisper model or executable not found. Offline transcription will not be available until models are downloaded.");
-            //     }
-            // });
 
             // Initialize and position the pill window at the center of the screen
             // The window is created dynamically in Rust but shown at app startup
