@@ -138,10 +138,13 @@ export interface Transcript {
   enhanced_text: string | null;
   enhanced_text_word_count: number | null;
   enhanced_text_character_count: number | null;
+  llm_enhancement_provider: string | null;
+  llm_model: string | null;
   audio_file_url: string | null;
   audio_file_size: number | null;
-  provider: string | null;
-  asr_model: string | null;
+  asr_provider: string;
+  asr_model: string;
+  focused_app: string;
   status: string;
   created_at: string;
   updated_at: string;

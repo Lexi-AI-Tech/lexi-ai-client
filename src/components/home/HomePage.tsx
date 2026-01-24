@@ -311,8 +311,8 @@ export const HomePage: React.FC = () => {
                     <span>
                       {transcript.original_text_word_count || 0} words
                     </span>
-                    {transcript.provider && (
-                      <span>• {transcript.provider}</span>
+                    {transcript.asr_provider && (
+                      <span>• {transcript.asr_provider}</span>
                     )}
                   </div>
                 </motion.div>

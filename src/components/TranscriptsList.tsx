@@ -508,7 +508,7 @@ export const TranscriptsList: React.FC = () => {
                     : "No text available"}
                 </div>
               )}
-              {transcript.provider && (
+              {transcript.asr_provider && (
                 <div
                   style={{
                     fontSize: "10px",
@@ -516,7 +516,7 @@ export const TranscriptsList: React.FC = () => {
                     marginTop: "4px",
                   }}
                 >
-                  {transcript.provider}
+                  {transcript.asr_provider}
                   {transcript.asr_model && ` • ${transcript.asr_model}`}
                 </div>
               )}
