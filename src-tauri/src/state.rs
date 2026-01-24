@@ -11,13 +11,9 @@ use tokio::sync::watch;
 /// Transcription task state for managing abort handles
 ///
 /// This allows canceling ongoing transcriptions when a new one starts.
-/// Each transcription task has a JoinHandle for cancellation and a oneshot channel
-/// for canceling the underlying HTTP request.
 pub struct TranscriptionTaskState {
     /// Handle to the current transcription task, if one is running
     pub task_handle: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
-    /// Sender for canceling the HTTP request associated with the transcription
-    pub cancel_tx: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 
 /// State for watch sender (to broadcast config changes)

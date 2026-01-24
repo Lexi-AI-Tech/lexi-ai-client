@@ -18,7 +18,6 @@
 //!
 //! ## Features
 //!
-//! - **Cancellation Support**: HTTP requests can be cancelled via tokio oneshot channel
 //! - **Error Handling**: Comprehensive error messages for debugging
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
@@ -28,7 +27,6 @@ use crate::commands::auth::get_auth_token_async;
 use reqwest::multipart;
 use std::error::Error;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::oneshot;
 
 /// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
 ///
@@ -55,16 +53,12 @@ impl SttService {
     /// 2. Sends the request to Lexi AI Server transcription endpoint
     /// 3. Returns the plain text response containing the transcribed text
     ///
-    /// The request can be cancelled by aborting the tokio task, which will cause
-    /// the HTTP request to be dropped and cancelled.
-    ///
     /// # Arguments
     /// * `audio_data` - WAV file data as bytes (typically from AudioRecorder)
     /// * `auth_token` - Optional authentication token (Bearer token) for authenticated requests
     /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
     /// * `enhance_transcription` - Whether to enhance the transcription with AI
     /// * `focused_app` - Name of the currently focused application (required)
-    /// * `cancel_rx` - Optional cancellation receiver. If this receives a signal, the request will be cancelled.
     /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
     /// * `offline_transcription` - Whether to use local Whisper model instead of server API
     /// * `vocabulary` - Optional vocabulary array to use as initial prompt for offline transcription
@@ -79,7 +73,6 @@ impl SttService {
         language: String,
         enhance_transcription: bool,
         focused_app: String,
-        cancel_rx: Option<oneshot::Receiver<()>>,
         app_handle: Option<AppHandle>,
         offline_transcription: bool,
         vocabulary: Vec<String>,
@@ -188,23 +181,8 @@ impl SttService {
             let mut request = self.client.post(&url).multipart(form);
             request = request.header("Authorization", format!("Bearer {}", current_token));
 
-            // Send the initial request with cancellation support
-            let res = if let Some(cancel_rx) = cancel_rx {
-                tokio::select! {
-                    result = request.send() => {
-                        match result {
-                            Ok(res) => res,
-                            Err(e) => return Err(Box::new(e)),
-                        }
-                    }
-                    _ = cancel_rx => {
-                        println!("🛑 HTTP request cancelled via cancellation signal");
-                        return Err("Request cancelled".into());
-                    }
-                }
-            } else {
-                request.send().await?
-            };
+            // Send the initial request
+            let res = request.send().await?;
 
             let status = res.status();
             println!("🔍 DEBUG: Response status: {}", status);
