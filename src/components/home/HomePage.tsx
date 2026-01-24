@@ -143,17 +143,17 @@ export const HomePage: React.FC = () => {
       // Calculate stats from transcripts
       const totalWords = response.transcripts.reduce(
         (acc, t) => acc + (t.original_text_word_count || 0),
-        0
+        0,
       );
       const totalChars = response.transcripts.reduce(
         (acc, t) => acc + (t.original_text_character_count || 0),
-        0
+        0,
       );
 
       // Estimate time saved: average typing speed ~40 WPM, voice ~150 WPM
       // Time saved = chars * (1/40 - 1/150) / 60 minutes
       const timeSavedMinutes = Math.round(
-        (totalChars / 40 - totalChars / 150) / 60
+        (totalChars / 40 - totalChars / 150) / 60,
       );
 
       // Count transcripts by period
@@ -164,13 +164,13 @@ export const HomePage: React.FC = () => {
 
       const counts = {
         "1d": response.transcripts.filter(
-          (t) => new Date(t.created_at) > oneDayAgo
+          (t) => new Date(t.created_at) > oneDayAgo,
         ).length,
         "7d": response.transcripts.filter(
-          (t) => new Date(t.created_at) > sevenDaysAgo
+          (t) => new Date(t.created_at) > sevenDaysAgo,
         ).length,
         "30d": response.transcripts.filter(
-          (t) => new Date(t.created_at) > thirtyDaysAgo
+          (t) => new Date(t.created_at) > thirtyDaysAgo,
         ).length,
       };
 
@@ -357,8 +357,8 @@ export const HomePage: React.FC = () => {
                 {activePeriod === "1d"
                   ? "24 hours"
                   : activePeriod === "7d"
-                  ? "7 days"
-                  : "30 days"}
+                    ? "7 days"
+                    : "30 days"}
               </div>
             </div>
 
@@ -399,7 +399,8 @@ export const HomePage: React.FC = () => {
                 <span className="insight-text">
                   Avg.{" "}
                   {Math.round(
-                    stats.wordsTyped / Math.max(stats.transcriptCounts["7d"], 1)
+                    stats.wordsTyped /
+                      Math.max(stats.transcriptCounts["7d"], 1),
                   )}{" "}
                   words per session
                 </span>

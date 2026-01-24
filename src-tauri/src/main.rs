@@ -241,7 +241,6 @@ pub fn main() {
         .manage(OAuthState::default())
         .manage(TranscriptionTaskState {
             task_handle: Mutex::new(None),
-            cancel_tx: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
