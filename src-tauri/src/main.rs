@@ -102,6 +102,7 @@ use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
 use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
+use commands::analytics::{get_analytics_stats, get_analytics_chart};
 use commands::utils::{format_date_relative, format_date_time, get_system_type};
 use commands::window::open_devtools;
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
@@ -274,6 +275,8 @@ pub fn main() {
             get_transcripts,
             get_transcript,
             delete_transcript,
+            get_analytics_stats,
+            get_analytics_chart,
             get_action_history,
             delete_action_history,
             get_action_triggers,

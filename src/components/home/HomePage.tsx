@@ -5,19 +5,26 @@
  * past transcriptions, and analytics.
  */
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Clock,
-  Target,
   FileText,
   TrendingUp,
   Sparkles,
   ChevronRight,
+  Flame,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 import type { Transcript } from "../../types";
+import {
+  getAnalyticsStats,
+  getAnalyticsChart,
+  type AnalyticsStats,
+  type ChartData,
+  type AnalyticsPeriod,
+} from "../../lib/analyticsApi";
 import "./home.css";
 
 // Animation variants
@@ -114,12 +121,18 @@ export const HomePage: React.FC = () => {
   const { user, isAuthenticated, tokens } = useAuthStore();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activePeriod, setActivePeriod] = useState<"1d" | "7d" | "30d">("7d");
-  const [stats, setStats] = useState({
-    wordsTyped: 0,
-    timeSaved: 0,
-    accuracyRate: 98.5,
-    transcriptCounts: { "1d": 0, "7d": 0, "30d": 0 },
+  const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
+
+  const [stats, setStats] = useState<AnalyticsStats>({
+    words_typed_this_week: 0,
+    time_saved_minutes: 0,
+    current_streak: 0,
+  });
+
+  const [chartData, setChartData] = useState<ChartData>({
+    labels: [],
+    data: [],
+    total_transcriptions: 0,
   });
 
   // Fetch transcripts
@@ -139,47 +152,6 @@ export const HomePage: React.FC = () => {
         pageSize: 5,
       });
       setTranscripts(response.transcripts);
-
-      // Calculate stats from transcripts
-      const totalWords = response.transcripts.reduce(
-        (acc, t) => acc + (t.original_text_word_count || 0),
-        0,
-      );
-      const totalChars = response.transcripts.reduce(
-        (acc, t) => acc + (t.original_text_character_count || 0),
-        0,
-      );
-
-      // Estimate time saved: average typing speed ~40 WPM, voice ~150 WPM
-      // Time saved = chars * (1/40 - 1/150) / 60 minutes
-      const timeSavedMinutes = Math.round(
-        (totalChars / 40 - totalChars / 150) / 60,
-      );
-
-      // Count transcripts by period
-      const now = new Date();
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-      const counts = {
-        "1d": response.transcripts.filter(
-          (t) => new Date(t.created_at) > oneDayAgo,
-        ).length,
-        "7d": response.transcripts.filter(
-          (t) => new Date(t.created_at) > sevenDaysAgo,
-        ).length,
-        "30d": response.transcripts.filter(
-          (t) => new Date(t.created_at) > thirtyDaysAgo,
-        ).length,
-      };
-
-      setStats({
-        wordsTyped: totalWords,
-        timeSaved: timeSavedMinutes,
-        accuracyRate: 98.5 + Math.random() * 1.5, // Simulated accuracy
-        transcriptCounts: counts,
-      });
     } catch (err) {
       console.error("Failed to fetch transcripts:", err);
     } finally {
@@ -187,11 +159,44 @@ export const HomePage: React.FC = () => {
     }
   }, [isAuthenticated, tokens?.access_token]);
 
+  // Fetch analytics stats
+  const fetchStats = useCallback(async () => {
+    if (!isAuthenticated || !tokens?.access_token) return;
+
+    try {
+      const data = await getAnalyticsStats();
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to fetch analytics stats:", err);
+    }
+  }, [isAuthenticated, tokens?.access_token]);
+
+  // Fetch chart data when period changes
+  useEffect(() => {
+    const fetchChart = async () => {
+      if (!isAuthenticated || !tokens?.access_token) return;
+
+      try {
+        const data = await getAnalyticsChart(activePeriod);
+        setChartData(data);
+      } catch (err) {
+        console.error("Failed to fetch chart data:", err);
+      }
+    };
+
+    fetchChart();
+  }, [isAuthenticated, tokens?.access_token, activePeriod]);
+
   useEffect(() => {
     fetchTranscripts();
-  }, [fetchTranscripts]);
+    fetchStats();
+  }, [fetchTranscripts, fetchStats]);
 
   const userName = user?.name?.split(" ")[0] || "there";
+
+  const maxChartValue = useMemo(() => {
+    return Math.max(...chartData.data, 1);
+  }, [chartData.data]);
 
   return (
     <motion.div
@@ -233,22 +238,22 @@ export const HomePage: React.FC = () => {
           <StatCard
             icon={FileText}
             label="Words Typed"
-            value={stats.wordsTyped.toLocaleString()}
+            value={stats.words_typed_this_week.toLocaleString()}
             subValue="this week"
             accentColor="rgba(99, 102, 241, 0.15)"
           />
           <StatCard
             icon={Clock}
             label="Time Saved"
-            value={`${stats.timeSaved}m`}
+            value={`${stats.time_saved_minutes}m`}
             subValue="vs typing"
             accentColor="rgba(16, 185, 129, 0.15)"
           />
           <StatCard
-            icon={Target}
-            label="Accuracy"
-            value={`${stats.accuracyRate.toFixed(1)}%`}
-            subValue="recognition rate"
+            icon={Flame}
+            label="Streak"
+            value={`${stats.current_streak}`}
+            subValue="days"
             accentColor="rgba(245, 158, 11, 0.15)"
           />
         </div>
@@ -350,7 +355,7 @@ export const HomePage: React.FC = () => {
                 <TrendingUp size={24} />
               </div>
               <div className="analytics-value">
-                {stats.transcriptCounts[activePeriod]}
+                {chartData.total_transcriptions}
               </div>
               <div className="analytics-label">
                 Transcriptions in{" "}
@@ -365,25 +370,23 @@ export const HomePage: React.FC = () => {
             <div className="analytics-chart">
               {/* Visual bar representation */}
               <div className="chart-bars">
-                {[...Array(7)].map((_, i) => (
+                {chartData.data.map((value, i) => (
                   <div
                     key={i}
                     className="chart-bar"
                     style={{
-                      height: `${20 + Math.random() * 80}%`,
-                      opacity: i === 6 ? 1 : 0.5,
+                      height: `${(value / maxChartValue) * 100}%`,
+                      opacity: i === chartData.data.length - 1 ? 1 : 0.5,
+                      minHeight: value > 0 ? "4px" : "0",
                     }}
+                    title={`${value} transcriptions`}
                   />
                 ))}
               </div>
               <div className="chart-labels">
-                <span>Mon</span>
-                <span>Tue</span>
-                <span>Wed</span>
-                <span>Thu</span>
-                <span>Fri</span>
-                <span>Sat</span>
-                <span>Sun</span>
+                {chartData.labels.map((label, i) => (
+                  <span key={i}>{label}</span>
+                ))}
               </div>
             </div>
 
@@ -391,7 +394,7 @@ export const HomePage: React.FC = () => {
               <div className="insight-item">
                 <span className="insight-dot success" />
                 <span className="insight-text">
-                  {stats.transcriptCounts["7d"]} successful this week
+                  {chartData.total_transcriptions} successful this period
                 </span>
               </div>
               <div className="insight-item">
@@ -399,8 +402,8 @@ export const HomePage: React.FC = () => {
                 <span className="insight-text">
                   Avg.{" "}
                   {Math.round(
-                    stats.wordsTyped /
-                      Math.max(stats.transcriptCounts["7d"], 1),
+                    stats.words_typed_this_week /
+                    Math.max(chartData.total_transcriptions, 1),
                   )}{" "}
                   words per session
                 </span>

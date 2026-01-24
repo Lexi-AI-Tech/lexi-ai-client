@@ -4,6 +4,7 @@
 //! into logical groups for better code organization.
 
 pub mod actions;
+pub mod analytics;
 pub mod app_config;
 pub mod auth;
 pub mod hotkey;
