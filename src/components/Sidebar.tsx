@@ -9,8 +9,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className="sidebar">
       <nav className="sidebar-nav">
+        {/* Home */}
         <button
-          className={`sidebar-item ${currentPage === "transcripts" ? "active" : ""}`}
+          className={`sidebar-item ${currentPage === "home" ? "active" : ""}`}
+          onClick={() => onNavigate("home")}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          <span>Home</span>
+        </button>
+
+        {/* Transcripts */}
+        <button
+          className={`sidebar-item ${
+            currentPage === "transcripts" ? "active" : ""
+          }`}
           onClick={() => onNavigate("transcripts")}
         >
           <svg
@@ -31,8 +55,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </svg>
           <span>Transcripts</span>
         </button>
+
+        {/* Vocabulary */}
         <button
-          className={`sidebar-item ${currentPage === "vocabulary" ? "active" : ""}`}
+          className={`sidebar-item ${
+            currentPage === "vocabulary" ? "active" : ""
+          }`}
           onClick={() => onNavigate("vocabulary")}
         >
           <svg
@@ -53,8 +81,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </svg>
           <span>Vocabulary</span>
         </button>
+
+        {/* Actions */}
         <button
-          className={`sidebar-item ${currentPage === "actions" ? "active" : ""}`}
+          className={`sidebar-item ${
+            currentPage === "actions" ? "active" : ""
+          }`}
           onClick={() => onNavigate("actions")}
         >
           <svg
@@ -73,8 +105,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </svg>
           <span>Actions</span>
         </button>
+
+        {/* Shortcuts */}
         <button
-          className={`sidebar-item ${currentPage === "shortcuts" ? "active" : ""}`}
+          className={`sidebar-item ${
+            currentPage === "shortcuts" ? "active" : ""
+          }`}
           onClick={() => onNavigate("shortcuts")}
         >
           <svg
@@ -92,8 +128,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </svg>
           <span>Shortcuts</span>
         </button>
+
+        {/* Settings */}
         <button
-          className={`sidebar-item ${currentPage === "settings" ? "active" : ""}`}
+          className={`sidebar-item ${
+            currentPage === "settings" ? "active" : ""
+          }`}
           onClick={() => onNavigate("settings")}
         >
           <svg

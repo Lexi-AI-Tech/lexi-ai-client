@@ -1,12 +1,13 @@
 /**
  * Main App Component
  *
- * Displays the transcripts list on the homepage.
+ * Main app with home dashboard, transcripts, and settings.
  */
 
 import { useState } from "react";
 
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
+import { HomePage } from "./components/home/HomePage";
 import { SettingsPage } from "./components/SettingsPage";
 import { VocabularyPage } from "./components/VocabularyPage";
 import { ActionsPage } from "./components/ActionsPage";
@@ -15,12 +16,18 @@ import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { useOnboardingStore } from "./store/onboardingStore";
 
-type Page = "transcripts" | "settings" | "vocabulary" | "actions" | "shortcuts";
+type Page =
+  | "home"
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts";
 
 function App() {
   // Check if onboarding is completed
   const { isCompleted, isInitialized } = useOnboardingStore();
-  const [currentPage, setCurrentPage] = useState<Page>("transcripts");
+  const [currentPage, setCurrentPage] = useState<Page>("home");
 
   // Wait for onboarding state to initialize before deciding what to show
   if (!isInitialized) {
@@ -32,7 +39,7 @@ function App() {
             justifyContent: "center",
             alignItems: "center",
             height: "100vh",
-            color: "rgba(255, 255, 255, 0.6)",
+            color: "rgba(0, 0, 0, 0.6)",
           }}
         >
           Loading...
@@ -51,13 +58,32 @@ function App() {
     <div className="app">
       <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
       <div className="main-content">
-        <div className="container">
-          {currentPage === "transcripts" && <TranscriptsList />}
-          {currentPage === "settings" && <SettingsPage />}
-          {currentPage === "vocabulary" && <VocabularyPage />}
-          {currentPage === "actions" && <ActionsPage />}
-          {currentPage === "shortcuts" && <ShortcutsPage />}
-        </div>
+        {currentPage === "home" && <HomePage />}
+        {currentPage === "transcripts" && (
+          <div className="container">
+            <TranscriptsList />
+          </div>
+        )}
+        {currentPage === "settings" && (
+          <div className="container">
+            <SettingsPage />
+          </div>
+        )}
+        {currentPage === "vocabulary" && (
+          <div className="container">
+            <VocabularyPage />
+          </div>
+        )}
+        {currentPage === "actions" && (
+          <div className="container">
+            <ActionsPage />
+          </div>
+        )}
+        {currentPage === "shortcuts" && (
+          <div className="container">
+            <ShortcutsPage />
+          </div>
+        )}
       </div>
     </div>
   );
