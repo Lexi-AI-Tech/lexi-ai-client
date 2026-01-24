@@ -18,14 +18,22 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 import type { Transcript } from "../../types";
-import {
-  getAnalyticsStats,
-  getAnalyticsChart,
-  type AnalyticsStats,
-  type ChartData,
-  type AnalyticsPeriod,
-} from "../../lib/analyticsApi";
 import "./home.css";
+
+// Analytics interfaces
+interface AnalyticsStats {
+  words_typed_this_week: number;
+  time_saved_minutes: number;
+  current_streak: number;
+}
+
+interface ChartData {
+  labels: string[];
+  data: number[];
+  total_transcriptions: number;
+}
+
+type AnalyticsPeriod = "1d" | "7d" | "30d";
 
 // Animation variants
 const containerVariants = {
@@ -164,10 +172,10 @@ export const HomePage: React.FC = () => {
     if (!isAuthenticated || !tokens?.access_token) return;
 
     try {
-      const data = await getAnalyticsStats();
+      const data = await invoke<AnalyticsStats>("get_analytics_stats");
       setStats(data);
-    } catch (err) {
-      console.error("Failed to fetch analytics stats:", err);
+    } catch (error: any) {
+      console.error("Failed to fetch analytics stats:", error);
     }
   }, [isAuthenticated, tokens?.access_token]);
 
@@ -177,10 +185,10 @@ export const HomePage: React.FC = () => {
       if (!isAuthenticated || !tokens?.access_token) return;
 
       try {
-        const data = await getAnalyticsChart(activePeriod);
+        const data = await invoke<ChartData>("get_analytics_chart", { period: activePeriod });
         setChartData(data);
-      } catch (err) {
-        console.error("Failed to fetch chart data:", err);
+      } catch (error: any) {
+        console.error(`Failed to fetch analytics chart for period ${activePeriod}:`, error);
       }
     };
 
