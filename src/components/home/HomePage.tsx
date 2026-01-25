@@ -185,10 +185,15 @@ export const HomePage: React.FC = () => {
       if (!isAuthenticated || !tokens?.access_token) return;
 
       try {
-        const data = await invoke<ChartData>("get_analytics_chart", { period: activePeriod });
+        const data = await invoke<ChartData>("get_analytics_chart", {
+          period: activePeriod,
+        });
         setChartData(data);
       } catch (error: any) {
-        console.error(`Failed to fetch analytics chart for period ${activePeriod}:`, error);
+        console.error(
+          `Failed to fetch analytics chart for period ${activePeriod}:`,
+          error,
+        );
       }
     };
 
@@ -411,7 +416,7 @@ export const HomePage: React.FC = () => {
                   Avg.{" "}
                   {Math.round(
                     stats.words_typed_this_week /
-                    Math.max(chartData.total_transcriptions, 1),
+                      Math.max(chartData.total_transcriptions, 1),
                   )}{" "}
                   words per session
                 </span>
