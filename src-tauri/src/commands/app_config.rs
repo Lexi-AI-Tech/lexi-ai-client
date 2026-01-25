@@ -98,7 +98,41 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
         Some(config_value) => match serde_json::from_value::<AppConfig>(config_value.clone()) {
             Ok(config) => {
                 println!("✅ Loaded app config from Tauri Store");
-                config
+                println!("🔍 Config details - hotkeys: {:?}, languages: {:?}, enhance_transcription: {:?}", 
+                    config.hotkeys, config.languages, config.enhance_transcription);
+
+                // Check if hotkeys are missing or empty - if so, try to fetch from server
+                let has_empty_hotkeys = config.hotkeys.is_none()
+                    || config
+                        .hotkeys
+                        .as_ref()
+                        .map(|h| h.is_empty())
+                        .unwrap_or(true);
+
+                if has_empty_hotkeys {
+                    println!(
+                        "⚠️  Config has empty/missing hotkeys, attempting to fetch from server"
+                    );
+                    match fetch_config_from_server(&app).await {
+                        Ok(server_config) => {
+                            println!(
+                                "✅ Fetched config from server with hotkeys: {:?}",
+                                server_config.hotkeys
+                            );
+                            server_config
+                        }
+                        Err(e) => {
+                            println!(
+                                "⚠️  Failed to fetch from server ({}), using existing config",
+                                e
+                            );
+                            config
+                        }
+                    }
+                } else {
+                    println!("✅ Config has valid hotkeys: {:?}", config.hotkeys);
+                    config
+                }
             }
             Err(_) => {
                 println!("⚠️  Failed to deserialize config from store, fetching from server");

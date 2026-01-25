@@ -16,7 +16,23 @@ use crate::google_oauth;
 use crate::secure_storage::{self, AuthData, UserData};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::AppHandle;
+
+// ============================================================================
+// Background Refresh Synchronization
+// ============================================================================
+
+/// Static flag to track if a background token refresh is currently in progress.
+/// This prevents multiple concurrent refresh attempts when multiple API calls
+/// happen simultaneously.
+static REFRESH_IN_PROGRESS: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
+
+fn get_refresh_flag() -> Arc<Mutex<bool>> {
+    REFRESH_IN_PROGRESS
+        .get_or_init(|| Arc::new(Mutex::new(false)))
+        .clone()
+}
 
 // ============================================================================
 // Authentication Data Types
@@ -383,17 +399,39 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
 
     // Case 2: Token expires soon (<15 min) - return current token, refresh in background
     if needs_background_refresh {
-        println!("🟡 Token expires soon, spawning background refresh...");
-        if let Some(refresh_token) = auth_data.refresh_token.clone() {
-            let app_clone = app.clone();
-            // Spawn background task - don't block API call
-            tokio::spawn(async move {
-                match refresh_access_token(&app_clone, &refresh_token).await {
-                    Ok(Some(_)) => println!("✅ Background token refresh completed"),
-                    Ok(None) => println!("⚠️  Background token refresh returned None"),
-                    Err(e) => eprintln!("⚠️  Background token refresh failed: {}", e),
+        let refresh_flag = get_refresh_flag();
+        let mut in_progress = refresh_flag.lock().unwrap();
+
+        // Only spawn a new refresh task if one isn't already in progress
+        if !*in_progress {
+            *in_progress = true;
+            drop(in_progress); // Release lock before spawning async task
+
+            println!("🟡 Token expires soon, spawning background refresh...");
+            if let Some(refresh_token) = auth_data.refresh_token.clone() {
+                let app_clone = app.clone();
+                let refresh_flag_clone = refresh_flag.clone();
+
+                // Spawn background task - don't block API call
+                tokio::spawn(async move {
+                    match refresh_access_token(&app_clone, &refresh_token).await {
+                        Ok(Some(_)) => println!("✅ Background token refresh completed"),
+                        Ok(None) => println!("⚠️  Background token refresh returned None"),
+                        Err(e) => eprintln!("⚠️  Background token refresh failed: {}", e),
+                    }
+                    // Reset the flag when refresh completes (success or failure)
+                    if let Ok(mut flag) = refresh_flag_clone.lock() {
+                        *flag = false;
+                    }
+                });
+            } else {
+                // No refresh token, reset flag immediately
+                if let Ok(mut flag) = refresh_flag.lock() {
+                    *flag = false;
                 }
-            });
+            }
+        } else {
+            println!("🟡 Token expires soon, but refresh already in progress (skipping duplicate)");
         }
         // Return current token immediately (still valid)
         return Some(auth_data.access_token);

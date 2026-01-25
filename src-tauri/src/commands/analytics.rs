@@ -33,10 +33,7 @@ pub async fn get_analytics_stats(app: AppHandle) -> Result<StatsResponse, String
         }
     };
 
-    let url = format!(
-        "{}/api/v1/analytics/stats",
-        crate::config::api_base_url()
-    );
+    let url = format!("{}/api/v1/analytics/stats", crate::config::api_base_url());
 
     let client = reqwest::Client::new();
     let response = client
@@ -62,13 +59,15 @@ pub async fn get_analytics_stats(app: AppHandle) -> Result<StatsResponse, String
 
     // Handle both direct response and wrapped response if needed (similar to transcripts)
     // Assuming backend returns direct JSON matching the struct based on implementation
-    serde_json::from_value(data)
-        .map_err(|e| format!("Failed to deserialize response: {}", e))
+    serde_json::from_value(data).map_err(|e| format!("Failed to deserialize response: {}", e))
 }
 
 /// Get chart data for a specific period
 #[tauri::command]
-pub async fn get_analytics_chart(app: AppHandle, period: String) -> Result<ChartDataResponse, String> {
+pub async fn get_analytics_chart(
+    app: AppHandle,
+    period: String,
+) -> Result<ChartDataResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Some(token) => token,
         None => {
@@ -107,6 +106,5 @@ pub async fn get_analytics_chart(app: AppHandle, period: String) -> Result<Chart
         .await
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    serde_json::from_value(data)
-        .map_err(|e| format!("Failed to deserialize response: {}", e))
+    serde_json::from_value(data).map_err(|e| format!("Failed to deserialize response: {}", e))
 }

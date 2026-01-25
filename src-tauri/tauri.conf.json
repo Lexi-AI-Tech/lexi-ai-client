@@ -57,9 +57,7 @@
   },
   "plugins": {
     "deep-link": {
-      "schemes": [
-        "speaklexi"
-      ]
+      "schemes": ["speaklexi"]
     }
   }
 }

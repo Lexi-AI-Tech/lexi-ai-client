@@ -86,6 +86,7 @@ use commands::actions::{
     create_action_trigger, delete_action_history, delete_action_trigger, get_action_history,
     get_action_triggers, update_action_trigger,
 };
+use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
     clear_auth_data, get_auth_data, get_current_user, get_pkce_verifier, has_auth_data, logout,
@@ -102,7 +103,6 @@ use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
 use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
-use commands::analytics::{get_analytics_stats, get_analytics_chart};
 use commands::utils::{format_date_relative, format_date_time, get_system_type};
 use commands::window::open_devtools;
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
