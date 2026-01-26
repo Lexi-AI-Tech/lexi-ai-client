@@ -104,8 +104,8 @@ use commands::onboarding::{
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::rooms::{
-    create_room, get_room_details, list_rooms, start_room_recording,
-    stop_room_recording_and_process, update_speaker,
+    create_room, export_room_transcript, finalize_room, get_room_details, list_rooms,
+    start_room_recording, stop_room_recording_and_process, update_speaker,
 };
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
@@ -385,9 +385,8 @@ pub fn main() {
                 is_recording: recording_state_tracker.clone(),
             });
             app.manage(RoomState {
-                recorder: Mutex::new(None),
                 is_recording: Mutex::new(false),
-                websocket: Mutex::new(None),
+                command_tx: Mutex::new(None),
             });
 
             // Listen to recording events to update state tracker

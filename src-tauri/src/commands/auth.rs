@@ -379,20 +379,93 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
 
     // Case 1: Token is EXPIRED - must refresh before returning
     if is_expired {
+        let refresh_flag = get_refresh_flag();
+        
+        // Try to acquire the refresh lock atomically
+        let is_first = {
+            let mut in_progress = refresh_flag.lock().unwrap();
+            if *in_progress {
+                // Another thread is already refreshing
+                false
+            } else {
+                // We're the first - claim the lock
+                *in_progress = true;
+                true
+            }
+        };
+        
+        if !is_first {
+            // Another thread is refreshing - wait for it to complete
+            println!("🔴 Token expired, but refresh already in progress, waiting...");
+            
+            // Poll the flag until refresh completes (with timeout)
+            let start = std::time::Instant::now();
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                let in_progress = {
+                    let guard = refresh_flag.lock().unwrap();
+                    *guard
+                };
+                
+                if !in_progress {
+                    // Refresh completed, get the new token
+                    if let Ok(Some(data)) = secure_storage::get_auth_data(app) {
+                        if let Some(expires_at) = data.expires_at {
+                            let now = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs();
+                            if expires_at > now {
+                                println!("✅ Got refreshed token from concurrent refresh");
+                                return Some(data.access_token);
+                            }
+                        }
+                    }
+                    break;
+                }
+                
+                // Timeout after 5 seconds
+                if start.elapsed().as_secs() >= 5 {
+                    eprintln!("⚠️  Timeout waiting for concurrent token refresh");
+                    break;
+                }
+            }
+            
+            // After waiting, try to get the token again
+            if let Ok(Some(data)) = secure_storage::get_auth_data(app) {
+                return Some(data.access_token);
+            }
+            return None;
+        }
+        
+        // We're the first to see expired token - do the refresh
         println!("🔴 Token expired, refreshing before API call...");
         if let Some(refresh_token) = &auth_data.refresh_token {
+            let refresh_flag_clone = refresh_flag.clone();
             match refresh_access_token(app, refresh_token).await {
                 Ok(Some(new_token)) => {
                     println!("✅ Token refreshed (was expired)");
+                    // Reset flag
+                    if let Ok(mut flag) = refresh_flag_clone.lock() {
+                        *flag = false;
+                    }
                     return Some(new_token);
                 }
                 Ok(None) | Err(_) => {
                     eprintln!("⚠️  Token refresh failed, user needs to re-authenticate");
+                    // Reset flag
+                    if let Ok(mut flag) = refresh_flag_clone.lock() {
+                        *flag = false;
+                    }
                     return None; // Force re-auth
                 }
             }
         } else {
             eprintln!("⚠️  Token expired but no refresh token available");
+            // Reset flag
+            if let Ok(mut flag) = refresh_flag.lock() {
+                *flag = false;
+            }
             return None;
         }
     }

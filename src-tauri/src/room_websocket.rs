@@ -26,7 +26,7 @@ pub struct RoomWebSocket {
     app: AppHandle,
     room_id: String,
     jwt_token: String,
-    audio_tx: Arc<Mutex<Option<mpsc::Sender<Vec<u8>>>>>,
+    pub audio_tx: Arc<Mutex<Option<mpsc::Sender<Vec<u8>>>>>,
     is_connected: Arc<Mutex<bool>>,
 }
 

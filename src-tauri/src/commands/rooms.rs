@@ -2,11 +2,11 @@
 //!
 //! Tauri commands for managing rooms and room recording.
 
-use crate::audio_recorder::AudioRecorder;
 use crate::commands::auth::get_auth_token_async;
 use crate::state::RoomState;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
+use std::thread;
 use tauri::{AppHandle, Emitter, State};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,9 +61,12 @@ pub async fn start_room_recording(
     room_id: String,
     state: State<'_, RoomState>,
 ) -> Result<(), String> {
-    let mut is_recording = state.is_recording.lock().unwrap();
-    if *is_recording {
-        return Err("Already recording".to_string());
+    // Check if already recording (drop lock before await)
+    {
+        let is_recording = state.is_recording.lock().unwrap();
+        if *is_recording {
+            return Err("Already recording".to_string());
+        }
     }
 
     // Get JWT token for WebSocket authentication
@@ -71,7 +74,10 @@ pub async fn start_room_recording(
         .await
         .ok_or("Authentication required")?;
 
-    // Create WebSocket connection
+    // Create channel for streaming audio data (std::mpsc for audio_recorder)
+    let (audio_tx, audio_rx) = mpsc::channel::<Vec<u8>>();
+
+    // Create WebSocket connection (async) - this will spawn tasks internally
     let mut websocket =
         crate::room_websocket::RoomWebSocket::new(app.clone(), room_id.clone(), auth_token);
 
@@ -80,25 +86,23 @@ pub async fn start_room_recording(
         .await
         .map_err(|e| format!("Failed to connect WebSocket: {}", e))?;
 
-    // Start audio recorder
-    let mut recorder_guard = state.recorder.lock().unwrap();
-    let mut recorder = AudioRecorder::new();
+    // Get the audio_tx from websocket to forward chunks
+    let websocket_audio_tx = websocket.audio_tx.clone();
 
-    // Create channel for streaming audio data (std::mpsc for audio_recorder)
-    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
-
-    // Store WebSocket in state first
-    *state.websocket.lock().unwrap() = Some(websocket);
-
-    // Spawn task to forward audio chunks from std::mpsc to WebSocket
-    let websocket_state = Arc::clone(&state.websocket);
-
-    tokio::spawn(async move {
+    // Spawn thread to forward audio chunks from std::mpsc to WebSocket's tokio channel
+    // Use a blocking runtime handle to send to async channel from sync context
+    let rt_handle = tokio::runtime::Handle::try_current()
+        .map_err(|_| "No tokio runtime available")?;
+    
+    thread::spawn(move || {
         loop {
-            match rx.recv() {
+            match audio_rx.recv() {
                 Ok(chunk) => {
-                    if let Ok(Some(ref ws)) = websocket_state.lock() {
-                        if let Err(e) = ws.send_audio_chunk(chunk) {
+                    let guard = websocket_audio_tx.lock().unwrap();
+                    if let Some(ref tx) = *guard {
+                        // Send to tokio channel using blocking send
+                        let tx_clone = tx.clone();
+                        if let Err(e) = rt_handle.block_on(tx_clone.send(chunk)) {
                             eprintln!("Failed to send audio chunk to WebSocket: {}", e);
                             break;
                         }
@@ -114,13 +118,32 @@ pub async fn start_room_recording(
         }
     });
 
-    recorder
-        .start_recording(Some(tx))
-        .map_err(|e| format!("Failed to start recording: {}", e))?;
+    // Start audio recorder in a dedicated thread (AudioRecorder is not Send+Sync)
+    let app_for_recorder = app.clone();
+    let (recorder_tx, recorder_rx) = mpsc::channel::<()>();
+    
+    thread::spawn(move || {
+        let mut recorder = crate::audio_recorder::AudioRecorder::new();
+        
+        if let Err(e) = recorder.start_recording(Some(audio_tx)) {
+            eprintln!("Failed to start recording: {}", e);
+            let _ = app_for_recorder.emit("room-websocket-error", format!("Recording failed: {}", e));
+            return;
+        }
 
-    // Store recorder in state
-    *recorder_guard = Some(recorder);
-    *is_recording = true;
+        // Wait for stop signal
+        let _ = recorder_rx.recv();
+        
+        // Stop recording
+        let _ = recorder.stop_recording();
+    });
+
+    // Store stop channel in state (this is Send+Sync)
+    *state.command_tx.lock().unwrap() = Some(recorder_tx);
+    *state.is_recording.lock().unwrap() = true;
+
+    // Note: WebSocket connection is managed by spawned tasks in RoomWebSocket::connect()
+    // It will stay alive as long as the tasks are running
 
     Ok(())
 }
@@ -136,19 +159,11 @@ pub async fn stop_room_recording_and_process(
         return Err("Not recording".to_string());
     }
 
-    // Close WebSocket connection
+    // Send stop signal to recorder thread
     {
-        let mut websocket_guard = state.websocket.lock().unwrap();
-        if let Some(mut ws) = websocket_guard.take() {
-            ws.close();
-        }
-    }
-
-    // Stop audio recorder
-    {
-        let mut recorder_guard = state.recorder.lock().unwrap();
-        if let Some(mut recorder) = recorder_guard.take() {
-            let _ = recorder.stop_recording();
+        let mut command_tx_guard = state.command_tx.lock().unwrap();
+        if let Some(tx) = command_tx_guard.take() {
+            let _ = tx.send(());
         }
     }
 

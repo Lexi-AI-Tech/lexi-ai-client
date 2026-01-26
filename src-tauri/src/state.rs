@@ -42,8 +42,10 @@ pub struct RecordingChannelState {
 }
 
 /// Room recording state
+/// 
+/// Note: AudioRecorder and RoomWebSocket cannot be stored here because they contain
+/// types that are not Send+Sync on macOS. They are managed in dedicated threads instead.
 pub struct RoomState {
-    pub recorder: Mutex<Option<crate::audio_recorder::AudioRecorder>>,
     pub is_recording: Mutex<bool>,
-    pub websocket: Mutex<Option<crate::room_websocket::RoomWebSocket>>,
+    pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
 }
