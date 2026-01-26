@@ -501,6 +501,20 @@ pub struct UserInfo {
     pub picture: Option<String>,
 }
 
+/// Get the current authentication token
+/// 
+/// Returns the access token if available and valid, None otherwise.
+#[tauri::command]
+pub async fn get_auth_token(app: AppHandle) -> Result<Option<String>, String> {
+    Ok(get_auth_token_async(&app).await)
+}
+
+/// Get the API base URL
+#[tauri::command]
+pub fn get_api_base_url() -> String {
+    crate::config::api_base_url().to_string()
+}
+
 /// Get current user information from backend
 #[tauri::command]
 pub async fn get_current_user(app: AppHandle) -> Result<UserInfo, String> {

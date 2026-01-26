@@ -89,7 +89,7 @@ use commands::actions::{
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
-    clear_auth_data, get_auth_data, get_current_user, get_pkce_verifier, has_auth_data, logout,
+    clear_auth_data, get_auth_data, get_auth_token, get_api_base_url, get_current_user, get_pkce_verifier, has_auth_data, logout,
     refresh_auth_token, start_google_login, store_auth_data,
 };
 use commands::hotkey::{
@@ -268,6 +268,8 @@ pub fn main() {
             get_auth_data,
             clear_auth_data,
             has_auth_data,
+            get_auth_token,
+            get_api_base_url,
             get_current_user,
             logout,
             refresh_auth_token,
@@ -304,6 +306,8 @@ pub fn main() {
             get_room_details,
             start_room_recording,
             stop_room_recording_and_process,
+            finalize_room,
+            export_room_transcript,
             update_speaker,
         ])
         .setup(move |app| {

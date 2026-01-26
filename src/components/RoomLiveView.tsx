@@ -11,6 +11,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Room, RoomTranscriptSegment } from "../types";
+import { SpeakerNamingModal } from "./SpeakerNamingModal";
 
 interface RoomLiveViewProps {
     roomId: string;
@@ -29,6 +30,8 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) =>
     const [isRecording, setIsRecording] = useState(false);
     const [liveTranscript, setLiveTranscript] = useState<StreamingTranscript | null>(null);
     const [segments, setSegments] = useState<RoomTranscriptSegment[]>([]);
+    const [showSpeakerNaming, setShowSpeakerNaming] = useState(false);
+    const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     // Refs for cleanup
@@ -69,15 +72,20 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) =>
         if (isRecording) return;
 
         try {
-            // 1. Connect WebSocket
-            // Default to localhost for dev if config missing, but better to use base url
-            // We can't easily get the config base URL here without an invoke, assume logic or hardcode relative
-            // Tauri apps usually know their backend. 
-            // For now, let's try to construct it from a known constant or invoke 'get_app_config' if strictly needed.
-            // But for simplicity, assuming localhost:8000 (standard for this project) or using the fetch logic.
-            // Let's use a hardcoded dev URL or environment variable.
+            // 1. Get auth token and construct WebSocket URL
+            const authToken = await invoke<string>("get_auth_token").catch(() => null);
+            if (!authToken) {
+                alert("Please sign in to start recording");
+                return;
+            }
 
-            const wsUrl = `ws://localhost:3000/api/v1/rooms/${roomId}/stream`;
+            // Get API base URL from config
+            const apiBaseUrl = await invoke<string>("get_api_base_url").catch(() => "http://localhost:3000");
+            
+            // Convert http/https to ws/wss
+            const wsBaseUrl = apiBaseUrl.replace(/^http/, "ws");
+            const wsUrl = `${wsBaseUrl}/api/v1/rooms/${roomId}/stream?token=${encodeURIComponent(authToken)}&provider=deepgram`;
+            
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 
@@ -87,6 +95,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) =>
                 // 2. Start Audio Recording (Rust)
                 await invoke("start_room_recording");
                 setIsRecording(true);
+                setRecordingStartTime(Date.now());
 
                 // 3. Listen for Audio Chunks from Rust
                 // The event name must match what we emit in Rust ("audio-chunk")
@@ -106,30 +115,44 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) =>
                     if (data.type === "transcript") {
                         if (data.is_final) {
                             // Final segment received - append to list
-                            // We construct a temporary segment object. Ideally server sends ID, but we can mock for UI.
-                            // Actually, server persists it asynchronously. We should trust the server's data or our constructed one.
-                            // To avoid duplicates if we reload, we just append locally.
-
                             const words = data.words || [];
-                            const startTime = words.length > 0 ? words[0].start : 0;
-                            const endTime = words.length > 0 ? words[words.length - 1].end : 0;
-                            const speaker = words.length > 0 && words[0].speaker ? `speaker_${words[0].speaker}` : "speaker_0";
+                            
+                            // Deepgram format (timing in seconds, speaker per word)
+                            let startTime = 0;
+                            let endTime = 0;
+                            let speaker = 0;
+                            
+                            if (words.length > 0) {
+                                // Deepgram provides timing in seconds in words array
+                                startTime = words[0].start || 0;
+                                endTime = words[words.length - 1].end || 0;
+                                // Use speaker from result (dominant speaker) or from first word
+                                speaker = data.speaker !== undefined ? data.speaker : (words[0].speaker || 0);
+                            }
 
                             const newSegment: RoomTranscriptSegment = {
                                 id: Math.random().toString(), // temp id
                                 segment_index: segments.length,
                                 start_time: startTime,
                                 end_time: endTime,
-                                speaker_label: speaker,
+                                speaker_label: `speaker_${speaker}`,
                                 text: data.transcript
                             };
 
                             setSegments(prev => [...prev, newSegment]);
                             setLiveTranscript(null); // Clear pending
                         } else {
-                            // Partial
+                            // Partial/interim transcript
                             setLiveTranscript(data);
                         }
+                    } else if (data.type === "error") {
+                        console.error("WebSocket error:", data.message);
+                        alert(`Transcription error: ${data.message}`);
+                        stopRecording();
+                    } else if (data.type === "session_start") {
+                        console.log("Transcription session started:", data.session_id);
+                    } else if (data.type === "session_end") {
+                        console.log("Transcription session ended:", data.reason);
                     }
                 } catch (e) {
                     console.error("Error parsing WS message:", e);
@@ -157,8 +180,22 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) =>
         // Stop Rust recording
         if (isRecording) {
             try {
+                // Send stop message to WebSocket
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify({ type: "stop" }));
+                }
+                
                 await invoke("stop_room_recording_and_process", { roomId });
-            } catch (e) { /* ignore */ }
+                
+                // Finalize room
+                try {
+                    await invoke("finalize_room", { roomId });
+                } catch (e) {
+                    console.error("Failed to finalize room:", e);
+                }
+            } catch (e) { 
+                console.error("Error stopping recording:", e);
+            }
         }
 
         // Unlisten tauri event
@@ -175,13 +212,45 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) =>
 
         setIsRecording(false);
         setLiveTranscript(null);
+        setRecordingStartTime(null);
 
-        // Optionally refresh full list from DB to ensure sync
-        // fetchRoomDetails(); 
+        // Refresh room details to get latest transcripts
+        await fetchRoomDetails();
+        
+        // Show speaker naming modal if there are transcripts
+        if (segments.length > 0) {
+            setShowSpeakerNaming(true);
+        }
+    };
+
+    const handleExportTranscript = async () => {
+        try {
+            const exportData = await invoke<any[]>("export_room_transcript", { roomId });
+            
+            // Create download
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${room?.name || "transcript"}_${new Date().toISOString().split("T")[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Failed to export transcript:", err);
+            alert("Failed to export transcript. Please try again.");
+        }
     };
 
     const getSpeakerName = (label: string) => {
         return room?.speaker_map?.[label] || label.replace("speaker_", "Speaker ");
+    };
+
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, "0")}`;
     };
 
     if (loading && !room) {
@@ -209,15 +278,35 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) =>
                     </span>
                 </div>
 
-                <div>
+                <div style={{ display: "flex", gap: "12px" }}>
                     {!isRecording ? (
-                        <button
-                            onClick={startRecording}
-                            className="settings-button primary"
-                            style={{ backgroundColor: "#34c759" }} // Green for start
-                        >
-                            Start Recording
-                        </button>
+                        <>
+                            {segments.length > 0 && (
+                                <>
+                                    <button
+                                        onClick={() => setShowSpeakerNaming(true)}
+                                        className="settings-button"
+                                        style={{ fontSize: "12px", padding: "6px 12px" }}
+                                    >
+                                        Name Speakers
+                                    </button>
+                                    <button
+                                        onClick={handleExportTranscript}
+                                        className="settings-button"
+                                        style={{ fontSize: "12px", padding: "6px 12px" }}
+                                    >
+                                        Export
+                                    </button>
+                                </>
+                            )}
+                            <button
+                                onClick={startRecording}
+                                className="settings-button primary"
+                                style={{ backgroundColor: "#34c759" }} // Green for start
+                            >
+                                Start Recording
+                            </button>
+                        </>
                     ) : (
                         <button
                             onClick={stopRecording}
@@ -239,7 +328,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) =>
                             <div style={{ minWidth: "100px", fontSize: "13px", color: "rgba(255,255,255,0.5)", marginTop: "4px" }}>
                                 <div>{getSpeakerName(seg.speaker_label)}</div>
                                 <div style={{ fontSize: "11px", opacity: 0.7 }}>
-                                    {new Date(seg.start_time * 1000).toISOString().substr(14, 5)}
+                                    {formatTime(seg.start_time)}
                                 </div>
                             </div>
                             <div style={{ flex: 1, lineHeight: 1.5, fontSize: "15px" }}>
@@ -263,6 +352,17 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) =>
                     <div ref={chatEndRef} />
                 </div>
             </div>
+
+            {showSpeakerNaming && room && (
+                <SpeakerNamingModal
+                    room={room}
+                    onClose={() => setShowSpeakerNaming(false)}
+                    onSave={(updatedRoom) => {
+                        setRoom(updatedRoom);
+                        setShowSpeakerNaming(false);
+                    }}
+                />
+            )}
         </div>
     );
 };

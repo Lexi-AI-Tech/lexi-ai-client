@@ -177,6 +177,70 @@ pub async fn get_room_details(app: AppHandle, room_id: String) -> Result<serde_j
     Ok(room)
 }
 
+/// Finalize room (mark as completed)
+#[tauri::command]
+pub async fn finalize_room(
+    app: AppHandle,
+    room_id: String,
+) -> Result<serde_json::Value, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .ok_or("Authentication required")?;
+
+    let client = reqwest::Client::new();
+    let url = format!("{}/api/v1/rooms/{}/finalize", crate::config::api_base_url(), room_id);
+
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+
+    let room: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    Ok(room)
+}
+
+/// Export room transcript as JSON
+#[tauri::command]
+pub async fn export_room_transcript(
+    app: AppHandle,
+    room_id: String,
+) -> Result<serde_json::Value, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .ok_or("Authentication required")?;
+
+    let client = reqwest::Client::new();
+    let url = format!("{}/api/v1/rooms/{}/export", crate::config::api_base_url(), room_id);
+
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+
+    let export_data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    Ok(export_data)
+}
+
 /// Update speaker name
 #[tauri::command]
 pub async fn update_speaker(
