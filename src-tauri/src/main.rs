@@ -72,7 +72,7 @@ use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
 use state::{
-    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, TranscriptionTaskState,
+    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, RoomState, TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
 
@@ -100,6 +100,10 @@ use commands::onboarding::{
     reset_onboarding, set_onboarding_step,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
+use commands::rooms::{
+    create_room, get_room_details, list_rooms, start_room_recording,
+    stop_room_recording_and_process, update_speaker,
+};
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
 use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
@@ -295,6 +299,12 @@ pub fn main() {
             previous_onboarding_step,
             complete_onboarding,
             reset_onboarding,
+            create_room,
+            list_rooms,
+            get_room_details,
+            start_room_recording,
+            stop_room_recording_and_process,
+            update_speaker,
         ])
         .setup(move |app| {
             // Create system tray first to avoid borrow checker issues
@@ -366,6 +376,10 @@ pub fn main() {
             app.manage(RecordingChannelState {
                 tx: Arc::new(Mutex::new(Some(recording_tx.clone()))),
                 is_recording: recording_state_tracker.clone(),
+            });
+            app.manage(RoomState {
+                recorder: Mutex::new(None),
+                is_recording: Mutex::new(false),
             });
 
             // Listen to recording events to update state tracker

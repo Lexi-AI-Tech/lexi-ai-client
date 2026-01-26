@@ -159,6 +159,28 @@ export interface PaginatedTranscriptsResponse {
 }
 
 // ============================================================================
+// Room Types
+// ============================================================================
+
+export interface RoomTranscriptSegment {
+  id: string;
+  segment_index: number;
+  start_time: number;
+  end_time: number;
+  speaker_label: string;
+  text: string;
+}
+
+export interface Room {
+  id: string;
+  name: string;
+  status: string;
+  created_at: string;
+  speaker_map?: Record<string, string>;
+  transcripts?: RoomTranscriptSegment[];
+}
+
+// ============================================================================
 // UI Component Types
 // ============================================================================
 
@@ -205,12 +227,13 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-    | "home"
-    | "transcripts"
-    | "settings"
-    | "vocabulary"
-    | "actions"
-    | "shortcuts";
+  | "home"
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts"
+  | "rooms";
   onNavigate: (
     page:
       | "home"
@@ -218,7 +241,8 @@ export interface SidebarProps {
       | "settings"
       | "vocabulary"
       | "actions"
-      | "shortcuts",
+      | "shortcuts"
+      | "rooms",
   ) => void;
 }
 

@@ -40,3 +40,9 @@ pub struct RecordingChannelState {
     /// Current recording state (true if recording, false if idle)
     pub is_recording: Arc<Mutex<bool>>,
 }
+
+/// Room recording state
+pub struct RoomState {
+    pub recorder: Mutex<Option<crate::audio_recorder::AudioRecorder>>,
+    pub is_recording: Mutex<bool>,
+}
