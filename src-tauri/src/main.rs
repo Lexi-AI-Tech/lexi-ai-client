@@ -57,6 +57,7 @@ mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortc
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
+mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
@@ -72,7 +73,8 @@ use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
 use state::{
-    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, RoomState, TranscriptionTaskState,
+    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, RoomState,
+    TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
 
@@ -89,8 +91,9 @@ use commands::actions::{
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
-    clear_auth_data, get_auth_data, get_auth_token, get_api_base_url, get_current_user, get_pkce_verifier, has_auth_data, logout,
-    refresh_auth_token, start_google_login, store_auth_data,
+    clear_auth_data, get_api_base_url, get_auth_data, get_auth_token, get_current_user,
+    get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
+    store_auth_data,
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
@@ -384,6 +387,7 @@ pub fn main() {
             app.manage(RoomState {
                 recorder: Mutex::new(None),
                 is_recording: Mutex::new(false),
+                websocket: Mutex::new(None),
             });
 
             // Listen to recording events to update state tracker

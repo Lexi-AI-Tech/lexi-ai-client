@@ -227,13 +227,13 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-  | "home"
-  | "transcripts"
-  | "settings"
-  | "vocabulary"
-  | "actions"
-  | "shortcuts"
-  | "rooms";
+    | "home"
+    | "transcripts"
+    | "settings"
+    | "vocabulary"
+    | "actions"
+    | "shortcuts"
+    | "rooms";
   onNavigate: (
     page:
       | "home"

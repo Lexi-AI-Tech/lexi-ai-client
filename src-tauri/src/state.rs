@@ -45,4 +45,5 @@ pub struct RecordingChannelState {
 pub struct RoomState {
     pub recorder: Mutex<Option<crate::audio_recorder::AudioRecorder>>,
     pub is_recording: Mutex<bool>,
+    pub websocket: Mutex<Option<crate::room_websocket::RoomWebSocket>>,
 }

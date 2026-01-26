@@ -6,8 +6,7 @@ use crate::audio_recorder::AudioRecorder;
 use crate::commands::auth::get_auth_token_async;
 use crate::state::RoomState;
 use serde::{Deserialize, Serialize};
-use std::sync::{mpsc, Mutex};
-use std::thread;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -59,6 +58,7 @@ pub async fn create_room(app: AppHandle, name: String) -> Result<Room, String> {
 #[tauri::command]
 pub async fn start_room_recording(
     app: AppHandle,
+    room_id: String,
     state: State<'_, RoomState>,
 ) -> Result<(), String> {
     let mut is_recording = state.is_recording.lock().unwrap();
@@ -66,32 +66,62 @@ pub async fn start_room_recording(
         return Err("Already recording".to_string());
     }
 
+    // Get JWT token for WebSocket authentication
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .ok_or("Authentication required")?;
+
+    // Create WebSocket connection
+    let mut websocket =
+        crate::room_websocket::RoomWebSocket::new(app.clone(), room_id.clone(), auth_token);
+
+    websocket
+        .connect()
+        .await
+        .map_err(|e| format!("Failed to connect WebSocket: {}", e))?;
+
+    // Start audio recorder
     let mut recorder_guard = state.recorder.lock().unwrap();
     let mut recorder = AudioRecorder::new();
-    
-    // Create channel for streaming audio data
-    let (tx, rx) = mpsc::channel::<Vec<u8>>();
-    
-    // Spawn a thread to forward chunks to the frontend
-    let app_handle = app.clone();
-    thread::spawn(move || {
-        while let Ok(chunk) = rx.recv() {
-            // Emit "audio-chunk" event to frontend
-            // Payload is Vec<u8> (serialized as array of numbers in JS)
-             if let Err(e) = app_handle.emit("audio-chunk", chunk) {
-                 eprintln!("Failed to emit audio chunk: {}", e);
-                 break;
-             }
+
+    // Create channel for streaming audio data (std::mpsc for audio_recorder)
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+
+    // Store WebSocket in state first
+    *state.websocket.lock().unwrap() = Some(websocket);
+
+    // Spawn task to forward audio chunks from std::mpsc to WebSocket
+    let websocket_state = Arc::clone(&state.websocket);
+
+    tokio::spawn(async move {
+        loop {
+            match rx.recv() {
+                Ok(chunk) => {
+                    if let Ok(Some(ref ws)) = websocket_state.lock() {
+                        if let Err(e) = ws.send_audio_chunk(chunk) {
+                            eprintln!("Failed to send audio chunk to WebSocket: {}", e);
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                Err(_) => {
+                    // Channel closed
+                    break;
+                }
+            }
         }
-        println!("Streaming thread finished");
     });
-    
-    recorder.start_recording(Some(tx))
+
+    recorder
+        .start_recording(Some(tx))
         .map_err(|e| format!("Failed to start recording: {}", e))?;
-    
+
+    // Store recorder in state
     *recorder_guard = Some(recorder);
     *is_recording = true;
-    
+
     Ok(())
 }
 
@@ -106,15 +136,22 @@ pub async fn stop_room_recording_and_process(
         return Err("Not recording".to_string());
     }
 
+    // Close WebSocket connection
+    {
+        let mut websocket_guard = state.websocket.lock().unwrap();
+        if let Some(mut ws) = websocket_guard.take() {
+            ws.close();
+        }
+    }
+
+    // Stop audio recorder
     {
         let mut recorder_guard = state.recorder.lock().unwrap();
         if let Some(mut recorder) = recorder_guard.take() {
-            // Just stop the recorder. We don't need the audio buffer since we streamed it.
-            // But we call stop_recording to cleanly close the stream.
             let _ = recorder.stop_recording();
         }
     }
-    
+
     *is_recording = false;
     Ok("Recording stopped".to_string())
 }
@@ -150,7 +187,10 @@ pub async fn list_rooms(app: AppHandle) -> Result<Vec<Room>, String> {
 
 /// Get room details
 #[tauri::command]
-pub async fn get_room_details(app: AppHandle, room_id: String) -> Result<serde_json::Value, String> {
+pub async fn get_room_details(
+    app: AppHandle,
+    room_id: String,
+) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or("Authentication required")?;
@@ -179,16 +219,17 @@ pub async fn get_room_details(app: AppHandle, room_id: String) -> Result<serde_j
 
 /// Finalize room (mark as completed)
 #[tauri::command]
-pub async fn finalize_room(
-    app: AppHandle,
-    room_id: String,
-) -> Result<serde_json::Value, String> {
+pub async fn finalize_room(app: AppHandle, room_id: String) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or("Authentication required")?;
 
     let client = reqwest::Client::new();
-    let url = format!("{}/api/v1/rooms/{}/finalize", crate::config::api_base_url(), room_id);
+    let url = format!(
+        "{}/api/v1/rooms/{}/finalize",
+        crate::config::api_base_url(),
+        room_id
+    );
 
     let response = client
         .post(&url)
@@ -220,7 +261,11 @@ pub async fn export_room_transcript(
         .ok_or("Authentication required")?;
 
     let client = reqwest::Client::new();
-    let url = format!("{}/api/v1/rooms/{}/export", crate::config::api_base_url(), room_id);
+    let url = format!(
+        "{}/api/v1/rooms/{}/export",
+        crate::config::api_base_url(),
+        room_id
+    );
 
     let response = client
         .get(&url)
@@ -254,7 +299,11 @@ pub async fn update_speaker(
         .ok_or("Authentication required")?;
 
     let client = reqwest::Client::new();
-    let url = format!("{}/api/v1/rooms/{}/speakers", crate::config::api_base_url(), room_id);
+    let url = format!(
+        "{}/api/v1/rooms/{}/speakers",
+        crate::config::api_base_url(),
+        room_id
+    );
 
     let payload = serde_json::json!({
         "speaker_label": speaker_label,

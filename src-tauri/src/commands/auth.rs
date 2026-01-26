@@ -502,7 +502,7 @@ pub struct UserInfo {
 }
 
 /// Get the current authentication token
-/// 
+///
 /// Returns the access token if available and valid, None otherwise.
 #[tauri::command]
 pub async fn get_auth_token(app: AppHandle) -> Result<Option<String>, String> {
