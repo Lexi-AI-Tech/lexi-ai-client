@@ -7,6 +7,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Copy, RefreshCw } from "lucide-react";
 import type { Transcript } from "../types";
 import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
@@ -227,6 +228,15 @@ export const TranscriptsList: React.FC = () => {
     return formattedDates[transcriptId] || "Loading...";
   };
 
+  const handleCopyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here if needed
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+    }
+  };
+
   const getStatusColor = (status: string): string => {
     switch (status.toLowerCase()) {
       case "completed":
@@ -437,7 +447,7 @@ export const TranscriptsList: React.FC = () => {
           <div className="transcripts-table-header">
             <span>Date</span>
             <span>Transcript</span>
-            <span>Source</span>
+            <span>Actions</span>
           </div>
           {transcripts.map((transcript) => (
             <div
@@ -461,12 +471,90 @@ export const TranscriptsList: React.FC = () => {
                 )}
               </div>
               <div className="transcript-cell transcript-cell-meta">
-                {transcript.audio_file_url && (
-                  <audio
-                    src={transcript.audio_file_url as string}
-                    controls
-                  />
-                )}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {transcript.original_text && (
+                    <button
+                      onClick={() => handleCopyToClipboard(transcript.original_text || "")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "32px",
+                        height: "32px",
+                        padding: 0,
+                        background: "#ffffff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        color: "#6b7280",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#f9fafb";
+                        e.currentTarget.style.borderColor = "#d1d5db";
+                        e.currentTarget.style.color = "#111827";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.borderColor = "#e5e7eb";
+                        e.currentTarget.style.color = "#6b7280";
+                      }}
+                      title="Copy transcript"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      // Regenerate action - placeholder for now
+                      console.log("Regenerate clicked for transcript:", transcript.id);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "32px",
+                      height: "32px",
+                      padding: 0,
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      color: "#6b7280",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f9fafb";
+                      e.currentTarget.style.borderColor = "#d1d5db";
+                      e.currentTarget.style.color = "#111827";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#ffffff";
+                      e.currentTarget.style.borderColor = "#e5e7eb";
+                      e.currentTarget.style.color = "#6b7280";
+                    }}
+                    title="Regenerate transcript"
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                  {transcript.audio_file_url && (
+                    <audio
+                      src={transcript.audio_file_url as string}
+                      controls
+                      style={{
+                        height: "32px",
+                        maxWidth: "200px",
+                      }}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           ))}

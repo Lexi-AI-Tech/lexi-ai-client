@@ -309,14 +309,6 @@ export const HomePage: React.FC = () => {
                   transition={{ duration: 0.2 }}
                 >
                   <div className="transcript-card-header">
-                    <span
-                      className={`transcript-status ${transcript.status.toLowerCase()}`}
-                    >
-                      {transcript.status}
-                    </span>
-                    <span className="transcript-time">
-                      {formatRelativeTime(transcript.created_at)}
-                    </span>
                   </div>
                   <p className="transcript-preview">
                     {transcript.original_text
