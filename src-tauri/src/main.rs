@@ -57,7 +57,6 @@ mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortc
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
-mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
@@ -73,7 +72,7 @@ use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
 use state::{
-    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, RoomState,
+    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState,
     TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
@@ -105,7 +104,7 @@ use commands::onboarding::{
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::rooms::{
     create_room, export_room_transcript, finalize_room, get_room_details, list_rooms,
-    start_room_recording, stop_room_recording_and_process, update_speaker,
+            update_speaker,
 };
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
@@ -307,8 +306,6 @@ pub fn main() {
             create_room,
             list_rooms,
             get_room_details,
-            start_room_recording,
-            stop_room_recording_and_process,
             finalize_room,
             export_room_transcript,
             update_speaker,
@@ -383,10 +380,6 @@ pub fn main() {
             app.manage(RecordingChannelState {
                 tx: Arc::new(Mutex::new(Some(recording_tx.clone()))),
                 is_recording: recording_state_tracker.clone(),
-            });
-            app.manage(RoomState {
-                is_recording: Mutex::new(false),
-                command_tx: Mutex::new(None),
             });
 
             // Listen to recording events to update state tracker

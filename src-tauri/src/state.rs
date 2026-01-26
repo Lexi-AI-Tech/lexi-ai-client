@@ -40,12 +40,3 @@ pub struct RecordingChannelState {
     /// Current recording state (true if recording, false if idle)
     pub is_recording: Arc<Mutex<bool>>,
 }
-
-/// Room recording state
-///
-/// Note: AudioRecorder and RoomWebSocket cannot be stored here because they contain
-/// types that are not Send+Sync on macOS. They are managed in dedicated threads instead.
-pub struct RoomState {
-    pub is_recording: Mutex<bool>,
-    pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
-}
