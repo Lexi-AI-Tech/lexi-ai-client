@@ -2,8 +2,11 @@ import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SystemType } from "../lib/constants";
 import type { PaginatedActionHistoryResponse, ActionTrigger } from "../types";
+import { useAuthStore } from "../store/authStore";
+import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
 export const ActionsPage: React.FC = () => {
+  const authStore = useAuthStore();
   const [actionHistory, setActionHistory] =
     useState<PaginatedActionHistoryResponse | null>(null);
   const [triggers, setTriggers] = useState<ActionTrigger[]>([]);
@@ -21,6 +24,13 @@ export const ActionsPage: React.FC = () => {
 
   // Load action history
   const loadActionHistory = async () => {
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setActionHistory(null);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
@@ -34,7 +44,21 @@ export const ActionsPage: React.FC = () => {
       setActionHistory(data);
     } catch (err: any) {
       console.error("Failed to load action history:", err);
-      setError(err?.message || "Failed to load action history");
+      const errorMessage = err?.message || "Failed to load action history";
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("Not authenticated");
+
+      if (isAuthError) {
+        console.log("Auth error loading action history, clearing auth");
+        authStore.clearAuth();
+        setActionHistory(null);
+        setError(null);
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -42,6 +66,12 @@ export const ActionsPage: React.FC = () => {
 
   // Load triggers
   const loadTriggers = async () => {
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setTriggers([]);
+      setIsLoadingTriggers(false);
+      return;
+    }
+
     try {
       setIsLoadingTriggers(true);
       const data = await invoke<ActionTrigger[]>("get_action_triggers", {
@@ -51,20 +81,41 @@ export const ActionsPage: React.FC = () => {
       setTriggers(data);
     } catch (err: any) {
       console.error("Failed to load triggers:", err);
+      const errorMessage = err?.message || "Failed to load triggers";
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("Not authenticated");
+
+      if (isAuthError) {
+        console.log("Auth error loading triggers, clearing auth");
+        authStore.clearAuth();
+        setTriggers([]);
+      }
     } finally {
       setIsLoadingTriggers(false);
     }
   };
 
   useEffect(() => {
-    loadActionHistory();
-  }, [page]);
+    if (authStore.isInitialized) {
+      loadActionHistory();
+    }
+  }, [page, authStore.isAuthenticated, authStore.isInitialized]);
 
   useEffect(() => {
-    loadTriggers();
-  }, []);
+    if (authStore.isInitialized) {
+      loadTriggers();
+    }
+  }, [authStore.isAuthenticated, authStore.isInitialized]);
 
   const handleDeleteAction = async (actionId: string) => {
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setError("Please sign in to delete actions");
+      return;
+    }
+
     if (!confirm("Are you sure you want to delete this action?")) {
       return;
     }
@@ -73,11 +124,29 @@ export const ActionsPage: React.FC = () => {
       await invoke("delete_action_history", { actionId });
       await loadActionHistory();
     } catch (err: any) {
-      setError(err?.message || "Failed to delete action");
+      const errorMessage = err?.message || "Failed to delete action";
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("Not authenticated");
+
+      if (isAuthError) {
+        console.log("Auth error deleting action, clearing auth");
+        authStore.clearAuth();
+        setError(null);
+      } else {
+        setError(errorMessage);
+      }
     }
   };
 
   const handleCreateTrigger = async () => {
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setError("Please sign in to create triggers");
+      return;
+    }
+
     if (!newTriggerPhrase.trim()) {
       setError("Trigger phrase cannot be empty");
       return;
@@ -96,11 +165,29 @@ export const ActionsPage: React.FC = () => {
       setShowCreateTrigger(false);
       await loadTriggers();
     } catch (err: any) {
-      setError(err?.message || "Failed to create trigger");
+      const errorMessage = err?.message || "Failed to create trigger";
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("Not authenticated");
+
+      if (isAuthError) {
+        console.log("Auth error creating trigger, clearing auth");
+        authStore.clearAuth();
+        setError(null);
+      } else {
+        setError(errorMessage);
+      }
     }
   };
 
   const handleUpdateTrigger = async (trigger: ActionTrigger) => {
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setError("Please sign in to update triggers");
+      return;
+    }
+
     try {
       setError(null);
       await invoke<ActionTrigger>("update_action_trigger", {
@@ -113,11 +200,29 @@ export const ActionsPage: React.FC = () => {
       await loadTriggers();
       setEditingTrigger(null);
     } catch (err: any) {
-      setError(err?.message || "Failed to update trigger");
+      const errorMessage = err?.message || "Failed to update trigger";
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("Not authenticated");
+
+      if (isAuthError) {
+        console.log("Auth error updating trigger, clearing auth");
+        authStore.clearAuth();
+        setError(null);
+      } else {
+        setError(errorMessage);
+      }
     }
   };
 
   const handleDeleteTrigger = async (triggerId: string) => {
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setError("Please sign in to delete triggers");
+      return;
+    }
+
     if (!confirm("Are you sure you want to delete this trigger?")) {
       return;
     }
@@ -130,7 +235,20 @@ export const ActionsPage: React.FC = () => {
       });
       await loadTriggers();
     } catch (err: any) {
-      setError(err?.message || "Failed to delete trigger");
+      const errorMessage = err?.message || "Failed to delete trigger";
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("Not authenticated");
+
+      if (isAuthError) {
+        console.log("Auth error deleting trigger, clearing auth");
+        authStore.clearAuth();
+        setError(null);
+      } else {
+        setError(errorMessage);
+      }
     }
   };
 
@@ -168,15 +286,111 @@ export const ActionsPage: React.FC = () => {
     return formattedDates[actionId] || "Loading...";
   };
 
+  // Show loading while waiting for auth to initialize
+  if (!authStore.isInitialized) {
+    return (
+      <div
+        style={{
+          padding: "2rem 2.5rem",
+          background: "#ffffff",
+          minHeight: "100vh",
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            marginBottom: "2rem",
+            fontSize: "24px",
+            fontWeight: 600,
+            color: "#111827",
+            letterSpacing: "-0.025em",
+          }}
+        >
+          Actions
+        </h2>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "40px",
+            color: "#6b7280",
+            fontSize: "14px",
+          }}
+        >
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!authStore.isAuthenticated) {
+    return (
+      <div
+        style={{
+          padding: "2rem 2.5rem",
+          background: "#ffffff",
+          minHeight: "100vh",
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            marginBottom: "2rem",
+            fontSize: "24px",
+            fontWeight: 600,
+            color: "#111827",
+            letterSpacing: "-0.025em",
+          }}
+        >
+          Actions
+        </h2>
+        <div style={{ textAlign: "center", padding: "16px 0" }}>
+          <p
+            style={{
+              fontSize: "0.875rem",
+              color: "#6b7280",
+              marginBottom: "16px",
+            }}
+          >
+            Sign in to access your actions
+          </p>
+          <GoogleLoginButton
+            onSuccess={() => {
+              // Actions will be loaded automatically via useEffect
+            }}
+            onError={(err) => {
+              setError(err || "Authentication failed");
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="actions-page">
+    <div
+      style={{
+        padding: "2rem 2.5rem",
+        background: "#ffffff",
+        minHeight: "100vh",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+      }}
+    >
       <h2
         style={{
           margin: 0,
-          marginBottom: "32px",
+          marginBottom: "2rem",
           fontSize: "24px",
           fontWeight: 600,
-          color: "#ffffff",
+          color: "#111827",
+          letterSpacing: "-0.025em",
         }}
       >
         Actions
@@ -186,13 +400,14 @@ export const ActionsPage: React.FC = () => {
         <div
           className="permission-message"
           style={{
-            background: "rgba(255, 59, 48, 0.1)",
-            borderColor: "rgba(255, 59, 48, 0.2)",
-            color: "rgba(255, 59, 48, 0.9)",
+            background: "#fef2f2",
+            borderColor: "#fecaca",
+            color: "#b91c1c",
             fontSize: "11px",
             padding: "12px",
             marginBottom: "16px",
-            borderRadius: "6px",
+            borderRadius: "0.5rem",
+            border: "1px solid",
           }}
         >
           {error}
@@ -200,13 +415,13 @@ export const ActionsPage: React.FC = () => {
       )}
 
       {/* Custom Triggers Section */}
-      <div style={{ marginBottom: "48px" }}>
+      <div style={{ marginBottom: "3rem" }}>
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: "16px",
+            marginBottom: "1.5rem",
           }}
         >
           <h3
@@ -214,7 +429,7 @@ export const ActionsPage: React.FC = () => {
               margin: 0,
               fontSize: "18px",
               fontWeight: 500,
-              color: "#ffffff",
+              color: "#111827",
             }}
           >
             Custom Action Triggers
@@ -223,8 +438,35 @@ export const ActionsPage: React.FC = () => {
             className="transcript-btn"
             onClick={() => setShowCreateTrigger(!showCreateTrigger)}
             style={{
-              padding: "6px 12px",
-              fontSize: "11px",
+              padding: "0.5rem 1.5rem",
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              backgroundColor: showCreateTrigger ? "#ffffff" : "#111827",
+              border: `1px solid ${showCreateTrigger ? "#e5e7eb" : "#111827"}`,
+              borderRadius: "0.5rem",
+              color: showCreateTrigger ? "#6b7280" : "#ffffff",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (showCreateTrigger) {
+                e.currentTarget.style.background = "#f9fafb";
+                e.currentTarget.style.borderColor = "#d1d5db";
+                e.currentTarget.style.color = "#111827";
+              } else {
+                e.currentTarget.style.background = "#374151";
+                e.currentTarget.style.borderColor = "#374151";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (showCreateTrigger) {
+                e.currentTarget.style.background = "#ffffff";
+                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.color = "#6b7280";
+              } else {
+                e.currentTarget.style.background = "#111827";
+                e.currentTarget.style.borderColor = "#111827";
+              }
             }}
           >
             {showCreateTrigger ? "Cancel" : "+ Add Trigger"}
@@ -234,18 +476,22 @@ export const ActionsPage: React.FC = () => {
         {showCreateTrigger && (
           <div
             style={{
-              padding: "16px",
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "6px",
-              marginBottom: "16px",
+              padding: "1.5rem",
+              backgroundColor: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: "0.75rem",
+              marginBottom: "1.5rem",
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
             }}
           >
             <div
               style={{
-                fontSize: "11px",
-                color: "rgba(255, 255, 255, 0.6)",
-                marginBottom: "8px",
+                fontSize: "0.6875rem",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                color: "#9ca3af",
+                marginBottom: "0.75rem",
               }}
             >
               Trigger Phrase
@@ -257,21 +503,61 @@ export const ActionsPage: React.FC = () => {
               placeholder="e.g., 'Activate', 'Start', etc."
               style={{
                 width: "100%",
-                padding: "8px 12px",
-                fontSize: "11px",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                borderRadius: "6px",
-                color: "#ffffff",
-                marginBottom: "12px",
+                padding: "0.875rem 1rem",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                backgroundColor: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.625rem",
+                color: "#111827",
+                marginBottom: "1rem",
+                outline: "none",
+                transition: "all 0.2s ease",
+                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#6366f1";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(99, 102, 241, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+              }}
+              onMouseEnter={(e) => {
+                if (document.activeElement !== e.currentTarget) {
+                  e.currentTarget.style.borderColor = "#d1d5db";
+                  e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.08)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (document.activeElement !== e.currentTarget) {
+                  e.currentTarget.style.borderColor = "#e5e7eb";
+                  e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                }
               }}
             />
             <button
               className="transcript-btn"
               onClick={handleCreateTrigger}
               style={{
-                padding: "6px 12px",
-                fontSize: "11px",
+                padding: "0.5rem 1.5rem",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                backgroundColor: "#111827",
+                border: "1px solid #111827",
+                borderRadius: "0.5rem",
+                color: "#ffffff",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#374151";
+                e.currentTarget.style.borderColor = "#374151";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#111827";
+                e.currentTarget.style.borderColor = "#111827";
               }}
             >
               Create Trigger
@@ -282,10 +568,13 @@ export const ActionsPage: React.FC = () => {
         {isLoadingTriggers ? (
           <div
             style={{
-              padding: "20px",
+              padding: "3rem 1rem",
               textAlign: "center",
-              color: "rgba(255, 255, 255, 0.6)",
-              fontSize: "12px",
+              color: "#6b7280",
+              fontSize: "0.875rem",
+              background: "#ffffff",
+              border: "1px solid #f3f4f6",
+              borderRadius: "0.75rem",
             }}
           >
             Loading triggers...
@@ -293,57 +582,87 @@ export const ActionsPage: React.FC = () => {
         ) : triggers.length === 0 ? (
           <div
             style={{
-              padding: "20px",
+              padding: "3rem 1rem",
               textAlign: "center",
-              color: "rgba(255, 255, 255, 0.6)",
-              fontSize: "12px",
+              color: "#6b7280",
+              fontSize: "0.875rem",
+              background: "#ffffff",
+              border: "1px solid #f3f4f6",
+              borderRadius: "0.75rem",
             }}
           >
             No custom triggers. Create one to get started.
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {triggers.map((trigger) => (
               <div
                 key={trigger.id}
                 style={{
-                  padding: "12px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "6px",
+                  padding: "1.25rem",
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "0.75rem",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  transition: "all 0.2s ease",
+                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#d1d5db";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.08)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "#e5e7eb";
+                  e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
                 }}
               >
                 <div style={{ flex: 1 }}>
                   <div
                     style={{
-                      fontSize: "13px",
-                      color: "#ffffff",
+                      fontSize: "0.9375rem",
+                      color: "#111827",
                       fontWeight: 500,
-                      marginBottom: "4px",
+                      marginBottom: "0.25rem",
                     }}
                   >
                     {trigger.trigger_phrase}
                   </div>
                   <div
                     style={{
-                      fontSize: "10px",
-                      color: "rgba(255, 255, 255, 0.5)",
+                      fontSize: "0.75rem",
+                      color: "#9ca3af",
                     }}
                   >
                     {trigger.is_active ? "Active" : "Inactive"}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "0.75rem" }}>
                   <button
                     className="transcript-btn"
                     onClick={() => handleUpdateTrigger(trigger)}
                     style={{
-                      padding: "4px 8px",
-                      fontSize: "10px",
+                      padding: "0.5rem 1rem",
+                      fontSize: "0.8125rem",
+                      fontWeight: 500,
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      color: "#6b7280",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
                       opacity: trigger.is_active ? 0.7 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f9fafb";
+                      e.currentTarget.style.borderColor = "#d1d5db";
+                      e.currentTarget.style.color = "#111827";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#ffffff";
+                      e.currentTarget.style.borderColor = "#e5e7eb";
+                      e.currentTarget.style.color = "#6b7280";
                     }}
                   >
                     {trigger.is_active ? "Deactivate" : "Activate"}
@@ -352,10 +671,23 @@ export const ActionsPage: React.FC = () => {
                     className="transcript-btn"
                     onClick={() => handleDeleteTrigger(trigger.id)}
                     style={{
-                      padding: "4px 8px",
-                      fontSize: "10px",
-                      backgroundColor: "rgba(255, 59, 48, 0.2)",
-                      borderColor: "rgba(255, 59, 48, 0.3)",
+                      padding: "0.5rem 1rem",
+                      fontSize: "0.8125rem",
+                      fontWeight: 500,
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #fecaca",
+                      borderRadius: "0.5rem",
+                      color: "#b91c1c",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#fef2f2";
+                      e.currentTarget.style.borderColor = "#fca5a5";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#ffffff";
+                      e.currentTarget.style.borderColor = "#fecaca";
                     }}
                   >
                     Delete
@@ -372,10 +704,10 @@ export const ActionsPage: React.FC = () => {
         <h3
           style={{
             margin: 0,
-            marginBottom: "16px",
+            marginBottom: "1.5rem",
             fontSize: "18px",
             fontWeight: 500,
-            color: "#ffffff",
+            color: "#111827",
           }}
         >
           Action History
@@ -384,10 +716,13 @@ export const ActionsPage: React.FC = () => {
         {isLoading ? (
           <div
             style={{
-              padding: "40px",
+              padding: "3rem 1rem",
               textAlign: "center",
-              color: "rgba(255, 255, 255, 0.6)",
-              fontSize: "14px",
+              color: "#6b7280",
+              fontSize: "0.875rem",
+              background: "#ffffff",
+              border: "1px solid #f3f4f6",
+              borderRadius: "0.75rem",
             }}
           >
             Loading action history...
@@ -395,10 +730,13 @@ export const ActionsPage: React.FC = () => {
         ) : !actionHistory || actionHistory.actions.length === 0 ? (
           <div
             style={{
-              padding: "40px",
+              padding: "3rem 1rem",
               textAlign: "center",
-              color: "rgba(255, 255, 255, 0.6)",
-              fontSize: "14px",
+              color: "#6b7280",
+              fontSize: "0.875rem",
+              background: "#ffffff",
+              border: "1px solid #f3f4f6",
+              borderRadius: "0.75rem",
             }}
           >
             No action history yet. Actions will appear here as you use them.
@@ -406,16 +744,26 @@ export const ActionsPage: React.FC = () => {
         ) : (
           <>
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+              style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
             >
               {actionHistory.actions.map((action) => (
                 <div
                   key={action.id}
                   style={{
-                    padding: "16px",
-                    backgroundColor: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    borderRadius: "6px",
+                    padding: "1.25rem",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.75rem",
+                    transition: "all 0.2s ease",
+                    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#d1d5db";
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.08)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "#e5e7eb";
+                    e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
                   }}
                 >
                   <div
@@ -423,16 +771,16 @@ export const ActionsPage: React.FC = () => {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "flex-start",
-                      marginBottom: "8px",
+                      marginBottom: "0.75rem",
                     }}
                   >
                     <div style={{ flex: 1 }}>
                       <div
                         style={{
-                          fontSize: "13px",
-                          color: "#ffffff",
+                          fontSize: "0.9375rem",
+                          color: "#111827",
                           fontWeight: 500,
-                          marginBottom: "4px",
+                          marginBottom: "0.25rem",
                         }}
                       >
                         {action.action_command}
@@ -440,9 +788,9 @@ export const ActionsPage: React.FC = () => {
                       {action.app_name && (
                         <div
                           style={{
-                            fontSize: "11px",
-                            color: "rgba(255, 255, 255, 0.6)",
-                            marginBottom: "4px",
+                            fontSize: "0.8125rem",
+                            color: "#6b7280",
+                            marginBottom: "0.25rem",
                           }}
                         >
                           App: {action.app_name}
@@ -453,10 +801,23 @@ export const ActionsPage: React.FC = () => {
                       className="transcript-btn"
                       onClick={() => handleDeleteAction(action.id)}
                       style={{
-                        padding: "4px 8px",
-                        fontSize: "10px",
-                        backgroundColor: "rgba(255, 59, 48, 0.2)",
-                        borderColor: "rgba(255, 59, 48, 0.3)",
+                        padding: "0.5rem 1rem",
+                        fontSize: "0.8125rem",
+                        fontWeight: 500,
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #fecaca",
+                        borderRadius: "0.5rem",
+                        color: "#b91c1c",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#fef2f2";
+                        e.currentTarget.style.borderColor = "#fca5a5";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.borderColor = "#fecaca";
                       }}
                     >
                       Delete
@@ -464,9 +825,9 @@ export const ActionsPage: React.FC = () => {
                   </div>
                   <div
                     style={{
-                      fontSize: "10px",
-                      color: "rgba(255, 255, 255, 0.5)",
-                      marginTop: "8px",
+                      fontSize: "0.75rem",
+                      color: "#9ca3af",
+                      marginTop: "0.5rem",
                     }}
                   >
                     {formatDate(action.id)} • Type: {action.action_type}
@@ -482,8 +843,8 @@ export const ActionsPage: React.FC = () => {
                   display: "flex",
                   justifyContent: "center",
                   alignItems: "center",
-                  gap: "12px",
-                  marginTop: "24px",
+                  gap: "0.75rem",
+                  marginTop: "1.5rem",
                 }}
               >
                 <button
@@ -491,18 +852,38 @@ export const ActionsPage: React.FC = () => {
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                   style={{
-                    padding: "6px 12px",
-                    fontSize: "11px",
+                    padding: "0.5rem 1rem",
+                    fontSize: "0.8125rem",
+                    fontWeight: 500,
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    color: "#6b7280",
                     opacity: page === 1 ? 0.5 : 1,
                     cursor: page === 1 ? "not-allowed" : "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (page !== 1) {
+                      e.currentTarget.style.background = "#f9fafb";
+                      e.currentTarget.style.borderColor = "#d1d5db";
+                      e.currentTarget.style.color = "#111827";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (page !== 1) {
+                      e.currentTarget.style.background = "#ffffff";
+                      e.currentTarget.style.borderColor = "#e5e7eb";
+                      e.currentTarget.style.color = "#6b7280";
+                    }
                   }}
                 >
                   Previous
                 </button>
                 <span
                   style={{
-                    fontSize: "12px",
-                    color: "rgba(255, 255, 255, 0.7)",
+                    fontSize: "0.8125rem",
+                    color: "#6b7280",
                   }}
                 >
                   Page {page} of {actionHistory.total_pages}
@@ -514,13 +895,33 @@ export const ActionsPage: React.FC = () => {
                   }
                   disabled={page === actionHistory.total_pages}
                   style={{
-                    padding: "6px 12px",
-                    fontSize: "11px",
+                    padding: "0.5rem 1rem",
+                    fontSize: "0.8125rem",
+                    fontWeight: 500,
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    color: "#6b7280",
                     opacity: page === actionHistory.total_pages ? 0.5 : 1,
                     cursor:
                       page === actionHistory.total_pages
                         ? "not-allowed"
                         : "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (page !== actionHistory.total_pages) {
+                      e.currentTarget.style.background = "#f9fafb";
+                      e.currentTarget.style.borderColor = "#d1d5db";
+                      e.currentTarget.style.color = "#111827";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (page !== actionHistory.total_pages) {
+                      e.currentTarget.style.background = "#ffffff";
+                      e.currentTarget.style.borderColor = "#e5e7eb";
+                      e.currentTarget.style.color = "#6b7280";
+                    }
                   }}
                 >
                   Next

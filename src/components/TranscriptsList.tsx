@@ -265,7 +265,7 @@ export const TranscriptsList: React.FC = () => {
           style={{
             textAlign: "center",
             padding: "24px",
-            color: "rgba(255, 255, 255, 0.6)",
+            color: "#6b7280",
           }}
         >
           Loading...
@@ -348,9 +348,9 @@ export const TranscriptsList: React.FC = () => {
         <div
           className="permission-message"
           style={{
-            background: "rgba(255, 193, 7, 0.1)",
-            borderColor: "rgba(255, 193, 7, 0.2)",
-            color: "rgba(255, 193, 7, 0.9)",
+            background: "#fef3c7",
+            borderColor: "#fde68a",
+            color: "#92400e",
             marginBottom: "16px",
           }}
         >
@@ -397,7 +397,7 @@ export const TranscriptsList: React.FC = () => {
           style={{
             textAlign: "center",
             padding: "24px",
-            color: "rgba(255, 255, 255, 0.6)",
+            color: "#6b7280",
           }}
         >
           Loading transcripts...
@@ -408,9 +408,9 @@ export const TranscriptsList: React.FC = () => {
         <div
           className="permission-message"
           style={{
-            background: "rgba(255, 59, 48, 0.1)",
-            borderColor: "rgba(255, 59, 48, 0.2)",
-            color: "rgba(255, 59, 48, 0.9)",
+            background: "#fef2f2",
+            borderColor: "#fecaca",
+            color: "#b91c1c",
           }}
         >
           {error}
@@ -422,7 +422,7 @@ export const TranscriptsList: React.FC = () => {
           style={{
             textAlign: "center",
             padding: "24px",
-            color: "rgba(255, 255, 255, 0.6)",
+            color: "#6b7280",
           }}
         >
           <p>No transcripts yet.</p>
@@ -433,165 +433,41 @@ export const TranscriptsList: React.FC = () => {
       )}
 
       {!loading && transcripts.length > 0 && (
-        <div className="transcripts-list">
+        <div className="transcripts-list transcripts-table">
+          <div className="transcripts-table-header">
+            <span>Date</span>
+            <span>Transcript</span>
+            <span>Source</span>
+          </div>
           {transcripts.map((transcript) => (
             <div
               key={transcript.id}
-              className="transcript-item"
-              style={{
-                background: getStatusColor(transcript.status),
-                borderColor: getStatusBorderColor(transcript.status),
-              }}
+              className="transcript-item transcripts-table-row"
             >
-              <div className="transcript-item-header">
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      marginBottom: "4px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "10px",
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                        textTransform: "uppercase",
-                        fontWeight: "600",
-                      }}
-                    >
-                      {transcript.status}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "10px",
-                        color: "rgba(255, 255, 255, 0.5)",
-                      }}
-                    >
-                      {formatDate(transcript.id)}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  className="transcript-btn"
-                  onClick={() => handleDelete(transcript.id)}
-                  disabled={deletingId === transcript.id}
-                  style={{
-                    background: "rgba(255, 59, 48, 0.1)",
-                    borderColor: "rgba(255, 59, 48, 0.3)",
-                    color: "rgba(255, 59, 48, 0.8)",
-                    fontSize: "10px",
-                    padding: "4px 8px",
-                  }}
-                >
-                  {deletingId === transcript.id ? "Deleting..." : "Delete"}
-                </button>
+              <div className="transcript-cell transcript-cell-date">
+                {formatDate(transcript.id)}
               </div>
-              {transcript.original_text ? (
-                <div className="transcript-item-text">
-                  {transcript.original_text}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    fontSize: "11px",
-                    color: "rgba(255, 255, 255, 0.5)",
-                    fontStyle: "italic",
-                  }}
-                >
-                  {transcript.status === "processing"
-                    ? "Processing..."
-                    : "No text available"}
-                </div>
-              )}
-              {transcript.asr_provider && (
-                <div
-                  style={{
-                    fontSize: "10px",
-                    color: "rgba(255, 255, 255, 0.4)",
-                    marginTop: "4px",
-                  }}
-                >
-                  {transcript.asr_provider}
-                  {transcript.asr_model && ` • ${transcript.asr_model}`}
-                </div>
-              )}
-
-              {transcript.audio_file_url && (
-                <div
-                  style={{
-                    marginTop: "12px",
-                    padding: "12px",
-                    background: "rgba(0, 0, 0, 0.2)",
-                    borderRadius: "8px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 500,
-                        color: "rgba(255, 255, 255, 0.7)",
-                      }}
-                    >
-                      Audio Recording
-                    </span>
-                    <a
-                      href={transcript.audio_file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="transcript-btn"
-                      style={{
-                        textDecoration: "none",
-                        fontSize: "11px",
-                        padding: "4px 8px",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      <span>Download</span>
-                      <svg
-                        width="10"
-                        height="10"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                      </svg>
-                    </a>
-                  </div>
+              <div className="transcript-cell transcript-cell-text">
+                {transcript.original_text ? (
+                  <span className="transcript-item-text">
+                    {transcript.original_text}
+                  </span>
+                ) : (
+                  <span className="transcript-item-empty">
+                    {transcript.status === "processing"
+                      ? "Processing..."
+                      : "No text available"}
+                  </span>
+                )}
+              </div>
+              <div className="transcript-cell transcript-cell-meta">
+                {transcript.audio_file_url && (
                   <audio
+                    src={transcript.audio_file_url as string}
                     controls
-                    src={transcript.audio_file_url}
-                    style={{
-                      width: "100%",
-                      height: "32px",
-                      borderRadius: "16px",
-                    }}
                   />
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ))}
         </div>

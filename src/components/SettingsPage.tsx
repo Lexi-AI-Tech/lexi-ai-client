@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { Monitor, Mic, Power, Keyboard } from "lucide-react";
 
 import {
   LanguageCode,
@@ -45,6 +46,9 @@ export const SettingsPage: React.FC = () => {
   const [isUpdatingHotkeys, setIsUpdatingHotkeys] = useState(false);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const [hotkeySuccess, setHotkeySuccess] = useState(false);
+  const [activeSection, setActiveSection] = useState<
+    "account" | "transcription" | "general" | "hotkeys"
+  >("account");
 
   // Derived values from config - no defaults, rely entirely on backend
   const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
@@ -338,32 +342,67 @@ export const SettingsPage: React.FC = () => {
       onClick={onToggle}
       disabled={disabled}
       style={{
-        width: "44px",
-        height: "24px",
-        borderRadius: "12px",
+        width: "48px",
+        height: "28px",
+        borderRadius: "14px",
         border: "none",
-        backgroundColor: enabled
-          ? "rgba(52, 199, 89, 1)"
-          : "rgba(255, 255, 255, 0.2)",
+        background: enabled
+          ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+          : "#e5e7eb",
         cursor: disabled ? "not-allowed" : "pointer",
         position: "relative",
-        transition: "background-color 0.2s",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         opacity: disabled ? 0.5 : 1,
+        boxShadow: enabled
+          ? "0 2px 8px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
+          : "inset 0 2px 4px rgba(0, 0, 0, 0.06)",
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled && enabled) {
+          e.currentTarget.style.boxShadow =
+            "0 4px 12px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
+        } else if (!disabled && !enabled) {
+          e.currentTarget.style.background = "#d1d5db";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!disabled && enabled) {
+          e.currentTarget.style.boxShadow =
+            "0 2px 8px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
+        } else if (!disabled && !enabled) {
+          e.currentTarget.style.background = "#e5e7eb";
+        }
       }}
     >
       <div
         style={{
-          width: "20px",
-          height: "20px",
+          width: "22px",
+          height: "22px",
           borderRadius: "50%",
-          backgroundColor: "#ffffff",
+          background: "#ffffff",
           position: "absolute",
-          top: "2px",
-          left: enabled ? "22px" : "2px",
-          transition: "left 0.2s",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
+          top: "3px",
+          left: enabled ? "23px" : "3px",
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          boxShadow: enabled
+            ? "0 2px 6px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1)"
+            : "0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.1)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
-      />
+      >
+        {enabled && (
+          <div
+            style={{
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+            }}
+          />
+        )}
+      </div>
     </button>
   );
 
@@ -377,7 +416,7 @@ export const SettingsPage: React.FC = () => {
             marginBottom: "32px",
             fontSize: "24px",
             fontWeight: 600,
-            color: "#ffffff",
+            color: "#111827",
           }}
         >
           Settings
@@ -388,7 +427,7 @@ export const SettingsPage: React.FC = () => {
             justifyContent: "center",
             alignItems: "center",
             padding: "40px",
-            color: "rgba(255, 255, 255, 0.6)",
+            color: "#6b7280",
             fontSize: "14px",
           }}
         >
@@ -409,7 +448,7 @@ export const SettingsPage: React.FC = () => {
             marginBottom: "32px",
             fontSize: "24px",
             fontWeight: 600,
-            color: "#ffffff",
+            color: "#111827",
           }}
         >
           Settings
@@ -421,7 +460,7 @@ export const SettingsPage: React.FC = () => {
               marginBottom: "16px",
               fontSize: "18px",
               fontWeight: 500,
-              color: "#ffffff",
+              color: "#111827",
             }}
           >
             Account
@@ -454,7 +493,7 @@ export const SettingsPage: React.FC = () => {
             marginBottom: "32px",
             fontSize: "24px",
             fontWeight: 600,
-            color: "#ffffff",
+            color: "#111827",
           }}
         >
           Settings
@@ -463,9 +502,9 @@ export const SettingsPage: React.FC = () => {
           <div
             className="permission-message"
             style={{
-              background: "rgba(255, 59, 48, 0.1)",
-              borderColor: "rgba(255, 59, 48, 0.2)",
-              color: "rgba(255, 59, 48, 0.9)",
+              background: "#fef2f2",
+              borderColor: "#fecaca",
+              color: "#b91c1c",
               fontSize: "11px",
               padding: "12px",
               marginBottom: "16px",
@@ -479,342 +518,691 @@ export const SettingsPage: React.FC = () => {
   }
 
   return (
-    <div className="settings-page">
-      <h2
+    <div
+      style={{
+        display: "flex",
+        width: "100%",
+        height: "calc(100vh - 48px)",
+        background: "#ffffff",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      {/* Sidebar Navigation */}
+      <div
         style={{
-          margin: 0,
-          marginBottom: "32px",
-          fontSize: "24px",
-          fontWeight: 600,
-          color: "#ffffff",
+          width: "240px",
+          background: "#ffffff",
+          borderRight: "1px solid #f3f4f6",
+          padding: "2rem 1.5rem",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        Settings
-      </h2>
-
-      <div style={{ marginBottom: "32px" }}>
-        <h3
+        <h2
           style={{
             margin: 0,
-            marginBottom: "16px",
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#ffffff",
+            marginBottom: "1.5rem",
+            fontSize: "1.5rem",
+            fontWeight: 600,
+            color: "#111827",
+            letterSpacing: "-0.025em",
           }}
         >
-          Account
-        </h3>
-        <GoogleLoginButton />
-      </div>
-
-      <div>
-        <h3
-          style={{
-            margin: 0,
-            marginBottom: "16px",
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#ffffff",
-          }}
-        >
-          Transcription
-        </h3>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div>
-            <div
-              style={{
-                fontSize: "11px",
-                color: "rgba(255, 255, 255, 0.6)",
-                marginBottom: "8px",
-              }}
-            >
-              Transcription Language
-            </div>
-            <select
-              value={selectedLanguage || ""}
-              onChange={(e) =>
-                setSelectedLanguage(e.target.value as LanguageCode)
-              }
-              disabled={isUpdating || isLoading}
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                fontSize: "11px",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                borderRadius: "6px",
-                color: "#ffffff",
-                cursor: isUpdating || isLoading ? "not-allowed" : "pointer",
-                opacity: isUpdating || isLoading ? 0.5 : 1,
-              }}
-            >
-              {SUPPORTED_LANGUAGES.map((lang) => (
-                <option key={lang.value} value={lang.value}>
-                  {lang.label}
-                </option>
-              ))}
-            </select>
-            <div
-              style={{
-                fontSize: "10px",
-                color: "rgba(255, 255, 255, 0.5)",
-                marginTop: "6px",
-              }}
-            >
-              {selectedLanguage === "auto"
-                ? "Language will be automatically detected from audio"
-                : selectedLanguage
-                  ? `Transcription will be limited to ${SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label || selectedLanguage}`
-                  : "No language selected"}
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px",
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "6px",
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#ffffff",
-                  marginBottom: "4px",
-                  fontWeight: 500,
-                }}
-              >
-                Enhance Transcription
-              </div>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.6)",
-                }}
-              >
-                Use AI to improve transcription accuracy and formatting
-              </div>
-            </div>
-            <ToggleSwitch
-              enabled={
-                (selectedEnhanceTranscription ??
-                  enhanceTranscription ??
-                  false) === true
-              }
-              onToggle={handleToggleEnhanceTranscription}
-              disabled={isLoading || isUpdating}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div style={{ marginTop: "32px" }}>
-        <h3
-          style={{
-            margin: 0,
-            marginBottom: "16px",
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#ffffff",
-          }}
-        >
-          General
-        </h3>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px",
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "6px",
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#ffffff",
-                  marginBottom: "4px",
-                  fontWeight: 500,
-                }}
-              >
-                Start on System Startup
-              </div>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.6)",
-                }}
-              >
-                Automatically launch Lexi AI when your computer starts
-              </div>
-            </div>
-            <ToggleSwitch
-              enabled={
-                (selectedAutostart ?? autostartEnabled ?? false) === true
-              }
-              onToggle={handleToggleAutostart}
-              disabled={isLoading || isUpdating}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div style={{ marginTop: "32px" }}>
-        <h3
-          style={{
-            margin: 0,
-            marginBottom: "16px",
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#ffffff",
-          }}
-        >
-          Hotkeys
-        </h3>
-
-        <div
+          Settings
+        </h2>
+        <nav
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: "12px",
-            marginBottom: "16px",
+            gap: "0.25rem",
+            padding: "0.75rem",
+            background: "#f9fafb",
+            borderRadius: "0.75rem",
+            border: "1px solid #f3f4f6",
           }}
         >
-          <div>
-            <div
+          {[
+            { id: "account" as const, label: "Account", icon: Monitor },
+            { id: "transcription" as const, label: "Transcription", icon: Mic },
+            { id: "general" as const, label: "General", icon: Power },
+            { id: "hotkeys" as const, label: "Hotkey Settings", icon: Keyboard },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveSection(id)}
               style={{
-                fontSize: "11px",
-                color: "rgba(255, 255, 255, 0.6)",
-                marginBottom: "8px",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.625rem",
+                padding: "0.625rem 0.75rem",
+                borderRadius: "0.5rem",
+                border: "none",
+                background:
+                  activeSection === id ? "#111827" : "transparent",
+                color: activeSection === id ? "#ffffff" : "#6b7280",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                fontSize: "0.8125rem",
+                fontWeight: activeSection === id ? 500 : 400,
+                textAlign: "left",
+              }}
+              onMouseEnter={(e) => {
+                if (activeSection !== id) {
+                  e.currentTarget.style.background = "#ffffff";
+                  e.currentTarget.style.color = "#111827";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeSection !== id) {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "#6b7280";
+                }
               }}
             >
-              Current Hotkeys ({currentHotkeys.hotkeys.length}/3)
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Main Content Area */}
+      <div
+        style={{
+          flex: 1,
+          padding: "2rem 2.5rem",
+          overflowY: "auto",
+        }}
+      >
+
+        {/* Account Section */}
+        {activeSection === "account" && (
+          <div>
+            <h2
+              style={{
+                margin: 0,
+                marginBottom: "0.5rem",
+                fontSize: "1.75rem",
+                fontWeight: 600,
+                color: "#111827",
+                letterSpacing: "-0.025em",
+              }}
+            >
+              Account
+            </h2>
+            <p
+              style={{
+                margin: 0,
+                marginBottom: "2rem",
+                fontSize: "0.9375rem",
+                color: "#6b7280",
+              }}
+            >
+              Manage your profile and account settings.
+            </p>
+            <div
+              style={{
+                padding: "1.5rem",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.75rem",
+              }}
+            >
+              <GoogleLoginButton />
             </div>
-            {currentHotkeys.hotkeys.length > 0 ? (
+          </div>
+        )}
+
+        {/* Transcription Section */}
+        {activeSection === "transcription" && (
+          <div>
+            <h2
+              style={{
+                margin: 0,
+                marginBottom: "0.5rem",
+                fontSize: "1.75rem",
+                fontWeight: 600,
+                color: "#111827",
+                letterSpacing: "-0.025em",
+              }}
+            >
+              Transcription
+            </h2>
+            <p
+              style={{
+                margin: 0,
+                marginBottom: "2rem",
+                fontSize: "0.9375rem",
+                color: "#6b7280",
+              }}
+            >
+              Language and processing configurations.
+            </p>
+
+            <div
+              style={{
+                padding: "1.5rem",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.75rem",
+                marginBottom: "1rem",
+              }}
+            >
               <div
                 style={{
-                  padding: "12px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "6px",
-                  marginBottom: "8px",
+                  fontSize: "0.6875rem",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "#9ca3af",
+                  marginBottom: "0.75rem",
                 }}
               >
-                {currentHotkeys.hotkeys.map((hotkey, index) => (
+                Language
+              </div>
+              <div style={{ position: "relative", marginBottom: "0.5rem" }}>
+                <select
+                  value={selectedLanguage || ""}
+                  onChange={(e) =>
+                    setSelectedLanguage(e.target.value as LanguageCode)
+                  }
+                  disabled={isUpdating || isLoading}
+                  style={{
+                    width: "100%",
+                    padding: "0.875rem 2.5rem 0.875rem 1rem",
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.625rem",
+                    color: "#111827",
+                    cursor: isUpdating || isLoading ? "not-allowed" : "pointer",
+                    opacity: isUpdating || isLoading ? 0.5 : 1,
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    MozAppearance: "none",
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 1rem center",
+                    transition: "all 0.2s ease",
+                    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+                  }}
+                  onFocus={(e) => {
+                    if (!isUpdating && !isLoading) {
+                      e.currentTarget.style.borderColor = "#6366f1";
+                      e.currentTarget.style.boxShadow =
+                        "0 0 0 3px rgba(99, 102, 241, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05)";
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "#e5e7eb";
+                    e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isUpdating && !isLoading) {
+                      e.currentTarget.style.borderColor = "#d1d5db";
+                      e.currentTarget.style.boxShadow =
+                        "0 2px 4px rgba(0, 0, 0, 0.08)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (document.activeElement !== e.currentTarget) {
+                      e.currentTarget.style.borderColor = "#e5e7eb";
+                      e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                    }
+                  }}
+                >
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#9ca3af",
+                }}
+              >
+                {selectedLanguage === "auto"
+                  ? "Automatically detected from your audio input."
+                  : selectedLanguage
+                    ? `Transcription will be limited to ${SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label || selectedLanguage}`
+                    : "No language selected"}
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: "1.5rem",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.75rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div style={{ flex: 1 }}>
                   <div
-                    key={index}
                     style={{
-                      fontSize: "11px",
-                      fontFamily:
-                        'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
-                      color: "rgba(255, 255, 255, 0.9)",
-                      padding: "4px 0",
+                      fontSize: "0.9375rem",
+                      color: "#111827",
+                      marginBottom: "0.25rem",
+                      fontWeight: 500,
                     }}
                   >
-                    {hotkey}
+                    Enhance Transcription
                   </div>
-                ))}
+                  <div
+                    style={{
+                      fontSize: "0.8125rem",
+                      color: "#6b7280",
+                    }}
+                  >
+                    Use AI to improve accuracy and formatting.
+                  </div>
+                </div>
+                <ToggleSwitch
+                  enabled={
+                    (selectedEnhanceTranscription ??
+                      enhanceTranscription ??
+                      false) === true
+                  }
+                  onToggle={handleToggleEnhanceTranscription}
+                  disabled={isLoading || isUpdating}
+                />
               </div>
-            ) : (
-              <div
+            </div>
+
+            <div style={{ marginTop: "1.5rem" }}>
+              <button
+                className="transcript-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!isUpdating && hasChanges() && !isLoading) {
+                    handleSaveSettings();
+                  }
+                }}
+                disabled={isUpdating || !hasChanges() || isLoading}
                 style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.4)",
-                  padding: "12px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "6px",
-                  marginBottom: "8px",
+                  padding: "0.5rem 1.5rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  background: "#111827",
+                  color: "#ffffff",
+                  border: "1px solid #111827",
+                  borderRadius: "0.5rem",
+                  opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
+                  cursor:
+                    isUpdating || !hasChanges() || isLoading
+                      ? "not-allowed"
+                      : "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isUpdating && hasChanges() && !isLoading) {
+                    e.currentTarget.style.background = "#374151";
+                    e.currentTarget.style.borderColor = "#374151";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isUpdating && hasChanges() && !isLoading) {
+                    e.currentTarget.style.background = "#111827";
+                    e.currentTarget.style.borderColor = "#111827";
+                  }
                 }}
               >
-                No hotkeys configured
-              </div>
-            )}
-            <div
-              style={{
-                fontSize: "10px",
-                color: "rgba(255, 255, 255, 0.5)",
-                marginTop: "6px",
-              }}
-            >
-              Press any of these combinations to start/stop recording
+                {isUpdating ? "Saving..." : "Save Settings"}
+              </button>
+
+              {error && (
+                <div
+                  className="permission-message"
+                  style={{
+                    background: "#fef2f2",
+                    borderColor: "#fecaca",
+                    color: "#b91c1c",
+                    fontSize: "11px",
+                    padding: "8px",
+                    marginTop: "12px",
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              {success && (
+                <div
+                  className="permission-message"
+                  style={{
+                    background: "#ecfdf5",
+                    borderColor: "#a7f3d0",
+                    color: "#047857",
+                    fontSize: "11px",
+                    padding: "8px",
+                    marginTop: "12px",
+                  }}
+                >
+                  Settings saved successfully!
+                </div>
+              )}
             </div>
           </div>
+        )}
 
+        {/* General Section */}
+        {activeSection === "general" && (
           <div>
-            <div
+            <h2
               style={{
-                fontSize: "11px",
-                color: "rgba(255, 255, 255, 0.6)",
-                marginBottom: "8px",
+                margin: 0,
+                marginBottom: "0.5rem",
+                fontSize: "1.75rem",
+                fontWeight: 600,
+                color: "#111827",
+                letterSpacing: "-0.025em",
               }}
             >
-              Configure Hotkeys
-            </div>
-            <HotkeySelector
-              value={selectedHotkeys}
-              onChange={handleHotkeySelectorChange}
-              maxHotkeys={3}
-              disabled={isUpdatingHotkeys}
-            />
-            <div
+              General
+            </h2>
+            <p
               style={{
-                fontSize: "10px",
-                color: "rgba(255, 255, 255, 0.5)",
-                marginTop: "6px",
+                margin: 0,
+                marginBottom: "2rem",
+                fontSize: "0.9375rem",
+                color: "#6b7280",
               }}
             >
-              Note: Fn key is handled separately and works on Mac. Other hotkeys
-              use Tauri global shortcuts.
+              Manage app behavior and performance.
+            </p>
+
+            <div
+              style={{
+                padding: "1.5rem",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.75rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: "0.9375rem",
+                      color: "#111827",
+                      marginBottom: "0.25rem",
+                      fontWeight: 500,
+                    }}
+                  >
+                    Start on System Startup
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.8125rem",
+                      color: "#6b7280",
+                    }}
+                  >
+                    Automatically launch when your computer starts.
+                  </div>
+                </div>
+                <ToggleSwitch
+                  enabled={
+                    (selectedAutostart ?? autostartEnabled ?? false) === true
+                  }
+                  onToggle={handleToggleAutostart}
+                  disabled={isLoading || isUpdating}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        <button
-          className="transcript-btn"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
-              handleSaveHotkeys();
-            }
-          }}
-          disabled={isUpdatingHotkeys || !hasHotkeyChanges() || isLoading}
-          style={{
-            padding: "8px 16px",
-            fontSize: "11px",
-            width: "100%",
-            opacity:
-              isUpdatingHotkeys || !hasHotkeyChanges() || isLoading ? 0.5 : 1,
-            cursor:
-              isUpdatingHotkeys || !hasHotkeyChanges() || isLoading
-                ? "not-allowed"
-                : "pointer",
-            transition: "opacity 0.2s",
-            marginBottom: "12px",
-          }}
-        >
-          {isUpdatingHotkeys ? "Saving..." : "Save Hotkeys"}
-        </button>
+        {/* Hotkeys Section */}
+        {activeSection === "hotkeys" && (
+          <div>
+            <h2
+              style={{
+                margin: 0,
+                marginBottom: "0.5rem",
+                fontSize: "1.75rem",
+                fontWeight: 600,
+                color: "#111827",
+                letterSpacing: "-0.025em",
+              }}
+            >
+              Hotkey Settings
+            </h2>
+            <p
+              style={{
+                margin: 0,
+                marginBottom: "2rem",
+                fontSize: "0.9375rem",
+                color: "#6b7280",
+              }}
+            >
+              Configure global triggers to activate the app.
+            </p>
+
+            <div
+              style={{
+                padding: "1.5rem",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.75rem",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.8125rem",
+                  fontWeight: 600,
+                  color: "#111827",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                Global Shortcut
+              </div>
+              <p
+                style={{
+                  fontSize: "0.8125rem",
+                  color: "#6b7280",
+                  margin: "0 0 1rem 0",
+                }}
+              >
+                Press keys to start/stop recording.
+              </p>
+              {currentHotkeys.hotkeys.length > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.5rem",
+                  }}
+                >
+                  {currentHotkeys.hotkeys.map((hotkey, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: "0.5rem 1rem",
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        fontSize: "0.8125rem",
+                        fontFamily:
+                          'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                        color: "#111827",
+                      }}
+                    >
+                      {hotkey}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: "0.5rem 1rem",
+                    background: "#f9fafb",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.8125rem",
+                    color: "#9ca3af",
+                    display: "inline-block",
+                  }}
+                >
+                  No hotkeys configured
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                padding: "1.5rem",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.75rem",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.8125rem",
+                  fontWeight: 600,
+                  color: "#111827",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                Configure Hotkeys
+              </div>
+              <HotkeySelector
+                value={selectedHotkeys}
+                onChange={handleHotkeySelectorChange}
+                maxHotkeys={3}
+                disabled={isUpdatingHotkeys}
+              />
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#9ca3af",
+                  marginTop: "0.75rem",
+                }}
+              >
+                Note: Fn key is handled separately and works on Mac. Other
+                hotkeys use Tauri global shortcuts.
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "0.75rem",
+                marginTop: "1rem",
+              }}
+            >
+              <button
+                className="transcript-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
+                    handleSaveHotkeys();
+                  }
+                }}
+                disabled={isUpdatingHotkeys || !hasHotkeyChanges() || isLoading}
+                style={{
+                  padding: "0.5rem 1.5rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  background: "#111827",
+                  color: "#ffffff",
+                  border: "1px solid #111827",
+                  borderRadius: "0.5rem",
+                  opacity:
+                    isUpdatingHotkeys || !hasHotkeyChanges() || isLoading
+                      ? 0.5
+                      : 1,
+                  cursor:
+                    isUpdatingHotkeys || !hasHotkeyChanges() || isLoading
+                      ? "not-allowed"
+                      : "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (
+                    !isUpdatingHotkeys &&
+                    hasHotkeyChanges() &&
+                    !isLoading
+                  ) {
+                    e.currentTarget.style.background = "#374151";
+                    e.currentTarget.style.borderColor = "#374151";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (
+                    !isUpdatingHotkeys &&
+                    hasHotkeyChanges() &&
+                    !isLoading
+                  ) {
+                    e.currentTarget.style.background = "#111827";
+                    e.currentTarget.style.borderColor = "#111827";
+                  }
+                }}
+              >
+                {isUpdatingHotkeys ? "Saving..." : "Update Hotkey"}
+              </button>
+              <button
+                className="transcript-btn"
+                onClick={() => {
+                  // Reset to default hotkeys
+                  const defaultHotkeys: HotkeyConfig = { hotkeys: ["Fn"] };
+                  setSelectedHotkeys(defaultHotkeys);
+                }}
+                style={{
+                  padding: "0.5rem 1.5rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  background: "#ffffff",
+                  color: "#6b7280",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "0.5rem",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#f9fafb";
+                  e.currentTarget.style.borderColor = "#d1d5db";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#ffffff";
+                  e.currentTarget.style.borderColor = "#e5e7eb";
+                }}
+              >
+                Reset Default
+              </button>
+            </div>
 
         {hotkeyError && (
           <div
             className="permission-message"
             style={{
-              background: "rgba(255, 59, 48, 0.1)",
-              borderColor: "rgba(255, 59, 48, 0.2)",
-              color: "rgba(255, 59, 48, 0.9)",
+              background: "#fef2f2",
+              borderColor: "#fecaca",
+              color: "#b91c1c",
               fontSize: "11px",
               padding: "8px",
               marginBottom: "12px",
@@ -828,9 +1216,9 @@ export const SettingsPage: React.FC = () => {
           <div
             className="permission-message"
             style={{
-              background: "rgba(52, 199, 89, 0.1)",
-              borderColor: "rgba(52, 199, 89, 0.2)",
-              color: "rgba(52, 199, 89, 0.9)",
+              background: "#ecfdf5",
+              borderColor: "#a7f3d0",
+              color: "#047857",
               fontSize: "11px",
               padding: "8px",
               marginBottom: "12px",
@@ -839,81 +1227,8 @@ export const SettingsPage: React.FC = () => {
             Hotkeys saved successfully!
           </div>
         )}
-      </div>
-
-      {/* 
-      <div style={{ marginTop: "32px" }}>
-        <ModelsSection />
-      </div> */}
-
-      <div style={{ marginTop: "32px" }}>
-        <button
-          className="transcript-btn"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isUpdating && hasChanges() && !isLoading) {
-              handleSaveSettings();
-            }
-          }}
-          disabled={isUpdating || !hasChanges() || isLoading}
-          style={{
-            padding: "8px 16px",
-            fontSize: "11px",
-            width: "100%",
-            opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
-            cursor:
-              isUpdating || !hasChanges() || isLoading
-                ? "not-allowed"
-                : "pointer",
-            transition: "opacity 0.2s",
-          }}
-        >
-          {isUpdating ? "Saving..." : "Save Settings"}
-        </button>
-
-        {error && (
-          <div
-            className="permission-message"
-            style={{
-              background: "rgba(255, 59, 48, 0.1)",
-              borderColor: "rgba(255, 59, 48, 0.2)",
-              color: "rgba(255, 59, 48, 0.9)",
-              fontSize: "11px",
-              padding: "8px",
-              marginTop: "12px",
-            }}
-          >
-            {error}
           </div>
         )}
-
-        {success && (
-          <div
-            className="permission-message"
-            style={{
-              background: "rgba(52, 199, 89, 0.1)",
-              borderColor: "rgba(52, 199, 89, 0.2)",
-              color: "rgba(52, 199, 89, 0.9)",
-              fontSize: "11px",
-              padding: "8px",
-              marginTop: "12px",
-            }}
-          >
-            Settings saved successfully!
-          </div>
-        )}
-
-        <div
-          style={{
-            fontSize: "10px",
-            color: "rgba(255, 255, 255, 0.4)",
-            marginTop: "8px",
-            lineHeight: "1.4",
-          }}
-        >
-          The listener will restart automatically when you change the hotkey.
-        </div>
       </div>
     </div>
   );
