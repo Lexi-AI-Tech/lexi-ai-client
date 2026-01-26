@@ -70,29 +70,46 @@ impl RoomWebSocket {
         *is_connected.lock().unwrap() = true;
 
         // Spawn task to send audio chunks
+        let mut total_chunks = 0;
+        let mut total_bytes = 0;
         tokio::spawn(async move {
             while let Some(chunk) = audio_rx.recv().await {
+                total_chunks += 1;
+                total_bytes += chunk.len();
+                if total_chunks % 100 == 0 {
+                    println!("📤 Sent {} audio chunks, total {} bytes to server", total_chunks, total_bytes);
+                }
                 if let Err(e) = write.send(Message::Binary(chunk)).await {
-                    eprintln!("Failed to send audio chunk: {}", e);
+                    eprintln!("❌ Failed to send audio chunk: {}", e);
                     break;
                 }
             }
+            println!("📤 Audio sending complete. Total: {} chunks, {} bytes", total_chunks, total_bytes);
         });
 
         // Spawn task to receive transcript messages
         let app = self.app.clone();
         let is_connected_clone = Arc::clone(&is_connected);
+        let mut transcript_count = 0;
         tokio::spawn(async move {
             loop {
                 match read.next().await {
                     Some(Ok(Message::Text(text))) => {
                         if let Ok(msg) = serde_json::from_str::<TranscriptMessage>(&text) {
+                            transcript_count += 1;
+                            if let Some(ref transcript) = msg.transcript {
+                                println!("📝 Received transcript #{}: is_final={}, text='{}'", 
+                                    transcript_count, 
+                                    msg.is_final.unwrap_or(false),
+                                    if transcript.len() > 50 { &transcript[..50] } else { transcript }
+                                );
+                            }
                             // Emit transcript event to frontend
                             if let Err(e) = app.emit("room-transcript", &msg) {
-                                eprintln!("Failed to emit transcript: {}", e);
+                                eprintln!("❌ Failed to emit transcript: {}", e);
                             }
                         } else {
-                            eprintln!("Failed to parse transcript message: {}", text);
+                            eprintln!("⚠️ Failed to parse transcript message: {}", text);
                         }
                     }
                     Some(Ok(Message::Close(_))) => {
