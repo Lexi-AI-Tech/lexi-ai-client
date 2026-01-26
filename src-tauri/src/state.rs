@@ -42,7 +42,7 @@ pub struct RecordingChannelState {
 }
 
 /// Room recording state
-/// 
+///
 /// Note: AudioRecorder and RoomWebSocket cannot be stored here because they contain
 /// types that are not Send+Sync on macOS. They are managed in dedicated threads instead.
 pub struct RoomState {

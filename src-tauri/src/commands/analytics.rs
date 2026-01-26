@@ -3,6 +3,7 @@
 //! Tauri commands for fetching analytics data.
 
 use crate::commands::auth::get_auth_token_async;
+use crate::utils;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
@@ -34,6 +35,8 @@ pub async fn get_analytics_stats(app: AppHandle) -> Result<StatsResponse, String
     };
 
     let url = format!("{}/api/v1/analytics/stats", crate::config::api_base_url());
+
+    utils::log_api_request("Get user statistics", "GET", &url);
 
     let client = reqwest::Client::new();
     let response = client
@@ -83,6 +86,8 @@ pub async fn get_analytics_chart(
         crate::config::api_base_url(),
         period
     );
+
+    utils::log_api_request("Get chart data for specific period", "GET", &url);
 
     let client = reqwest::Client::new();
     let response = client

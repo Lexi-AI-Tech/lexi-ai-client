@@ -14,6 +14,7 @@
 use crate::commands::app_config;
 use crate::google_oauth;
 use crate::secure_storage::{self, AuthData, UserData};
+use crate::utils;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -236,8 +237,6 @@ async fn refresh_access_token(
     use reqwest;
     use serde_json::json;
 
-    use crate::commands::utils;
-
     let client = reqwest::Client::new();
     let url = auth::refresh_url();
 
@@ -251,6 +250,7 @@ async fn refresh_access_token(
     });
 
     println!("🔄 Attempting to refresh access token...");
+    utils::log_api_request("Refresh access token", "POST", &url);
 
     match client
         .post(&url)
@@ -380,7 +380,7 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
     // Case 1: Token is EXPIRED - must refresh before returning
     if is_expired {
         let refresh_flag = get_refresh_flag();
-        
+
         // Try to acquire the refresh lock atomically
         let is_first = {
             let mut in_progress = refresh_flag.lock().unwrap();
@@ -393,11 +393,11 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
                 true
             }
         };
-        
+
         if !is_first {
             // Another thread is refreshing - wait for it to complete
             println!("🔴 Token expired, but refresh already in progress, waiting...");
-            
+
             // Poll the flag until refresh completes (with timeout)
             let start = std::time::Instant::now();
             loop {
@@ -406,7 +406,7 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
                     let guard = refresh_flag.lock().unwrap();
                     *guard
                 };
-                
+
                 if !in_progress {
                     // Refresh completed, get the new token
                     if let Ok(Some(data)) = secure_storage::get_auth_data(app) {
@@ -423,21 +423,21 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
                     }
                     break;
                 }
-                
+
                 // Timeout after 5 seconds
                 if start.elapsed().as_secs() >= 5 {
                     eprintln!("⚠️  Timeout waiting for concurrent token refresh");
                     break;
                 }
             }
-            
+
             // After waiting, try to get the token again
             if let Ok(Some(data)) = secure_storage::get_auth_data(app) {
                 return Some(data.access_token);
             }
             return None;
         }
-        
+
         // We're the first to see expired token - do the refresh
         println!("🔴 Token expired, refreshing before API call...");
         if let Some(refresh_token) = &auth_data.refresh_token {
@@ -597,6 +597,8 @@ pub async fn get_current_user(app: AppHandle) -> Result<UserInfo, String> {
 
     let url = format!("{}/api/v1/auth/me", crate::config::api_base_url());
 
+    utils::log_api_request("Get current user information", "GET", &url);
+
     let client = reqwest::Client::new();
     let response = client
         .get(&url)
@@ -637,6 +639,8 @@ pub async fn logout(app: AppHandle) -> Result<(), String> {
         .ok_or_else(|| "Authentication required".to_string())?;
 
     let url = format!("{}/api/v1/auth/logout", crate::config::api_base_url());
+
+    utils::log_api_request("Logout from backend", "POST", &url);
 
     let client = reqwest::Client::new();
     let response = client

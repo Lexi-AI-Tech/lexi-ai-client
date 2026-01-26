@@ -4,6 +4,7 @@
 
 use crate::commands::auth::get_auth_token_async;
 use crate::state::RoomState;
+use crate::utils;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
 use std::thread;
@@ -33,6 +34,8 @@ pub async fn create_room(app: AppHandle, name: String) -> Result<Room, String> {
     let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
 
     let payload = RoomCreate { name };
+
+    utils::log_api_request("Create a new room", "POST", &url);
 
     let response = client
         .post(&url)
@@ -91,9 +94,9 @@ pub async fn start_room_recording(
 
     // Spawn thread to forward audio chunks from std::mpsc to WebSocket's tokio channel
     // Use a blocking runtime handle to send to async channel from sync context
-    let rt_handle = tokio::runtime::Handle::try_current()
-        .map_err(|_| "No tokio runtime available")?;
-    
+    let rt_handle =
+        tokio::runtime::Handle::try_current().map_err(|_| "No tokio runtime available")?;
+
     thread::spawn(move || {
         loop {
             match audio_rx.recv() {
@@ -121,19 +124,20 @@ pub async fn start_room_recording(
     // Start audio recorder in a dedicated thread (AudioRecorder is not Send+Sync)
     let app_for_recorder = app.clone();
     let (recorder_tx, recorder_rx) = mpsc::channel::<()>();
-    
+
     thread::spawn(move || {
         let mut recorder = crate::audio_recorder::AudioRecorder::new();
-        
+
         if let Err(e) = recorder.start_recording(Some(audio_tx)) {
             eprintln!("Failed to start recording: {}", e);
-            let _ = app_for_recorder.emit("room-websocket-error", format!("Recording failed: {}", e));
+            let _ =
+                app_for_recorder.emit("room-websocket-error", format!("Recording failed: {}", e));
             return;
         }
 
         // Wait for stop signal
         let _ = recorder_rx.recv();
-        
+
         // Stop recording
         let _ = recorder.stop_recording();
     });
@@ -181,6 +185,8 @@ pub async fn list_rooms(app: AppHandle) -> Result<Vec<Room>, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
 
+    utils::log_api_request("List user's rooms", "GET", &url);
+
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -212,6 +218,8 @@ pub async fn get_room_details(
 
     let client = reqwest::Client::new();
     let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
+
+    utils::log_api_request("Get room details", "GET", &url);
 
     let response = client
         .get(&url)
@@ -245,6 +253,8 @@ pub async fn finalize_room(app: AppHandle, room_id: String) -> Result<serde_json
         crate::config::api_base_url(),
         room_id
     );
+
+    utils::log_api_request("Finalize room (mark as completed)", "POST", &url);
 
     let response = client
         .post(&url)
@@ -281,6 +291,8 @@ pub async fn export_room_transcript(
         crate::config::api_base_url(),
         room_id
     );
+
+    utils::log_api_request("Export room transcript as JSON", "GET", &url);
 
     let response = client
         .get(&url)
@@ -324,6 +336,8 @@ pub async fn update_speaker(
         "speaker_label": speaker_label,
         "new_name": new_name
     });
+
+    utils::log_api_request("Update speaker name in room", "PATCH", &url);
 
     let response = client
         .patch(&url)
