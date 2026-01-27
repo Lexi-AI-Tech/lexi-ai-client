@@ -14,7 +14,6 @@ use tauri::{AppHandle, Emitter, State};
 pub struct Room {
     pub id: String,
     pub name: String,
-    pub status: String,
     pub created_at: String,
 }
 
@@ -26,7 +25,6 @@ pub struct RoomCreate {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RoomUpdate {
     pub name: Option<String>,
-    pub status: Option<String>,
 }
 
 /// Create a new room
@@ -221,33 +219,7 @@ pub async fn stop_room_recording_and_process(
         *is_recording = false;
     }
 
-    // Call Update Room API to set status to completed
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .ok_or("Authentication required")?;
-
-    let client = reqwest::Client::new();
-    let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
-    let payload = RoomUpdate {
-        name: None,
-        status: Some("completed".to_string()),
-    };
-
-    utils::log_api_request("Update room status to completed", "PATCH", &url);
-
-    let response = client
-        .patch(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Server error updating room: {}", response.status()));
-    }
-
-    Ok("Recording stopped and room processed".to_string())
+    Ok("Recording stopped".to_string())
 }
 
 /// List user's rooms
@@ -321,7 +293,6 @@ pub async fn update_room(
     app: AppHandle,
     room_id: String,
     name: Option<String>,
-    status: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
@@ -330,7 +301,7 @@ pub async fn update_room(
     let client = reqwest::Client::new();
     let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
 
-    let payload = RoomUpdate { name, status };
+    let payload = RoomUpdate { name };
 
     utils::log_api_request("Update room details", "PATCH", &url);
 

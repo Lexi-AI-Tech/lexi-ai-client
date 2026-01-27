@@ -302,19 +302,19 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
             ←
           </button>
           <h2 style={{ margin: 0, fontSize: "18px" }}>{room?.name}</h2>
-          <span
-            style={{
-              fontSize: "12px",
-              padding: "2px 8px",
-              borderRadius: "10px",
-              backgroundColor: isRecording
-                ? "rgba(255, 59, 48, 0.2)"
-                : "rgba(255, 255, 255, 0.1)",
-              color: isRecording ? "#ff3b30" : "rgba(255, 255, 255, 0.6)",
-            }}
-          >
-            {isRecording ? "● Live" : room?.status}
-          </span>
+          {isRecording && (
+            <span
+              style={{
+                fontSize: "12px",
+                padding: "2px 8px",
+                borderRadius: "10px",
+                backgroundColor: "rgba(255, 59, 48, 0.2)",
+                color: "#ff3b30",
+              }}
+            >
+              ● Live
+            </span>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: "12px" }}>

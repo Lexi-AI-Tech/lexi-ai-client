@@ -174,7 +174,6 @@ export interface RoomTranscriptSegment {
 export interface Room {
   id: string;
   name: string;
-  status: string;
   created_at: string;
   speaker_map?: Record<string, string>;
   transcripts?: RoomTranscriptSegment[];
@@ -227,13 +226,13 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-    | "home"
-    | "transcripts"
-    | "settings"
-    | "vocabulary"
-    | "actions"
-    | "shortcuts"
-    | "rooms";
+  | "home"
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts"
+  | "rooms";
   onNavigate: (
     page:
       | "home"

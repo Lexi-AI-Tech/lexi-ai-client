@@ -207,12 +207,12 @@ export const RoomsPage: React.FC = () => {
                 transition: "background 0.2s",
               }}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.1)")
+              (e.currentTarget.style.backgroundColor =
+                "rgba(255, 255, 255, 0.1)")
               }
               onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.05)")
+              (e.currentTarget.style.backgroundColor =
+                "rgba(255, 255, 255, 0.05)")
               }
             >
               <div
@@ -232,27 +232,7 @@ export const RoomsPage: React.FC = () => {
                     {formatDate(room.created_at)}
                   </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    padding: "2px 8px",
-                    borderRadius: "10px",
-                    backgroundColor:
-                      room.status === "active"
-                        ? "rgba(52, 199, 89, 0.2)"
-                        : room.status === "processing"
-                          ? "rgba(255, 193, 7, 0.2)"
-                          : "rgba(255, 255, 255, 0.1)",
-                    color:
-                      room.status === "active"
-                        ? "#34c759"
-                        : room.status === "processing"
-                          ? "#ffc107"
-                          : "rgba(255, 255, 255, 0.6)",
-                  }}
-                >
-                  {room.status}
-                </div>
+
               </div>
             </div>
           ))}
