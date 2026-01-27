@@ -87,7 +87,7 @@ pub async fn start_room_recording(
     let app_config = crate::commands::app_config::get_app_config(app.clone())
         .await
         .map_err(|e| format!("Failed to load app config: {}", e))?;
-    
+
     // Get first language from config, default to "auto"
     let language_code = app_config
         .languages
@@ -116,7 +116,7 @@ pub async fn start_room_recording(
         let mut ready_rx_guard = websocket.ready_rx.lock().unwrap();
         ready_rx_guard.take()
     };
-    
+
     if let Some(ready_rx) = ready_rx {
         // Wait for ready signal (with timeout)
         match tokio::time::timeout(tokio::time::Duration::from_secs(10), ready_rx).await {
@@ -322,44 +322,6 @@ pub async fn update_room(
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
     Ok(room)
-}
-
-/// Export room transcript as JSON
-#[tauri::command]
-pub async fn export_room_transcript(
-    app: AppHandle,
-    room_id: String,
-) -> Result<serde_json::Value, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .ok_or("Authentication required")?;
-
-    let client = reqwest::Client::new();
-    let url = format!(
-        "{}/api/v1/rooms/{}/export",
-        crate::config::api_base_url(),
-        room_id
-    );
-
-    utils::log_api_request("Export room transcript as JSON", "GET", &url);
-
-    let response = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
-    }
-
-    let export_data: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    Ok(export_data)
 }
 
 /// Update speaker name

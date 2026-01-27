@@ -36,7 +36,7 @@ pub struct RoomWebSocket {
     jwt_token: String,
     language: String,
     pub audio_tx: Arc<Mutex<Option<mpsc::Sender<Vec<u8>>>>>,
-    pub text_tx: Arc<Mutex<Option<mpsc::Sender<String>>>>,  // For sending text messages (like end_recording)
+    pub text_tx: Arc<Mutex<Option<mpsc::Sender<String>>>>, // For sending text messages (like end_recording)
     is_connected: Arc<Mutex<bool>>,
     pub ready_rx: Arc<Mutex<Option<tokio::sync::oneshot::Receiver<()>>>>, // Receive signal when server is ready
 }
@@ -57,15 +57,15 @@ impl RoomWebSocket {
 
     pub async fn connect(&mut self) -> Result<(), String> {
         use urlencoding::encode;
-        
+
         let api_base_url = crate::config::api_base_url();
         let ws_base_url = api_base_url
             .replace("http://", "ws://")
             .replace("https://", "wss://");
         let ws_url = format!(
             "{}/api/v1/rooms/{}/stream?token={}&language={}",
-            ws_base_url, 
-            self.room_id, 
+            ws_base_url,
+            self.room_id,
             encode(&self.jwt_token),
             encode(&self.language)
         );
@@ -150,21 +150,22 @@ impl RoomWebSocket {
                                 continue;
                             }
                         }
-                        
+
                         // Try to parse as transcript message
                         if let Ok(msg) = serde_json::from_str::<TranscriptMessage>(&text) {
                             transcript_count += 1;
-                            println!("📝 Received transcript #{}: speaker={}, text={:?}", 
-                                transcript_count, 
+                            println!(
+                                "📝 Received transcript #{}: speaker={}, text={:?}",
+                                transcript_count,
                                 msg.speaker_id.unwrap_or(0),
                                 msg.text
                             );
-                            
+
                             // Debug: Print what we're about to emit
                             if let Ok(json_str) = serde_json::to_string(&msg) {
                                 println!("📤 Emitting to frontend: {}", json_str);
                             }
-                            
+
                             match app.emit("room-transcript", &msg) {
                                 Ok(_) => {
                                     println!("✅ Successfully emitted 'room-transcript' event to frontend");
@@ -224,8 +225,9 @@ impl RoomWebSocket {
         // Send end_recording message before closing
         let end_recording_msg = serde_json::json!({
             "type": "end_recording"
-        }).to_string();
-        
+        })
+        .to_string();
+
         if let Err(e) = self.send_text_message(end_recording_msg) {
             eprintln!("⚠️ Failed to send end_recording message: {}", e);
         } else {
@@ -233,7 +235,7 @@ impl RoomWebSocket {
             // Give a brief moment for the message to be sent
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
-        
+
         *self.is_connected.lock().unwrap() = false;
         *self.audio_tx.lock().unwrap() = None;
         *self.text_tx.lock().unwrap() = None;

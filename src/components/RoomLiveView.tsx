@@ -58,7 +58,9 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
   const segmentsRef = useRef<RoomTranscriptSegment[]>([]);
   useEffect(() => {
     segmentsRef.current = segments;
-    console.log(`🔄 UI Update: ${segments.length} segments, Live: ${liveTranscript ? "Yes" : "No"}`);
+    console.log(
+      `🔄 UI Update: ${segments.length} segments, Live: ${liveTranscript ? "Yes" : "No"}`,
+    );
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [segments, liveTranscript]);
 
@@ -74,12 +76,15 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
     try {
       setLoading(true);
       const data = await invoke<Room>("get_room_details", { roomId });
-      console.log(`📡 Fetched details. Transcripts in DB: ${data.transcripts?.length ?? 0}, Local: ${segmentsRef.current.length}`);
+      console.log(
+        `📡 Fetched details. Transcripts in DB: ${data.transcripts?.length ?? 0}, Local: ${segmentsRef.current.length}`,
+      );
       setRoom(data);
       if (data.transcripts) {
         // Sort by start_time just in case
         const sorted = [...data.transcripts].sort(
-          (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
+          (a, b) =>
+            new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
         );
 
         // Safety Check 1: Recording Active?
@@ -90,7 +95,9 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
 
         // Safety Check 2: DB Empty but Local Has Data? (Prevent Wipe)
         if (sorted.length === 0 && segmentsRef.current.length > 0) {
-          console.log("⚠️ Skipping DB update - DB empty but local has segments (DB lag?)");
+          console.log(
+            "⚠️ Skipping DB update - DB empty but local has segments (DB lag?)",
+          );
           return;
         }
 
@@ -135,7 +142,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
     setRecordingStartTime(null);
     console.log("🛑 Stopping recording and preserving local segments...");
 
-    // Do NOT fetch room details here immediately. 
+    // Do NOT fetch room details here immediately.
     // The DB writes are async and likely not ready. Fetching now would overwrite our valid live segments with empty DB data.
     // relying on local state for immediate feedback.
 
@@ -192,7 +199,9 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
             console.log("✅ Adding segment to UI:", newSegment);
             setSegments((prev) => {
               const updated = [...prev, newSegment];
-              console.log(`📊 Segments updated: ${prev.length} -> ${updated.length}`);
+              console.log(
+                `📊 Segments updated: ${prev.length} -> ${updated.length}`,
+              );
               return updated;
             });
             setLiveTranscript(null); // Clear pending
@@ -200,7 +209,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
             console.warn("⚠️ Invalid transcript data:", {
               type: data.type,
               hasText,
-              text: data.text
+              text: data.text,
             });
           }
         },
@@ -229,15 +238,12 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
       setIsRecording(true);
       setRecordingStartTime(Date.now());
       console.log("✅ Recording started successfully");
-
     } catch (err) {
       console.error("Failed to start recording:", err);
       alert(`Failed to start recording: ${err}`);
       stopRecording();
     }
   };
-
-
 
   const getSpeakerName = (label: string) => {
     return room?.speaker_map?.[label] || label.replace("speaker_", "Speaker ");
@@ -248,11 +254,17 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
       if (!isoString) return "00:00";
       // Handle Python isoformat with microseconds (6 digits) -> JS (3 digits)
       // e.g. 2023-10-10T10:10:10.123456 -> 2023-10-10T10:10:10.123
-      const cleanIso = isoString.length > 23 ? isoString.substring(0, 23) : isoString;
+      const cleanIso =
+        isoString.length > 23 ? isoString.substring(0, 23) : isoString;
 
       const date = new Date(cleanIso);
       if (isNaN(date.getTime())) return "00:00";
-      return date.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      return date.toLocaleTimeString([], {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
     } catch (e) {
       return "00:00";
     }
@@ -324,7 +336,6 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
                   >
                     Name Speakers
                   </button>
-
                 </>
               )}
               <button

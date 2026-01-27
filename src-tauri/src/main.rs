@@ -104,8 +104,8 @@ use commands::onboarding::{
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
 use commands::rooms::{
-    create_room, export_room_transcript, get_room_details, list_rooms,
-    start_room_recording, stop_room_recording_and_process, update_room, update_speaker,
+    create_room, get_room_details, list_rooms, start_room_recording,
+    stop_room_recording_and_process, update_room, update_speaker,
 };
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
@@ -310,7 +310,6 @@ pub fn main() {
             start_room_recording,
             stop_room_recording_and_process,
             update_room,
-            export_room_transcript,
             update_speaker,
         ])
         .setup(move |app| {
