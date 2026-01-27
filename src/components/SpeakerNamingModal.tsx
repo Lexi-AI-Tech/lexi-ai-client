@@ -52,15 +52,11 @@ export const SpeakerNamingModal: React.FC<SpeakerNamingModalProps> = ({
     setSaving(true);
     try {
       // Update each speaker name
-      const updates = Object.entries(speakerNames).map(([label, name]) =>
-        invoke("update_speaker", {
-          roomId: room.id,
-          speakerLabel: label,
-          newName: name,
-        }),
-      );
-
-      await Promise.all(updates);
+      // Update speaker names in bulk
+      await invoke("update_speaker", {
+        roomId: room.id,
+        speakerMap: speakerNames,
+      });
 
       // Fetch updated room
       const updatedRoom = await invoke<Room>("get_room_details", {

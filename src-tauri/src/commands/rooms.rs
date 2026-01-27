@@ -324,13 +324,12 @@ pub async fn update_room(
     Ok(room)
 }
 
-/// Update speaker name
+/// Update speaker names
 #[tauri::command]
 pub async fn update_speaker(
     app: AppHandle,
     room_id: String,
-    speaker_label: String,
-    new_name: String,
+    speaker_map: std::collections::HashMap<String, String>,
 ) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
@@ -344,11 +343,10 @@ pub async fn update_speaker(
     );
 
     let payload = serde_json::json!({
-        "speaker_label": speaker_label,
-        "new_name": new_name
+        "speaker_map": speaker_map
     });
 
-    utils::log_api_request("Update speaker name in room", "PATCH", &url);
+    utils::log_api_request("Update speaker names in room", "PATCH", &url);
 
     let response = client
         .patch(&url)
