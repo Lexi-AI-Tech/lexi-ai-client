@@ -237,29 +237,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
     }
   };
 
-  const handleExportTranscript = async () => {
-    try {
-      const exportData = await invoke<any[]>("export_room_transcript", {
-        roomId,
-      });
 
-      // Create download
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${room?.name || "transcript"}_${new Date().toISOString().split("T")[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Failed to export transcript:", err);
-      alert("Failed to export transcript. Please try again.");
-    }
-  };
 
   const getSpeakerName = (label: string) => {
     return room?.speaker_map?.[label] || label.replace("speaker_", "Speaker ");
@@ -346,13 +324,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
                   >
                     Name Speakers
                   </button>
-                  <button
-                    onClick={handleExportTranscript}
-                    className="settings-button"
-                    style={{ fontSize: "12px", padding: "6px 12px" }}
-                  >
-                    Export
-                  </button>
+
                 </>
               )}
               <button
