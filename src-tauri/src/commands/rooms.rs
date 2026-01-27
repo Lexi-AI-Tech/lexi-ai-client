@@ -23,6 +23,12 @@ pub struct RoomCreate {
     pub name: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RoomUpdate {
+    pub name: Option<String>,
+    pub status: Option<String>,
+}
+
 /// Create a new room
 #[tauri::command]
 pub async fn create_room(app: AppHandle, name: String) -> Result<Room, String> {
@@ -279,25 +285,29 @@ pub async fn get_room_details(
     Ok(room)
 }
 
-/// Finalize room (mark as completed)
+/// Update room details (e.g. status)
 #[tauri::command]
-pub async fn finalize_room(app: AppHandle, room_id: String) -> Result<serde_json::Value, String> {
+pub async fn update_room(
+    app: AppHandle,
+    room_id: String,
+    name: Option<String>,
+    status: Option<String>,
+) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or("Authentication required")?;
 
     let client = reqwest::Client::new();
-    let url = format!(
-        "{}/api/v1/rooms/{}/finalize",
-        crate::config::api_base_url(),
-        room_id
-    );
+    let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
 
-    utils::log_api_request("Finalize room (mark as completed)", "POST", &url);
+    let payload = RoomUpdate { name, status };
+
+    utils::log_api_request("Update room details", "PATCH", &url);
 
     let response = client
-        .post(&url)
+        .patch(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&payload)
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;

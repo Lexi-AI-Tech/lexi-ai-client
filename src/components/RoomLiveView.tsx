@@ -111,7 +111,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
 
         // Finalize room
         try {
-          await invoke("finalize_room", { roomId });
+          await invoke("update_room", { roomId, status: "completed" });
         } catch (e) {
           console.error("Failed to finalize room:", e);
         }
