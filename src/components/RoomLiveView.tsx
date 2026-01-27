@@ -111,17 +111,10 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
   };
 
   const stopRecording = async () => {
-    // Stop Rust recording (handles WebSocket cleanup)
+    // Stop Rust recording (handles WebSocket cleanup and room finalization)
     if (isRecording) {
       try {
         await invoke("stop_room_recording_and_process", { roomId });
-
-        // Finalize room
-        try {
-          await invoke("update_room", { roomId, status: "completed" });
-        } catch (e) {
-          console.error("Failed to finalize room:", e);
-        }
       } catch (e) {
         console.error("Error stopping recording:", e);
       }

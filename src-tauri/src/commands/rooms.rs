@@ -197,27 +197,57 @@ pub async fn start_room_recording(
     Ok(())
 }
 
-/// Stop recording (no processing needed here as it was streamed)
+/// Stop recording and finalize the room
 #[tauri::command]
 pub async fn stop_room_recording_and_process(
+    app: AppHandle,
     state: State<'_, RoomState>,
-    _room_id: String, // unused but kept for compatibility/future
+    room_id: String,
 ) -> Result<String, String> {
-    let mut is_recording = state.is_recording.lock().unwrap();
-    if !*is_recording {
-        return Err("Not recording".to_string());
-    }
-
-    // Send stop signal to recorder thread
     {
-        let mut command_tx_guard = state.command_tx.lock().unwrap();
-        if let Some(tx) = command_tx_guard.take() {
-            let _ = tx.send(());
+        let mut is_recording = state.is_recording.lock().unwrap();
+        if !*is_recording {
+            return Err("Not recording".to_string());
         }
+
+        // Send stop signal to recorder thread
+        {
+            let mut command_tx_guard = state.command_tx.lock().unwrap();
+            if let Some(tx) = command_tx_guard.take() {
+                let _ = tx.send(());
+            }
+        }
+
+        *is_recording = false;
     }
 
-    *is_recording = false;
-    Ok("Recording stopped".to_string())
+    // Call Update Room API to set status to completed
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .ok_or("Authentication required")?;
+
+    let client = reqwest::Client::new();
+    let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
+    let payload = RoomUpdate {
+        name: None,
+        status: Some("completed".to_string()),
+    };
+
+    utils::log_api_request("Update room status to completed", "PATCH", &url);
+
+    let response = client
+        .patch(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error updating room: {}", response.status()));
+    }
+
+    Ok("Recording stopped and room processed".to_string())
 }
 
 /// List user's rooms
