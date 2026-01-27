@@ -77,12 +77,27 @@ pub async fn start_room_recording(
         .await
         .ok_or("Authentication required")?;
 
+    // Get language from app config
+    let app_config = crate::commands::app_config::get_app_config(app.clone())
+        .await
+        .map_err(|e| format!("Failed to load app config: {}", e))?;
+    
+    // Get first language from config, default to "auto"
+    let language_code = app_config
+        .languages
+        .and_then(|langs| langs.first().cloned())
+        .unwrap_or_else(|| "auto".to_string());
+
     // Create channel for streaming audio data (std::mpsc for audio_recorder)
     let (audio_tx, audio_rx) = mpsc::channel::<Vec<u8>>();
 
     // Create WebSocket connection (async) - this will spawn tasks internally
-    let mut websocket =
-        crate::room_websocket::RoomWebSocket::new(app.clone(), room_id.clone(), auth_token);
+    let mut websocket = crate::room_websocket::RoomWebSocket::new(
+        app.clone(),
+        room_id.clone(),
+        auth_token,
+        language_code,
+    );
 
     websocket
         .connect()

@@ -14,10 +14,11 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 pub struct TranscriptMessage {
     #[serde(rename = "type")]
     pub msg_type: String,
-    pub transcript: Option<String>,
-    #[serde(rename = "is_final")]
-    pub is_final: Option<bool>,
-    pub words: Option<Vec<serde_json::Value>>,
+    pub text: Option<String>,
+    #[serde(rename = "starttime")]
+    pub start_time: Option<f64>,
+    #[serde(rename = "endtime")]
+    pub end_time: Option<f64>,
     pub speaker: Option<u32>,
     pub message: Option<String>, // For error messages
 }
@@ -26,29 +27,36 @@ pub struct RoomWebSocket {
     app: AppHandle,
     room_id: String,
     jwt_token: String,
+    language: String,
     pub audio_tx: Arc<Mutex<Option<mpsc::Sender<Vec<u8>>>>>,
     is_connected: Arc<Mutex<bool>>,
 }
 
 impl RoomWebSocket {
-    pub fn new(app: AppHandle, room_id: String, jwt_token: String) -> Self {
+    pub fn new(app: AppHandle, room_id: String, jwt_token: String, language: String) -> Self {
         Self {
             app,
             room_id,
             jwt_token,
+            language,
             audio_tx: Arc::new(Mutex::new(None)),
             is_connected: Arc::new(Mutex::new(false)),
         }
     }
 
     pub async fn connect(&mut self) -> Result<(), String> {
+        use urlencoding::encode;
+        
         let api_base_url = crate::config::api_base_url();
         let ws_base_url = api_base_url
             .replace("http://", "ws://")
             .replace("https://", "wss://");
         let ws_url = format!(
-            "{}/api/v1/rooms/{}/stream?token={}",
-            ws_base_url, self.room_id, self.jwt_token
+            "{}/api/v1/rooms/{}/stream?token={}&language={}",
+            ws_base_url, 
+            self.room_id, 
+            encode(&self.jwt_token),
+            encode(&self.language)
         );
 
         let url = ws_url
@@ -97,14 +105,30 @@ impl RoomWebSocket {
                     Some(Ok(Message::Text(text))) => {
                         if let Ok(msg) = serde_json::from_str::<TranscriptMessage>(&text) {
                             transcript_count += 1;
-                            if let Some(ref transcript) = msg.transcript {
-                                println!("📝 Received transcript #{}: is_final={}, text='{}'", 
+                            if let Some(ref transcript_text) = msg.text {
+                                // Safely truncate to 50 characters (not bytes) to avoid panicking on Unicode
+                                let preview: String = transcript_text
+                                    .chars()
+                                    .take(50)
+                                    .collect();
+                                println!("📝 Received transcript #{}: speaker={}, text='{}'", 
                                     transcript_count, 
-                                    msg.is_final.unwrap_or(false),
-                                    if transcript.len() > 50 { &transcript[..50] } else { transcript }
+                                    msg.speaker.unwrap_or(0),
+                                    preview
                                 );
                             }
                             // Emit transcript event to frontend
+                            // Log what we're emitting for debugging
+                            println!("📤 Emitting transcript to frontend: msg_type={}, text={:?}, speaker={:?}, start_time={:?}, end_time={:?}", 
+                                msg.msg_type,
+                                msg.text.as_ref().map(|t| {
+                                    let preview: String = t.chars().take(30).collect();
+                                    preview
+                                }),
+                                msg.speaker,
+                                msg.start_time,
+                                msg.end_time
+                            );
                             if let Err(e) = app.emit("room-transcript", &msg) {
                                 eprintln!("❌ Failed to emit transcript: {}", e);
                             }

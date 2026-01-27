@@ -19,9 +19,10 @@ interface RoomLiveViewProps {
 }
 
 interface StreamingTranscript {
-  words: any[];
-  transcript: string;
-  is_final: boolean;
+  starttime?: number;
+  endtime?: number;
+  text: string;
+  speaker?: number;
 }
 
 export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
@@ -81,6 +82,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
 
     try {
       // Start recording - Rust backend handles WebSocket connection
+      // Language is read from app config
       await invoke("start_room_recording", { roomId });
       setIsRecording(true);
       setRecordingStartTime(Date.now());
@@ -90,43 +92,26 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
         "room-transcript",
         (event) => {
           const data = event.payload;
+          console.log("📥 Received transcript event:", data);
 
-          if (data.type === "transcript") {
-            if (data.is_final) {
-              // Final segment received - append to list
-              const words = data.words || [];
+          // Check both "type" and "msg_type" (Rust struct field name)
+          const msgType = data.type || data.msg_type;
+          if (msgType === "transcript") {
+            // All transcripts are final (server only sends final transcripts)
+            const newSegment: RoomTranscriptSegment = {
+              id: Math.random().toString(), // temp id
+              segment_index: segments.length,
+              start_time: data.starttime || 0,
+              end_time: data.endtime || 0,
+              speaker_label: `speaker_${data.speaker || 0}`,
+              text: data.text || "",
+            };
 
-              // Deepgram format (timing in seconds, speaker per word)
-              let startTime = 0;
-              let endTime = 0;
-              let speaker = 0;
-
-              if (words.length > 0) {
-                // Deepgram provides timing in seconds in words array
-                startTime = words[0].start || 0;
-                endTime = words[words.length - 1].end || 0;
-                // Use speaker from result (dominant speaker) or from first word
-                speaker =
-                  data.speaker !== undefined
-                    ? data.speaker
-                    : words[0].speaker || 0;
-              }
-
-              const newSegment: RoomTranscriptSegment = {
-                id: Math.random().toString(), // temp id
-                segment_index: segments.length,
-                start_time: startTime,
-                end_time: endTime,
-                speaker_label: `speaker_${speaker}`,
-                text: data.transcript || "",
-              };
-
-              setSegments((prev) => [...prev, newSegment]);
-              setLiveTranscript(null); // Clear pending
-            } else {
-              // Partial/interim transcript
-              setLiveTranscript(data);
-            }
+            console.log("✅ Adding segment to UI:", newSegment);
+            setSegments((prev) => [...prev, newSegment]);
+            setLiveTranscript(null); // Clear pending
+          } else {
+            console.warn("⚠️ Unexpected message type:", msgType, "Full data:", data);
           }
         },
       );
@@ -320,54 +305,74 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: "24px",
             maxWidth: "800px",
             margin: "0 auto",
           }}
         >
           {segments.map((seg, idx) => (
-            <div key={seg.id || idx} style={{ display: "flex", gap: "16px" }}>
+            <div
+              key={seg.id || idx}
+              style={{
+                padding: "12px 0",
+                borderBottom: "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <div style={{ fontSize: "15px", lineHeight: 1.6 }}>
+                <span
+                  style={{
+                    color: "rgba(255,255,255,0.7)",
+                    fontWeight: 500,
+                    marginRight: "8px",
+                  }}
+                >
+                  {getSpeakerName(seg.speaker_label)} →
+                </span>
+                <span style={{ color: "rgba(255,255,255,0.9)" }}>
+                  {seg.text}
+                </span>
+              </div>
               <div
                 style={{
-                  minWidth: "100px",
-                  fontSize: "13px",
-                  color: "rgba(255,255,255,0.5)",
+                  fontSize: "11px",
+                  color: "rgba(255,255,255,0.4)",
                   marginTop: "4px",
                 }}
               >
-                <div>{getSpeakerName(seg.speaker_label)}</div>
-                <div style={{ fontSize: "11px", opacity: 0.7 }}>
-                  {formatTime(seg.start_time)}
-                </div>
-              </div>
-              <div style={{ flex: 1, lineHeight: 1.5, fontSize: "15px" }}>
-                {seg.text}
+                {formatTime(seg.start_time)}
               </div>
             </div>
           ))}
 
           {/* Live Segment */}
           {liveTranscript && (
-            <div style={{ display: "flex", gap: "16px", opacity: 0.7 }}>
-              <div
-                style={{
-                  minWidth: "100px",
-                  fontSize: "13px",
-                  color: "rgba(255,255,255,0.5)",
-                  marginTop: "4px",
-                }}
-              >
-                <div>...</div>
-              </div>
-              <div
-                style={{
-                  flex: 1,
-                  lineHeight: 1.5,
-                  fontSize: "15px",
-                  fontStyle: "italic",
-                }}
-              >
-                {liveTranscript.transcript}
+            <div
+              style={{
+                padding: "12px 0",
+                opacity: 0.7,
+                borderBottom: "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <div style={{ fontSize: "15px", lineHeight: 1.6 }}>
+                <span
+                  style={{
+                    color: "rgba(255,255,255,0.7)",
+                    fontWeight: 500,
+                    marginRight: "8px",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {liveTranscript.speaker !== undefined
+                    ? `${getSpeakerName(`speaker_${liveTranscript.speaker}`)} →`
+                    : "... →"}
+                </span>
+                <span
+                  style={{
+                    color: "rgba(255,255,255,0.9)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {liveTranscript.text}
+                </span>
               </div>
             </div>
           )}
