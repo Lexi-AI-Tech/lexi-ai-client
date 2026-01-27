@@ -66,7 +66,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
       if (data.transcripts) {
         // Sort by start_time just in case
         const sorted = [...data.transcripts].sort(
-          (a, b) => a.start_time - b.start_time,
+          (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
         );
         setSegments(sorted);
       }
@@ -74,67 +74,6 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
       console.error("Failed to load room:", err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const startRecording = async () => {
-    if (isRecording) return;
-
-    try {
-      // Start recording - Rust backend handles WebSocket connection
-      // Language is read from app config
-      await invoke("start_room_recording", { roomId });
-      setIsRecording(true);
-      setRecordingStartTime(Date.now());
-
-      // Listen for transcript events from Rust backend
-      console.log("🎧 Setting up 'room-transcript' event listener...");
-      transcriptUnlistenRef.current = await listen<any>(
-        "room-transcript",
-        (event) => {
-          console.log("📥 Received transcript event from Tauri:", event);
-          const data = event.payload;
-          console.log("📥 Event payload:", JSON.stringify(data, null, 2));
-
-          // Server sends: {"type": "transcript", "starttime": number, "endtime": number, "text": string, "speaker": number}
-          // All transcripts are final (server only sends final transcripts)
-          if (data.type === "transcript" && data.text && data.speaker !== undefined) {
-            const newSegment: RoomTranscriptSegment = {
-              id: Math.random().toString(), // temp id
-              segment_index: segments.length,
-              start_time: data.starttime ?? 0,
-              end_time: data.endtime ?? 0,
-              speaker_label: `speaker_${data.speaker ?? 0}`,
-              text: data.text ?? "",
-            };
-
-            console.log("✅ Adding segment to UI:", newSegment);
-            setSegments((prev) => {
-              const updated = [...prev, newSegment];
-              console.log("📊 Total segments now:", updated.length);
-              return updated;
-            });
-            setLiveTranscript(null); // Clear pending
-          } else {
-            console.warn("⚠️ Invalid transcript data. Missing text or speaker:", data);
-          }
-        },
-      );
-      console.log("✅ Event listener set up successfully");
-
-      // Listen for WebSocket errors
-      errorUnlistenRef.current = await listen<string>(
-        "room-websocket-error",
-        (event) => {
-          console.error("WebSocket error:", event.payload);
-          alert(`Transcription error: ${event.payload}`);
-          stopRecording();
-        },
-      );
-    } catch (err) {
-      console.error("Failed to start recording:", err);
-      alert(`Failed to start recording: ${err}`);
-      stopRecording();
     }
   };
 
@@ -178,6 +117,98 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
     }
   };
 
+  const startRecording = async () => {
+    if (isRecording) return;
+
+    try {
+      // 1. Setup listeners FIRST before triggering the backend action
+      // This prevents race conditions where backend emits events before frontend is listneing
+      console.log("🎧 Setting up 'room-transcript' event listener...");
+
+      // Clear existing listener if any
+      if (transcriptUnlistenRef.current) {
+        transcriptUnlistenRef.current();
+        transcriptUnlistenRef.current = null;
+      }
+
+      transcriptUnlistenRef.current = await listen<any>(
+        "room-transcript",
+        (event) => {
+          console.log("📥 Received transcript event from Tauri:", event);
+          const data = event.payload;
+
+          // Debug payload structure
+          if (!data) {
+            console.error("❌ Received null/undefined payload");
+            return;
+          }
+
+          // Robust validation
+          // Check type match
+          const isTranscript = data.type === "transcript";
+          // Check text exists (allow empty string technically, but usually we want content)
+          const hasText = typeof data.text === "string";
+          // Check speaker exists (handle 0, null, undefined)
+          // Note: We accept null/undefined speaker and default to 0
+
+          if (isTranscript && hasText) {
+            const newSegment: RoomTranscriptSegment = {
+              id: Math.random().toString(), // temp id
+              segment_index: segments.length,
+              start_time: data.start_time ?? new Date().toISOString(),
+              end_time: data.end_time ?? new Date().toISOString(),
+              speaker_label: `speaker_${data.speaker_id ?? 0}`,
+              text: data.text,
+            };
+
+            console.log("✅ Adding segment to UI:", newSegment);
+            setSegments((prev) => {
+              const updated = [...prev, newSegment];
+              console.log(`📊 Segments updated: ${prev.length} -> ${updated.length}`);
+              return updated;
+            });
+            setLiveTranscript(null); // Clear pending
+          } else {
+            console.warn("⚠️ Invalid transcript data:", {
+              type: data.type,
+              hasText,
+              text: data.text
+            });
+          }
+        },
+      );
+      console.log("✅ Transcript listener set up successfully");
+
+      // Listen for WebSocket errors
+      if (errorUnlistenRef.current) {
+        errorUnlistenRef.current();
+        errorUnlistenRef.current = null;
+      }
+
+      errorUnlistenRef.current = await listen<string>(
+        "room-websocket-error",
+        (event) => {
+          console.error("WebSocket error:", event.payload);
+          alert(`Transcription error: ${event.payload}`);
+          stopRecording();
+        },
+      );
+
+      // 2. Start recording - Rust backend handles WebSocket connection
+      // Language is read from app config
+      console.log("🚀 Invoking start_room_recording...");
+      await invoke("start_room_recording", { roomId });
+      setIsRecording(true);
+      setRecordingStartTime(Date.now());
+      console.log("✅ Recording started successfully");
+
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+      alert(`Failed to start recording: ${err}`);
+      stopRecording();
+    }
+  };
+
   const handleExportTranscript = async () => {
     try {
       const exportData = await invoke<any[]>("export_room_transcript", {
@@ -206,10 +237,19 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
     return room?.speaker_map?.[label] || label.replace("speaker_", "Speaker ");
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  const formatTime = (isoString: string) => {
+    // Parse ISO string to gets absolute seconds, but usually for UI we just show HH:MM:SS or MM:SS
+    // However, the previous logic assumed relative seconds. 
+    // If we want relative time from room start, we'd need room start time.
+    // For now, let's just parse the Date and show local time HH:MM:SS
+    try {
+      if (!isoString) return "00:00";
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return "00:00";
+      return date.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    } catch (e) {
+      return "00:00";
+    }
   };
 
   if (loading && !room) {

@@ -15,11 +15,12 @@ pub struct TranscriptMessage {
     #[serde(rename = "type")]
     pub msg_type: String,
     pub text: Option<String>,
-    #[serde(rename = "starttime")]
-    pub start_time: Option<f64>,
-    #[serde(rename = "endtime")]
-    pub end_time: Option<f64>,
-    pub speaker: Option<u32>,
+    #[serde(rename = "start_time")]
+    pub start_time: Option<String>,
+    #[serde(rename = "end_time")]
+    pub end_time: Option<String>,
+    #[serde(rename = "speaker_id")]
+    pub speaker_id: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -155,7 +156,7 @@ impl RoomWebSocket {
                             transcript_count += 1;
                             println!("📝 Received transcript #{}: speaker={}, text={:?}", 
                                 transcript_count, 
-                                msg.speaker.unwrap_or(0),
+                                msg.speaker_id.unwrap_or(0),
                                 msg.text
                             );
                             

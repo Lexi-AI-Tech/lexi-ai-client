@@ -165,8 +165,8 @@ export interface PaginatedTranscriptsResponse {
 export interface RoomTranscriptSegment {
   id: string;
   segment_index: number;
-  start_time: number;
-  end_time: number;
+  start_time: string;
+  end_time: string;
   speaker_label: string;
   text: string;
 }
@@ -227,13 +227,13 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-    | "home"
-    | "transcripts"
-    | "settings"
-    | "vocabulary"
-    | "actions"
-    | "shortcuts"
-    | "rooms";
+  | "home"
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts"
+  | "rooms";
   onNavigate: (
     page:
       | "home"
