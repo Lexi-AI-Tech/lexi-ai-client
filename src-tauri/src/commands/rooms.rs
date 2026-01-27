@@ -104,6 +104,30 @@ pub async fn start_room_recording(
         .await
         .map_err(|e| format!("Failed to connect WebSocket: {}", e))?;
 
+    // Wait for server to be ready before starting audio recording
+    println!("⏳ Waiting for server ready signal...");
+    let ready_rx = {
+        let mut ready_rx_guard = websocket.ready_rx.lock().unwrap();
+        ready_rx_guard.take()
+    };
+    
+    if let Some(ready_rx) = ready_rx {
+        // Wait for ready signal (with timeout)
+        match tokio::time::timeout(tokio::time::Duration::from_secs(10), ready_rx).await {
+            Ok(Ok(_)) => {
+                println!("✅ Server ready - starting audio recording");
+            }
+            Ok(Err(_)) => {
+                return Err("Server ready channel closed unexpectedly".to_string());
+            }
+            Err(_) => {
+                return Err("Timeout waiting for server ready signal".to_string());
+            }
+        }
+    } else {
+        return Err("Ready channel not initialized".to_string());
+    }
+
     // Get the audio_tx from websocket to forward chunks
     let websocket_audio_tx = websocket.audio_tx.clone();
 

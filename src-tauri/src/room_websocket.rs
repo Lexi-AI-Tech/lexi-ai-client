@@ -23,6 +23,13 @@ pub struct TranscriptMessage {
     pub message: Option<String>, // For error messages
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServerMessage {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub message: Option<String>,
+}
+
 pub struct RoomWebSocket {
     app: AppHandle,
     room_id: String,
@@ -30,6 +37,7 @@ pub struct RoomWebSocket {
     language: String,
     pub audio_tx: Arc<Mutex<Option<mpsc::Sender<Vec<u8>>>>>,
     is_connected: Arc<Mutex<bool>>,
+    pub ready_rx: Arc<Mutex<Option<tokio::sync::oneshot::Receiver<()>>>>, // Receive signal when server is ready
 }
 
 impl RoomWebSocket {
@@ -41,6 +49,7 @@ impl RoomWebSocket {
             language,
             audio_tx: Arc::new(Mutex::new(None)),
             is_connected: Arc::new(Mutex::new(false)),
+            ready_rx: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -74,10 +83,14 @@ impl RoomWebSocket {
         let (audio_tx, mut audio_rx) = mpsc::channel::<Vec<u8>>(100);
         *self.audio_tx.lock().unwrap() = Some(audio_tx);
 
+        // Create ready signal channel
+        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+        *self.ready_rx.lock().unwrap() = Some(ready_rx);
+
         let is_connected = Arc::clone(&self.is_connected);
         *is_connected.lock().unwrap() = true;
 
-        // Spawn task to send audio chunks
+        // Spawn task to send audio chunks (will start sending immediately - chunks will queue)
         let mut total_chunks = 0;
         let mut total_bytes = 0;
         tokio::spawn(async move {
@@ -95,45 +108,42 @@ impl RoomWebSocket {
             println!("📤 Audio sending complete. Total: {} chunks, {} bytes", total_chunks, total_bytes);
         });
 
-        // Spawn task to receive transcript messages
+        // Spawn task to receive messages from server
         let app = self.app.clone();
-        let is_connected_clone = Arc::clone(&is_connected);
+        let is_connected_clone = Arc::clone(&self.is_connected);
+        let mut ready_tx_for_handler = Some(ready_tx);
         let mut transcript_count = 0;
         tokio::spawn(async move {
             loop {
                 match read.next().await {
                     Some(Ok(Message::Text(text))) => {
+                        // Try to parse as server control message first
+                        if let Ok(server_msg) = serde_json::from_str::<ServerMessage>(&text) {
+                            if server_msg.msg_type == "ready" {
+                                println!("✅ Received 'ready' signal from server");
+                                // Signal that server is ready (only once)
+                                if let Some(tx) = ready_tx_for_handler.take() {
+                                    let _ = tx.send(());
+                                }
+                                // Emit event to frontend
+                                let _ = app.emit("room-websocket-ready", ());
+                                continue;
+                            }
+                        }
+                        
+                        // Try to parse as transcript message
                         if let Ok(msg) = serde_json::from_str::<TranscriptMessage>(&text) {
                             transcript_count += 1;
-                            if let Some(ref transcript_text) = msg.text {
-                                // Safely truncate to 50 characters (not bytes) to avoid panicking on Unicode
-                                let preview: String = transcript_text
-                                    .chars()
-                                    .take(50)
-                                    .collect();
-                                println!("📝 Received transcript #{}: speaker={}, text='{}'", 
-                                    transcript_count, 
-                                    msg.speaker.unwrap_or(0),
-                                    preview
-                                );
-                            }
-                            // Emit transcript event to frontend
-                            // Log what we're emitting for debugging
-                            println!("📤 Emitting transcript to frontend: msg_type={}, text={:?}, speaker={:?}, start_time={:?}, end_time={:?}", 
-                                msg.msg_type,
-                                msg.text.as_ref().map(|t| {
-                                    let preview: String = t.chars().take(30).collect();
-                                    preview
-                                }),
-                                msg.speaker,
-                                msg.start_time,
-                                msg.end_time
+                            println!("📝 Received transcript #{}: speaker={}, text={:?}", 
+                                transcript_count, 
+                                msg.speaker.unwrap_or(0),
+                                msg.text
                             );
                             if let Err(e) = app.emit("room-transcript", &msg) {
                                 eprintln!("❌ Failed to emit transcript: {}", e);
                             }
                         } else {
-                            eprintln!("⚠️ Failed to parse transcript message: {}", text);
+                            eprintln!("⚠️ Failed to parse message: {}", text);
                         }
                     }
                     Some(Ok(Message::Close(_))) => {
