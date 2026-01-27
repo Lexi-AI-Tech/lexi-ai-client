@@ -20,7 +20,6 @@ pub struct TranscriptMessage {
     #[serde(rename = "endtime")]
     pub end_time: Option<f64>,
     pub speaker: Option<u32>,
-    pub message: Option<String>, // For error messages
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -139,8 +138,19 @@ impl RoomWebSocket {
                                 msg.speaker.unwrap_or(0),
                                 msg.text
                             );
-                            if let Err(e) = app.emit("room-transcript", &msg) {
-                                eprintln!("❌ Failed to emit transcript: {}", e);
+                            
+                            // Debug: Print what we're about to emit
+                            if let Ok(json_str) = serde_json::to_string(&msg) {
+                                println!("📤 Emitting to frontend: {}", json_str);
+                            }
+                            
+                            match app.emit("room-transcript", &msg) {
+                                Ok(_) => {
+                                    println!("✅ Successfully emitted 'room-transcript' event to frontend");
+                                }
+                                Err(e) => {
+                                    eprintln!("❌ Failed to emit transcript: {}", e);
+                                }
                             }
                         } else {
                             eprintln!("⚠️ Failed to parse message: {}", text);

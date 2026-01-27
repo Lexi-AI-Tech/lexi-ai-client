@@ -88,33 +88,39 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
       setRecordingStartTime(Date.now());
 
       // Listen for transcript events from Rust backend
+      console.log("🎧 Setting up 'room-transcript' event listener...");
       transcriptUnlistenRef.current = await listen<any>(
         "room-transcript",
         (event) => {
+          console.log("📥 Received transcript event from Tauri:", event);
           const data = event.payload;
-          console.log("📥 Received transcript event:", data);
+          console.log("📥 Event payload:", JSON.stringify(data, null, 2));
 
-          // Check both "type" and "msg_type" (Rust struct field name)
-          const msgType = data.type || data.msg_type;
-          if (msgType === "transcript") {
-            // All transcripts are final (server only sends final transcripts)
+          // Server sends: {"type": "transcript", "starttime": number, "endtime": number, "text": string, "speaker": number}
+          // All transcripts are final (server only sends final transcripts)
+          if (data.type === "transcript" && data.text && data.speaker !== undefined) {
             const newSegment: RoomTranscriptSegment = {
               id: Math.random().toString(), // temp id
               segment_index: segments.length,
-              start_time: data.starttime || 0,
-              end_time: data.endtime || 0,
-              speaker_label: `speaker_${data.speaker || 0}`,
-              text: data.text || "",
+              start_time: data.starttime ?? 0,
+              end_time: data.endtime ?? 0,
+              speaker_label: `speaker_${data.speaker ?? 0}`,
+              text: data.text ?? "",
             };
 
             console.log("✅ Adding segment to UI:", newSegment);
-            setSegments((prev) => [...prev, newSegment]);
+            setSegments((prev) => {
+              const updated = [...prev, newSegment];
+              console.log("📊 Total segments now:", updated.length);
+              return updated;
+            });
             setLiveTranscript(null); // Clear pending
           } else {
-            console.warn("⚠️ Unexpected message type:", msgType, "Full data:", data);
+            console.warn("⚠️ Invalid transcript data. Missing text or speaker:", data);
           }
         },
       );
+      console.log("✅ Event listener set up successfully");
 
       // Listen for WebSocket errors
       errorUnlistenRef.current = await listen<string>(
