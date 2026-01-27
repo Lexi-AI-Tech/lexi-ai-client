@@ -14,6 +14,7 @@ import { ActionsPage } from "./components/ActionsPage";
 import { ShortcutsPage } from "./components/ShortcutsPage";
 import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
+import { NotesPage } from "./components/NotesPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 
 type Page =
@@ -22,7 +23,8 @@ type Page =
   | "settings"
   | "vocabulary"
   | "actions"
-  | "shortcuts";
+  | "shortcuts"
+  | "notes";
 
 function App() {
   // Check if onboarding is completed
@@ -82,6 +84,11 @@ function App() {
         {currentPage === "shortcuts" && (
           <div className="container">
             <ShortcutsPage />
+          </div>
+        )}
+        {currentPage === "notes" && (
+          <div className="container">
+            <NotesPage />
           </div>
         )}
       </div>
