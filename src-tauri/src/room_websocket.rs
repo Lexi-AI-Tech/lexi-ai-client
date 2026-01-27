@@ -35,6 +35,7 @@ pub struct RoomWebSocket {
     jwt_token: String,
     language: String,
     pub audio_tx: Arc<Mutex<Option<mpsc::Sender<Vec<u8>>>>>,
+    pub text_tx: Arc<Mutex<Option<mpsc::Sender<String>>>>,  // For sending text messages (like end_recording)
     is_connected: Arc<Mutex<bool>>,
     pub ready_rx: Arc<Mutex<Option<tokio::sync::oneshot::Receiver<()>>>>, // Receive signal when server is ready
 }
@@ -47,6 +48,7 @@ impl RoomWebSocket {
             jwt_token,
             language,
             audio_tx: Arc::new(Mutex::new(None)),
+            text_tx: Arc::new(Mutex::new(None)),
             is_connected: Arc::new(Mutex::new(false)),
             ready_rx: Arc::new(Mutex::new(None)),
         }
@@ -78,9 +80,11 @@ impl RoomWebSocket {
 
         let (mut write, mut read) = ws_stream.split();
 
-        // Create channel for audio chunks
+        // Create channels
         let (audio_tx, mut audio_rx) = mpsc::channel::<Vec<u8>>(100);
+        let (text_tx, mut text_rx) = mpsc::channel::<String>(10);
         *self.audio_tx.lock().unwrap() = Some(audio_tx);
+        *self.text_tx.lock().unwrap() = Some(text_tx);
 
         // Create ready signal channel
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
@@ -89,22 +93,38 @@ impl RoomWebSocket {
         let is_connected = Arc::clone(&self.is_connected);
         *is_connected.lock().unwrap() = true;
 
-        // Spawn task to send audio chunks (will start sending immediately - chunks will queue)
+        // Spawn task to send messages (audio chunks and text messages)
         let mut total_chunks = 0;
         let mut total_bytes = 0;
         tokio::spawn(async move {
-            while let Some(chunk) = audio_rx.recv().await {
-                total_chunks += 1;
-                total_bytes += chunk.len();
-                if total_chunks % 100 == 0 {
-                    println!("📤 Sent {} audio chunks, total {} bytes to server", total_chunks, total_bytes);
-                }
-                if let Err(e) = write.send(Message::Binary(chunk)).await {
-                    eprintln!("❌ Failed to send audio chunk: {}", e);
-                    break;
+            loop {
+                tokio::select! {
+                    // Send audio chunks
+                    Some(chunk) = audio_rx.recv() => {
+                        total_chunks += 1;
+                        total_bytes += chunk.len();
+                        if total_chunks % 100 == 0 {
+                            println!("📤 Sent {} audio chunks, total {} bytes to server", total_chunks, total_bytes);
+                        }
+                        if let Err(e) = write.send(Message::Binary(chunk)).await {
+                            eprintln!("❌ Failed to send audio chunk: {}", e);
+                            break;
+                        }
+                    }
+                    // Send text messages (like end_recording)
+                    Some(text) = text_rx.recv() => {
+                        println!("📤 Sending text message to server: {}", text);
+                        if let Err(e) = write.send(Message::Text(text)).await {
+                            eprintln!("❌ Failed to send text message: {}", e);
+                            break;
+                        }
+                    }
+                    else => {
+                        println!("📤 Audio/text sending complete. Total: {} chunks, {} bytes", total_chunks, total_bytes);
+                        break;
+                    }
                 }
             }
-            println!("📤 Audio sending complete. Total: {} chunks, {} bytes", total_chunks, total_bytes);
         });
 
         // Spawn task to receive messages from server
@@ -189,8 +209,32 @@ impl RoomWebSocket {
         *self.is_connected.lock().unwrap()
     }
 
+    pub fn send_text_message(&self, message: String) -> Result<(), String> {
+        if let Some(ref tx) = *self.text_tx.lock().unwrap() {
+            tx.try_send(message)
+                .map_err(|e| format!("Failed to send text message: {}", e))?;
+            Ok(())
+        } else {
+            Err("WebSocket not connected".to_string())
+        }
+    }
+
     pub fn close(&mut self) {
+        // Send end_recording message before closing
+        let end_recording_msg = serde_json::json!({
+            "type": "end_recording"
+        }).to_string();
+        
+        if let Err(e) = self.send_text_message(end_recording_msg) {
+            eprintln!("⚠️ Failed to send end_recording message: {}", e);
+        } else {
+            println!("📍 Sent end_recording signal to server");
+            // Give a brief moment for the message to be sent
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        
         *self.is_connected.lock().unwrap() = false;
         *self.audio_tx.lock().unwrap() = None;
+        *self.text_tx.lock().unwrap() = None;
     }
 }
