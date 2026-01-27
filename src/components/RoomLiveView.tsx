@@ -19,10 +19,10 @@ interface RoomLiveViewProps {
 }
 
 interface StreamingTranscript {
-  starttime?: number;
-  endtime?: number;
+  start_time?: string;
+  end_time?: string;
   text: string;
-  speaker?: number;
+  speaker_id?: number;
 }
 
 export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
@@ -54,20 +54,46 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
   }, [roomId]);
 
   // Auto-scroll
+  // Auto-scroll and debug logs
+  const segmentsRef = useRef<RoomTranscriptSegment[]>([]);
   useEffect(() => {
+    segmentsRef.current = segments;
+    console.log(`🔄 UI Update: ${segments.length} segments, Live: ${liveTranscript ? "Yes" : "No"}`);
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [segments, liveTranscript]);
 
+  const isRecordingRef = useRef(false);
+
+  // Update ref when state changes
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
   const fetchRoomDetails = async () => {
+    console.log("📡 Fetching room details...");
     try {
       setLoading(true);
       const data = await invoke<Room>("get_room_details", { roomId });
+      console.log(`📡 Fetched details. Transcripts in DB: ${data.transcripts?.length ?? 0}, Local: ${segmentsRef.current.length}`);
       setRoom(data);
       if (data.transcripts) {
         // Sort by start_time just in case
         const sorted = [...data.transcripts].sort(
           (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
         );
+
+        // Safety Check 1: Recording Active?
+        if (isRecordingRef.current) {
+          console.log("⚠️ Skipping DB update - Recording active");
+          return;
+        }
+
+        // Safety Check 2: DB Empty but Local Has Data? (Prevent Wipe)
+        if (sorted.length === 0 && segmentsRef.current.length > 0) {
+          console.log("⚠️ Skipping DB update - DB empty but local has segments (DB lag?)");
+          return;
+        }
+
         setSegments(sorted);
       }
     } catch (err) {
@@ -107,9 +133,11 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
     setIsRecording(false);
     setLiveTranscript(null);
     setRecordingStartTime(null);
+    console.log("🛑 Stopping recording and preserving local segments...");
 
-    // Refresh room details to get latest transcripts
-    await fetchRoomDetails();
+    // Do NOT fetch room details here immediately. 
+    // The DB writes are async and likely not ready. Fetching now would overwrite our valid live segments with empty DB data.
+    // relying on local state for immediate feedback.
 
     // Show speaker naming modal if there are transcripts
     if (segments.length > 0) {
@@ -238,13 +266,13 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
   };
 
   const formatTime = (isoString: string) => {
-    // Parse ISO string to gets absolute seconds, but usually for UI we just show HH:MM:SS or MM:SS
-    // However, the previous logic assumed relative seconds. 
-    // If we want relative time from room start, we'd need room start time.
-    // For now, let's just parse the Date and show local time HH:MM:SS
     try {
       if (!isoString) return "00:00";
-      const date = new Date(isoString);
+      // Handle Python isoformat with microseconds (6 digits) -> JS (3 digits)
+      // e.g. 2023-10-10T10:10:10.123456 -> 2023-10-10T10:10:10.123
+      const cleanIso = isoString.length > 23 ? isoString.substring(0, 23) : isoString;
+
+      const date = new Date(cleanIso);
       if (isNaN(date.getTime())) return "00:00";
       return date.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
     } catch (e) {
@@ -259,7 +287,13 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
   return (
     <div
       className="room-live-view"
-      style={{ display: "flex", flexDirection: "column", height: "100%" }}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        backgroundColor: "#1e1e1e",
+        color: "white",
+      }}
     >
       {/* Header */}
       <div
@@ -407,8 +441,8 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
                     fontStyle: "italic",
                   }}
                 >
-                  {liveTranscript.speaker !== undefined
-                    ? `${getSpeakerName(`speaker_${liveTranscript.speaker}`)} →`
+                  {liveTranscript.speaker_id !== undefined
+                    ? `${getSpeakerName(`speaker_${liveTranscript.speaker_id}`)} →`
                     : "... →"}
                 </span>
                 <span
