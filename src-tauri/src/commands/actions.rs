@@ -150,14 +150,13 @@ pub async fn delete_action_history(app: AppHandle, action_id: String) -> Result<
 #[tauri::command]
 pub async fn get_action_triggers(
     app: AppHandle,
-    system_type: Option<String>,
     include_inactive: Option<bool>,
 ) -> Result<Vec<ActionTrigger>, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
+    let system_type = utils::get_system_type().to_string();
     let include_inactive = include_inactive.unwrap_or(false);
 
     let mut query_params = vec![("system_type", system_type)];
@@ -216,13 +215,12 @@ pub async fn get_action_triggers(
 pub async fn create_action_trigger(
     app: AppHandle,
     request: ActionTriggerCreateRequest,
-    system_type: Option<String>,
 ) -> Result<ActionTrigger, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
+    let system_type = utils::get_system_type().to_string();
 
     let url = format!(
         "{}/api/v1/actions/triggers?system_type={}",
@@ -272,13 +270,12 @@ pub async fn update_action_trigger(
     app: AppHandle,
     trigger_id: String,
     request: ActionTriggerUpdateRequest,
-    system_type: Option<String>,
 ) -> Result<ActionTrigger, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
+    let system_type = utils::get_system_type().to_string();
 
     let url = format!(
         "{}/api/v1/actions/triggers/{}?system_type={}",
@@ -325,16 +322,12 @@ pub async fn update_action_trigger(
 
 /// Delete an action trigger
 #[tauri::command]
-pub async fn delete_action_trigger(
-    app: AppHandle,
-    trigger_id: String,
-    system_type: Option<String>,
-) -> Result<(), String> {
+pub async fn delete_action_trigger(app: AppHandle, trigger_id: String) -> Result<(), String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
+    let system_type = utils::get_system_type().to_string();
 
     let url = format!(
         "{}/api/v1/actions/triggers/{}?system_type={}",

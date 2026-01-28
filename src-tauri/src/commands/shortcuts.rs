@@ -29,15 +29,12 @@ pub struct ShortcutUpdateRequest {
 
 /// Get all shortcuts
 #[tauri::command]
-pub async fn get_shortcuts(
-    app: AppHandle,
-    system_type: Option<String>,
-) -> Result<Vec<Shortcut>, String> {
+pub async fn get_shortcuts(app: AppHandle) -> Result<Vec<Shortcut>, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
+    let system_type = utils::get_system_type().to_string();
 
     let url = format!(
         "{}/api/v1/shortcuts?system_type={}",
@@ -84,13 +81,12 @@ pub async fn get_shortcuts(
 pub async fn create_shortcut(
     app: AppHandle,
     request: ShortcutCreateRequest,
-    system_type: Option<String>,
 ) -> Result<Shortcut, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
+    let system_type = utils::get_system_type().to_string();
 
     let url = format!(
         "{}/api/v1/shortcuts?system_type={}",
@@ -140,13 +136,12 @@ pub async fn update_shortcut(
     app: AppHandle,
     shortcut_id: String,
     request: ShortcutUpdateRequest,
-    system_type: Option<String>,
 ) -> Result<Shortcut, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
+    let system_type = utils::get_system_type().to_string();
 
     let url = format!(
         "{}/api/v1/shortcuts/{}?system_type={}",
@@ -193,16 +188,12 @@ pub async fn update_shortcut(
 
 /// Delete a shortcut
 #[tauri::command]
-pub async fn delete_shortcut(
-    app: AppHandle,
-    shortcut_id: String,
-    system_type: Option<String>,
-) -> Result<(), String> {
+pub async fn delete_shortcut(app: AppHandle, shortcut_id: String) -> Result<(), String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
+    let system_type = utils::get_system_type().to_string();
 
     let url = format!(
         "{}/api/v1/shortcuts/{}?system_type={}",

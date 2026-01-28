@@ -122,11 +122,7 @@ pub async fn get_note(app: AppHandle, note_id: String) -> Result<Note, String> {
         }
     };
 
-    let url = format!(
-        "{}/api/v1/notes/{}",
-        crate::config::api_base_url(),
-        note_id
-    );
+    let url = format!("{}/api/v1/notes/{}", crate::config::api_base_url(), note_id);
 
     let client = reqwest::Client::new();
     let response = client
@@ -163,11 +159,7 @@ pub async fn get_note(app: AppHandle, note_id: String) -> Result<Note, String> {
 
 /// Create a new note
 #[tauri::command]
-pub async fn create_note(
-    app: AppHandle,
-    title: String,
-    content: String,
-) -> Result<Note, String> {
+pub async fn create_note(app: AppHandle, title: String, content: String) -> Result<Note, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Some(token) => token,
         None => {
@@ -235,11 +227,7 @@ pub async fn update_note(
         }
     };
 
-    let url = format!(
-        "{}/api/v1/notes/{}",
-        crate::config::api_base_url(),
-        note_id
-    );
+    let url = format!("{}/api/v1/notes/{}", crate::config::api_base_url(), note_id);
 
     let request_body = UpdateNoteRequest { title, content };
 
@@ -291,11 +279,7 @@ pub async fn delete_note(app: AppHandle, note_id: String) -> Result<(), String> 
         }
     };
 
-    let url = format!(
-        "{}/api/v1/notes/{}",
-        crate::config::api_base_url(),
-        note_id
-    );
+    let url = format!("{}/api/v1/notes/{}", crate::config::api_base_url(), note_id);
 
     let client = reqwest::Client::new();
     let response = client
