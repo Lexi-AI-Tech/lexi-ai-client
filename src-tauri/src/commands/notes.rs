@@ -9,7 +9,9 @@ use tauri::{AppHandle, Emitter};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Note {
     pub id: String,
-    pub user_id: String,
+    pub team_id: String,
+    pub created_by: String,
+    pub updated_by: String,
     pub title: String,
     pub content: String,
     pub created_at: String,

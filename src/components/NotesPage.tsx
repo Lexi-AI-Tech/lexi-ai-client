@@ -1,22 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-
-interface Note {
-    id: string;
-    user_id: string;
-    title: string;
-    content: string;
-    created_at: string;
-    updated_at: string;
-}
-
-interface PaginatedNotesResponse {
-    notes: Note[];
-    total: number;
-    page: number;
-    page_size: number;
-    total_pages: number;
-}
+import { Note, PaginatedNotesResponse } from "../types";
 
 export const NotesPage: React.FC = () => {
     const [notes, setNotes] = useState<Note[]>([]);

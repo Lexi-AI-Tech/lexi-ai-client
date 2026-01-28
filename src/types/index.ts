@@ -184,6 +184,39 @@ export interface Room {
 }
 
 // ============================================================================
+// Notes Types
+// ============================================================================
+
+export interface Note {
+  id: string;
+  team_id: string;
+  created_by: string;
+  updated_by: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NoteCreateRequest {
+  title: string;
+  content: string;
+}
+
+export interface NoteUpdateRequest {
+  title?: string;
+  content?: string;
+}
+
+export interface PaginatedNotesResponse {
+  notes: Note[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+// ============================================================================
 // UI Component Types
 // ============================================================================
 
