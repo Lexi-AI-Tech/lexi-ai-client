@@ -36,11 +36,11 @@ pub mod auth {
     }
 }
 
-/// Speech-to-Text (STT) endpoints
-pub mod stt {
+/// Assistant endpoints
+pub mod assistant {
     use super::*;
 
-    pub const TRANSCRIBE: &str = "/stt";
+    pub const TRANSCRIBE: &str = "/assistant";
 
     /// Build transcribe endpoint URL (no query parameters, all data in form body)
     pub fn transcribe_url() -> String {

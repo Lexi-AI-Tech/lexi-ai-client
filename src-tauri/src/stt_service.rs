@@ -21,7 +21,7 @@
 //! - **Error Handling**: Comprehensive error messages for debugging
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
-use crate::api_endpoints::stt;
+use crate::api_endpoints::assistant;
 use crate::commands::auth::get_auth_token_async;
 use crate::utils;
 // use crate::whisper; // COMMENTED OUT: Model execution functionality
@@ -178,7 +178,7 @@ impl SttService {
             let form = build_form(&audio_data)?;
 
             // Build the request URL
-            let url = stt::transcribe_url();
+            let url = assistant::transcribe_url();
             utils::log_api_request("Transcribe audio to text", "POST", &url);
             let mut request = self.client.post(&url).multipart(form);
             request = request.header("Authorization", format!("Bearer {}", current_token));

@@ -16,7 +16,6 @@ export const NotesPage: React.FC = () => {
     fetchNotes();
   }, []);
 
-
   const fetchNotes = async () => {
     try {
       setLoading(true);
@@ -32,7 +31,6 @@ export const NotesPage: React.FC = () => {
       setLoading(false);
     }
   };
-
 
   const handleEdit = (note: Note) => {
     setEditingId(note.id);
@@ -197,9 +195,7 @@ export const NotesPage: React.FC = () => {
                 border: "none",
                 borderRadius: "6px",
                 cursor:
-                  isCreating || !content.trim()
-                    ? "not-allowed"
-                    : "pointer",
+                  isCreating || !content.trim() ? "not-allowed" : "pointer",
                 fontSize: "14px",
                 fontWeight: 500,
                 opacity: isCreating || !content.trim() ? 0.6 : 1,
