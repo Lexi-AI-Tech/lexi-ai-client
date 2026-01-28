@@ -9,13 +9,34 @@ export const NotesPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form state
-  const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     fetchNotes();
   }, []);
+
+  // Generate title from content
+  const generateTitle = (text: string): string => {
+    if (!text || !text.trim()) {
+      return "Untitled Note";
+    }
+    // Try to get first sentence
+    const firstSentenceMatch = text.match(/^[^.!?]+[.!?]/);
+    if (firstSentenceMatch) {
+      let title = firstSentenceMatch[0].trim();
+      // Limit to 50 characters
+      if (title.length > 50) {
+        title = title.substring(0, 47) + "...";
+      }
+      return title;
+    }
+    // Fallback to first 50 characters
+    const truncated = text.trim().substring(0, 50);
+    return truncated.length < text.trim().length
+      ? truncated + "..."
+      : truncated;
+  };
 
   const fetchNotes = async () => {
     try {
@@ -33,35 +54,38 @@ export const NotesPage: React.FC = () => {
     }
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !content.trim()) {
-      alert("Please fill in both title and content");
+
+  const handleEdit = (note: Note) => {
+    setEditingId(note.id);
+    setContent(note.content);
+  };
+
+  const handleCreate = async () => {
+    if (!content.trim()) {
+      setError("Please enter some content for the note");
       return;
     }
 
     try {
       setIsCreating(true);
-      await invoke("create_note", { title, content });
-      setTitle("");
+      setError(null);
+      const autoTitle = generateTitle(content);
+      await invoke("create_note", {
+        title: autoTitle,
+        content: content.trim(),
+      });
       setContent("");
       await fetchNotes();
     } catch (err) {
-      alert(`Failed to create note: ${err}`);
+      setError(`Failed to create note: ${err}`);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleEdit = (note: Note) => {
-    setEditingId(note.id);
-    setTitle(note.title);
-    setContent(note.content);
-  };
-
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingId || !title.trim() || !content.trim()) {
+    if (!editingId || !content.trim()) {
       return;
     }
 
@@ -69,11 +93,9 @@ export const NotesPage: React.FC = () => {
       setIsCreating(true);
       await invoke("update_note", {
         noteId: editingId,
-        title,
         content,
       });
       setEditingId(null);
-      setTitle("");
       setContent("");
       await fetchNotes();
     } catch (err) {
@@ -98,7 +120,6 @@ export const NotesPage: React.FC = () => {
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setTitle("");
     setContent("");
   };
 
@@ -156,91 +177,110 @@ export const NotesPage: React.FC = () => {
         <h3 style={{ marginTop: 0, marginBottom: "16px", fontSize: "16px" }}>
           {editingId ? "Edit Note" : "Create New Note"}
         </h3>
-        <form onSubmit={editingId ? handleUpdate : handleCreate}>
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              htmlFor="note-title"
-              style={{
-                display: "block",
-                marginBottom: "8px",
-                fontWeight: 500,
-                fontSize: "14px",
-              }}
-            >
-              Title
-            </label>
-            <input
-              id="note-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter note title"
-              disabled={isCreating}
-              style={{
-                width: "100%",
-                padding: "10px",
-                border: "1px solid #ddd",
-                borderRadius: "6px",
-                fontSize: "14px",
-                fontFamily: "inherit",
-              }}
-            />
-          </div>
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              htmlFor="note-content"
-              style={{
-                display: "block",
-                marginBottom: "8px",
-                fontWeight: 500,
-                fontSize: "14px",
-              }}
-            >
-              Content
-            </label>
-            <textarea
-              id="note-content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Enter note content"
-              disabled={isCreating}
-              rows={4}
-              style={{
-                width: "100%",
-                padding: "10px",
-                border: "1px solid #ddd",
-                borderRadius: "6px",
-                fontSize: "14px",
-                fontFamily: "inherit",
-                resize: "vertical",
-              }}
-            />
-          </div>
-          <div style={{ display: "flex", gap: "8px" }}>
+        {!editingId ? (
+          <div>
+            <div style={{ marginBottom: "16px" }}>
+              <label
+                htmlFor="note-content"
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: 500,
+                  fontSize: "14px",
+                }}
+              >
+                Content
+              </label>
+              <textarea
+                id="note-content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Use your global hotkey to record a note. The title will be generated automatically."
+                disabled={isCreating}
+                rows={4}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  border: "1px solid #ddd",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontFamily: "inherit",
+                  resize: "vertical",
+                }}
+              />
+            </div>
             <button
-              type="submit"
-              disabled={isCreating}
+              type="button"
+              onClick={handleCreate}
+              disabled={isCreating || !content.trim()}
               style={{
                 padding: "10px 20px",
                 backgroundColor: "#007bff",
                 color: "white",
                 border: "none",
                 borderRadius: "6px",
-                cursor: isCreating ? "not-allowed" : "pointer",
+                cursor:
+                  isCreating || !content.trim()
+                    ? "not-allowed"
+                    : "pointer",
                 fontSize: "14px",
                 fontWeight: 500,
-                opacity: isCreating ? 0.6 : 1,
+                opacity: isCreating || !content.trim() ? 0.6 : 1,
               }}
             >
-              {isCreating
-                ? editingId
-                  ? "Updating..."
-                  : "Creating..."
-                : editingId
-                  ? "Update Note"
-                  : "Create Note"}
+              {isCreating ? "Creating..." : "Create Note"}
             </button>
-            {editingId && (
+          </div>
+        ) : (
+          <form onSubmit={handleUpdate}>
+            <div style={{ marginBottom: "16px" }}>
+              <label
+                htmlFor="note-content"
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: 500,
+                  fontSize: "14px",
+                }}
+              >
+                Content
+              </label>
+              <textarea
+                id="note-content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Enter note content"
+                disabled={isCreating}
+                rows={4}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  border: "1px solid #ddd",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontFamily: "inherit",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="submit"
+                disabled={isCreating}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "#007bff",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: isCreating ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  opacity: isCreating ? 0.6 : 1,
+                }}
+              >
+                {isCreating ? "Updating..." : "Update Note"}
+              </button>
               <button
                 type="button"
                 onClick={handleCancelEdit}
@@ -259,9 +299,9 @@ export const NotesPage: React.FC = () => {
               >
                 Cancel
               </button>
-            )}
-          </div>
-        </form>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Notes List */}
