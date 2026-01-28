@@ -23,6 +23,7 @@
 
 use crate::api_endpoints::stt;
 use crate::commands::auth::get_auth_token_async;
+use crate::utils;
 // use crate::whisper; // COMMENTED OUT: Model execution functionality
 use reqwest::multipart;
 use std::error::Error;
@@ -178,6 +179,7 @@ impl SttService {
 
             // Build the request URL
             let url = stt::transcribe_url();
+            utils::log_api_request("Transcribe audio to text", "POST", &url);
             let mut request = self.client.post(&url).multipart(form);
             request = request.header("Authorization", format!("Bearer {}", current_token));
 
@@ -207,6 +209,11 @@ impl SttService {
                             let retry_form = build_form(&audio_data)?;
 
                             // Build retry request
+                            utils::log_api_request(
+                                "Retry transcription after token refresh",
+                                "POST",
+                                &url,
+                            );
                             let mut retry_request = self.client.post(&url).multipart(retry_form);
                             retry_request = retry_request
                                 .header("Authorization", format!("Bearer {}", current_token));

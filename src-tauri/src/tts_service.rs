@@ -5,6 +5,7 @@
 
 use crate::api_endpoints::tts;
 use crate::commands::auth::get_auth_token_async;
+use crate::utils;
 use reqwest::multipart;
 use std::error::Error;
 use std::fs;
@@ -59,6 +60,7 @@ impl TtsService {
 
         // Build the request URL using centralized endpoint
         let url = tts::speak_url();
+        utils::log_api_request("Convert text to speech", "POST", &url);
         let mut request = client.post(&url).multipart(form);
 
         // Add authorization header

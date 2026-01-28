@@ -34,11 +34,12 @@ use std::sync::{Arc, Mutex};
 /// When recording stops, the samples are converted to WAV format (16-bit PCM) for
 /// compatibility with speech-to-text APIs.
 pub struct AudioRecorder {
-    device: Device,                   // The audio input device (microphone)
-    config: StreamConfig,             // Audio configuration (sample rate, channels, etc.)
-    stream: Option<Stream>,           // Active audio stream (None when not recording)
-    audio_data: Arc<Mutex<Vec<f32>>>, // Shared buffer storing captured audio samples
-    volume_tx: Option<Sender<f32>>,   // Optional channel for real-time volume updates
+    device: Device,                     // The audio input device (microphone)
+    config: StreamConfig,               // Audio configuration (sample rate, channels, etc.)
+    stream: Option<Stream>,             // Active audio stream (None when not recording)
+    audio_data: Arc<Mutex<Vec<f32>>>,   // Shared buffer storing captured audio samples
+    volume_tx: Option<Sender<f32>>,     // Optional channel for real-time volume updates
+    stream_tx: Option<Sender<Vec<u8>>>, // Optional channel for streaming audio data
 }
 
 impl AudioRecorder {
@@ -70,6 +71,7 @@ impl AudioRecorder {
             stream: None,                                 // No active stream initially
             audio_data: Arc::new(Mutex::new(Vec::new())), // Empty audio buffer
             volume_tx: None,                              // No volume callback by default
+            stream_tx: None,                              // No streaming by default
         }
     }
 
@@ -81,13 +83,13 @@ impl AudioRecorder {
 
     /// Starts recording audio from the input device
     ///
-    /// Creates an audio input stream that continuously captures audio samples
-    /// and stores them in the internal buffer. The stream runs in a separate
-    /// thread managed by cpal, calling the callback function whenever new
-    /// audio data is available.
-    ///
-    /// Returns an error if the stream cannot be created or started.
-    pub fn start_recording(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    /// Accepts an optional sender for streaming audio data.
+    pub fn start_recording(
+        &mut self,
+        stream_sender: Option<Sender<Vec<u8>>>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.stream_tx = stream_sender;
+
         // Clone the Arc to share the audio buffer with the stream callback
         let audio_data = Arc::clone(&self.audio_data);
 
@@ -98,58 +100,59 @@ impl AudioRecorder {
         let config = self.config.clone();
         let _channels = config.channels;
 
-        // Clone the volume sender for the callback
+        // Clone senders for the callback
         let volume_tx = self.volume_tx.clone();
+        let stream_tx = self.stream_tx.clone();
 
         // For throttling volume updates (every ~50ms worth of samples)
         let sample_rate = config.sample_rate.0 as usize;
-        let samples_per_update = sample_rate / 20; // ~50ms at given sample rate
+        let samples_per_update = sample_rate / 20; // ~50ms
         let sample_counter = Arc::new(Mutex::new(0usize));
 
         // Build the input stream with callbacks
         let stream = self.device.build_input_stream(
             &config,
-            // This callback is called whenever new audio data is available
-            // It runs in a separate thread managed by cpal
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                // Lock the shared buffer and append the new audio samples
+                // 1. Buffer for legacy stop_recording
                 {
                     let mut audio_buffer = audio_data.lock().unwrap();
                     audio_buffer.extend_from_slice(data);
                 }
 
-                // Calculate and send volume level (throttled)
+                // 2. Stream if enabled
+                if let Some(ref tx) = stream_tx {
+                    // Convert f32 samples to i16 bytes (PCM)
+                    let amplitude = i16::MAX as f32;
+                    let mut bytes = Vec::with_capacity(data.len() * 2);
+                    for sample in data {
+                        let val = (sample * amplitude) as i16;
+                        bytes.extend_from_slice(&val.to_le_bytes());
+                    }
+                    // Send chunk (ignore errors if receiver dropped)
+                    let _ = tx.send(bytes);
+                }
+
+                // 3. Volume updates
                 if let Some(ref tx) = volume_tx {
                     let mut counter = sample_counter.lock().unwrap();
                     *counter += data.len();
 
                     if *counter >= samples_per_update {
                         *counter = 0;
-
-                        // Calculate RMS (Root Mean Square) volume
                         let sum_squares: f32 = data.iter().map(|s| s * s).sum();
                         let rms = (sum_squares / data.len() as f32).sqrt();
-
-                        // Normalize to 0-1 range (typical voice RMS is 0.01-0.3)
-                        // Apply some amplification for better visual response
                         let normalized = (rms * 5.0).min(1.0);
-
-                        // Send volume (ignore errors if receiver dropped)
                         let _ = tx.send(normalized);
                     }
                 }
             },
-            // Error callback - called if there's an issue with the audio stream
             move |err| {
                 eprintln!("Error in audio stream: {}", err);
             },
-            None, // No timeout
+            None,
         )?;
 
-        // Start the stream (begin capturing audio)
         stream.play()?;
-
-        // Store the stream so we can stop it later
         self.stream = Some(stream);
         Ok(())
     }

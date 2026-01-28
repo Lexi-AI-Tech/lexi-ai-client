@@ -130,7 +130,8 @@ export interface TauriAppConfig {
 
 export interface Transcript {
   id: string;
-  user_id: string;
+  created_by: string;
+  updated_by: string;
   original_text: string;
   original_text_word_count: number;
   original_text_character_count: number;
@@ -156,6 +157,30 @@ export interface PaginatedTranscriptsResponse {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+// ============================================================================
+// Room Types
+// ============================================================================
+
+export interface RoomTranscriptSegment {
+  id: string;
+  segment_index: number;
+  start_time: string;
+  end_time: string;
+  speaker_label: string;
+  text: string;
+}
+
+export interface Room {
+  id: string;
+  created_by: string;
+  updated_by: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  speaker_map?: Record<string, string>;
+  transcripts?: RoomTranscriptSegment[];
 }
 
 // ============================================================================
@@ -210,7 +235,8 @@ export interface SidebarProps {
     | "settings"
     | "vocabulary"
     | "actions"
-    | "shortcuts";
+    | "shortcuts"
+    | "rooms";
   onNavigate: (
     page:
       | "home"
@@ -218,7 +244,8 @@ export interface SidebarProps {
       | "settings"
       | "vocabulary"
       | "actions"
-      | "shortcuts",
+      | "shortcuts"
+      | "rooms",
   ) => void;
 }
 
@@ -228,7 +255,8 @@ export interface SidebarProps {
 
 export interface ActionHistory {
   id: string;
-  user_id: string;
+  created_by: string;
+  updated_by: string;
   action_command: string;
   app_name: string | null;
   selected_text: string | null;

@@ -211,6 +211,8 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
     let client = reqwest::Client::new();
     let url = app_config::get_url(Some(&format!("system_type={}", utils::get_system_type())));
 
+    utils::log_api_request("Fetch app configuration from server", "GET", &url);
+
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -459,6 +461,8 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
     let client = reqwest::Client::new();
     let url = app_config::update_url();
     let request_body = build_request_body(config);
+
+    utils::log_api_request("Sync app configuration to cloud", "PUT", &url);
 
     match client
         .put(&url)
