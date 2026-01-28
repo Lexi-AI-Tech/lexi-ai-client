@@ -308,8 +308,7 @@ export const HomePage: React.FC = () => {
                   whileHover={{ scale: 1.01 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="transcript-card-header">
-                  </div>
+                  <div className="transcript-card-header"></div>
                   <p className="transcript-preview">
                     {transcript.original_text
                       ? transcript.original_text.length > 120

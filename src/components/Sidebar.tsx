@@ -32,8 +32,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Transcripts */}
         <button
-          className={`sidebar-item ${currentPage === "transcripts" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "transcripts" ? "active" : ""
+          }`}
           onClick={() => onNavigate("transcripts")}
         >
           <svg
@@ -80,8 +81,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Vocabulary */}
         <button
-          className={`sidebar-item ${currentPage === "vocabulary" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "vocabulary" ? "active" : ""
+          }`}
           onClick={() => onNavigate("vocabulary")}
         >
           <svg
@@ -105,8 +107,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Actions */}
         <button
-          className={`sidebar-item ${currentPage === "actions" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "actions" ? "active" : ""
+          }`}
           onClick={() => onNavigate("actions")}
         >
           <svg
@@ -128,8 +131,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Shortcuts */}
         <button
-          className={`sidebar-item ${currentPage === "shortcuts" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "shortcuts" ? "active" : ""
+          }`}
           onClick={() => onNavigate("shortcuts")}
         >
           <svg
@@ -150,8 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Notes */}
         <button
-          className={`sidebar-item ${currentPage === "notes" ? "active" : ""
-            }`}
+          className={`sidebar-item ${currentPage === "notes" ? "active" : ""}`}
           onClick={() => onNavigate("notes")}
         >
           <svg
@@ -175,8 +178,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Settings */}
         <button
-          className={`sidebar-item ${currentPage === "settings" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "settings" ? "active" : ""
+          }`}
           onClick={() => onNavigate("settings")}
         >
           <svg

@@ -273,18 +273,21 @@ export const VocabularyPage: React.FC = () => {
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                e.currentTarget.style.boxShadow =
+                  "0 1px 2px rgba(0, 0, 0, 0.05)";
               }}
               onMouseEnter={(e) => {
                 if (document.activeElement !== e.currentTarget) {
                   e.currentTarget.style.borderColor = "#d1d5db";
-                  e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.08)";
+                  e.currentTarget.style.boxShadow =
+                    "0 2px 4px rgba(0, 0, 0, 0.08)";
                 }
               }}
               onMouseLeave={(e) => {
                 if (document.activeElement !== e.currentTarget) {
                   e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 2px rgba(0, 0, 0, 0.05)";
                 }
               }}
               autoFocus
@@ -387,7 +390,9 @@ export const VocabularyPage: React.FC = () => {
           accuracy for specific words or phrases.
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
+        >
           {visibleVocabulary.map((item) => (
             <div
               key={item.id || item.value}
@@ -404,11 +409,13 @@ export const VocabularyPage: React.FC = () => {
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = "#d1d5db";
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.08)";
+                e.currentTarget.style.boxShadow =
+                  "0 4px 12px rgba(0, 0, 0, 0.08)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                e.currentTarget.style.boxShadow =
+                  "0 1px 2px rgba(0, 0, 0, 0.05)";
               }}
             >
               <div style={{ flex: 1 }}>
@@ -485,8 +492,8 @@ export const VocabularyPage: React.FC = () => {
           }}
         >
           <strong style={{ fontWeight: 600 }}>Tip:</strong> Adding vocabulary
-          terms helps improve transcription accuracy for specific words, names, or
-          technical terms. System-generated vocabulary cannot be deleted.
+          terms helps improve transcription accuracy for specific words, names,
+          or technical terms. System-generated vocabulary cannot be deleted.
         </div>
       )}
     </div>
