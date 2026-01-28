@@ -137,7 +137,7 @@ pub fn spawn_recording_thread(
                     let mut new_recorder = AudioRecorder::new();
                     new_recorder.set_volume_sender(volume_tx);
 
-                    match new_recorder.start_recording() {
+                    match new_recorder.start_recording(None) {
                         Ok(_) => {
                             ctx.recorder = Some(new_recorder);
                             ctx.started_at = Some(Instant::now());

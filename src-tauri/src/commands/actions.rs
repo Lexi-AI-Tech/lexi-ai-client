@@ -3,13 +3,15 @@
 //! Tauri commands for managing action history and triggers.
 
 use crate::commands::auth::get_auth_token_async;
+use crate::utils;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActionHistory {
     pub id: String,
-    pub user_id: String,
+    pub created_by: String,
+    pub updated_by: String,
     pub action_command: String,
     pub app_name: Option<String>,
     pub selected_text: Option<String>,
@@ -75,6 +77,8 @@ pub async fn get_action_history(
         query_string
     );
 
+    utils::log_api_request("Get paginated action history", "GET", &url);
+
     let client = reqwest::Client::new();
     let response = client
         .get(&url)
@@ -119,6 +123,8 @@ pub async fn delete_action_history(app: AppHandle, action_id: String) -> Result<
         crate::config::api_base_url(),
         action_id
     );
+
+    utils::log_api_request("Delete action history entry", "DELETE", &url);
 
     let client = reqwest::Client::new();
     let response = client
@@ -171,6 +177,8 @@ pub async fn get_action_triggers(
         query_string
     );
 
+    utils::log_api_request("Get all action triggers", "GET", &url);
+
     let client = reqwest::Client::new();
     let response = client
         .get(&url)
@@ -221,6 +229,8 @@ pub async fn create_action_trigger(
         crate::config::api_base_url(),
         urlencoding::encode(&system_type)
     );
+
+    utils::log_api_request("Create new action trigger", "POST", &url);
 
     let client = reqwest::Client::new();
     let response = client
@@ -277,6 +287,8 @@ pub async fn update_action_trigger(
         urlencoding::encode(&system_type)
     );
 
+    utils::log_api_request("Update action trigger", "PUT", &url);
+
     let client = reqwest::Client::new();
     let response = client
         .put(&url)
@@ -330,6 +342,8 @@ pub async fn delete_action_trigger(
         trigger_id,
         urlencoding::encode(&system_type)
     );
+
+    utils::log_api_request("Delete action trigger", "DELETE", &url);
 
     let client = reqwest::Client::new();
     let response = client
