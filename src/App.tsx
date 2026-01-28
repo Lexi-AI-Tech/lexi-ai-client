@@ -15,6 +15,7 @@ import { ShortcutsPage } from "./components/ShortcutsPage";
 import { RoomsPage } from "./components/RoomsPage";
 import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
+import { NotesPage } from "./components/NotesPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 
 type Page =
@@ -24,6 +25,7 @@ type Page =
   | "vocabulary"
   | "actions"
   | "shortcuts"
+  | "notes"
   | "rooms";
 
 function App() {
@@ -89,6 +91,11 @@ function App() {
         {currentPage === "shortcuts" && (
           <div className="container">
             <ShortcutsPage />
+          </div>
+        )}
+        {currentPage === "notes" && (
+          <div className="container">
+            <NotesPage />
           </div>
         )}
       </div>

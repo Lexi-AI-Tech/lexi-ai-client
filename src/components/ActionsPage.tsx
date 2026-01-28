@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { SystemType } from "../lib/constants";
 import type { PaginatedActionHistoryResponse, ActionTrigger } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
@@ -75,7 +74,6 @@ export const ActionsPage: React.FC = () => {
     try {
       setIsLoadingTriggers(true);
       const data = await invoke<ActionTrigger[]>("get_action_triggers", {
-        systemType: SystemType.MAC,
         includeInactive: true,
       });
       setTriggers(data);
@@ -156,10 +154,9 @@ export const ActionsPage: React.FC = () => {
       setError(null);
       await invoke<ActionTrigger>("create_action_trigger", {
         request: {
-          phrase: newTriggerPhrase.trim(),
-          isActive: true,
+          trigger_phrase: newTriggerPhrase.trim(),
+          is_active: true,
         },
-        systemType: SystemType.MAC,
       });
       setNewTriggerPhrase("");
       setShowCreateTrigger(false);
@@ -193,9 +190,8 @@ export const ActionsPage: React.FC = () => {
       await invoke<ActionTrigger>("update_action_trigger", {
         triggerId: trigger.id,
         request: {
-          isActive: !trigger.is_active,
+          is_active: !trigger.is_active,
         },
-        systemType: SystemType.MAC,
       });
       await loadTriggers();
       setEditingTrigger(null);
@@ -231,7 +227,6 @@ export const ActionsPage: React.FC = () => {
       setError(null);
       await invoke("delete_action_trigger", {
         triggerId,
-        systemType: SystemType.MAC,
       });
       await loadTriggers();
     } catch (err: any) {
@@ -522,18 +517,21 @@ export const ActionsPage: React.FC = () => {
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                e.currentTarget.style.boxShadow =
+                  "0 1px 2px rgba(0, 0, 0, 0.05)";
               }}
               onMouseEnter={(e) => {
                 if (document.activeElement !== e.currentTarget) {
                   e.currentTarget.style.borderColor = "#d1d5db";
-                  e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.08)";
+                  e.currentTarget.style.boxShadow =
+                    "0 2px 4px rgba(0, 0, 0, 0.08)";
                 }
               }}
               onMouseLeave={(e) => {
                 if (document.activeElement !== e.currentTarget) {
                   e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 2px rgba(0, 0, 0, 0.05)";
                 }
               }}
             />
@@ -594,7 +592,9 @@ export const ActionsPage: React.FC = () => {
             No custom triggers. Create one to get started.
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
+          >
             {triggers.map((trigger) => (
               <div
                 key={trigger.id}
@@ -611,11 +611,13 @@ export const ActionsPage: React.FC = () => {
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = "#d1d5db";
-                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.08)";
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 12px rgba(0, 0, 0, 0.08)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 2px rgba(0, 0, 0, 0.05)";
                 }}
               >
                 <div style={{ flex: 1 }}>
@@ -744,7 +746,11 @@ export const ActionsPage: React.FC = () => {
         ) : (
           <>
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+              }}
             >
               {actionHistory.actions.map((action) => (
                 <div
@@ -759,11 +765,13 @@ export const ActionsPage: React.FC = () => {
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = "#d1d5db";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.08)";
+                    e.currentTarget.style.boxShadow =
+                      "0 4px 12px rgba(0, 0, 0, 0.08)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                    e.currentTarget.style.boxShadow =
+                      "0 1px 2px rgba(0, 0, 0, 0.05)";
                   }}
                 >
                   <div

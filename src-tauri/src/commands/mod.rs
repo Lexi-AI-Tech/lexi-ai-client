@@ -8,6 +8,7 @@ pub mod analytics;
 pub mod app_config;
 pub mod auth;
 pub mod hotkey;
+pub mod notes;
 pub mod onboarding;
 pub mod pill;
 pub mod rooms;

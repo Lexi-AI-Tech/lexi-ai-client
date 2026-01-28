@@ -3,14 +3,6 @@
  */
 
 /**
- * Supported operating system types
- */
-export enum SystemType {
-  MAC = "mac",
-  WINDOWS = "windows",
-}
-
-/**
  * Supported device types
  */
 export enum DeviceType {

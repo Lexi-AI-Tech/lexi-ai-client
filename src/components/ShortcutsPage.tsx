@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { SystemType } from "../lib/constants";
 import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
@@ -27,9 +26,7 @@ export const ShortcutsPage: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await invoke<Shortcut[]>("get_shortcuts", {
-        systemType: SystemType.MAC,
-      });
+      const data = await invoke<Shortcut[]>("get_shortcuts");
       setShortcuts(data);
     } catch (err: any) {
       console.error("Failed to load shortcuts:", err);
@@ -77,7 +74,6 @@ export const ShortcutsPage: React.FC = () => {
           shortcut: newShortcut.trim(),
           value: newValue.trim(),
         },
-        systemType: SystemType.MAC,
       });
       setNewShortcut("");
       setNewValue("");
@@ -125,7 +121,6 @@ export const ShortcutsPage: React.FC = () => {
           shortcut: editingShortcut.shortcut,
           value: editingShortcut.value,
         },
-        systemType: SystemType.MAC,
       });
       await loadShortcuts();
       setEditingShortcut(null);
@@ -161,7 +156,6 @@ export const ShortcutsPage: React.FC = () => {
       setError(null);
       await invoke("delete_shortcut", {
         shortcutId,
-        systemType: SystemType.MAC,
       });
       await loadShortcuts();
     } catch (err: any) {
@@ -422,18 +416,21 @@ export const ShortcutsPage: React.FC = () => {
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                e.currentTarget.style.boxShadow =
+                  "0 1px 2px rgba(0, 0, 0, 0.05)";
               }}
               onMouseEnter={(e) => {
                 if (document.activeElement !== e.currentTarget) {
                   e.currentTarget.style.borderColor = "#d1d5db";
-                  e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.08)";
+                  e.currentTarget.style.boxShadow =
+                    "0 2px 4px rgba(0, 0, 0, 0.08)";
                 }
               }}
               onMouseLeave={(e) => {
                 if (document.activeElement !== e.currentTarget) {
                   e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 2px rgba(0, 0, 0, 0.05)";
                 }
               }}
             />
@@ -475,18 +472,21 @@ export const ShortcutsPage: React.FC = () => {
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                e.currentTarget.style.boxShadow =
+                  "0 1px 2px rgba(0, 0, 0, 0.05)";
               }}
               onMouseEnter={(e) => {
                 if (document.activeElement !== e.currentTarget) {
                   e.currentTarget.style.borderColor = "#d1d5db";
-                  e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.08)";
+                  e.currentTarget.style.boxShadow =
+                    "0 2px 4px rgba(0, 0, 0, 0.08)";
                 }
               }}
               onMouseLeave={(e) => {
                 if (document.activeElement !== e.currentTarget) {
                   e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 2px rgba(0, 0, 0, 0.05)";
                 }
               }}
             />
@@ -547,7 +547,9 @@ export const ShortcutsPage: React.FC = () => {
             No shortcuts. Create one to get started.
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
+          >
             {shortcuts.map((shortcut) => {
               const isEditing = editingShortcut?.id === shortcut.id;
               return (
@@ -567,13 +569,15 @@ export const ShortcutsPage: React.FC = () => {
                   onMouseEnter={(e) => {
                     if (!isEditing) {
                       e.currentTarget.style.borderColor = "#d1d5db";
-                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.08)";
+                      e.currentTarget.style.boxShadow =
+                        "0 4px 12px rgba(0, 0, 0, 0.08)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isEditing) {
                       e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                      e.currentTarget.style.boxShadow =
+                        "0 1px 2px rgba(0, 0, 0, 0.05)";
                     }
                   }}
                 >
@@ -621,7 +625,8 @@ export const ShortcutsPage: React.FC = () => {
                           }}
                           onBlur={(e) => {
                             e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                            e.currentTarget.style.boxShadow =
+                              "0 1px 2px rgba(0, 0, 0, 0.05)";
                           }}
                         />
                       </div>
@@ -667,7 +672,8 @@ export const ShortcutsPage: React.FC = () => {
                           }}
                           onBlur={(e) => {
                             e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                            e.currentTarget.style.boxShadow =
+                              "0 1px 2px rgba(0, 0, 0, 0.05)";
                           }}
                         />
                       </div>

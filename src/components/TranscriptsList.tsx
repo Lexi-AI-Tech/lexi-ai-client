@@ -481,7 +481,9 @@ export const TranscriptsList: React.FC = () => {
                 >
                   {transcript.original_text && (
                     <button
-                      onClick={() => handleCopyToClipboard(transcript.original_text || "")}
+                      onClick={() =>
+                        handleCopyToClipboard(transcript.original_text || "")
+                      }
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -514,7 +516,10 @@ export const TranscriptsList: React.FC = () => {
                   <button
                     onClick={() => {
                       // Regenerate action - placeholder for now
-                      console.log("Regenerate clicked for transcript:", transcript.id);
+                      console.log(
+                        "Regenerate clicked for transcript:",
+                        transcript.id,
+                      );
                     }}
                     style={{
                       display: "flex",

@@ -675,7 +675,7 @@ body::before {
 }
 
 .transcript-item:hover {
- background: #f9fafb;
+  background: #f9fafb;
 }
 
 .transcript-item-header {

@@ -566,7 +566,11 @@ export const SettingsPage: React.FC = () => {
             { id: "account" as const, label: "Account", icon: Monitor },
             { id: "transcription" as const, label: "Transcription", icon: Mic },
             { id: "general" as const, label: "General", icon: Power },
-            { id: "hotkeys" as const, label: "Hotkey Settings", icon: Keyboard },
+            {
+              id: "hotkeys" as const,
+              label: "Hotkey Settings",
+              icon: Keyboard,
+            },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -578,8 +582,7 @@ export const SettingsPage: React.FC = () => {
                 padding: "0.625rem 0.75rem",
                 borderRadius: "0.5rem",
                 border: "none",
-                background:
-                  activeSection === id ? "#111827" : "transparent",
+                background: activeSection === id ? "#111827" : "transparent",
                 color: activeSection === id ? "#ffffff" : "#6b7280",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
@@ -615,7 +618,6 @@ export const SettingsPage: React.FC = () => {
           overflowY: "auto",
         }}
       >
-
         {/* Account Section */}
         {activeSection === "account" && (
           <div>
@@ -737,7 +739,8 @@ export const SettingsPage: React.FC = () => {
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                    e.currentTarget.style.boxShadow =
+                      "0 1px 2px rgba(0, 0, 0, 0.05)";
                   }}
                   onMouseEnter={(e) => {
                     if (!isUpdating && !isLoading) {
@@ -749,7 +752,8 @@ export const SettingsPage: React.FC = () => {
                   onMouseLeave={(e) => {
                     if (document.activeElement !== e.currentTarget) {
                       e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                      e.currentTarget.style.boxShadow =
+                        "0 1px 2px rgba(0, 0, 0, 0.05)";
                     }
                   }}
                 >
@@ -1143,21 +1147,13 @@ export const SettingsPage: React.FC = () => {
                   transition: "all 0.2s ease",
                 }}
                 onMouseEnter={(e) => {
-                  if (
-                    !isUpdatingHotkeys &&
-                    hasHotkeyChanges() &&
-                    !isLoading
-                  ) {
+                  if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
                     e.currentTarget.style.background = "#374151";
                     e.currentTarget.style.borderColor = "#374151";
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (
-                    !isUpdatingHotkeys &&
-                    hasHotkeyChanges() &&
-                    !isLoading
-                  ) {
+                  if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
                     e.currentTarget.style.background = "#111827";
                     e.currentTarget.style.borderColor = "#111827";
                   }
@@ -1196,37 +1192,37 @@ export const SettingsPage: React.FC = () => {
               </button>
             </div>
 
-        {hotkeyError && (
-          <div
-            className="permission-message"
-            style={{
-              background: "#fef2f2",
-              borderColor: "#fecaca",
-              color: "#b91c1c",
-              fontSize: "11px",
-              padding: "8px",
-              marginBottom: "12px",
-            }}
-          >
-            {hotkeyError}
-          </div>
-        )}
+            {hotkeyError && (
+              <div
+                className="permission-message"
+                style={{
+                  background: "#fef2f2",
+                  borderColor: "#fecaca",
+                  color: "#b91c1c",
+                  fontSize: "11px",
+                  padding: "8px",
+                  marginBottom: "12px",
+                }}
+              >
+                {hotkeyError}
+              </div>
+            )}
 
-        {hotkeySuccess && (
-          <div
-            className="permission-message"
-            style={{
-              background: "#ecfdf5",
-              borderColor: "#a7f3d0",
-              color: "#047857",
-              fontSize: "11px",
-              padding: "8px",
-              marginBottom: "12px",
-            }}
-          >
-            Hotkeys saved successfully!
-          </div>
-        )}
+            {hotkeySuccess && (
+              <div
+                className="permission-message"
+                style={{
+                  background: "#ecfdf5",
+                  borderColor: "#a7f3d0",
+                  color: "#047857",
+                  fontSize: "11px",
+                  padding: "8px",
+                  marginBottom: "12px",
+                }}
+              >
+                Hotkeys saved successfully!
+              </div>
+            )}
           </div>
         )}
       </div>

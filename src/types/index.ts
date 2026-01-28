@@ -5,7 +5,7 @@
  * This file serves as the single source of truth for type definitions.
  */
 
-import { SystemType, DeviceType, LanguageCode } from "../lib/constants";
+import { DeviceType, LanguageCode } from "../lib/constants";
 
 // ============================================================================
 // API Types
@@ -87,7 +87,7 @@ export interface VocabularyItem {
  * AppConfig from server API (complete config with all fields)
  */
 export interface AppConfig {
-  system_type: SystemType;
+  system_type: string;
   device_type: DeviceType;
   hotkeys: string[];
   languages: LanguageCode[];
@@ -102,7 +102,7 @@ export interface AppConfig {
  * AppConfigUpdateRequest for updating app config (partial updates supported)
  */
 export interface AppConfigUpdateRequest {
-  system_type?: SystemType;
+  system_type?: string;
   device_type?: DeviceType;
   hotkeys?: string[];
   languages?: LanguageCode[];
@@ -184,6 +184,36 @@ export interface Room {
 }
 
 // ============================================================================
+// Notes Types
+// ============================================================================
+
+export interface Note {
+  id: string;
+  team_id: string;
+  created_by: string;
+  updated_by: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NoteCreateRequest {
+  content: string;
+}
+
+export interface NoteUpdateRequest {
+  content?: string;
+}
+
+export interface PaginatedNotesResponse {
+  notes: Note[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+// ============================================================================
 // UI Component Types
 // ============================================================================
 
@@ -236,7 +266,8 @@ export interface SidebarProps {
     | "vocabulary"
     | "actions"
     | "shortcuts"
-    | "rooms";
+    | "rooms"
+    | "notes";
   onNavigate: (
     page:
       | "home"
@@ -245,6 +276,7 @@ export interface SidebarProps {
       | "vocabulary"
       | "actions"
       | "shortcuts"
+      | "notes"
       | "rooms",
   ) => void;
 }
