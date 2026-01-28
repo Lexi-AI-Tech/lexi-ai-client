@@ -16,27 +16,6 @@ export const NotesPage: React.FC = () => {
     fetchNotes();
   }, []);
 
-  // Generate title from content
-  const generateTitle = (text: string): string => {
-    if (!text || !text.trim()) {
-      return "Untitled Note";
-    }
-    // Try to get first sentence
-    const firstSentenceMatch = text.match(/^[^.!?]+[.!?]/);
-    if (firstSentenceMatch) {
-      let title = firstSentenceMatch[0].trim();
-      // Limit to 50 characters
-      if (title.length > 50) {
-        title = title.substring(0, 47) + "...";
-      }
-      return title;
-    }
-    // Fallback to first 50 characters
-    const truncated = text.trim().substring(0, 50);
-    return truncated.length < text.trim().length
-      ? truncated + "..."
-      : truncated;
-  };
 
   const fetchNotes = async () => {
     try {
@@ -69,9 +48,7 @@ export const NotesPage: React.FC = () => {
     try {
       setIsCreating(true);
       setError(null);
-      const autoTitle = generateTitle(content);
       await invoke("create_note", {
-        title: autoTitle,
         content: content.trim(),
       });
       setContent("");
@@ -195,7 +172,7 @@ export const NotesPage: React.FC = () => {
                 id="note-content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Use your global hotkey to record a note. The title will be generated automatically."
+                placeholder="Use your global hotkey to record a note."
                 disabled={isCreating}
                 rows={4}
                 style={{
@@ -346,21 +323,11 @@ export const NotesPage: React.FC = () => {
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
+                  justifyContent: "flex-end",
                   alignItems: "start",
                   marginBottom: "12px",
                 }}
               >
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: "18px",
-                    fontWeight: 600,
-                    color: "#333",
-                  }}
-                >
-                  {note.title}
-                </h3>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button
                     onClick={() => handleEdit(note)}

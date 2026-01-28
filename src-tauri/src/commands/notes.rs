@@ -12,7 +12,6 @@ pub struct Note {
     pub team_id: String,
     pub created_by: String,
     pub updated_by: String,
-    pub title: String,
     pub content: String,
     pub created_at: String,
     pub updated_at: String,
@@ -29,13 +28,11 @@ pub struct PaginatedNotesResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateNoteRequest {
-    pub title: String,
     pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateNoteRequest {
-    pub title: Option<String>,
     pub content: Option<String>,
 }
 
@@ -159,7 +156,7 @@ pub async fn get_note(app: AppHandle, note_id: String) -> Result<Note, String> {
 
 /// Create a new note
 #[tauri::command]
-pub async fn create_note(app: AppHandle, title: String, content: String) -> Result<Note, String> {
+pub async fn create_note(app: AppHandle, content: String) -> Result<Note, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Some(token) => token,
         None => {
@@ -172,7 +169,7 @@ pub async fn create_note(app: AppHandle, title: String, content: String) -> Resu
 
     let url = format!("{}/api/v1/notes", crate::config::api_base_url());
 
-    let request_body = CreateNoteRequest { title, content };
+    let request_body = CreateNoteRequest { content };
 
     let client = reqwest::Client::new();
     let response = client
@@ -214,7 +211,6 @@ pub async fn create_note(app: AppHandle, title: String, content: String) -> Resu
 pub async fn update_note(
     app: AppHandle,
     note_id: String,
-    title: Option<String>,
     content: Option<String>,
 ) -> Result<Note, String> {
     let auth_token = match get_auth_token_async(&app).await {
@@ -229,7 +225,7 @@ pub async fn update_note(
 
     let url = format!("{}/api/v1/notes/{}", crate::config::api_base_url(), note_id);
 
-    let request_body = UpdateNoteRequest { title, content };
+    let request_body = UpdateNoteRequest { content };
 
     let client = reqwest::Client::new();
     let response = client

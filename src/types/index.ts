@@ -192,19 +192,16 @@ export interface Note {
   team_id: string;
   created_by: string;
   updated_by: string;
-  title: string;
   content: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface NoteCreateRequest {
-  title: string;
   content: string;
 }
 
 export interface NoteUpdateRequest {
-  title?: string;
   content?: string;
 }
 
