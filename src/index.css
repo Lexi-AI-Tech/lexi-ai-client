@@ -120,7 +120,6 @@ body::before {
 .container {
   padding: 24px;
   width: 100%;
-  max-width: 800px;
   margin: 0 auto;
   position: relative;
   z-index: 1;
@@ -638,10 +637,10 @@ body::before {
 .transcripts-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   max-height: 400px;
   overflow-y: auto;
-  padding-right: 4px;
+  border: 1px solid #f3f4f6;
+  border-radius: 8px;
 }
 
 .transcripts-list::-webkit-scrollbar {
@@ -663,17 +662,20 @@ body::before {
 }
 
 .transcript-item {
+  display: flex;
+  align-items: start;
   padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #f3f4f6;
   background: #ffffff;
   transition: all 0.2s ease;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.transcripts-list .transcript-item:last-child {
+  border-bottom: none;
 }
 
 .transcript-item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border-color: #e5e7eb;
+ background: #f9fafb;
 }
 
 .transcript-item-header {
@@ -681,17 +683,63 @@ body::before {
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
-  margin-bottom: 8px;
 }
 
 .transcript-item-text {
-  font-size: 12px;
+  font-size: 14px;
   color: #374151;
-  line-height: 1.5;
-  word-wrap: break-word;
-  margin-bottom: 4px;
+}
+.transcript-item-date {
+  font-size: 11px;
+  color: #9ca3af;
 }
 
+/* Table-style transcripts view */
+.transcripts-table {
+  margin-top: 8px;
+}
+
+.transcripts-table-header {
+  display: grid;
+  grid-template-columns: 140px 1.8fr 1fr;
+  padding: 12px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.transcripts-table-row {
+  display: grid;
+  grid-template-columns: 140px 1.8fr 1fr;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.transcript-cell {
+  font-size: 12px;
+}
+
+.transcript-cell-date {
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.transcript-cell-text {
+  color: #111827;
+}
+
+.transcript-cell-meta {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.transcript-item-empty {
+  font-style: italic;
+  color: #9ca3af;
+}
 /* Responsive adjustments */
 @media (max-height: 300px) {
   .container {
