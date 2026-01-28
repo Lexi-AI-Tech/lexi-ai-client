@@ -10,7 +10,8 @@ use tauri::{AppHandle, Emitter};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Transcript {
     pub id: String,
-    pub user_id: String,
+    pub created_by: String,
+    pub updated_by: String,
     pub original_text: String,
     pub original_text_word_count: i32,
     pub original_text_character_count: i32,

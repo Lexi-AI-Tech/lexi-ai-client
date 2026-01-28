@@ -10,7 +10,8 @@ use tauri::AppHandle;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActionHistory {
     pub id: String,
-    pub user_id: String,
+    pub created_by: String,
+    pub updated_by: String,
     pub action_command: String,
     pub app_name: Option<String>,
     pub selected_text: Option<String>,

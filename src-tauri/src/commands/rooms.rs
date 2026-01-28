@@ -13,8 +13,23 @@ use tauri::{AppHandle, Emitter, State};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Room {
     pub id: String,
+    pub created_by: String,
+    pub updated_by: String,
     pub name: String,
     pub created_at: String,
+    pub updated_at: String,
+    pub speaker_map: Option<std::collections::HashMap<String, String>>,
+    pub transcripts: Option<Vec<RoomTranscriptSegment>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RoomTranscriptSegment {
+    pub id: String,
+    pub segment_index: i32,
+    pub start_time: String,
+    pub end_time: String,
+    pub speaker_label: String,
+    pub text: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

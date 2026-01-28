@@ -207,12 +207,12 @@ export const RoomsPage: React.FC = () => {
                 transition: "background 0.2s",
               }}
               onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor =
-                "rgba(255, 255, 255, 0.1)")
+                (e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.1)")
               }
               onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor =
-                "rgba(255, 255, 255, 0.05)")
+                (e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.05)")
               }
             >
               <div
@@ -232,7 +232,6 @@ export const RoomsPage: React.FC = () => {
                     {formatDate(room.created_at)}
                   </div>
                 </div>
-
               </div>
             </div>
           ))}
