@@ -37,7 +37,7 @@ pub async fn get_shortcuts(
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| "macos".to_string());
+    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
 
     let url = format!(
         "{}/api/v1/shortcuts?system_type={}",
@@ -90,7 +90,7 @@ pub async fn create_shortcut(
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| "macos".to_string());
+    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
 
     let url = format!(
         "{}/api/v1/shortcuts?system_type={}",
@@ -146,7 +146,7 @@ pub async fn update_shortcut(
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| "macos".to_string());
+    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
 
     let url = format!(
         "{}/api/v1/shortcuts/{}?system_type={}",
@@ -202,7 +202,7 @@ pub async fn delete_shortcut(
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| "macos".to_string());
+    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
 
     let url = format!(
         "{}/api/v1/shortcuts/{}?system_type={}",

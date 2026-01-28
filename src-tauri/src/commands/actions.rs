@@ -157,7 +157,7 @@ pub async fn get_action_triggers(
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| "macos".to_string());
+    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
     let include_inactive = include_inactive.unwrap_or(false);
 
     let mut query_params = vec![("system_type", system_type)];
@@ -222,7 +222,7 @@ pub async fn create_action_trigger(
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| "macos".to_string());
+    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
 
     let url = format!(
         "{}/api/v1/actions/triggers?system_type={}",
@@ -278,7 +278,7 @@ pub async fn update_action_trigger(
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| "macos".to_string());
+    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
 
     let url = format!(
         "{}/api/v1/actions/triggers/{}?system_type={}",
@@ -334,7 +334,7 @@ pub async fn delete_action_trigger(
         .await
         .ok_or_else(|| "Authentication required".to_string())?;
 
-    let system_type = system_type.unwrap_or_else(|| "macos".to_string());
+    let system_type = system_type.unwrap_or_else(|| utils::get_system_type().to_string());
 
     let url = format!(
         "{}/api/v1/actions/triggers/{}?system_type={}",
