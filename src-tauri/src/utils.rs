@@ -22,3 +22,9 @@ pub fn get_system_type() -> &'static str {
 pub fn get_device_type() -> &'static str {
     "desktop"
 }
+
+/// Log an API request with its purpose, method, and URL
+/// This helps track all API calls made to the server
+pub fn log_api_request(purpose: &str, method: &str, url: &str) {
+    println!("🌐 API Request: {} {} | Purpose: {}", method, url, purpose);
+}

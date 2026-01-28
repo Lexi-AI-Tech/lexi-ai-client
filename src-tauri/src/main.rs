@@ -57,6 +57,7 @@ mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortc
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod recording_thread; // Recording thread management
+mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
@@ -72,7 +73,8 @@ use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
 use state::{
-    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, TranscriptionTaskState,
+    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, RoomState,
+    TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
 
@@ -89,8 +91,9 @@ use commands::actions::{
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
-    clear_auth_data, get_auth_data, get_current_user, get_pkce_verifier, has_auth_data, logout,
-    refresh_auth_token, start_google_login, store_auth_data,
+    clear_auth_data, get_api_base_url, get_auth_data, get_auth_token, get_current_user,
+    get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
+    store_auth_data,
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
@@ -100,6 +103,10 @@ use commands::onboarding::{
     reset_onboarding, set_onboarding_step,
 };
 use commands::pill::{show_pill_window, toggle_pill_window};
+use commands::rooms::{
+    create_room, get_room_details, list_rooms, start_room_recording,
+    stop_room_recording_and_process, update_room, update_speaker,
+};
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
 use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
@@ -264,6 +271,8 @@ pub fn main() {
             get_auth_data,
             clear_auth_data,
             has_auth_data,
+            get_auth_token,
+            get_api_base_url,
             get_current_user,
             logout,
             refresh_auth_token,
@@ -295,6 +304,13 @@ pub fn main() {
             previous_onboarding_step,
             complete_onboarding,
             reset_onboarding,
+            create_room,
+            list_rooms,
+            get_room_details,
+            start_room_recording,
+            stop_room_recording_and_process,
+            update_room,
+            update_speaker,
         ])
         .setup(move |app| {
             // Create system tray first to avoid borrow checker issues
@@ -366,6 +382,10 @@ pub fn main() {
             app.manage(RecordingChannelState {
                 tx: Arc::new(Mutex::new(Some(recording_tx.clone()))),
                 is_recording: recording_state_tracker.clone(),
+            });
+            app.manage(RoomState {
+                is_recording: Mutex::new(false),
+                command_tx: Mutex::new(None),
             });
 
             // Listen to recording events to update state tracker

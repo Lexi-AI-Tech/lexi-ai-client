@@ -15,6 +15,7 @@
 use crate::api_endpoints::action;
 use crate::commands::auth::get_auth_token_async;
 use crate::cursor_context::CursorContext;
+use crate::utils;
 use reqwest::multipart;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -317,6 +318,7 @@ async fn send_action_request(
 
     // Build the request URL using centralized endpoint
     let url = action::perform_url();
+    utils::log_api_request("Perform voice action", "POST", &url);
     let mut request = client.post(&url).multipart(form);
 
     // Add authorization header if token is provided

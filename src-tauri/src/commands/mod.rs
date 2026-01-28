@@ -10,6 +10,7 @@ pub mod auth;
 pub mod hotkey;
 pub mod onboarding;
 pub mod pill;
+pub mod rooms;
 pub mod shortcuts;
 pub mod text;
 pub mod transcripts;

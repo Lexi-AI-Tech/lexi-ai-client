@@ -3,6 +3,7 @@
 //! Tauri commands for managing shortcuts.
 
 use crate::commands::auth::get_auth_token_async;
+use crate::utils;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
@@ -43,6 +44,8 @@ pub async fn get_shortcuts(
         crate::config::api_base_url(),
         urlencoding::encode(&system_type)
     );
+
+    utils::log_api_request("Get all shortcuts", "GET", &url);
 
     let client = reqwest::Client::new();
     let response = client
@@ -94,6 +97,8 @@ pub async fn create_shortcut(
         crate::config::api_base_url(),
         urlencoding::encode(&system_type)
     );
+
+    utils::log_api_request("Create new shortcut", "POST", &url);
 
     let client = reqwest::Client::new();
     let response = client
@@ -150,6 +155,8 @@ pub async fn update_shortcut(
         urlencoding::encode(&system_type)
     );
 
+    utils::log_api_request("Update shortcut", "PUT", &url);
+
     let client = reqwest::Client::new();
     let response = client
         .put(&url)
@@ -203,6 +210,8 @@ pub async fn delete_shortcut(
         shortcut_id,
         urlencoding::encode(&system_type)
     );
+
+    utils::log_api_request("Delete shortcut", "DELETE", &url);
 
     let client = reqwest::Client::new();
     let response = client

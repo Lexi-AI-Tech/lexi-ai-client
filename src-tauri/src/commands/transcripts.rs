@@ -3,13 +3,15 @@
 //! Tauri commands for managing transcripts (transcription history).
 
 use crate::commands::auth::get_auth_token_async;
+use crate::utils;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Transcript {
     pub id: String,
-    pub user_id: String,
+    pub created_by: String,
+    pub updated_by: String,
     pub original_text: String,
     pub original_text_word_count: i32,
     pub original_text_character_count: i32,
@@ -86,6 +88,8 @@ pub async fn get_transcripts(
         query_string
     );
 
+    utils::log_api_request("Get paginated list of transcripts", "GET", &url);
+
     let client = reqwest::Client::new();
     let response = client
         .get(&url)
@@ -138,6 +142,8 @@ pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Tra
         transcript_id
     );
 
+    utils::log_api_request("Get specific transcript by ID", "GET", &url);
+
     let client = reqwest::Client::new();
     let response = client
         .get(&url)
@@ -189,6 +195,8 @@ pub async fn delete_transcript(app: AppHandle, transcript_id: String) -> Result<
         crate::config::api_base_url(),
         transcript_id
     );
+
+    utils::log_api_request("Delete transcript by ID", "DELETE", &url);
 
     let client = reqwest::Client::new();
     let response = client
