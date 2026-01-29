@@ -557,178 +557,114 @@ pub fn start_listener(
     // Key state tracker to prevent spurious/duplicate events
     let key_state_tracker = Arc::new(Mutex::new(KeyStateTracker::new()));
 
-    // Watchdog thread: Monitors the rdev listener and respawns it if it crashes
-    // Each retry spawns a NEW thread to avoid system-level hook conflicts
+    // Start rdev listener thread - always running, reads hotkeys dynamically
     std::thread::spawn(move || {
-        const MAX_RETRIES: u32 = 5;
-        let mut retry_count = 0;
-        let mut backoff_seconds = 2;
+        let key_state_tracker_for_callback = key_state_tracker.clone();
+        let callback = move |event: Event| {
+            // Check if we're in hotkey recording mode (for UI hotkey selection)
+            let is_recording = recording_state_for_rdev
+                .lock()
+                .map(|guard| *guard)
+                .unwrap_or(false);
 
-        loop {
-            println!(
-                "🔑 Starting rdev listener (attempt {}/{})",
-                retry_count + 1,
-                MAX_RETRIES + 1
-            );
-
-            // Clone everything needed for this attempt's callback
-            let app_for_attempt = app_for_rdev.clone();
-            let recording_tx_for_attempt = recording_tx_for_rdev.clone();
-            let recording_state_for_attempt = recording_state_for_rdev.clone();
-            let config_rx_for_attempt = config_rx_for_rdev.clone();
-            let key_state_tracker_for_attempt = key_state_tracker.clone();
-
-            // Spawn listener in a NEW thread (critical for recovery)
-            // This ensures each attempt gets a fresh thread context
-            let listener_handle = std::thread::spawn(move || {
-                let callback = move |event: Event| {
-                    // Check if we're in hotkey recording mode (for UI hotkey selection)
-                    let is_recording = recording_state_for_attempt
-                        .lock()
-                        .map(|guard| *guard)
-                        .unwrap_or(false);
-
-                    // If in recording mode, emit key events to frontend for hotkey selection
-                    if is_recording {
-                        match &event.event_type {
-                            EventType::KeyPress(ref key) => {
-                                let key_str = key_to_string(key);
-                                let _ = app_for_attempt.emit(
-                                    "hotkey-recorded",
-                                    serde_json::json!({
-                                        "key": key_str,
-                                        "modifiers": []
-                                    }),
-                                );
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    // Get current hotkeys from AppConfig (single source of truth: Tauri Store)
-                    let current_hotkeys = config_rx_for_attempt.borrow().clone();
-                    let current_rdev_hotkeys = rdev_hotkeys(&current_hotkeys);
-
-                    // Check if this event matches any configured rdev hotkey
-                    let command = if matches_rdev_hotkey(&event.event_type, &current_rdev_hotkeys) {
-                        // For Fn key, use the state tracker (press/release behavior)
-                        if matches!(
-                            &event.event_type,
-                            EventType::KeyPress(Key::Function)
-                                | EventType::KeyRelease(Key::Function)
-                        ) {
-                            // Use state tracker for Fn key
-                            if let Ok(mut tracker) = key_state_tracker_for_attempt.lock() {
-                                tracker.process_event(&event.event_type)
-                            } else {
-                                eprintln!("❌ Failed to lock key state tracker");
-                                None
-                            }
-                        } else {
-                            // For other rdev hotkeys (modifier-only, single keys, etc.)
-                            // This can be extended in the future
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                    // Process command if we got one
-                    if let Some(command) = command {
-                        let trigger_type = match command {
-                            RecordingCommand::Start => "PRESSED",
-                            RecordingCommand::Stop => "RELEASED",
-                        };
-                        println!("=== HOTKEY TRIGGER: {} ===", trigger_type);
-
-                        // CRITICAL: Send recording command IMMEDIATELY for responsive UI
-                        // This is the hot path - no blocking operations here
-                        if let Err(e) = recording_tx_for_attempt.send(command) {
-                            eprintln!("Failed to send recording signal: {:?}", e);
-                        }
-
-                        // Query cursor context asynchronously (non-blocking)
-                        // This runs in background and doesn't delay recording start
-                        std::thread::spawn(|| {
-                            if let Some(context) = crate::cursor_context::get_cursor_context() {
-                                println!(
-                                    "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
-                                    context.app_name, context.pid, context.selected_text
-                                );
-                            }
-                        });
-
-                        println!(
-                            "Hotkey {} - {} recording",
-                            match command {
-                                RecordingCommand::Start => "pressed",
-                                RecordingCommand::Stop => "released",
-                            },
-                            match command {
-                                RecordingCommand::Start => "Starting",
-                                RecordingCommand::Stop => "Stopping",
-                            }
+            // If in recording mode, emit key events to frontend for hotkey selection
+            if is_recording {
+                match &event.event_type {
+                    EventType::KeyPress(ref key) => {
+                        let key_str = key_to_string(key);
+                        let _ = app_for_rdev.emit(
+                            "hotkey-recorded",
+                            serde_json::json!({
+                                "key": key_str,
+                                "modifiers": []
+                            }),
                         );
-
-                        // NOTE: Don't emit recording_started/recording_stopped here anymore.
-                        // The recording_thread.rs now handles this AFTER actual recording starts/stops.
-                        // This prevents race conditions where UI updates before audio stream is ready.
                     }
-
-                    // Emit all keyboard events for debug (commented out by default)
-                    if let Some(event_string) = event_type_to_string(&event.event_type) {
-                        // println!("Keyboard event: {:?}", event);
-                        if let Err(e) = app_for_attempt.emit("global-input", &event_string) {
-                            eprintln!("Failed to emit event: {:?}", e);
-                        }
-                    }
-                };
-
-                // This blocks until crash or app exit
-                listen(callback)
-            });
-
-            // Wait for the listener thread to complete (which means it crashed or exited)
-            match listener_handle.join() {
-                Ok(Ok(())) => {
-                    // Clean exit - listener stopped gracefully (e.g., app shutdown)
-                    println!("✅ rdev listener stopped cleanly");
-                    break;
-                }
-                Ok(Err(error)) => {
-                    // listen() returned an error
-                    eprintln!("❌ rdev listener crashed: {:?}", error);
-
-                    retry_count += 1;
-                    if retry_count >= MAX_RETRIES {
-                        eprintln!(
-                            "🛑 Max retries ({}) reached. Global keyboard shortcuts disabled.",
-                            MAX_RETRIES
-                        );
-                        eprintln!("   This usually means Input Monitoring permission is missing.");
-                        eprintln!(
-                            "   Check: System Settings > Privacy & Security > Input Monitoring"
-                        );
-                        break;
-                    }
-
-                    // Exponential backoff before retry (2s, 4s, 8s, 16s, 32s, capped at 60s)
-                    eprintln!(
-                        "🔄 Retrying in {}s... ({}/{} attempts remaining)",
-                        backoff_seconds,
-                        MAX_RETRIES - retry_count,
-                        MAX_RETRIES
-                    );
-                    std::thread::sleep(Duration::from_secs(backoff_seconds));
-                    backoff_seconds = (backoff_seconds * 2).min(60); // Cap at 60 seconds
-                }
-                Err(e) => {
-                    // Thread panicked
-                    eprintln!("❌ rdev listener thread panicked: {:?}", e);
-                    eprintln!("🛑 Global keyboard shortcuts disabled.");
-                    break;
+                    _ => {}
                 }
             }
+
+            // Get current hotkeys from AppConfig (single source of truth: Tauri Store)
+            let current_hotkeys = config_rx_for_rdev.borrow().clone();
+            let current_rdev_hotkeys = rdev_hotkeys(&current_hotkeys);
+
+            // Check if this event matches any configured rdev hotkey
+            let command = if matches_rdev_hotkey(&event.event_type, &current_rdev_hotkeys) {
+                // For Fn key, use the state tracker (press/release behavior)
+                if matches!(
+                    &event.event_type,
+                    EventType::KeyPress(Key::Function) | EventType::KeyRelease(Key::Function)
+                ) {
+                    // Use state tracker for Fn key
+                    if let Ok(mut tracker) = key_state_tracker_for_callback.lock() {
+                        tracker.process_event(&event.event_type)
+                    } else {
+                        eprintln!("❌ Failed to lock key state tracker");
+                        None
+                    }
+                } else {
+                    // For other rdev hotkeys (modifier-only, single keys, etc.)
+                    // This can be extended in the future
+                    None
+                }
+            } else {
+                None
+            };
+
+            // Process command if we got one
+            if let Some(command) = command {
+                let trigger_type = match command {
+                    RecordingCommand::Start => "PRESSED",
+                    RecordingCommand::Stop => "RELEASED",
+                };
+                println!("=== HOTKEY TRIGGER: {} ===", trigger_type);
+
+                // CRITICAL: Send recording command IMMEDIATELY for responsive UI
+                // This is the hot path - no blocking operations here
+                if let Err(e) = recording_tx_for_rdev.send(command) {
+                    eprintln!("Failed to send recording signal: {:?}", e);
+                }
+
+                // Query cursor context asynchronously (non-blocking)
+                // This runs in background and doesn't delay recording start
+                std::thread::spawn(|| {
+                    if let Some(context) = crate::cursor_context::get_cursor_context() {
+                        println!(
+                            "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
+                            context.app_name, context.pid, context.selected_text
+                        );
+                    }
+                });
+
+                println!(
+                    "Hotkey {} - {} recording",
+                    match command {
+                        RecordingCommand::Start => "pressed",
+                        RecordingCommand::Stop => "released",
+                    },
+                    match command {
+                        RecordingCommand::Start => "Starting",
+                        RecordingCommand::Stop => "Stopping",
+                    }
+                );
+
+                // NOTE: Don't emit recording_started/recording_stopped here anymore.
+                // The recording_thread.rs now handles this AFTER actual recording starts/stops.
+                // This prevents race conditions where UI updates before audio stream is ready.
+            }
+
+            // Emit all keyboard events for debug (commented out by default)
+            if let Some(event_string) = event_type_to_string(&event.event_type) {
+                // println!("Keyboard event: {:?}", event);
+                if let Err(e) = app_for_rdev.emit("global-input", &event_string) {
+                    eprintln!("Failed to emit event: {:?}", e);
+                }
+            }
+        };
+
+        println!("🔑 Starting rdev listener (always running, reads hotkeys dynamically)");
+        if let Err(error) = listen(callback) {
+            eprintln!("rdev listen error: {:?}", error);
         }
     });
 
