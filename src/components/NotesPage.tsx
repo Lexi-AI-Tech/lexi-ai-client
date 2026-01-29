@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Mic, Search, LayoutGrid, RefreshCw, Edit, Trash2, X } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
+
+type ViewMode = "list" | "grid";
 
 export const NotesPage: React.FC = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [hoveredNoteId, setHoveredNoteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   // Form state
   const [content, setContent] = useState("");
@@ -19,14 +25,13 @@ export const NotesPage: React.FC = () => {
   const fetchNotes = async () => {
     try {
       setLoading(true);
-      setError(null);
       const response = await invoke<PaginatedNotesResponse>("get_notes", {
         page: 1,
         pageSize: 100,
       });
       setNotes(response.notes);
     } catch (err) {
-      setError(err as string);
+      console.error("Failed to fetch notes:", err);
     } finally {
       setLoading(false);
     }
@@ -39,27 +44,25 @@ export const NotesPage: React.FC = () => {
 
   const handleCreate = async () => {
     if (!content.trim()) {
-      setError("Please enter some content for the note");
       return;
     }
 
     try {
       setIsCreating(true);
-      setError(null);
       await invoke("create_note", {
         content: content.trim(),
       });
       setContent("");
       await fetchNotes();
     } catch (err) {
-      setError(`Failed to create note: ${err}`);
+      console.error("Failed to create note:", err);
+      alert(`Failed to create note: ${err}`);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpdate = async () => {
     if (!editingId || !content.trim()) {
       return;
     }
@@ -98,277 +101,597 @@ export const NotesPage: React.FC = () => {
     setContent("");
   };
 
+  const handleFinish = () => {
+    if (editingId) {
+      handleUpdate();
+    } else {
+      handleCreate();
+    }
+  };
+
+  // Filter notes based on search query
+  const filteredNotes = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return notes;
+    }
+    const query = searchQuery.toLowerCase();
+    return notes.filter((note) =>
+      note.content.toLowerCase().includes(query)
+    );
+  }, [notes, searchQuery]);
+
+  const toggleViewMode = () => {
+    setViewMode((prev) => (prev === "list" ? "grid" : "list"));
+  };
+
+  const handleSearchClick = () => {
+    setShowSearch((prev) => !prev);
+    if (showSearch) {
+      setSearchQuery("");
+    }
+  };
+
   if (loading) {
     return (
-      <div className="page-container">
-        <div className="page-header">
-          <h1>Notes</h1>
-        </div>
-        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
-          Loading notes...
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="page-container">
-        <div className="page-header">
-          <h1>Notes</h1>
-        </div>
-        <div
-          style={{
-            textAlign: "center",
-            padding: "40px",
-            color: "#d32f2f",
-          }}
-        >
-          Error: {error}
-        </div>
+      <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
+        Loading notes...
       </div>
     );
   }
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1>Notes</h1>
-        <p style={{ color: "#666", fontSize: "14px" }}>
-          Create and manage your notes
-        </p>
-      </div>
+    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+      {/* Quick Thoughts Section */}
+      <div style={{ marginBottom: "48px" }}>
+        <h2
+          style={{
+            fontSize: "18px",
+            fontWeight: 500,
+            color: "#111827",
+            marginBottom: "16px",
+            marginTop: 0,
+          }}
+        >
+          For quick thoughts you want to come back to.
+        </h2>
+        <div
+          style={{
+            position: "relative",
+            backgroundColor: "#ffffff",
+            border: "1px solid #e5e7eb",
+            borderRadius: "12px",
+            padding: "20px",
+            minHeight: "200px",
+          }}
+        >
+          {/* Microphone Icon */}
+          <div
+            style={{
+              position: "absolute",
+              top: "16px",
+              right: "16px",
+              cursor: "pointer",
+              color: "#6b7280",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "32px",
+              height: "32px",
+              borderRadius: "6px",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#f3f4f6";
+              e.currentTarget.style.color = "#111827";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "#6b7280";
+            }}
+          >
+            <Mic size={18} />
+          </div>
 
-      {/* Create/Edit Form */}
-      <div
-        style={{
-          backgroundColor: "#f9f9f9",
-          border: "1px solid #ddd",
-          borderRadius: "8px",
-          padding: "20px",
-          marginBottom: "24px",
-        }}
-      >
-        <h3 style={{ marginTop: 0, marginBottom: "16px", fontSize: "16px" }}>
-          {editingId ? "Edit Note" : "Create New Note"}
-        </h3>
-        {!editingId ? (
-          <div>
-            <div style={{ marginBottom: "16px" }}>
-              <label
-                htmlFor="note-content"
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontWeight: 500,
-                  fontSize: "14px",
-                }}
-              >
-                Content
-              </label>
-              <textarea
-                id="note-content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Use your global hotkey to record a note."
-                disabled={isCreating}
-                rows={4}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #ddd",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  fontFamily: "inherit",
-                  resize: "vertical",
-                }}
-              />
-            </div>
+          {/* Textarea */}
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Hey, just wanted to see how it is going there."
+            disabled={isCreating}
+            style={{
+              width: "100%",
+              border: "none",
+              outline: "none",
+              fontSize: "15px",
+              fontFamily: "inherit",
+              color: "#111827",
+              resize: "none",
+              minHeight: "150px",
+              paddingRight: "40px",
+              lineHeight: 1.6,
+              background: "transparent",
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                handleFinish();
+              }
+            }}
+          />
+
+          {/* Finish Button */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginTop: "12px",
+            }}
+          >
             <button
               type="button"
-              onClick={handleCreate}
+              onClick={handleFinish}
               disabled={isCreating || !content.trim()}
               style={{
-                padding: "10px 20px",
-                backgroundColor: "#007bff",
-                color: "white",
+                padding: "8px 16px",
+                backgroundColor: "#f3f4f6",
+                color: "#6b7280",
                 border: "none",
                 borderRadius: "6px",
                 cursor:
                   isCreating || !content.trim() ? "not-allowed" : "pointer",
                 fontSize: "14px",
                 fontWeight: 500,
-                opacity: isCreating || !content.trim() ? 0.6 : 1,
+                transition: "all 0.2s ease",
+                opacity: isCreating || !content.trim() ? 0.5 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!isCreating && content.trim()) {
+                  e.currentTarget.style.backgroundColor = "#e5e7eb";
+                  e.currentTarget.style.color = "#111827";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isCreating && content.trim()) {
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
+                  e.currentTarget.style.color = "#6b7280";
+                }
               }}
             >
-              {isCreating ? "Creating..." : "Create Note"}
+              {isCreating
+                ? editingId
+                  ? "Updating..."
+                  : "Creating..."
+                : "Finish"}
             </button>
           </div>
-        ) : (
-          <form onSubmit={handleUpdate}>
-            <div style={{ marginBottom: "16px" }}>
-              <label
-                htmlFor="note-content"
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontWeight: 500,
-                  fontSize: "14px",
-                }}
-              >
-                Content
-              </label>
-              <textarea
-                id="note-content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Enter note content"
-                disabled={isCreating}
-                rows={4}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #ddd",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  fontFamily: "inherit",
-                  resize: "vertical",
-                }}
-              />
-            </div>
-            <div style={{ display: "flex", gap: "8px" }}>
+        </div>
+      </div>
+
+      {/* Recents Section */}
+      <div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "16px",
+          }}
+        >
+          <h3
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              color: "#9ca3af",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              margin: 0,
+            }}
+          >
+            RECENTS
+          </h3>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={handleSearchClick}
+              style={{
+                background: showSearch ? "#f3f4f6" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: showSearch ? "#111827" : "#9ca3af",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!showSearch) {
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
+                  e.currentTarget.style.color = "#111827";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!showSearch) {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "#9ca3af";
+                }
+              }}
+            >
+              <Search size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={toggleViewMode}
+              style={{
+                background: viewMode === "grid" ? "#f3f4f6" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: viewMode === "grid" ? "#111827" : "#9ca3af",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (viewMode !== "grid") {
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
+                  e.currentTarget.style.color = "#111827";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (viewMode !== "grid") {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "#9ca3af";
+                }
+              }}
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={fetchNotes}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f3f4f6";
+                e.currentTarget.style.color = "#111827";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "#9ca3af";
+              }}
+            >
+              <RefreshCw size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Search Input */}
+        {showSearch && (
+          <div
+            style={{
+              marginBottom: "16px",
+              position: "relative",
+            }}
+          >
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search notes..."
+              autoFocus
+              style={{
+                width: "100%",
+                padding: "10px 40px 10px 12px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontFamily: "inherit",
+                outline: "none",
+                transition: "all 0.2s ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#d1d5db";
+                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0, 0, 0, 0.05)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            />
+            {searchQuery && (
               <button
-                type="submit"
-                disabled={isCreating}
+                type="button"
+                onClick={() => setSearchQuery("")}
                 style={{
-                  padding: "10px 20px",
-                  backgroundColor: "#007bff",
-                  color: "white",
+                  position: "absolute",
+                  right: "8px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
                   border: "none",
-                  borderRadius: "6px",
-                  cursor: isCreating ? "not-allowed" : "pointer",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  opacity: isCreating ? 0.6 : 1,
+                  cursor: "pointer",
+                  color: "#9ca3af",
+                  padding: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "4px",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
+                  e.currentTarget.style.color = "#111827";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "#9ca3af";
                 }}
               >
-                {isCreating ? "Updating..." : "Update Note"}
+                <X size={16} />
               </button>
+            )}
+          </div>
+        )}
+
+        {/* Notes List */}
+        {filteredNotes.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "60px 20px",
+              color: "#9ca3af",
+            }}
+          >
+            <p style={{ margin: 0, fontSize: "14px" }}>
+              {searchQuery ? "No notes match your search" : "No notes found"}
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: viewMode === "grid" ? "grid" : "flex",
+              flexDirection: viewMode === "list" ? "column" : undefined,
+              gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(280px, 1fr))" : undefined,
+              gap: "12px",
+            }}
+          >
+            {filteredNotes.map((note) => (
+              <div
+                key={note.id}
+                style={{
+                  backgroundColor: "#ffffff",
+                  border:
+                    hoveredNoteId === note.id
+                      ? "1px solid #d1d5db"
+                      : "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  transition: "all 0.2s ease",
+                  position: "relative",
+                  boxShadow:
+                    hoveredNoteId === note.id
+                      ? "0 1px 3px rgba(0, 0, 0, 0.05)"
+                      : "none",
+                  height: viewMode === "grid" ? "auto" : undefined,
+                  minHeight: viewMode === "grid" ? "150px" : undefined,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+                onMouseEnter={() => setHoveredNoteId(note.id)}
+                onMouseLeave={() => setHoveredNoteId(null)}
+              >
+                {/* Action buttons - shown on hover */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "12px",
+                    right: "12px",
+                    display: "flex",
+                    gap: "6px",
+                    opacity: hoveredNoteId === note.id ? 1 : 0,
+                    transition: "opacity 0.2s ease",
+                  }}
+                  className="note-actions"
+                >
+                  <button
+                    onClick={() => handleEdit(note)}
+                    style={{
+                      padding: "6px",
+                      backgroundColor: "#f3f4f6",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#6b7280",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#e5e7eb";
+                      e.currentTarget.style.color = "#111827";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f3f4f6";
+                      e.currentTarget.style.color = "#6b7280";
+                    }}
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(note.id)}
+                    style={{
+                      padding: "6px",
+                      backgroundColor: "#fef2f2",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#ef4444",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#fee2e2";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#fef2f2";
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                <p
+                  style={{
+                    margin: "0 0 8px 0",
+                    color: "#374151",
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                    fontSize: "14px",
+                    paddingRight: "60px",
+                    flex: 1,
+                    overflow: viewMode === "grid" ? "hidden" : "visible",
+                    display: viewMode === "grid" ? "-webkit-box" : "block",
+                    WebkitLineClamp: viewMode === "grid" ? 4 : undefined,
+                    WebkitBoxOrient: viewMode === "grid" ? "vertical" : undefined,
+                    textOverflow: viewMode === "grid" ? "ellipsis" : undefined,
+                  }}
+                >
+                  {note.content}
+                </p>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#9ca3af",
+                    marginTop: "auto",
+                    paddingTop: "8px",
+                  }}
+                >
+                  {new Date(note.created_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Edit mode overlay */}
+      {editingId && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={handleCancelEdit}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "12px",
+              padding: "24px",
+              maxWidth: "600px",
+              width: "90%",
+              maxHeight: "80vh",
+              overflow: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              style={{
+                marginTop: 0,
+                marginBottom: "16px",
+                fontSize: "16px",
+                fontWeight: 600,
+                color: "#111827",
+              }}
+            >
+              Edit Note
+            </h3>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Enter note content"
+              disabled={isCreating}
+              rows={8}
+              style={{
+                width: "100%",
+                padding: "12px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontFamily: "inherit",
+                resize: "vertical",
+                marginBottom: "16px",
+              }}
+            />
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
               <button
                 type="button"
                 onClick={handleCancelEdit}
                 disabled={isCreating}
                 style={{
                   padding: "10px 20px",
-                  backgroundColor: "#6c757d",
-                  color: "white",
+                  backgroundColor: "#f3f4f6",
+                  color: "#6b7280",
                   border: "none",
                   borderRadius: "6px",
                   cursor: isCreating ? "not-allowed" : "pointer",
                   fontSize: "14px",
                   fontWeight: 500,
-                  opacity: isCreating ? 0.6 : 1,
                 }}
               >
                 Cancel
               </button>
-            </div>
-          </form>
-        )}
-      </div>
-
-      {/* Notes List */}
-      {notes.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "60px 20px",
-            color: "#999",
-          }}
-        >
-          <svg
-            width="64"
-            height="64"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            style={{ margin: "0 auto 16px", opacity: 0.3 }}
-          >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="12" y1="18" x2="12" y2="12"></line>
-            <line x1="9" y1="15" x2="15" y2="15"></line>
-          </svg>
-          <h3 style={{ marginTop: 0, marginBottom: "8px" }}>No notes yet</h3>
-          <p style={{ margin: 0 }}>Create your first note to get started</p>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {notes.map((note) => (
-            <div
-              key={note.id}
-              style={{
-                backgroundColor: "white",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                padding: "20px",
-                transition: "box-shadow 0.2s",
-              }}
-            >
-              <div
+              <button
+                type="button"
+                onClick={handleUpdate}
+                disabled={isCreating || !content.trim()}
                 style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  alignItems: "start",
-                  marginBottom: "12px",
+                  padding: "10px 20px",
+                  backgroundColor: "#111827",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor:
+                    isCreating || !content.trim()
+                      ? "not-allowed"
+                      : "pointer",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  opacity: isCreating || !content.trim() ? 0.5 : 1,
                 }}
               >
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button
-                    onClick={() => handleEdit(note)}
-                    style={{
-                      padding: "6px 12px",
-                      backgroundColor: "#f0f0f0",
-                      border: "1px solid #ddd",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(note.id)}
-                    style={{
-                      padding: "6px 12px",
-                      backgroundColor: "#fee",
-                      border: "1px solid #fcc",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                      color: "#c33",
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-              <p
-                style={{
-                  margin: "0 0 12px 0",
-                  color: "#666",
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {note.content}
-              </p>
-              <div style={{ fontSize: "12px", color: "#999" }}>
-                Created: {new Date(note.created_at).toLocaleString()}
-              </div>
+                {isCreating ? "Updating..." : "Update"}
+              </button>
             </div>
-          ))}
+          </div>
         </div>
       )}
     </div>

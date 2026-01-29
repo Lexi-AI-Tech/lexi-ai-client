@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Monitor, Mic, Power, Keyboard } from "lucide-react";
+import { Monitor, Mic, Power, Keyboard, ChevronDown, Check } from "lucide-react";
 
 import {
   LanguageCode,
@@ -49,6 +49,8 @@ export const SettingsPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<
     "account" | "transcription" | "general" | "hotkeys"
   >("account");
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  const languageDropdownRef = useRef<HTMLDivElement>(null);
 
   // Derived values from config - no defaults, rely entirely on backend
   const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
@@ -91,6 +93,26 @@ export const SettingsPage: React.FC = () => {
 
     loadConfig();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        languageDropdownRef.current &&
+        !languageDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsLanguageDropdownOpen(false);
+      }
+    };
+
+    if (isLanguageDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isLanguageDropdownOpen]);
 
   // Load hotkeys on mount
   useEffect(() => {
@@ -409,28 +431,8 @@ export const SettingsPage: React.FC = () => {
   // Don't render settings content until config is loaded to prevent flash of defaults
   if (isLoading) {
     return (
-      <div className="settings-page">
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "32px",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-          }}
-        >
-          Settings
-        </h2>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "40px",
-            color: "#6b7280",
-            fontSize: "14px",
-          }}
-        >
+      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
           Loading settings...
         </div>
       </div>
@@ -441,43 +443,44 @@ export const SettingsPage: React.FC = () => {
   // This prevents showing cached config when user is logged out
   if (!authStore.isAuthenticated) {
     return (
-      <div className="settings-page">
+      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
         <h2
           style={{
-            margin: 0,
-            marginBottom: "32px",
-            fontSize: "24px",
-            fontWeight: 600,
+            fontSize: "18px",
+            fontWeight: 500,
             color: "#111827",
+            marginBottom: "16px",
+            marginTop: 0,
           }}
         >
           Settings
         </h2>
-        <div style={{ marginBottom: "32px" }}>
-          <h3
+        <div
+          style={{
+            backgroundColor: "#ffffff",
+            border: "1px solid #e5e7eb",
+            borderRadius: "12px",
+            padding: "40px",
+            textAlign: "center",
+          }}
+        >
+          <p
             style={{
-              margin: 0,
-              marginBottom: "16px",
-              fontSize: "18px",
-              fontWeight: 500,
-              color: "#111827",
+              fontSize: "14px",
+              color: "#6b7280",
+              marginBottom: "20px",
             }}
           >
-            Account
-          </h3>
-          <div style={{ textAlign: "center", padding: "16px 0" }}>
-            <p className="permission-text" style={{ marginBottom: "16px" }}>
-              Sign in to access your settings
-            </p>
-            <GoogleLoginButton
-              onSuccess={() => {
-                // Settings will be loaded automatically via useEffect
-              }}
-              onError={(err) => {
-                setError(err || "Authentication failed");
-              }}
-            />
-          </div>
+            Sign in to access your settings
+          </p>
+          <GoogleLoginButton
+            onSuccess={() => {
+              // Settings will be loaded automatically via useEffect
+            }}
+            onError={(err) => {
+              setError(err || "Authentication failed");
+            }}
+          />
         </div>
       </div>
     );
@@ -486,28 +489,28 @@ export const SettingsPage: React.FC = () => {
   // Show error state if config failed to load
   if (config === null) {
     return (
-      <div className="settings-page">
+      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
         <h2
           style={{
-            margin: 0,
-            marginBottom: "32px",
-            fontSize: "24px",
-            fontWeight: 600,
+            fontSize: "18px",
+            fontWeight: 500,
             color: "#111827",
+            marginBottom: "16px",
+            marginTop: 0,
           }}
         >
           Settings
         </h2>
         {error && (
           <div
-            className="permission-message"
             style={{
               background: "#fef2f2",
-              borderColor: "#fecaca",
+              border: "1px solid #fecaca",
               color: "#b91c1c",
-              fontSize: "11px",
-              padding: "12px",
-              marginBottom: "16px",
+              fontSize: "13px",
+              padding: "12px 16px",
+              marginBottom: "24px",
+              borderRadius: "8px",
             }}
           >
             {error}
@@ -518,139 +521,99 @@ export const SettingsPage: React.FC = () => {
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        width: "100%",
-        height: "calc(100vh - 48px)",
-        background: "#ffffff",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      {/* Sidebar Navigation */}
-      <div
+    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+      <h2
         style={{
-          width: "240px",
-          background: "#ffffff",
-          borderRight: "1px solid #f3f4f6",
-          padding: "2rem 1.5rem",
-          display: "flex",
-          flexDirection: "column",
+          fontSize: "18px",
+          fontWeight: 500,
+          color: "#111827",
+          marginBottom: "24px",
+          marginTop: 0,
         }}
       >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "1.5rem",
-            fontSize: "1.5rem",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Settings
-        </h2>
-        <nav
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.25rem",
-            padding: "0.75rem",
-            background: "#f9fafb",
-            borderRadius: "0.75rem",
-            border: "1px solid #f3f4f6",
-          }}
-        >
-          {[
-            { id: "account" as const, label: "Account", icon: Monitor },
-            { id: "transcription" as const, label: "Transcription", icon: Mic },
-            { id: "general" as const, label: "General", icon: Power },
-            {
-              id: "hotkeys" as const,
-              label: "Hotkey Settings",
-              icon: Keyboard,
-            },
-          ].map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveSection(id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.625rem",
-                padding: "0.625rem 0.75rem",
-                borderRadius: "0.5rem",
-                border: "none",
-                background: activeSection === id ? "#111827" : "transparent",
-                color: activeSection === id ? "#ffffff" : "#6b7280",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                fontSize: "0.8125rem",
-                fontWeight: activeSection === id ? 500 : 400,
-                textAlign: "left",
-              }}
-              onMouseEnter={(e) => {
-                if (activeSection !== id) {
-                  e.currentTarget.style.background = "#ffffff";
-                  e.currentTarget.style.color = "#111827";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (activeSection !== id) {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "#6b7280";
-                }
-              }}
-            >
-              <Icon size={16} />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
+        Settings
+      </h2>
+
+      {/* Section Navigation */}
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginBottom: "32px",
+          flexWrap: "wrap",
+        }}
+      >
+        {[
+          { id: "account" as const, label: "Account", icon: Monitor },
+          { id: "transcription" as const, label: "Transcription", icon: Mic },
+          { id: "general" as const, label: "General", icon: Power },
+          {
+            id: "hotkeys" as const,
+            label: "Hotkeys",
+            icon: Keyboard,
+          },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveSection(id)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 16px",
+              borderRadius: "8px",
+              border: "none",
+              background: activeSection === id ? "#111827" : "#f3f4f6",
+              color: activeSection === id ? "#ffffff" : "#6b7280",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              fontSize: "14px",
+              fontWeight: activeSection === id ? 500 : 400,
+            }}
+            onMouseEnter={(e) => {
+              if (activeSection !== id) {
+                e.currentTarget.style.background = "#e5e7eb";
+                e.currentTarget.style.color = "#111827";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeSection !== id) {
+                e.currentTarget.style.background = "#f3f4f6";
+                e.currentTarget.style.color = "#6b7280";
+              }
+            }}
+          >
+            <Icon size={16} />
+            <span>{label}</span>
+          </button>
+        ))}
       </div>
 
       {/* Main Content Area */}
-      <div
-        style={{
-          flex: 1,
-          padding: "2rem 2.5rem",
-          overflowY: "auto",
-        }}
-      >
+      <div>
         {/* Account Section */}
         {activeSection === "account" && (
           <div>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: "0.5rem",
-                fontSize: "1.75rem",
-                fontWeight: 600,
-                color: "#111827",
-                letterSpacing: "-0.025em",
-              }}
-            >
-              Account
-            </h2>
-            <p
-              style={{
-                margin: 0,
-                marginBottom: "2rem",
-                fontSize: "0.9375rem",
-                color: "#6b7280",
-              }}
-            >
-              Manage your profile and account settings.
-            </p>
             <div
               style={{
-                padding: "1.5rem",
-                background: "#ffffff",
+                backgroundColor: "#ffffff",
                 border: "1px solid #e5e7eb",
-                borderRadius: "0.75rem",
+                borderRadius: "12px",
+                padding: "24px",
               }}
             >
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "#9ca3af",
+                  marginBottom: "16px",
+                }}
+              >
+                Account
+              </div>
               <GoogleLoginButton />
             </div>
           </div>
@@ -659,114 +622,185 @@ export const SettingsPage: React.FC = () => {
         {/* Transcription Section */}
         {activeSection === "transcription" && (
           <div>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: "0.5rem",
-                fontSize: "1.75rem",
-                fontWeight: 600,
-                color: "#111827",
-                letterSpacing: "-0.025em",
-              }}
-            >
-              Transcription
-            </h2>
-            <p
-              style={{
-                margin: 0,
-                marginBottom: "2rem",
-                fontSize: "0.9375rem",
-                color: "#6b7280",
-              }}
-            >
-              Language and processing configurations.
-            </p>
-
             <div
               style={{
-                padding: "1.5rem",
-                background: "#ffffff",
+                backgroundColor: "#ffffff",
                 border: "1px solid #e5e7eb",
-                borderRadius: "0.75rem",
-                marginBottom: "1rem",
+                borderRadius: "12px",
+                padding: "24px",
+                marginBottom: "16px",
               }}
             >
               <div
                 style={{
-                  fontSize: "0.6875rem",
+                  fontSize: "11px",
                   fontWeight: 600,
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
                   color: "#9ca3af",
-                  marginBottom: "0.75rem",
+                  marginBottom: "12px",
                 }}
               >
                 Language
               </div>
-              <div style={{ position: "relative", marginBottom: "0.5rem" }}>
-                <select
-                  value={selectedLanguage || ""}
-                  onChange={(e) =>
-                    setSelectedLanguage(e.target.value as LanguageCode)
-                  }
+              <div
+                ref={languageDropdownRef}
+                style={{ position: "relative", marginBottom: "12px" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isUpdating && !isLoading) {
+                      setIsLanguageDropdownOpen(!isLanguageDropdownOpen);
+                    }
+                  }}
                   disabled={isUpdating || isLoading}
                   style={{
                     width: "100%",
-                    padding: "0.875rem 2.5rem 0.875rem 1rem",
-                    fontSize: "0.875rem",
-                    fontWeight: 500,
+                    padding: "12px 16px",
+                    fontSize: "14px",
+                    fontFamily: "inherit",
                     backgroundColor: "#ffffff",
                     border: "1px solid #e5e7eb",
-                    borderRadius: "0.625rem",
+                    borderRadius: "8px",
                     color: "#111827",
                     cursor: isUpdating || isLoading ? "not-allowed" : "pointer",
                     opacity: isUpdating || isLoading ? 0.5 : 1,
-                    appearance: "none",
-                    WebkitAppearance: "none",
-                    MozAppearance: "none",
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "right 1rem center",
                     transition: "all 0.2s ease",
+                    outline: "none",
+                    fontWeight: 500,
                     boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-                  }}
-                  onFocus={(e) => {
-                    if (!isUpdating && !isLoading) {
-                      e.currentTarget.style.borderColor = "#6366f1";
-                      e.currentTarget.style.boxShadow =
-                        "0 0 0 3px rgba(99, 102, 241, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05)";
-                    }
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.boxShadow =
-                      "0 1px 2px rgba(0, 0, 0, 0.05)";
+                    textAlign: "left",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                   onMouseEnter={(e) => {
                     if (!isUpdating && !isLoading) {
                       e.currentTarget.style.borderColor = "#d1d5db";
-                      e.currentTarget.style.boxShadow =
-                        "0 2px 4px rgba(0, 0, 0, 0.08)";
+                      e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.08)";
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (document.activeElement !== e.currentTarget) {
+                    if (!isLanguageDropdownOpen) {
                       e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.boxShadow =
-                        "0 1px 2px rgba(0, 0, 0, 0.05)";
+                      e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
                     }
                   }}
                 >
-                  {SUPPORTED_LANGUAGES.map((lang) => (
-                    <option key={lang.value} value={lang.value}>
-                      {lang.label}
-                    </option>
-                  ))}
-                </select>
+                  <span>
+                    {selectedLanguage
+                      ? SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label ||
+                        "Select language"
+                      : "Auto Detect Language"}
+                  </span>
+                  <ChevronDown
+                    size={18}
+                    style={{
+                      color: "#6b7280",
+                      transform: isLanguageDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.2s ease",
+                    }}
+                  />
+                </button>
+
+                {isLanguageDropdownOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      marginTop: "4px",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                      zIndex: 1000,
+                      maxHeight: "300px",
+                      overflowY: "auto",
+                      overflowX: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "8px 0",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedLanguage(null);
+                          setIsLanguageDropdownOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "10px 16px",
+                          backgroundColor: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          fontSize: "14px",
+                          color: "#111827",
+                          transition: "background-color 0.15s ease",
+                          textAlign: "left",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#f3f4f6";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <span>Auto Detect Language</span>
+                        {!selectedLanguage && (
+                          <Check size={16} style={{ color: "#111827", flexShrink: 0 }} />
+                        )}
+                      </button>
+                      {SUPPORTED_LANGUAGES.filter((lang) => lang.value !== "auto").map((lang) => (
+                        <button
+                          key={lang.value}
+                          type="button"
+                          onClick={() => {
+                            setSelectedLanguage(lang.value as LanguageCode);
+                            setIsLanguageDropdownOpen(false);
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "10px 16px",
+                            backgroundColor: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            fontSize: "14px",
+                            color: "#111827",
+                            transition: "background-color 0.15s ease",
+                            textAlign: "left",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f3f4f6";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }}
+                        >
+                          <span>{lang.label}</span>
+                          {selectedLanguage === lang.value && (
+                            <Check size={16} style={{ color: "#111827", flexShrink: 0 }} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div
                 style={{
-                  fontSize: "0.75rem",
+                  fontSize: "12px",
                   color: "#9ca3af",
                 }}
               >
@@ -780,11 +814,11 @@ export const SettingsPage: React.FC = () => {
 
             <div
               style={{
-                padding: "1.5rem",
-                background: "#ffffff",
+                backgroundColor: "#ffffff",
                 border: "1px solid #e5e7eb",
-                borderRadius: "0.75rem",
-                marginBottom: "1rem",
+                borderRadius: "12px",
+                padding: "24px",
+                marginBottom: "24px",
               }}
             >
               <div
@@ -797,9 +831,9 @@ export const SettingsPage: React.FC = () => {
                 <div style={{ flex: 1 }}>
                   <div
                     style={{
-                      fontSize: "0.9375rem",
+                      fontSize: "15px",
                       color: "#111827",
-                      marginBottom: "0.25rem",
+                      marginBottom: "4px",
                       fontWeight: 500,
                     }}
                   >
@@ -807,7 +841,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                   <div
                     style={{
-                      fontSize: "0.8125rem",
+                      fontSize: "13px",
                       color: "#6b7280",
                     }}
                   >
@@ -826,9 +860,8 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ marginTop: "1.5rem" }}>
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
               <button
-                className="transcript-btn"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -838,13 +871,13 @@ export const SettingsPage: React.FC = () => {
                 }}
                 disabled={isUpdating || !hasChanges() || isLoading}
                 style={{
-                  padding: "0.5rem 1.5rem",
-                  fontSize: "0.875rem",
+                  padding: "8px 16px",
+                  fontSize: "14px",
                   fontWeight: 500,
                   background: "#111827",
                   color: "#ffffff",
-                  border: "1px solid #111827",
-                  borderRadius: "0.5rem",
+                  border: "none",
+                  borderRadius: "6px",
                   opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
                   cursor:
                     isUpdating || !hasChanges() || isLoading
@@ -855,87 +888,61 @@ export const SettingsPage: React.FC = () => {
                 onMouseEnter={(e) => {
                   if (!isUpdating && hasChanges() && !isLoading) {
                     e.currentTarget.style.background = "#374151";
-                    e.currentTarget.style.borderColor = "#374151";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isUpdating && hasChanges() && !isLoading) {
                     e.currentTarget.style.background = "#111827";
-                    e.currentTarget.style.borderColor = "#111827";
                   }
                 }}
               >
                 {isUpdating ? "Saving..." : "Save Settings"}
               </button>
-
-              {error && (
-                <div
-                  className="permission-message"
-                  style={{
-                    background: "#fef2f2",
-                    borderColor: "#fecaca",
-                    color: "#b91c1c",
-                    fontSize: "11px",
-                    padding: "8px",
-                    marginTop: "12px",
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-
-              {success && (
-                <div
-                  className="permission-message"
-                  style={{
-                    background: "#ecfdf5",
-                    borderColor: "#a7f3d0",
-                    color: "#047857",
-                    fontSize: "11px",
-                    padding: "8px",
-                    marginTop: "12px",
-                  }}
-                >
-                  Settings saved successfully!
-                </div>
-              )}
             </div>
+
+            {error && (
+              <div
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  color: "#b91c1c",
+                  fontSize: "13px",
+                  padding: "12px 16px",
+                  marginTop: "16px",
+                  borderRadius: "8px",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            {success && (
+              <div
+                style={{
+                  background: "#ecfdf5",
+                  border: "1px solid #a7f3d0",
+                  color: "#047857",
+                  fontSize: "13px",
+                  padding: "12px 16px",
+                  marginTop: "16px",
+                  borderRadius: "8px",
+                }}
+              >
+                Settings saved successfully!
+              </div>
+            )}
           </div>
         )}
 
         {/* General Section */}
         {activeSection === "general" && (
           <div>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: "0.5rem",
-                fontSize: "1.75rem",
-                fontWeight: 600,
-                color: "#111827",
-                letterSpacing: "-0.025em",
-              }}
-            >
-              General
-            </h2>
-            <p
-              style={{
-                margin: 0,
-                marginBottom: "2rem",
-                fontSize: "0.9375rem",
-                color: "#6b7280",
-              }}
-            >
-              Manage app behavior and performance.
-            </p>
-
             <div
               style={{
-                padding: "1.5rem",
-                background: "#ffffff",
+                backgroundColor: "#ffffff",
                 border: "1px solid #e5e7eb",
-                borderRadius: "0.75rem",
-                marginBottom: "1rem",
+                borderRadius: "12px",
+                padding: "24px",
               }}
             >
               <div
@@ -948,9 +955,9 @@ export const SettingsPage: React.FC = () => {
                 <div style={{ flex: 1 }}>
                   <div
                     style={{
-                      fontSize: "0.9375rem",
+                      fontSize: "15px",
                       color: "#111827",
-                      marginBottom: "0.25rem",
+                      marginBottom: "4px",
                       fontWeight: 500,
                     }}
                   >
@@ -958,7 +965,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                   <div
                     style={{
-                      fontSize: "0.8125rem",
+                      fontSize: "13px",
                       color: "#6b7280",
                     }}
                   >
@@ -980,74 +987,44 @@ export const SettingsPage: React.FC = () => {
         {/* Hotkeys Section */}
         {activeSection === "hotkeys" && (
           <div>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: "0.5rem",
-                fontSize: "1.75rem",
-                fontWeight: 600,
-                color: "#111827",
-                letterSpacing: "-0.025em",
-              }}
-            >
-              Hotkey Settings
-            </h2>
-            <p
-              style={{
-                margin: 0,
-                marginBottom: "2rem",
-                fontSize: "0.9375rem",
-                color: "#6b7280",
-              }}
-            >
-              Configure global triggers to activate the app.
-            </p>
-
             <div
               style={{
-                padding: "1.5rem",
-                background: "#ffffff",
+                backgroundColor: "#ffffff",
                 border: "1px solid #e5e7eb",
-                borderRadius: "0.75rem",
-                marginBottom: "1.5rem",
+                borderRadius: "12px",
+                padding: "24px",
+                marginBottom: "16px",
               }}
             >
               <div
                 style={{
-                  fontSize: "0.8125rem",
+                  fontSize: "11px",
                   fontWeight: 600,
-                  color: "#111827",
-                  marginBottom: "0.75rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "#9ca3af",
+                  marginBottom: "12px",
                 }}
               >
-                Global Shortcut
+                Current Hotkey
               </div>
-              <p
-                style={{
-                  fontSize: "0.8125rem",
-                  color: "#6b7280",
-                  margin: "0 0 1rem 0",
-                }}
-              >
-                Press keys to start/stop recording.
-              </p>
               {currentHotkeys.hotkeys.length > 0 ? (
                 <div
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
-                    gap: "0.5rem",
+                    gap: "8px",
                   }}
                 >
                   {currentHotkeys.hotkeys.map((hotkey, index) => (
                     <div
                       key={index}
                       style={{
-                        padding: "0.5rem 1rem",
-                        background: "#f9fafb",
+                        padding: "6px 12px",
+                        background: "#f3f4f6",
                         border: "1px solid #e5e7eb",
-                        borderRadius: "0.5rem",
-                        fontSize: "0.8125rem",
+                        borderRadius: "6px",
+                        fontSize: "13px",
                         fontFamily:
                           'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
                         color: "#111827",
@@ -1060,11 +1037,11 @@ export const SettingsPage: React.FC = () => {
               ) : (
                 <div
                   style={{
-                    padding: "0.5rem 1rem",
-                    background: "#f9fafb",
+                    padding: "6px 12px",
+                    background: "#f3f4f6",
                     border: "1px solid #e5e7eb",
-                    borderRadius: "0.5rem",
-                    fontSize: "0.8125rem",
+                    borderRadius: "6px",
+                    fontSize: "13px",
                     color: "#9ca3af",
                     display: "inline-block",
                   }}
@@ -1076,19 +1053,21 @@ export const SettingsPage: React.FC = () => {
 
             <div
               style={{
-                padding: "1.5rem",
-                background: "#ffffff",
+                backgroundColor: "#ffffff",
                 border: "1px solid #e5e7eb",
-                borderRadius: "0.75rem",
-                marginBottom: "1.5rem",
+                borderRadius: "12px",
+                padding: "24px",
+                marginBottom: "24px",
               }}
             >
               <div
                 style={{
-                  fontSize: "0.8125rem",
+                  fontSize: "11px",
                   fontWeight: 600,
-                  color: "#111827",
-                  marginBottom: "0.75rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "#9ca3af",
+                  marginBottom: "12px",
                 }}
               >
                 Configure Hotkeys
@@ -1101,9 +1080,9 @@ export const SettingsPage: React.FC = () => {
               />
               <div
                 style={{
-                  fontSize: "0.75rem",
+                  fontSize: "12px",
                   color: "#9ca3af",
-                  marginTop: "0.75rem",
+                  marginTop: "12px",
                 }}
               >
                 Note: Fn key is handled separately and works on Mac. Other
@@ -1111,15 +1090,38 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "0.75rem",
-                marginTop: "1rem",
-              }}
-            >
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
               <button
-                className="transcript-btn"
+                onClick={() => {
+                  // Reset to default hotkeys
+                  const defaultHotkeys: HotkeyConfig = { hotkeys: ["Fn"] };
+                  setSelectedHotkeys(defaultHotkeys);
+                }}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  background: "#ffffff",
+                  color: "#6b7280",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#f3f4f6";
+                  e.currentTarget.style.borderColor = "#d1d5db";
+                  e.currentTarget.style.color = "#111827";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#ffffff";
+                  e.currentTarget.style.borderColor = "#e5e7eb";
+                  e.currentTarget.style.color = "#6b7280";
+                }}
+              >
+                Reset Default
+              </button>
+              <button
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -1129,13 +1131,13 @@ export const SettingsPage: React.FC = () => {
                 }}
                 disabled={isUpdatingHotkeys || !hasHotkeyChanges() || isLoading}
                 style={{
-                  padding: "0.5rem 1.5rem",
-                  fontSize: "0.875rem",
+                  padding: "8px 16px",
+                  fontSize: "14px",
                   fontWeight: 500,
                   background: "#111827",
                   color: "#ffffff",
-                  border: "1px solid #111827",
-                  borderRadius: "0.5rem",
+                  border: "none",
+                  borderRadius: "6px",
                   opacity:
                     isUpdatingHotkeys || !hasHotkeyChanges() || isLoading
                       ? 0.5
@@ -1149,59 +1151,28 @@ export const SettingsPage: React.FC = () => {
                 onMouseEnter={(e) => {
                   if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
                     e.currentTarget.style.background = "#374151";
-                    e.currentTarget.style.borderColor = "#374151";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
                     e.currentTarget.style.background = "#111827";
-                    e.currentTarget.style.borderColor = "#111827";
                   }
                 }}
               >
                 {isUpdatingHotkeys ? "Saving..." : "Update Hotkey"}
               </button>
-              <button
-                className="transcript-btn"
-                onClick={() => {
-                  // Reset to default hotkeys
-                  const defaultHotkeys: HotkeyConfig = { hotkeys: ["Fn"] };
-                  setSelectedHotkeys(defaultHotkeys);
-                }}
-                style={{
-                  padding: "0.5rem 1.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  background: "#ffffff",
-                  color: "#6b7280",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "0.5rem",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#f9fafb";
-                  e.currentTarget.style.borderColor = "#d1d5db";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#ffffff";
-                  e.currentTarget.style.borderColor = "#e5e7eb";
-                }}
-              >
-                Reset Default
-              </button>
             </div>
 
             {hotkeyError && (
               <div
-                className="permission-message"
                 style={{
                   background: "#fef2f2",
-                  borderColor: "#fecaca",
+                  border: "1px solid #fecaca",
                   color: "#b91c1c",
-                  fontSize: "11px",
-                  padding: "8px",
-                  marginBottom: "12px",
+                  fontSize: "13px",
+                  padding: "12px 16px",
+                  marginTop: "16px",
+                  borderRadius: "8px",
                 }}
               >
                 {hotkeyError}
@@ -1210,14 +1181,14 @@ export const SettingsPage: React.FC = () => {
 
             {hotkeySuccess && (
               <div
-                className="permission-message"
                 style={{
                   background: "#ecfdf5",
-                  borderColor: "#a7f3d0",
+                  border: "1px solid #a7f3d0",
                   color: "#047857",
-                  fontSize: "11px",
-                  padding: "8px",
-                  marginBottom: "12px",
+                  fontSize: "13px",
+                  padding: "12px 16px",
+                  marginTop: "16px",
+                  borderRadius: "8px",
                 }}
               >
                 Hotkeys saved successfully!
