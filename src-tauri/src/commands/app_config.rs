@@ -20,15 +20,6 @@ use crate::utils;
 
 const STORE_FILE: &str = ".app-config.dat";
 
-/// Vocabulary item structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VocabularyItem {
-    pub id: Option<String>,
-    pub value: String,
-    pub is_system_generated: bool,
-    pub hidden: bool,
-}
-
 /// Action trigger structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionTrigger {
@@ -51,8 +42,8 @@ pub struct AppConfig {
     pub enhance_transcription: Option<bool>,
     /// Whether to launch application on system startup
     pub launch_on_system_startup: Option<bool>,
-    /// Vocabulary dictionary for transcription (array of vocabulary items)
-    pub vocabulary: Option<Vec<VocabularyItem>>,
+    /// Vocabulary for transcription (array of strings)
+    pub vocabulary: Option<Vec<String>>,
     /// Action triggers for voice commands (array of action trigger items)
     pub action_triggers: Option<Vec<ActionTrigger>>,
     /// Shortcuts for text expansion (array of shortcut items)
@@ -76,7 +67,7 @@ struct ServerAppConfigResponse {
     pub languages: Vec<String>,
     pub enhance_transcription: bool,
     pub launch_on_system_startup: bool,
-    pub vocabulary: Vec<VocabularyItem>,
+    pub vocabulary: Vec<String>,
     pub action_triggers: Vec<ActionTrigger>,
     pub shortcuts: Vec<Shortcut>,
 }

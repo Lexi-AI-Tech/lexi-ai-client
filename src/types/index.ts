@@ -76,13 +76,6 @@ export interface AuthState {
 // App Configuration Types
 // ============================================================================
 
-export interface VocabularyItem {
-  id: string; // UUID as string (stored in JSONB)
-  value: string;
-  is_system_generated: boolean;
-  hidden: boolean;
-}
-
 /**
  * AppConfig from server API (complete config with all fields)
  */
@@ -93,7 +86,7 @@ export interface AppConfig {
   languages: LanguageCode[];
   enhance_transcription: boolean;
   launch_on_system_startup: boolean;
-  vocabulary: VocabularyItem[];
+  vocabulary: string[];
   action_triggers: ActionTrigger[];
   shortcuts: Shortcut[];
 }
@@ -108,7 +101,7 @@ export interface AppConfigUpdateRequest {
   languages?: LanguageCode[];
   enhance_transcription?: boolean;
   launch_on_system_startup?: boolean;
-  vocabulary?: VocabularyItem[] | null;
+  vocabulary?: string[] | null;
   action_triggers?: ActionTrigger[] | null;
   shortcuts?: Shortcut[] | null;
 }
@@ -121,7 +114,7 @@ export interface TauriAppConfig {
   hotkeys?: string[] | null;
   enhance_transcription?: boolean | null;
   launch_on_system_startup?: boolean | null;
-  vocabulary?: VocabularyItem[] | null;
+  vocabulary?: string[] | null;
 }
 
 // ============================================================================

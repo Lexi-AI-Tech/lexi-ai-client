@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Search, RefreshCw, Plus, X, Trash2 } from "lucide-react";
-import type { VocabularyItem, TauriAppConfig } from "../types";
+import type { TauriAppConfig } from "../types";
 
 export const VocabularyPage: React.FC = () => {
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
@@ -12,7 +12,7 @@ export const VocabularyPage: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [hoveredVocabularyId, setHoveredVocabularyId] = useState<string | null>(null);
+  const [hoveredVocabularyValue, setHoveredVocabularyValue] = useState<string | null>(null);
 
   const vocabulary = config?.vocabulary || [];
 
@@ -37,16 +37,13 @@ export const VocabularyPage: React.FC = () => {
   }, []);
 
   // Filter vocabulary based on search query
-  const visibleVocabulary = vocabulary.filter((item) => !item.hidden);
   const filteredVocabulary = useMemo(() => {
     if (!searchQuery.trim()) {
-      return visibleVocabulary;
+      return vocabulary;
     }
     const query = searchQuery.toLowerCase();
-    return visibleVocabulary.filter((item) =>
-      item.value.toLowerCase().includes(query)
-    );
-  }, [visibleVocabulary, searchQuery]);
+    return vocabulary.filter((item) => item.toLowerCase().includes(query));
+  }, [vocabulary, searchQuery]);
 
   const handleSearchClick = () => {
     setShowSearch((prev) => !prev);
@@ -82,15 +79,7 @@ export const VocabularyPage: React.FC = () => {
     }
 
     const currentVocabulary = vocabulary || [];
-    const newItem: VocabularyItem = {
-      id: "", // Server will generate ID
-      value: newVocabularyValue.trim(),
-      is_system_generated: false,
-      hidden: false,
-    };
-
-    // Add new item to the list
-    const updatedVocabulary = [...currentVocabulary, newItem];
+    const updatedVocabulary = [...currentVocabulary, newVocabularyValue.trim()];
 
     try {
       await updateConfig({ vocabulary: updatedVocabulary });
@@ -103,16 +92,9 @@ export const VocabularyPage: React.FC = () => {
   };
 
   // Delete vocabulary item
-  const handleDeleteVocabulary = async (itemId: string) => {
-    if (!itemId) {
-      setError("Cannot delete item without ID");
-      return;
-    }
-
+  const handleDeleteVocabulary = async (value: string) => {
     const currentVocabulary = vocabulary || [];
-    const updatedVocabulary = currentVocabulary.filter(
-      (item) => item.id !== itemId,
-    );
+    const updatedVocabulary = currentVocabulary.filter((item) => item !== value);
 
     try {
       await updateConfig({ vocabulary: updatedVocabulary });
@@ -499,13 +481,13 @@ export const VocabularyPage: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {filteredVocabulary.map((item) => (
+            {filteredVocabulary.map((item, index) => (
               <div
-                key={item.id || item.value}
+                key={`${item}-${index}`}
                 style={{
                   backgroundColor: "#ffffff",
                   border:
-                    hoveredVocabularyId === item.id
+                    hoveredVocabularyValue === item
                       ? "1px solid #d1d5db"
                       : "1px solid #e5e7eb",
                   borderRadius: "8px",
@@ -513,55 +495,53 @@ export const VocabularyPage: React.FC = () => {
                   transition: "all 0.2s ease",
                   position: "relative",
                   boxShadow:
-                    hoveredVocabularyId === item.id
+                    hoveredVocabularyValue === item
                       ? "0 1px 3px rgba(0, 0, 0, 0.05)"
                       : "none",
                 }}
-                onMouseEnter={() => setHoveredVocabularyId(item.id || item.value)}
-                onMouseLeave={() => setHoveredVocabularyId(null)}
+                onMouseEnter={() => setHoveredVocabularyValue(item)}
+                onMouseLeave={() => setHoveredVocabularyValue(null)}
               >
-                {!item.is_system_generated && (
-                  <div
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "12px",
+                    right: "12px",
+                    opacity: hoveredVocabularyValue === item ? 1 : 0,
+                    transition: "opacity 0.2s ease",
+                  }}
+                >
+                  <button
+                    onClick={() => handleDeleteVocabulary(item)}
+                    disabled={isUpdating}
                     style={{
-                      position: "absolute",
-                      top: "12px",
-                      right: "12px",
-                      opacity: hoveredVocabularyId === (item.id || item.value) ? 1 : 0,
-                      transition: "opacity 0.2s ease",
+                      padding: "6px",
+                      backgroundColor: "#fef2f2",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: isUpdating ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#ef4444",
+                      transition: "all 0.2s ease",
+                      opacity: isUpdating ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isUpdating) {
+                        e.currentTarget.style.backgroundColor = "#fee2e2";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isUpdating) {
+                        e.currentTarget.style.backgroundColor = "#fef2f2";
+                      }
                     }}
                   >
-                    <button
-                      onClick={() => handleDeleteVocabulary(item.id)}
-                      disabled={isUpdating}
-                      style={{
-                        padding: "6px",
-                        backgroundColor: "#fef2f2",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: isUpdating ? "not-allowed" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#ef4444",
-                        transition: "all 0.2s ease",
-                        opacity: isUpdating ? 0.5 : 1,
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isUpdating) {
-                          e.currentTarget.style.backgroundColor = "#fee2e2";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isUpdating) {
-                          e.currentTarget.style.backgroundColor = "#fef2f2";
-                        }
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                )}
-                <div style={{ paddingRight: item.is_system_generated ? "0" : "50px" }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div style={{ paddingRight: "50px" }}>
                   <div
                     style={{
                       fontSize: "15px",
@@ -570,19 +550,8 @@ export const VocabularyPage: React.FC = () => {
                       marginBottom: "4px",
                     }}
                   >
-                    {item.value}
+                    {item}
                   </div>
-                  {item.is_system_generated && (
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "#9ca3af",
-                        marginTop: "4px",
-                      }}
-                    >
-                      System generated
-                    </div>
-                  )}
                 </div>
               </div>
             ))}

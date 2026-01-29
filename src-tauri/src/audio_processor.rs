@@ -91,12 +91,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript.
         // Do more experiment on how we can use this trick to manipulate the model behavior.
         // Get vocabulary from app config
-        let vocabulary: Vec<String> = app_config
-            .vocabulary
-            .unwrap_or_default()
-            .into_iter()
-            .map(|item| item.value)
-            .collect();
+        let vocabulary: Vec<String> = app_config.vocabulary.clone().unwrap_or_default();
 
         println!(
             "⚙️  Transcription settings: enhance={}, offline={}, vocabulary_size={}",
