@@ -1,6 +1,7 @@
 import React from "react";
 
 import type { SidebarProps } from "../types";
+import logoImage from "../assets/light_mode_without_text.png";
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentPage,
@@ -8,6 +9,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   return (
     <div className="sidebar">
+      <div
+        className="sidebar-logo"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          marginBottom: "24px",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          borderRadius: "8px",
+          margin: "8px 8px 24px 18px",
+        }}
+        onClick={() => onNavigate("home")}
+      >
+        <div
+          style={{
+            width: "24px",
+            borderRadius: "8px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginRight: "10px",
+            flexShrink: 0,
+            overflow: "hidden",
+          }}
+        >
+          <img
+            src={logoImage}
+            alt="Lexi Logo"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        </div>
+        <span
+          style={{
+            fontSize: "24px",
+            fontWeight: 500,
+            color: "#111827",
+            letterSpacing: "1.5px",
+            lineHeight: "24px",
+          }}
+        >
+          Lexi
+        </span>
+      </div>
       <nav className="sidebar-nav">
         {/* Home */}
         <button
