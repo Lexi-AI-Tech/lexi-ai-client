@@ -25,6 +25,6 @@ pub fn get_device_type() -> &'static str {
 
 /// Log an API request with its purpose, method, and URL
 /// This helps track all API calls made to the server
-pub fn log_api_request(purpose: &str, method: &str, url: &str) {
-    println!("🌐 API Request: {} {} | Purpose: {}", method, url, purpose);
+pub fn log_api_request(_purpose: &str, _method: &str, _url: &str) {
+    // println!("🌐 API Request: {} {} | Purpose: {}", _method, _url, _purpose);
 }

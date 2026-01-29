@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { VocabularyItem, TauriAppConfig } from "../types";
+import { Search, RefreshCw, Plus, X, Trash2 } from "lucide-react";
+import type { TauriAppConfig } from "../types";
 
 export const VocabularyPage: React.FC = () => {
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
@@ -9,6 +10,11 @@ export const VocabularyPage: React.FC = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [newVocabularyValue, setNewVocabularyValue] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [hoveredVocabularyValue, setHoveredVocabularyValue] = useState<
+    string | null
+  >(null);
 
   const vocabulary = config?.vocabulary || [];
 
@@ -31,6 +37,22 @@ export const VocabularyPage: React.FC = () => {
 
     loadConfig();
   }, []);
+
+  // Filter vocabulary based on search query
+  const filteredVocabulary = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return vocabulary;
+    }
+    const query = searchQuery.toLowerCase();
+    return vocabulary.filter((item) => item.toLowerCase().includes(query));
+  }, [vocabulary, searchQuery]);
+
+  const handleSearchClick = () => {
+    setShowSearch((prev) => !prev);
+    if (showSearch) {
+      setSearchQuery("");
+    }
+  };
 
   // Update config function
   const updateConfig = async (updates: Partial<TauriAppConfig>) => {
@@ -59,15 +81,7 @@ export const VocabularyPage: React.FC = () => {
     }
 
     const currentVocabulary = vocabulary || [];
-    const newItem: VocabularyItem = {
-      id: "", // Server will generate ID
-      value: newVocabularyValue.trim(),
-      is_system_generated: false,
-      hidden: false,
-    };
-
-    // Add new item to the list
-    const updatedVocabulary = [...currentVocabulary, newItem];
+    const updatedVocabulary = [...currentVocabulary, newVocabularyValue.trim()];
 
     try {
       await updateConfig({ vocabulary: updatedVocabulary });
@@ -80,15 +94,10 @@ export const VocabularyPage: React.FC = () => {
   };
 
   // Delete vocabulary item
-  const handleDeleteVocabulary = async (itemId: string) => {
-    if (!itemId) {
-      setError("Cannot delete item without ID");
-      return;
-    }
-
+  const handleDeleteVocabulary = async (value: string) => {
     const currentVocabulary = vocabulary || [];
     const updatedVocabulary = currentVocabulary.filter(
-      (item) => item.id !== itemId,
+      (item) => item !== value,
     );
 
     try {
@@ -101,119 +110,38 @@ export const VocabularyPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "32px",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Vocabulary
-        </h2>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "40px",
-            color: "#6b7280",
-            fontSize: "14px",
-          }}
-        >
+      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
           Loading vocabulary...
         </div>
       </div>
     );
   }
 
-  const visibleVocabulary = vocabulary.filter((item) => !item.hidden);
-
   return (
-    <div
-      style={{
-        padding: "2rem 2.5rem",
-        background: "#ffffff",
-        minHeight: "100vh",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      <div
+    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+      <h2
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "2rem",
+          fontSize: "18px",
+          fontWeight: 500,
+          color: "#111827",
+          marginBottom: "16px",
+          marginTop: 0,
         }}
       >
-        <h2
-          style={{
-            margin: 0,
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Vocabulary
-        </h2>
-        {!showAddForm && (
-          <button
-            onClick={() => setShowAddForm(true)}
-            disabled={isUpdating}
-            style={{
-              padding: "0.5rem 1.5rem",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              backgroundColor: "#111827",
-              border: "1px solid #111827",
-              borderRadius: "0.5rem",
-              color: "#ffffff",
-              cursor: isUpdating ? "not-allowed" : "pointer",
-              opacity: isUpdating ? 0.5 : 1,
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (!isUpdating) {
-                e.currentTarget.style.background = "#374151";
-                e.currentTarget.style.borderColor = "#374151";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isUpdating) {
-                e.currentTarget.style.background = "#111827";
-                e.currentTarget.style.borderColor = "#111827";
-              }
-            }}
-          >
-            + Add Vocabulary
-          </button>
-        )}
-      </div>
+        Vocabulary
+      </h2>
 
       {error && (
         <div
-          className="permission-message"
           style={{
             background: "#fef2f2",
-            borderColor: "#fecaca",
+            border: "1px solid #fecaca",
             color: "#b91c1c",
-            fontSize: "11px",
-            padding: "12px",
-            marginBottom: "16px",
-            borderRadius: "0.5rem",
-            border: "1px solid",
+            fontSize: "13px",
+            padding: "12px 16px",
+            marginBottom: "24px",
+            borderRadius: "8px",
           }}
         >
           {error}
@@ -224,107 +152,62 @@ export const VocabularyPage: React.FC = () => {
       {showAddForm && (
         <div
           style={{
-            padding: "1.5rem",
             backgroundColor: "#ffffff",
             border: "1px solid #e5e7eb",
-            borderRadius: "0.75rem",
-            marginBottom: "1.5rem",
-            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+            borderRadius: "12px",
+            padding: "20px",
+            marginBottom: "24px",
           }}
         >
           <div
             style={{
-              display: "flex",
-              gap: "0.75rem",
-              alignItems: "center",
+              fontSize: "11px",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              color: "#9ca3af",
+              marginBottom: "8px",
             }}
           >
-            <input
-              type="text"
-              value={newVocabularyValue}
-              onChange={(e) => setNewVocabularyValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleAddVocabulary();
-                } else if (e.key === "Escape") {
-                  setShowAddForm(false);
-                  setNewVocabularyValue("");
-                }
-              }}
-              placeholder="Enter vocabulary term..."
-              disabled={isUpdating}
-              style={{
-                flex: 1,
-                padding: "0.875rem 1rem",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "0.625rem",
-                color: "#111827",
-                outline: "none",
-                transition: "all 0.2s ease",
-                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#6366f1";
-                e.currentTarget.style.boxShadow =
-                  "0 0 0 3px rgba(99, 102, 241, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow =
-                  "0 1px 2px rgba(0, 0, 0, 0.05)";
-              }}
-              onMouseEnter={(e) => {
-                if (document.activeElement !== e.currentTarget) {
-                  e.currentTarget.style.borderColor = "#d1d5db";
-                  e.currentTarget.style.boxShadow =
-                    "0 2px 4px rgba(0, 0, 0, 0.08)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (document.activeElement !== e.currentTarget) {
-                  e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.boxShadow =
-                    "0 1px 2px rgba(0, 0, 0, 0.05)";
-                }
-              }}
-              autoFocus
-            />
-            <button
-              onClick={handleAddVocabulary}
-              disabled={isUpdating || !newVocabularyValue.trim()}
-              style={{
-                padding: "0.875rem 1.5rem",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                backgroundColor: "#111827",
-                border: "1px solid #111827",
-                borderRadius: "0.5rem",
-                color: "#ffffff",
-                cursor:
-                  isUpdating || !newVocabularyValue.trim()
-                    ? "not-allowed"
-                    : "pointer",
-                opacity: isUpdating || !newVocabularyValue.trim() ? 0.5 : 1,
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!isUpdating && newVocabularyValue.trim()) {
-                  e.currentTarget.style.background = "#374151";
-                  e.currentTarget.style.borderColor = "#374151";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isUpdating && newVocabularyValue.trim()) {
-                  e.currentTarget.style.background = "#111827";
-                  e.currentTarget.style.borderColor = "#111827";
-                }
-              }}
-            >
-              Add
-            </button>
+            Vocabulary Term
+          </div>
+          <input
+            type="text"
+            value={newVocabularyValue}
+            onChange={(e) => setNewVocabularyValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleAddVocabulary();
+              } else if (e.key === "Escape") {
+                setShowAddForm(false);
+                setNewVocabularyValue("");
+              }
+            }}
+            placeholder="Enter vocabulary term..."
+            disabled={isUpdating}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              fontSize: "14px",
+              backgroundColor: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              color: "#111827",
+              marginBottom: "16px",
+              outline: "none",
+              transition: "all 0.2s ease",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#d1d5db";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "#e5e7eb";
+            }}
+            autoFocus
+          />
+          <div
+            style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}
+          >
             <button
               onClick={() => {
                 setShowAddForm(false);
@@ -332,170 +215,359 @@ export const VocabularyPage: React.FC = () => {
               }}
               disabled={isUpdating}
               style={{
-                padding: "0.875rem 1.5rem",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "0.5rem",
+                padding: "8px 16px",
+                backgroundColor: "#f3f4f6",
                 color: "#6b7280",
+                border: "none",
+                borderRadius: "6px",
                 cursor: isUpdating ? "not-allowed" : "pointer",
-                opacity: isUpdating ? 0.5 : 1,
+                fontSize: "14px",
+                fontWeight: 500,
                 transition: "all 0.2s ease",
+                opacity: isUpdating ? 0.5 : 1,
               }}
               onMouseEnter={(e) => {
                 if (!isUpdating) {
-                  e.currentTarget.style.background = "#f9fafb";
-                  e.currentTarget.style.borderColor = "#d1d5db";
+                  e.currentTarget.style.backgroundColor = "#e5e7eb";
                   e.currentTarget.style.color = "#111827";
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isUpdating) {
-                  e.currentTarget.style.background = "#ffffff";
-                  e.currentTarget.style.borderColor = "#e5e7eb";
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
                   e.currentTarget.style.color = "#6b7280";
                 }
               }}
             >
               Cancel
             </button>
-          </div>
-          <div
-            style={{
-              fontSize: "0.75rem",
-              color: "#9ca3af",
-              marginTop: "0.75rem",
-            }}
-          >
-            Press Enter to add, Esc to cancel
-          </div>
-        </div>
-      )}
-
-      {/* Vocabulary List */}
-      {visibleVocabulary.length === 0 ? (
-        <div
-          style={{
-            padding: "3rem 1rem",
-            textAlign: "center",
-            color: "#6b7280",
-            fontSize: "0.875rem",
-            background: "#ffffff",
-            border: "1px solid #f3f4f6",
-            borderRadius: "0.75rem",
-          }}
-        >
-          No vocabulary items yet. Add vocabulary terms to improve transcription
-          accuracy for specific words or phrases.
-        </div>
-      ) : (
-        <div
-          style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
-        >
-          {visibleVocabulary.map((item) => (
-            <div
-              key={item.id || item.value}
+            <button
+              onClick={handleAddVocabulary}
+              disabled={isUpdating || !newVocabularyValue.trim()}
               style={{
-                padding: "1.25rem",
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "0.75rem",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                padding: "8px 16px",
+                backgroundColor: "#111827",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "6px",
+                cursor:
+                  isUpdating || !newVocabularyValue.trim()
+                    ? "not-allowed"
+                    : "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+                opacity: isUpdating || !newVocabularyValue.trim() ? 0.5 : 1,
                 transition: "all 0.2s ease",
-                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "#d1d5db";
-                e.currentTarget.style.boxShadow =
-                  "0 4px 12px rgba(0, 0, 0, 0.08)";
+                if (!isUpdating && newVocabularyValue.trim()) {
+                  e.currentTarget.style.backgroundColor = "#374151";
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow =
-                  "0 1px 2px rgba(0, 0, 0, 0.05)";
+                if (!isUpdating && newVocabularyValue.trim()) {
+                  e.currentTarget.style.backgroundColor = "#111827";
+                }
               }}
             >
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: "0.9375rem",
-                    color: "#111827",
-                    fontWeight: 500,
-                    marginBottom: "0.25rem",
-                  }}
-                >
-                  {item.value}
-                </div>
-                {item.is_system_generated && (
-                  <div
-                    style={{
-                      fontSize: "0.75rem",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    System generated
-                  </div>
-                )}
-              </div>
-              {!item.is_system_generated && (
-                <button
-                  onClick={() => handleDeleteVocabulary(item.id)}
-                  disabled={isUpdating}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    fontSize: "0.8125rem",
-                    fontWeight: 500,
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #fecaca",
-                    borderRadius: "0.5rem",
-                    color: "#b91c1c",
-                    cursor: isUpdating ? "not-allowed" : "pointer",
-                    opacity: isUpdating ? 0.5 : 1,
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isUpdating) {
-                      e.currentTarget.style.background = "#fef2f2";
-                      e.currentTarget.style.borderColor = "#fca5a5";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isUpdating) {
-                      e.currentTarget.style.background = "#ffffff";
-                      e.currentTarget.style.borderColor = "#fecaca";
-                    }
-                  }}
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-          ))}
+              Add
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Info message */}
-      {visibleVocabulary.length > 0 && (
+      {/* Vocabulary Section */}
+      <div>
         <div
           style={{
-            marginTop: "1.5rem",
-            padding: "1rem",
-            backgroundColor: "#eff6ff",
-            border: "1px solid #bfdbfe",
-            borderRadius: "0.75rem",
-            fontSize: "0.8125rem",
-            color: "#1e40af",
-            lineHeight: "1.5",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "16px",
           }}
         >
-          <strong style={{ fontWeight: 600 }}>Tip:</strong> Adding vocabulary
-          terms helps improve transcription accuracy for specific words, names,
-          or technical terms. System-generated vocabulary cannot be deleted.
+          <h3
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              color: "#9ca3af",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              margin: 0,
+            }}
+          >
+            ALL TERMS
+          </h3>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={handleSearchClick}
+              style={{
+                background: showSearch ? "#f3f4f6" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: showSearch ? "#111827" : "#9ca3af",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!showSearch) {
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
+                  e.currentTarget.style.color = "#111827";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!showSearch) {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "#9ca3af";
+                }
+              }}
+            >
+              <Search size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const loadConfig = async () => {
+                  setIsLoading(true);
+                  setError(null);
+                  try {
+                    const loadedConfig =
+                      await invoke<TauriAppConfig>("get_app_config");
+                    setConfig(loadedConfig);
+                  } catch (err: any) {
+                    console.error("Failed to load app config:", err);
+                    setError(err?.message || "Failed to load vocabulary");
+                  } finally {
+                    setIsLoading(false);
+                  }
+                };
+                loadConfig();
+              }}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f3f4f6";
+                e.currentTarget.style.color = "#111827";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "#9ca3af";
+              }}
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddForm(true);
+                setNewVocabularyValue("");
+              }}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f3f4f6";
+                e.currentTarget.style.color = "#111827";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "#9ca3af";
+              }}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Search Input */}
+        {showSearch && (
+          <div
+            style={{
+              marginBottom: "16px",
+              position: "relative",
+            }}
+          >
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search vocabulary..."
+              autoFocus
+              style={{
+                width: "100%",
+                padding: "10px 40px 10px 12px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontFamily: "inherit",
+                outline: "none",
+                transition: "all 0.2s ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#d1d5db";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(0, 0, 0, 0.05)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                style={{
+                  position: "absolute",
+                  right: "8px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#9ca3af",
+                  padding: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "4px",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
+                  e.currentTarget.style.color = "#111827";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "#9ca3af";
+                }}
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Vocabulary List */}
+        {filteredVocabulary.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "60px 20px",
+              color: "#9ca3af",
+            }}
+          >
+            <p style={{ margin: 0, fontSize: "14px" }}>
+              {searchQuery
+                ? "No vocabulary terms match your search"
+                : "No vocabulary items yet. Add vocabulary terms to improve transcription accuracy."}
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
+            {filteredVocabulary.map((item, index) => (
+              <div
+                key={`${item}-${index}`}
+                style={{
+                  backgroundColor: "#ffffff",
+                  border:
+                    hoveredVocabularyValue === item
+                      ? "1px solid #d1d5db"
+                      : "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  transition: "all 0.2s ease",
+                  position: "relative",
+                  boxShadow:
+                    hoveredVocabularyValue === item
+                      ? "0 1px 3px rgba(0, 0, 0, 0.05)"
+                      : "none",
+                }}
+                onMouseEnter={() => setHoveredVocabularyValue(item)}
+                onMouseLeave={() => setHoveredVocabularyValue(null)}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "12px",
+                    right: "12px",
+                    opacity: hoveredVocabularyValue === item ? 1 : 0,
+                    transition: "opacity 0.2s ease",
+                  }}
+                >
+                  <button
+                    onClick={() => handleDeleteVocabulary(item)}
+                    disabled={isUpdating}
+                    style={{
+                      padding: "6px",
+                      backgroundColor: "#fef2f2",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: isUpdating ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#ef4444",
+                      transition: "all 0.2s ease",
+                      opacity: isUpdating ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isUpdating) {
+                        e.currentTarget.style.backgroundColor = "#fee2e2";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isUpdating) {
+                        e.currentTarget.style.backgroundColor = "#fef2f2";
+                      }
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div style={{ paddingRight: "50px" }}>
+                  <div
+                    style={{
+                      fontSize: "15px",
+                      color: "#111827",
+                      fontWeight: 400,
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {item}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

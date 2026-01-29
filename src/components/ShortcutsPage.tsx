@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Search, RefreshCw, Plus, X, Edit, Trash2 } from "lucide-react";
 import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
@@ -13,6 +14,11 @@ export const ShortcutsPage: React.FC = () => {
   const [newShortcut, setNewShortcut] = useState("");
   const [newValue, setNewValue] = useState("");
   const [editingShortcut, setEditingShortcut] = useState<Shortcut | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [hoveredShortcutId, setHoveredShortcutId] = useState<string | null>(
+    null,
+  );
 
   // Load shortcuts
   const loadShortcuts = async () => {
@@ -55,6 +61,26 @@ export const ShortcutsPage: React.FC = () => {
       loadShortcuts();
     }
   }, [authStore.isAuthenticated, authStore.isInitialized]);
+
+  // Filter shortcuts based on search query
+  const filteredShortcuts = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return shortcuts;
+    }
+    const query = searchQuery.toLowerCase();
+    return shortcuts.filter(
+      (shortcut) =>
+        shortcut.shortcut.toLowerCase().includes(query) ||
+        shortcut.value.toLowerCase().includes(query),
+    );
+  }, [shortcuts, searchQuery]);
+
+  const handleSearchClick = () => {
+    setShowSearch((prev) => !prev);
+    if (showSearch) {
+      setSearchQuery("");
+    }
+  };
 
   const handleCreateShortcut = async () => {
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
@@ -179,37 +205,8 @@ export const ShortcutsPage: React.FC = () => {
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Shortcuts
-        </h2>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "40px",
-            color: "#6b7280",
-            fontSize: "14px",
-          }}
-        >
+      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
           Loading...
         </div>
       </div>
@@ -219,33 +216,32 @@ export const ShortcutsPage: React.FC = () => {
   // Show login prompt if not authenticated
   if (!authStore.isAuthenticated) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
+      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
         <h2
           style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
+            fontSize: "18px",
+            fontWeight: 500,
             color: "#111827",
-            letterSpacing: "-0.025em",
+            marginBottom: "16px",
+            marginTop: 0,
           }}
         >
           Shortcuts
         </h2>
-        <div style={{ textAlign: "center", padding: "16px 0" }}>
+        <div
+          style={{
+            backgroundColor: "#ffffff",
+            border: "1px solid #e5e7eb",
+            borderRadius: "12px",
+            padding: "40px",
+            textAlign: "center",
+          }}
+        >
           <p
             style={{
-              fontSize: "0.875rem",
+              fontSize: "14px",
               color: "#6b7280",
-              marginBottom: "16px",
+              marginBottom: "20px",
             }}
           >
             Sign in to access your shortcuts
@@ -264,23 +260,14 @@ export const ShortcutsPage: React.FC = () => {
   }
 
   return (
-    <div
-      style={{
-        padding: "2rem 2.5rem",
-        background: "#ffffff",
-        minHeight: "100vh",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-      }}
-    >
+    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
       <h2
         style={{
-          margin: 0,
-          marginBottom: "2rem",
-          fontSize: "24px",
-          fontWeight: 600,
+          fontSize: "18px",
+          fontWeight: 500,
           color: "#111827",
-          letterSpacing: "-0.025em",
+          marginBottom: "16px",
+          marginTop: 0,
         }}
       >
         Shortcuts
@@ -288,19 +275,166 @@ export const ShortcutsPage: React.FC = () => {
 
       {error && (
         <div
-          className="permission-message"
           style={{
             background: "#fef2f2",
-            borderColor: "#fecaca",
+            border: "1px solid #fecaca",
             color: "#b91c1c",
-            fontSize: "11px",
-            padding: "12px",
-            marginBottom: "16px",
-            borderRadius: "0.5rem",
-            border: "1px solid",
+            fontSize: "13px",
+            padding: "12px 16px",
+            marginBottom: "24px",
+            borderRadius: "8px",
           }}
         >
           {error}
+        </div>
+      )}
+
+      {/* Create Shortcut Form */}
+      {showCreateShortcut && (
+        <div
+          style={{
+            backgroundColor: "#ffffff",
+            border: "1px solid #e5e7eb",
+            borderRadius: "12px",
+            padding: "20px",
+            marginBottom: "24px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              color: "#9ca3af",
+              marginBottom: "8px",
+            }}
+          >
+            Shortcut
+          </div>
+          <input
+            type="text"
+            value={newShortcut}
+            onChange={(e) => setNewShortcut(e.target.value)}
+            placeholder="e.g., 'hey lexi'"
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              fontSize: "14px",
+              backgroundColor: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              color: "#111827",
+              marginBottom: "16px",
+              outline: "none",
+              transition: "all 0.2s ease",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#d1d5db";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "#e5e7eb";
+            }}
+          />
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              color: "#9ca3af",
+              marginBottom: "8px",
+            }}
+          >
+            Value
+          </div>
+          <input
+            type="text"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            placeholder="e.g., 'Hello, this is Lexi'"
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              fontSize: "14px",
+              backgroundColor: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              color: "#111827",
+              marginBottom: "16px",
+              outline: "none",
+              transition: "all 0.2s ease",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#d1d5db";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "#e5e7eb";
+            }}
+          />
+          <div
+            style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}
+          >
+            <button
+              onClick={() => {
+                setShowCreateShortcut(false);
+                setNewShortcut("");
+                setNewValue("");
+              }}
+              style={{
+                padding: "8px 16px",
+                backgroundColor: "#f3f4f6",
+                color: "#6b7280",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#e5e7eb";
+                e.currentTarget.style.color = "#111827";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "#f3f4f6";
+                e.currentTarget.style.color = "#6b7280";
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateShortcut}
+              disabled={!newShortcut.trim() || !newValue.trim()}
+              style={{
+                padding: "8px 16px",
+                backgroundColor: "#111827",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "6px",
+                cursor:
+                  !newShortcut.trim() || !newValue.trim()
+                    ? "not-allowed"
+                    : "pointer",
+                fontSize: "14px",
+                fontWeight: 500,
+                opacity: !newShortcut.trim() || !newValue.trim() ? 0.5 : 1,
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (newShortcut.trim() && newValue.trim()) {
+                  e.currentTarget.style.backgroundColor = "#374151";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (newShortcut.trim() && newValue.trim()) {
+                  e.currentTarget.style.backgroundColor = "#111827";
+                }
+              }}
+            >
+              Create
+            </button>
+          </div>
         </div>
       )}
 
@@ -311,287 +445,249 @@ export const ShortcutsPage: React.FC = () => {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: "1.5rem",
+            marginBottom: "16px",
           }}
         >
           <h3
             style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              color: "#9ca3af",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
               margin: 0,
-              fontSize: "18px",
-              fontWeight: 500,
-              color: "#111827",
             }}
           >
-            Custom Shortcuts
+            ALL SHORTCUTS
           </h3>
-          <button
-            className="transcript-btn"
-            onClick={() => {
-              setShowCreateShortcut(!showCreateShortcut);
-              setNewShortcut("");
-              setNewValue("");
-            }}
-            style={{
-              padding: "0.5rem 1.5rem",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              backgroundColor: showCreateShortcut ? "#ffffff" : "#111827",
-              border: `1px solid ${showCreateShortcut ? "#e5e7eb" : "#111827"}`,
-              borderRadius: "0.5rem",
-              color: showCreateShortcut ? "#6b7280" : "#ffffff",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (showCreateShortcut) {
-                e.currentTarget.style.background = "#f9fafb";
-                e.currentTarget.style.borderColor = "#d1d5db";
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={handleSearchClick}
+              style={{
+                background: showSearch ? "#f3f4f6" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: showSearch ? "#111827" : "#9ca3af",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!showSearch) {
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
+                  e.currentTarget.style.color = "#111827";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!showSearch) {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "#9ca3af";
+                }
+              }}
+            >
+              <Search size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={loadShortcuts}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f3f4f6";
                 e.currentTarget.style.color = "#111827";
-              } else {
-                e.currentTarget.style.background = "#374151";
-                e.currentTarget.style.borderColor = "#374151";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (showCreateShortcut) {
-                e.currentTarget.style.background = "#ffffff";
-                e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.color = "#6b7280";
-              } else {
-                e.currentTarget.style.background = "#111827";
-                e.currentTarget.style.borderColor = "#111827";
-              }
-            }}
-          >
-            {showCreateShortcut ? "Cancel" : "+ Add Shortcut"}
-          </button>
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "#9ca3af";
+              }}
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreateShortcut(true);
+                setNewShortcut("");
+                setNewValue("");
+              }}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f3f4f6";
+                e.currentTarget.style.color = "#111827";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "#9ca3af";
+              }}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
         </div>
 
-        {showCreateShortcut && (
+        {/* Search Input */}
+        {showSearch && (
           <div
             style={{
-              padding: "1.5rem",
-              backgroundColor: "#ffffff",
-              border: "1px solid #e5e7eb",
-              borderRadius: "0.75rem",
-              marginBottom: "1.5rem",
-              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+              marginBottom: "16px",
+              position: "relative",
             }}
           >
-            <div
-              style={{
-                fontSize: "0.6875rem",
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                color: "#9ca3af",
-                marginBottom: "0.75rem",
-              }}
-            >
-              Shortcut
-            </div>
             <input
               type="text"
-              value={newShortcut}
-              onChange={(e) => setNewShortcut(e.target.value)}
-              placeholder="e.g., 'hey lexi'"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search shortcuts..."
+              autoFocus
               style={{
                 width: "100%",
-                padding: "0.875rem 1rem",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                backgroundColor: "#ffffff",
+                padding: "10px 40px 10px 12px",
                 border: "1px solid #e5e7eb",
-                borderRadius: "0.625rem",
-                color: "#111827",
-                marginBottom: "1rem",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontFamily: "inherit",
                 outline: "none",
                 transition: "all 0.2s ease",
-                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#6366f1";
+                e.currentTarget.style.borderColor = "#d1d5db";
                 e.currentTarget.style.boxShadow =
-                  "0 0 0 3px rgba(99, 102, 241, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05)";
+                  "0 0 0 3px rgba(0, 0, 0, 0.05)";
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow =
-                  "0 1px 2px rgba(0, 0, 0, 0.05)";
-              }}
-              onMouseEnter={(e) => {
-                if (document.activeElement !== e.currentTarget) {
-                  e.currentTarget.style.borderColor = "#d1d5db";
-                  e.currentTarget.style.boxShadow =
-                    "0 2px 4px rgba(0, 0, 0, 0.08)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (document.activeElement !== e.currentTarget) {
-                  e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.boxShadow =
-                    "0 1px 2px rgba(0, 0, 0, 0.05)";
-                }
+                e.currentTarget.style.boxShadow = "none";
               }}
             />
-            <div
-              style={{
-                fontSize: "0.6875rem",
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                color: "#9ca3af",
-                marginBottom: "0.75rem",
-              }}
-            >
-              Value
-            </div>
-            <input
-              type="text"
-              value={newValue}
-              onChange={(e) => setNewValue(e.target.value)}
-              placeholder="e.g., 'Hello, this is Lexi'"
-              style={{
-                width: "100%",
-                padding: "0.875rem 1rem",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "0.625rem",
-                color: "#111827",
-                marginBottom: "1rem",
-                outline: "none",
-                transition: "all 0.2s ease",
-                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#6366f1";
-                e.currentTarget.style.boxShadow =
-                  "0 0 0 3px rgba(99, 102, 241, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow =
-                  "0 1px 2px rgba(0, 0, 0, 0.05)";
-              }}
-              onMouseEnter={(e) => {
-                if (document.activeElement !== e.currentTarget) {
-                  e.currentTarget.style.borderColor = "#d1d5db";
-                  e.currentTarget.style.boxShadow =
-                    "0 2px 4px rgba(0, 0, 0, 0.08)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (document.activeElement !== e.currentTarget) {
-                  e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.boxShadow =
-                    "0 1px 2px rgba(0, 0, 0, 0.05)";
-                }
-              }}
-            />
-            <button
-              className="transcript-btn"
-              onClick={handleCreateShortcut}
-              style={{
-                padding: "0.5rem 1.5rem",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                backgroundColor: "#111827",
-                border: "1px solid #111827",
-                borderRadius: "0.5rem",
-                color: "#ffffff",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#374151";
-                e.currentTarget.style.borderColor = "#374151";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#111827";
-                e.currentTarget.style.borderColor = "#111827";
-              }}
-            >
-              Create Shortcut
-            </button>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                style={{
+                  position: "absolute",
+                  right: "8px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#9ca3af",
+                  padding: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "4px",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
+                  e.currentTarget.style.color = "#111827";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "#9ca3af";
+                }}
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
         )}
 
+        {/* Shortcuts List */}
         {isLoading ? (
           <div
             style={{
-              padding: "3rem 1rem",
               textAlign: "center",
-              color: "#6b7280",
-              fontSize: "0.875rem",
-              background: "#ffffff",
-              border: "1px solid #f3f4f6",
-              borderRadius: "0.75rem",
+              padding: "60px 20px",
+              color: "#9ca3af",
             }}
           >
-            Loading shortcuts...
+            <p style={{ margin: 0, fontSize: "14px" }}>Loading shortcuts...</p>
           </div>
-        ) : shortcuts.length === 0 ? (
+        ) : filteredShortcuts.length === 0 ? (
           <div
             style={{
-              padding: "3rem 1rem",
               textAlign: "center",
-              color: "#6b7280",
-              fontSize: "0.875rem",
-              background: "#ffffff",
-              border: "1px solid #f3f4f6",
-              borderRadius: "0.75rem",
+              padding: "60px 20px",
+              color: "#9ca3af",
             }}
           >
-            No shortcuts. Create one to get started.
+            <p style={{ margin: 0, fontSize: "14px" }}>
+              {searchQuery
+                ? "No shortcuts match your search"
+                : "No shortcuts found"}
+            </p>
           </div>
         ) : (
           <div
-            style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
           >
-            {shortcuts.map((shortcut) => {
+            {filteredShortcuts.map((shortcut) => {
               const isEditing = editingShortcut?.id === shortcut.id;
               return (
                 <div
                   key={shortcut.id}
                   style={{
-                    padding: "1.25rem",
                     backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "0.75rem",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "1rem",
+                    border:
+                      hoveredShortcutId === shortcut.id && !isEditing
+                        ? "1px solid #d1d5db"
+                        : "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    padding: "16px",
                     transition: "all 0.2s ease",
-                    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+                    position: "relative",
+                    boxShadow:
+                      hoveredShortcutId === shortcut.id && !isEditing
+                        ? "0 1px 3px rgba(0, 0, 0, 0.05)"
+                        : "none",
                   }}
-                  onMouseEnter={(e) => {
-                    if (!isEditing) {
-                      e.currentTarget.style.borderColor = "#d1d5db";
-                      e.currentTarget.style.boxShadow =
-                        "0 4px 12px rgba(0, 0, 0, 0.08)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isEditing) {
-                      e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.boxShadow =
-                        "0 1px 2px rgba(0, 0, 0, 0.05)";
-                    }
-                  }}
+                  onMouseEnter={() => setHoveredShortcutId(shortcut.id)}
+                  onMouseLeave={() => setHoveredShortcutId(null)}
                 >
                   {isEditing ? (
-                    <>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                      }}
+                    >
                       <div>
                         <div
                           style={{
-                            fontSize: "0.6875rem",
+                            fontSize: "11px",
                             fontWeight: 600,
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                             color: "#9ca3af",
-                            marginBottom: "0.5rem",
+                            marginBottom: "6px",
                           }}
                         >
                           Shortcut
@@ -607,38 +703,32 @@ export const ShortcutsPage: React.FC = () => {
                           }
                           style={{
                             width: "100%",
-                            padding: "0.875rem 1rem",
-                            fontSize: "0.875rem",
-                            fontWeight: 500,
+                            padding: "10px 12px",
+                            fontSize: "14px",
                             backgroundColor: "#ffffff",
                             border: "1px solid #e5e7eb",
-                            borderRadius: "0.625rem",
+                            borderRadius: "8px",
                             color: "#111827",
                             outline: "none",
                             transition: "all 0.2s ease",
-                            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
                           }}
                           onFocus={(e) => {
-                            e.currentTarget.style.borderColor = "#6366f1";
-                            e.currentTarget.style.boxShadow =
-                              "0 0 0 3px rgba(99, 102, 241, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05)";
+                            e.currentTarget.style.borderColor = "#d1d5db";
                           }}
                           onBlur={(e) => {
                             e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.boxShadow =
-                              "0 1px 2px rgba(0, 0, 0, 0.05)";
                           }}
                         />
                       </div>
                       <div>
                         <div
                           style={{
-                            fontSize: "0.6875rem",
+                            fontSize: "11px",
                             fontWeight: 600,
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                             color: "#9ca3af",
-                            marginBottom: "0.5rem",
+                            marginBottom: "6px",
                           }}
                         >
                           Value
@@ -654,160 +744,160 @@ export const ShortcutsPage: React.FC = () => {
                           }
                           style={{
                             width: "100%",
-                            padding: "0.875rem 1rem",
-                            fontSize: "0.875rem",
-                            fontWeight: 500,
+                            padding: "10px 12px",
+                            fontSize: "14px",
                             backgroundColor: "#ffffff",
                             border: "1px solid #e5e7eb",
-                            borderRadius: "0.625rem",
+                            borderRadius: "8px",
                             color: "#111827",
                             outline: "none",
                             transition: "all 0.2s ease",
-                            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
                           }}
                           onFocus={(e) => {
-                            e.currentTarget.style.borderColor = "#6366f1";
-                            e.currentTarget.style.boxShadow =
-                              "0 0 0 3px rgba(99, 102, 241, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05)";
+                            e.currentTarget.style.borderColor = "#d1d5db";
                           }}
                           onBlur={(e) => {
                             e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.boxShadow =
-                              "0 1px 2px rgba(0, 0, 0, 0.05)";
                           }}
                         />
                       </div>
-                      <div style={{ display: "flex", gap: "0.75rem" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          justifyContent: "flex-end",
+                        }}
+                      >
                         <button
-                          className="transcript-btn"
-                          onClick={() => handleUpdateShortcut(shortcut)}
-                          style={{
-                            padding: "0.5rem 1.5rem",
-                            fontSize: "0.875rem",
-                            fontWeight: 500,
-                            backgroundColor: "#111827",
-                            border: "1px solid #111827",
-                            borderRadius: "0.5rem",
-                            color: "#ffffff",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#374151";
-                            e.currentTarget.style.borderColor = "#374151";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "#111827";
-                            e.currentTarget.style.borderColor = "#111827";
-                          }}
-                        >
-                          Save
-                        </button>
-                        <button
-                          className="transcript-btn"
                           onClick={() => setEditingShortcut(null)}
                           style={{
-                            padding: "0.5rem 1.5rem",
-                            fontSize: "0.875rem",
-                            fontWeight: 500,
-                            backgroundColor: "#ffffff",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "0.5rem",
+                            padding: "8px 16px",
+                            backgroundColor: "#f3f4f6",
                             color: "#6b7280",
+                            border: "none",
+                            borderRadius: "6px",
                             cursor: "pointer",
+                            fontSize: "14px",
+                            fontWeight: 500,
                             transition: "all 0.2s ease",
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#f9fafb";
-                            e.currentTarget.style.borderColor = "#d1d5db";
+                            e.currentTarget.style.backgroundColor = "#e5e7eb";
                             e.currentTarget.style.color = "#111827";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "#ffffff";
-                            e.currentTarget.style.borderColor = "#e5e7eb";
+                            e.currentTarget.style.backgroundColor = "#f3f4f6";
                             e.currentTarget.style.color = "#6b7280";
                           }}
                         >
                           Cancel
                         </button>
+                        <button
+                          onClick={() => handleUpdateShortcut(shortcut)}
+                          style={{
+                            padding: "8px 16px",
+                            backgroundColor: "#111827",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            transition: "all 0.2s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#374151";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "#111827";
+                          }}
+                        >
+                          Save
+                        </button>
                       </div>
-                    </>
+                    </div>
                   ) : (
                     <>
-                      <div style={{ flex: 1 }}>
+                      {/* Action buttons - shown on hover */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "12px",
+                          right: "12px",
+                          display: "flex",
+                          gap: "6px",
+                          opacity: hoveredShortcutId === shortcut.id ? 1 : 0,
+                          transition: "opacity 0.2s ease",
+                        }}
+                      >
+                        <button
+                          onClick={() => handleUpdateShortcut(shortcut)}
+                          style={{
+                            padding: "6px",
+                            backgroundColor: "#f3f4f6",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#6b7280",
+                            transition: "all 0.2s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#e5e7eb";
+                            e.currentTarget.style.color = "#111827";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f3f4f6";
+                            e.currentTarget.style.color = "#6b7280";
+                          }}
+                        >
+                          <Edit size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteShortcut(shortcut.id)}
+                          style={{
+                            padding: "6px",
+                            backgroundColor: "#fef2f2",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#ef4444",
+                            transition: "all 0.2s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#fee2e2";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "#fef2f2";
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div style={{ paddingRight: "60px" }}>
                         <div
                           style={{
-                            fontSize: "0.9375rem",
+                            fontSize: "15px",
                             color: "#111827",
                             fontWeight: 500,
-                            marginBottom: "0.25rem",
+                            marginBottom: "4px",
                           }}
                         >
                           {shortcut.shortcut}
                         </div>
                         <div
                           style={{
-                            fontSize: "0.8125rem",
+                            fontSize: "14px",
                             color: "#6b7280",
-                            marginBottom: "0.25rem",
                           }}
                         >
                           → {shortcut.value}
                         </div>
-                      </div>
-                      <div style={{ display: "flex", gap: "0.75rem" }}>
-                        <button
-                          className="transcript-btn"
-                          onClick={() => handleUpdateShortcut(shortcut)}
-                          style={{
-                            padding: "0.5rem 1rem",
-                            fontSize: "0.8125rem",
-                            fontWeight: 500,
-                            backgroundColor: "#ffffff",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "0.5rem",
-                            color: "#6b7280",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#f9fafb";
-                            e.currentTarget.style.borderColor = "#d1d5db";
-                            e.currentTarget.style.color = "#111827";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "#ffffff";
-                            e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.color = "#6b7280";
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="transcript-btn"
-                          onClick={() => handleDeleteShortcut(shortcut.id)}
-                          style={{
-                            padding: "0.5rem 1rem",
-                            fontSize: "0.8125rem",
-                            fontWeight: 500,
-                            backgroundColor: "#ffffff",
-                            border: "1px solid #fecaca",
-                            borderRadius: "0.5rem",
-                            color: "#b91c1c",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#fef2f2";
-                            e.currentTarget.style.borderColor = "#fca5a5";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "#ffffff";
-                            e.currentTarget.style.borderColor = "#fecaca";
-                          }}
-                        >
-                          Delete
-                        </button>
                       </div>
                     </>
                   )}
