@@ -12,7 +12,9 @@ export const VocabularyPage: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [hoveredVocabularyValue, setHoveredVocabularyValue] = useState<string | null>(null);
+  const [hoveredVocabularyValue, setHoveredVocabularyValue] = useState<
+    string | null
+  >(null);
 
   const vocabulary = config?.vocabulary || [];
 
@@ -94,7 +96,9 @@ export const VocabularyPage: React.FC = () => {
   // Delete vocabulary item
   const handleDeleteVocabulary = async (value: string) => {
     const currentVocabulary = vocabulary || [];
-    const updatedVocabulary = currentVocabulary.filter((item) => item !== value);
+    const updatedVocabulary = currentVocabulary.filter(
+      (item) => item !== value,
+    );
 
     try {
       await updateConfig({ vocabulary: updatedVocabulary });
@@ -201,7 +205,9 @@ export const VocabularyPage: React.FC = () => {
             }}
             autoFocus
           />
-          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+          <div
+            style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}
+          >
             <button
               onClick={() => {
                 setShowAddForm(false);
@@ -330,7 +336,8 @@ export const VocabularyPage: React.FC = () => {
                   setIsLoading(true);
                   setError(null);
                   try {
-                    const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
+                    const loadedConfig =
+                      await invoke<TauriAppConfig>("get_app_config");
                     setConfig(loadedConfig);
                   } catch (err: any) {
                     console.error("Failed to load app config:", err);
@@ -422,7 +429,8 @@ export const VocabularyPage: React.FC = () => {
               }}
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = "#d1d5db";
-                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0, 0, 0, 0.05)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(0, 0, 0, 0.05)";
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
@@ -480,7 +488,9 @@ export const VocabularyPage: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
             {filteredVocabulary.map((item, index) => (
               <div
                 key={`${item}-${index}`}

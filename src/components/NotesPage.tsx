@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Mic, Search, LayoutGrid, RefreshCw, Edit, Trash2, X } from "lucide-react";
+import {
+  Mic,
+  Search,
+  LayoutGrid,
+  RefreshCw,
+  Edit,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
 
 type ViewMode = "list" | "grid";
@@ -115,9 +123,7 @@ export const NotesPage: React.FC = () => {
       return notes;
     }
     const query = searchQuery.toLowerCase();
-    return notes.filter((note) =>
-      note.content.toLowerCase().includes(query)
-    );
+    return notes.filter((note) => note.content.toLowerCase().includes(query));
   }, [notes, searchQuery]);
 
   const toggleViewMode = () => {
@@ -404,7 +410,8 @@ export const NotesPage: React.FC = () => {
               }}
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = "#d1d5db";
-                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0, 0, 0, 0.05)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(0, 0, 0, 0.05)";
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
@@ -464,7 +471,10 @@ export const NotesPage: React.FC = () => {
             style={{
               display: viewMode === "grid" ? "grid" : "flex",
               flexDirection: viewMode === "list" ? "column" : undefined,
-              gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(280px, 1fr))" : undefined,
+              gridTemplateColumns:
+                viewMode === "grid"
+                  ? "repeat(auto-fill, minmax(280px, 1fr))"
+                  : undefined,
               gap: "12px",
             }}
           >
@@ -568,7 +578,8 @@ export const NotesPage: React.FC = () => {
                     overflow: viewMode === "grid" ? "hidden" : "visible",
                     display: viewMode === "grid" ? "-webkit-box" : "block",
                     WebkitLineClamp: viewMode === "grid" ? 4 : undefined,
-                    WebkitBoxOrient: viewMode === "grid" ? "vertical" : undefined,
+                    WebkitBoxOrient:
+                      viewMode === "grid" ? "vertical" : undefined,
                     textOverflow: viewMode === "grid" ? "ellipsis" : undefined,
                   }}
                 >
@@ -651,7 +662,13 @@ export const NotesPage: React.FC = () => {
                 marginBottom: "16px",
               }}
             />
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
               <button
                 type="button"
                 onClick={handleCancelEdit}
@@ -680,9 +697,7 @@ export const NotesPage: React.FC = () => {
                   border: "none",
                   borderRadius: "6px",
                   cursor:
-                    isCreating || !content.trim()
-                      ? "not-allowed"
-                      : "pointer",
+                    isCreating || !content.trim() ? "not-allowed" : "pointer",
                   fontSize: "14px",
                   fontWeight: 500,
                   opacity: isCreating || !content.trim() ? 0.5 : 1,

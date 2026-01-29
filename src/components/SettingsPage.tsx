@@ -1,7 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Monitor, Mic, Power, Keyboard, ChevronDown, Check } from "lucide-react";
+import {
+  Monitor,
+  Mic,
+  Power,
+  Keyboard,
+  ChevronDown,
+  Check,
+} from "lucide-react";
 
 import {
   LanguageCode,
@@ -678,27 +685,32 @@ export const SettingsPage: React.FC = () => {
                   onMouseEnter={(e) => {
                     if (!isUpdating && !isLoading) {
                       e.currentTarget.style.borderColor = "#d1d5db";
-                      e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.08)";
+                      e.currentTarget.style.boxShadow =
+                        "0 2px 4px rgba(0, 0, 0, 0.08)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isLanguageDropdownOpen) {
                       e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+                      e.currentTarget.style.boxShadow =
+                        "0 1px 2px rgba(0, 0, 0, 0.05)";
                     }
                   }}
                 >
                   <span>
                     {selectedLanguage
-                      ? SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label ||
-                        "Select language"
+                      ? SUPPORTED_LANGUAGES.find(
+                          (l) => l.value === selectedLanguage,
+                        )?.label || "Select language"
                       : "Auto Detect Language"}
                   </span>
                   <ChevronDown
                     size={18}
                     style={{
                       color: "#6b7280",
-                      transform: isLanguageDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      transform: isLanguageDropdownOpen
+                        ? "rotate(180deg)"
+                        : "rotate(0deg)",
                       transition: "transform 0.2s ease",
                     }}
                   />
@@ -756,10 +768,15 @@ export const SettingsPage: React.FC = () => {
                       >
                         <span>Auto Detect Language</span>
                         {!selectedLanguage && (
-                          <Check size={16} style={{ color: "#111827", flexShrink: 0 }} />
+                          <Check
+                            size={16}
+                            style={{ color: "#111827", flexShrink: 0 }}
+                          />
                         )}
                       </button>
-                      {SUPPORTED_LANGUAGES.filter((lang) => lang.value !== "auto").map((lang) => (
+                      {SUPPORTED_LANGUAGES.filter(
+                        (lang) => lang.value !== "auto",
+                      ).map((lang) => (
                         <button
                           key={lang.value}
                           type="button"
@@ -785,12 +802,16 @@ export const SettingsPage: React.FC = () => {
                             e.currentTarget.style.backgroundColor = "#f3f4f6";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
                           }}
                         >
                           <span>{lang.label}</span>
                           {selectedLanguage === lang.value && (
-                            <Check size={16} style={{ color: "#111827", flexShrink: 0 }} />
+                            <Check
+                              size={16}
+                              style={{ color: "#111827", flexShrink: 0 }}
+                            />
                           )}
                         </button>
                       ))}
@@ -860,7 +881,13 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -1090,7 +1117,13 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
               <button
                 onClick={() => {
                   // Reset to default hotkeys

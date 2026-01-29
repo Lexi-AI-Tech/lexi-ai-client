@@ -16,7 +16,9 @@ export const ShortcutsPage: React.FC = () => {
   const [editingShortcut, setEditingShortcut] = useState<Shortcut | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [hoveredShortcutId, setHoveredShortcutId] = useState<string | null>(null);
+  const [hoveredShortcutId, setHoveredShortcutId] = useState<string | null>(
+    null,
+  );
 
   // Load shortcuts
   const loadShortcuts = async () => {
@@ -69,7 +71,7 @@ export const ShortcutsPage: React.FC = () => {
     return shortcuts.filter(
       (shortcut) =>
         shortcut.shortcut.toLowerCase().includes(query) ||
-        shortcut.value.toLowerCase().includes(query)
+        shortcut.value.toLowerCase().includes(query),
     );
   }, [shortcuts, searchQuery]);
 
@@ -370,7 +372,9 @@ export const ShortcutsPage: React.FC = () => {
               e.currentTarget.style.borderColor = "#e5e7eb";
             }}
           />
-          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+          <div
+            style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}
+          >
             <button
               onClick={() => {
                 setShowCreateShortcut(false);
@@ -436,7 +440,6 @@ export const ShortcutsPage: React.FC = () => {
 
       {/* Shortcuts Section */}
       <div>
-
         <div
           style={{
             display: "flex",
@@ -573,7 +576,8 @@ export const ShortcutsPage: React.FC = () => {
               }}
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = "#d1d5db";
-                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0, 0, 0, 0.05)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(0, 0, 0, 0.05)";
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
@@ -641,7 +645,9 @@ export const ShortcutsPage: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
             {filteredShortcuts.map((shortcut) => {
               const isEditing = editingShortcut?.id === shortcut.id;
               return (
@@ -666,7 +672,13 @@ export const ShortcutsPage: React.FC = () => {
                   onMouseLeave={() => setHoveredShortcutId(null)}
                 >
                   {isEditing ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                      }}
+                    >
                       <div>
                         <div
                           style={{
@@ -749,7 +761,13 @@ export const ShortcutsPage: React.FC = () => {
                           }}
                         />
                       </div>
-                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          justifyContent: "flex-end",
+                        }}
+                      >
                         <button
                           onClick={() => setEditingShortcut(null)}
                           style={{
