@@ -38,8 +38,8 @@
 
 use crate::RecordingCommand;
 use rdev::{listen, Event, EventType, Key};
+use std::collections::HashSet;
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tokio::sync::watch;
@@ -408,82 +408,76 @@ pub fn unregister_all_hotkeys(app: &AppHandle, hotkeys: &[String]) {
 }
 
 // ============================================================================
-// rdev Listener (for Fn key)
+// rdev Listener (configurable hotkeys)
 // ============================================================================
 
-/// Tracks the actual state of the Function key to prevent spurious events
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum KeyState {
-    Released,
-    Pressed,
-}
-
-/// Key state tracker to prevent duplicate/spurious events
+/// Tracks which configured rdev hotkeys are currently pressed (set-based).
+/// Keys are identified by the hotkey string from config (e.g. "Fn").
+/// Insert on KeyPress, remove on KeyRelease; duplicate events are ignored.
 struct KeyStateTracker {
-    state: KeyState,
-    last_state_change: Instant,
+    /// Hotkey strings that are currently considered pressed (we saw KeyPress, not yet KeyRelease).
+    pressed_hotkeys: HashSet<String>,
 }
 
 impl KeyStateTracker {
     fn new() -> Self {
         Self {
-            state: KeyState::Released,
-            last_state_change: Instant::now(),
+            pressed_hotkeys: HashSet::new(),
         }
     }
 
-    /// Returns Some(command) only if this is a valid state transition
-    /// Filters out duplicate events and ensures proper Start→Stop ordering
-    fn process_event(&mut self, event_type: &EventType) -> Option<RecordingCommand> {
-        // Reduced from 50ms to 16ms (~1 frame at 60fps) for more responsive feel
-        // Still prevents double-triggering from hardware bounce
-        const MIN_STATE_DURATION: Duration = Duration::from_millis(16);
-
-        match event_type {
-            EventType::KeyPress(Key::Function) => {
-                // Only transition to Pressed if currently Released
-                if self.state == KeyState::Released {
-                    let elapsed = self.last_state_change.elapsed();
-                    if elapsed >= MIN_STATE_DURATION {
-                        self.state = KeyState::Pressed;
-                        self.last_state_change = Instant::now();
-                        println!("🔑 Key state: Released → Pressed (after {:?})", elapsed);
-                        return Some(RecordingCommand::Start);
-                    } else {
-                        println!(
-                            "⚠️  Ignoring rapid KeyPress (only {:?} since last change)",
-                            elapsed
-                        );
-                    }
-                } else {
-                    // Already pressed - ignore duplicate KeyPress
-                    println!("⚠️  Ignoring duplicate KeyPress (key already pressed)");
-                }
+    /// Returns Some(command) only when this hotkey's state actually changes.
+    /// Start when hotkey is newly pressed; Stop when hotkey is newly released.
+    fn process_event(&mut self, hotkey: &str, is_press: bool) -> Option<RecordingCommand> {
+        let key = hotkey.trim().to_string();
+        if is_press {
+            // "Insert" — only emit Start if hotkey wasn't already in pressed set
+            if self.pressed_hotkeys.insert(key.clone()) {
+                println!("🔑 Key state: {} pressed", key);
+                Some(RecordingCommand::Start)
+            } else {
+                println!("⚠️  Ignoring duplicate KeyPress ({} already pressed)", key);
+                None
             }
-            EventType::KeyRelease(Key::Function) => {
-                // Only transition to Released if currently Pressed
-                if self.state == KeyState::Pressed {
-                    let elapsed = self.last_state_change.elapsed();
-                    if elapsed >= MIN_STATE_DURATION {
-                        self.state = KeyState::Released;
-                        self.last_state_change = Instant::now();
-                        println!("🔑 Key state: Pressed → Released (held for {:?})", elapsed);
-                        return Some(RecordingCommand::Stop);
-                    } else {
-                        println!(
-                            "⚠️  Ignoring rapid KeyRelease (only {:?} since press)",
-                            elapsed
-                        );
-                    }
-                } else {
-                    // Already released - ignore duplicate KeyRelease
-                    println!("⚠️  Ignoring duplicate KeyRelease (key already released)");
-                }
+        } else {
+            // "Remove" — only emit Stop if hotkey was in pressed set
+            if self.pressed_hotkeys.remove(&key) {
+                println!("🔑 Key state: {} released", key);
+                Some(RecordingCommand::Stop)
+            } else {
+                println!(
+                    "⚠️  Ignoring duplicate KeyRelease ({} already released)",
+                    key
+                );
+                None
             }
-            _ => {}
         }
-        None
     }
+}
+
+/// Maps an rdev event to the configured hotkey it matches and whether it's press or release.
+/// Returns None if the event doesn't match any configured rdev hotkey.
+fn event_to_rdev_hotkey_action(
+    event_type: &EventType,
+    rdev_hotkeys: &[String],
+) -> Option<(String, bool)> {
+    for hotkey in rdev_hotkeys {
+        let trimmed = hotkey.trim();
+
+        // Fn key
+        if trimmed.eq_ignore_ascii_case("Fn") {
+            match event_type {
+                EventType::KeyPress(Key::Function) => return Some((trimmed.to_string(), true)),
+                EventType::KeyRelease(Key::Function) => return Some((trimmed.to_string(), false)),
+                _ => {} // not Fn event, try next hotkey
+            }
+        }
+
+        // Extend here for other rdev hotkeys (modifier-only, single keys, etc.)
+        // e.g. map Key::CapsLock, modifier combinations, etc. to (hotkey_string, is_press)
+    }
+
+    None
 }
 
 /// Helper to convert keyboard EventType to a string for frontend emission
@@ -588,28 +582,14 @@ pub fn start_listener(
             let current_hotkeys = config_rx_for_rdev.borrow().clone();
             let current_rdev_hotkeys = rdev_hotkeys(&current_hotkeys);
 
-            // Check if this event matches any configured rdev hotkey
-            let command = if matches_rdev_hotkey(&event.event_type, &current_rdev_hotkeys) {
-                // For Fn key, use the state tracker (press/release behavior)
-                if matches!(
-                    &event.event_type,
-                    EventType::KeyPress(Key::Function) | EventType::KeyRelease(Key::Function)
-                ) {
-                    // Use state tracker for Fn key
-                    if let Ok(mut tracker) = key_state_tracker_for_callback.lock() {
-                        tracker.process_event(&event.event_type)
-                    } else {
-                        eprintln!("❌ Failed to lock key state tracker");
-                        None
-                    }
-                } else {
-                    // For other rdev hotkeys (modifier-only, single keys, etc.)
-                    // This can be extended in the future
-                    None
-                }
-            } else {
-                None
-            };
+            // Check if this event matches any configured rdev hotkey; use state tracker for press/release
+            let command = event_to_rdev_hotkey_action(&event.event_type, &current_rdev_hotkeys)
+                .and_then(|(hotkey, is_press)| {
+                    key_state_tracker_for_callback
+                        .lock()
+                        .ok()
+                        .and_then(|mut tracker| tracker.process_event(&hotkey, is_press))
+                });
 
             // Process command if we got one
             if let Some(command) = command {
