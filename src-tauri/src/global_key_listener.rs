@@ -40,6 +40,7 @@ use crate::RecordingCommand;
 use rdev::{listen, Event, EventType, Key};
 use std::collections::HashSet;
 use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tokio::sync::watch;
@@ -411,30 +412,45 @@ pub fn unregister_all_hotkeys(app: &AppHandle, hotkeys: &[String]) {
 // rdev Listener (configurable hotkeys)
 // ============================================================================
 
+/// Minimum time between Start and Stop events. If user releases before this, we send Stop after the remaining delay.
+const MIN_PRESS_RELEASE_INTERVAL: Duration = Duration::from_millis(500);
+
+/// Result of processing a hotkey event: either send a command now or send Stop after a delay.
+enum HotkeyCommandResult {
+    SendNow(RecordingCommand),
+    /// Send Stop after this duration (user released before MIN_PRESS_RELEASE_INTERVAL).
+    SendStopAfter(Duration),
+}
+
 /// Tracks which configured rdev hotkeys are currently pressed (set-based).
 /// Keys are identified by the hotkey string from config (e.g. "Fn").
 /// Insert on KeyPress, remove on KeyRelease; duplicate events are ignored.
+/// At least MIN_PRESS_RELEASE_INTERVAL must pass between Start and Stop — if user releases sooner, Stop is sent after the remaining time.
 struct KeyStateTracker {
     /// Hotkey strings that are currently considered pressed (we saw KeyPress, not yet KeyRelease).
     pressed_hotkeys: HashSet<String>,
+    /// When we last sent Start (key pressed); used to enforce minimum time before Stop.
+    last_press_at: Option<Instant>,
 }
 
 impl KeyStateTracker {
     fn new() -> Self {
         Self {
             pressed_hotkeys: HashSet::new(),
+            last_press_at: None,
         }
     }
 
-    /// Returns Some(command) only when this hotkey's state actually changes.
-    /// Start when hotkey is newly pressed; Stop when hotkey is newly released.
-    fn process_event(&mut self, hotkey: &str, is_press: bool) -> Option<RecordingCommand> {
+    /// Returns a result when we should send a command (now or after delay).
+    /// Start when hotkey is newly pressed; Stop when released, either now or after delay so that at least MIN_PRESS_RELEASE_INTERVAL has passed since Start.
+    fn process_event(&mut self, hotkey: &str, is_press: bool) -> Option<HotkeyCommandResult> {
         let key = hotkey.trim().to_string();
         if is_press {
             // "Insert" — only emit Start if hotkey wasn't already in pressed set
             if self.pressed_hotkeys.insert(key.clone()) {
                 println!("🔑 Key state: {} pressed", key);
-                Some(RecordingCommand::Start)
+                self.last_press_at = Some(Instant::now());
+                Some(HotkeyCommandResult::SendNow(RecordingCommand::Start))
             } else {
                 println!("⚠️  Ignoring duplicate KeyPress ({} already pressed)", key);
                 None
@@ -443,7 +459,21 @@ impl KeyStateTracker {
             // "Remove" — only emit Stop if hotkey was in pressed set
             if self.pressed_hotkeys.remove(&key) {
                 println!("🔑 Key state: {} released", key);
-                Some(RecordingCommand::Stop)
+                let elapsed = self
+                    .last_press_at
+                    .map(|t| t.elapsed())
+                    .unwrap_or(MIN_PRESS_RELEASE_INTERVAL);
+                if elapsed >= MIN_PRESS_RELEASE_INTERVAL {
+                    Some(HotkeyCommandResult::SendNow(RecordingCommand::Stop))
+                } else {
+                    let remaining = MIN_PRESS_RELEASE_INTERVAL - elapsed;
+                    println!(
+                        "⏱️  Release before {:.1}s — will send Stop in {:.2}s",
+                        MIN_PRESS_RELEASE_INTERVAL.as_secs_f64(),
+                        remaining.as_secs_f64()
+                    );
+                    Some(HotkeyCommandResult::SendStopAfter(remaining))
+                }
             } else {
                 println!(
                     "⚠️  Ignoring duplicate KeyRelease ({} already released)",
@@ -559,7 +589,7 @@ pub fn start_listener(
             let current_rdev_hotkeys = rdev_hotkeys(&current_hotkeys);
 
             // Check if this event matches any configured rdev hotkey; use state tracker for press/release
-            let command = event_to_rdev_hotkey_action(&event.event_type, &current_rdev_hotkeys)
+            let result = event_to_rdev_hotkey_action(&event.event_type, &current_rdev_hotkeys)
                 .and_then(|(hotkey, is_press)| {
                     key_state_tracker_for_callback
                         .lock()
@@ -567,46 +597,68 @@ pub fn start_listener(
                         .and_then(|mut tracker| tracker.process_event(&hotkey, is_press))
                 });
 
-            // Process command if we got one
-            if let Some(command) = command {
-                let trigger_type = match command {
-                    RecordingCommand::Start => "PRESSED",
-                    RecordingCommand::Stop => "RELEASED",
-                };
-                println!("=== HOTKEY TRIGGER: {} ===", trigger_type);
-
-                // CRITICAL: Send recording command IMMEDIATELY for responsive UI
-                // This is the hot path - no blocking operations here
-                if let Err(e) = recording_tx_for_rdev.send(command) {
-                    eprintln!("Failed to send recording signal: {:?}", e);
-                }
-
-                // Query cursor context asynchronously (non-blocking)
-                // This runs in background and doesn't delay recording start
-                std::thread::spawn(|| {
-                    if let Some(context) = crate::cursor_context::get_cursor_context() {
+            // Process command if we got one (send now or schedule delayed Stop)
+            if let Some(result) = result {
+                match &result {
+                    HotkeyCommandResult::SendNow(cmd) => {
+                        let trigger_type = match cmd {
+                            RecordingCommand::Start => "PRESSED",
+                            RecordingCommand::Stop => "RELEASED",
+                        };
+                        println!("=== HOTKEY TRIGGER: {} ===", trigger_type);
+                    }
+                    HotkeyCommandResult::SendStopAfter(d) => {
                         println!(
-                            "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
-                            context.app_name, context.pid, context.selected_text
+                            "=== HOTKEY TRIGGER: RELEASED (delayed {:.2}s) ===",
+                            d.as_secs_f64()
                         );
                     }
-                });
+                }
 
-                println!(
-                    "Hotkey {} - {} recording",
-                    match command {
-                        RecordingCommand::Start => "pressed",
-                        RecordingCommand::Stop => "released",
-                    },
-                    match command {
-                        RecordingCommand::Start => "Starting",
-                        RecordingCommand::Stop => "Stopping",
+                match result {
+                    HotkeyCommandResult::SendNow(command) => {
+                        if let Err(e) = recording_tx_for_rdev.send(command) {
+                            eprintln!("Failed to send recording signal: {:?}", e);
+                        }
+                        if let RecordingCommand::Start = command {
+                            std::thread::spawn(|| {
+                                if let Some(context) = crate::cursor_context::get_cursor_context() {
+                                    println!(
+                                        "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
+                                        context.app_name, context.pid, context.selected_text
+                                    );
+                                }
+                            });
+                        }
+                        println!(
+                            "Hotkey {} - {} recording",
+                            match command {
+                                RecordingCommand::Start => "pressed",
+                                RecordingCommand::Stop => "released",
+                            },
+                            match command {
+                                RecordingCommand::Start => "Starting",
+                                RecordingCommand::Stop => "Stopping",
+                            }
+                        );
                     }
-                );
+                    HotkeyCommandResult::SendStopAfter(delay) => {
+                        let tx = recording_tx_for_rdev.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(delay);
+                            if let Err(e) = tx.send(RecordingCommand::Stop) {
+                                eprintln!("Failed to send delayed Stop: {:?}", e);
+                            } else {
+                                println!(
+                                    "Hotkey released - Stopping recording (after minimum interval)"
+                                );
+                            }
+                        });
+                    }
+                }
 
                 // NOTE: Don't emit recording_started/recording_stopped here anymore.
                 // The recording_thread.rs now handles this AFTER actual recording starts/stops.
-                // This prevents race conditions where UI updates before audio stream is ready.
             }
 
             // Emit all keyboard events for debug (commented out by default)
