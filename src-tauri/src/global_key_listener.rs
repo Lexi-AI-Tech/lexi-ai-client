@@ -502,30 +502,6 @@ fn key_to_string(key: &Key) -> String {
     }
 }
 
-/// Checks if a keyboard event matches any of the configured rdev hotkeys
-/// Returns true if the event should trigger recording
-fn matches_rdev_hotkey(event_type: &EventType, rdev_hotkeys: &[String]) -> bool {
-    for hotkey in rdev_hotkeys {
-        let trimmed = hotkey.trim();
-
-        // Check for Fn key
-        if trimmed.eq_ignore_ascii_case("Fn") {
-            if matches!(
-                event_type,
-                EventType::KeyPress(Key::Function) | EventType::KeyRelease(Key::Function)
-            ) {
-                return true;
-            }
-        }
-
-        // For other rdev hotkeys, we'd need to parse and match
-        // Currently only Fn is supported via rdev, others go to Tauri
-        // This can be extended in the future for modifier-only or single-key hotkeys
-    }
-
-    false
-}
-
 /// Starts the global keyboard listener with dynamic config support.
 ///
 /// This spawns two threads:
