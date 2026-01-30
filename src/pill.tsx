@@ -266,6 +266,29 @@ const Pill: React.FC = () => {
           }
         });
 
+        // Listen for recording skipped (e.g. too short) — go back to idle without processing
+        const unlistenSkipped = await listen("recording_skipped", async () => {
+          setStatus("idle");
+          const window = getCurrentWindow();
+          try {
+            const physicalPos = await window.outerPosition();
+            const scaleFactor = await window.scaleFactor();
+            const logicalX = physicalPos.x / scaleFactor;
+            const logicalY = physicalPos.y / scaleFactor;
+            await window.setSize(
+              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
+            );
+            await window.setPosition(
+              new LogicalPosition(
+                logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
+                logicalY + HEIGHT_DIFF,
+              ),
+            );
+          } catch (e) {
+            console.error("Failed to shrink window:", e);
+          }
+        });
+
         // Listen for volume updates (audio levels) - real audio data takes priority
         let unlistenVolume: (() => void) | undefined;
         try {
@@ -386,6 +409,7 @@ const Pill: React.FC = () => {
           unlistenProcessing();
           unlistenSuccess();
           unlistenError();
+          unlistenSkipped();
           if (unlistenVolume) {
             unlistenVolume();
           }

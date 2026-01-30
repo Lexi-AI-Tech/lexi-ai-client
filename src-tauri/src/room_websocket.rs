@@ -196,48 +196,4 @@ impl RoomWebSocket {
 
         Ok(())
     }
-
-    pub fn send_audio_chunk(&self, chunk: Vec<u8>) -> Result<(), String> {
-        if let Some(ref tx) = *self.audio_tx.lock().unwrap() {
-            tx.try_send(chunk)
-                .map_err(|e| format!("Failed to send audio chunk: {}", e))?;
-            Ok(())
-        } else {
-            Err("WebSocket not connected".to_string())
-        }
-    }
-
-    pub fn is_connected(&self) -> bool {
-        *self.is_connected.lock().unwrap()
-    }
-
-    pub fn send_text_message(&self, message: String) -> Result<(), String> {
-        if let Some(ref tx) = *self.text_tx.lock().unwrap() {
-            tx.try_send(message)
-                .map_err(|e| format!("Failed to send text message: {}", e))?;
-            Ok(())
-        } else {
-            Err("WebSocket not connected".to_string())
-        }
-    }
-
-    pub fn close(&mut self) {
-        // Send end_recording message before closing
-        let end_recording_msg = serde_json::json!({
-            "type": "end_recording"
-        })
-        .to_string();
-
-        if let Err(e) = self.send_text_message(end_recording_msg) {
-            eprintln!("⚠️ Failed to send end_recording message: {}", e);
-        } else {
-            println!("📍 Sent end_recording signal to server");
-            // Give a brief moment for the message to be sent
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
-
-        *self.is_connected.lock().unwrap() = false;
-        *self.audio_tx.lock().unwrap() = None;
-        *self.text_tx.lock().unwrap() = None;
-    }
 }

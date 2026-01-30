@@ -213,9 +213,9 @@ pub async fn start_room_recording(
 /// Stop recording and finalize the room
 #[tauri::command]
 pub async fn stop_room_recording_and_process(
-    app: AppHandle,
+    _app: AppHandle,
     state: State<'_, RoomState>,
-    room_id: String,
+    _room_id: String,
 ) -> Result<String, String> {
     {
         let mut is_recording = state.is_recording.lock().unwrap();

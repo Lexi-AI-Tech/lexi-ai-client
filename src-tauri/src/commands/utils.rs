@@ -14,13 +14,6 @@ pub fn get_system_type() -> &'static str {
     utils::get_system_type()
 }
 
-/// Get the device type as a string
-///
-#[tauri::command]
-pub fn get_device_type() -> &'static str {
-    utils::get_device_type()
-}
-
 /// Format a date string as a relative time (e.g., "Just now", "5 minutes ago", "2 hours ago")
 ///
 /// This provides human-readable relative time formatting similar to social media platforms.

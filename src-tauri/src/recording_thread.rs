@@ -76,6 +76,8 @@ pub fn spawn_recording_thread(
         // This is the maximum latency for receiving a recording command
         const TIMEOUT_CHECK_INTERVAL: Duration = Duration::from_millis(50);
         const STUCK_THRESHOLD: Duration = Duration::from_secs(8);
+        /// Recordings shorter than this are not sent to the Assistant API; we just complete the lifecycle and go idle.
+        const MIN_RECORDING_DURATION: Duration = Duration::from_millis(700); // 0.7 seconds
 
         loop {
             let command = match recording_rx.recv_timeout(TIMEOUT_CHECK_INTERVAL) {
@@ -173,8 +175,19 @@ pub fn spawn_recording_thread(
                                 );
 
                                 app_handle.emit("recording_stopped", ()).unwrap_or_default();
-                                // Process the audio using Tauri's async runtime
-                                process_audio(audio_data, app_handle.clone());
+
+                                if duration < MIN_RECORDING_DURATION {
+                                    println!(
+                                        "⏭️  Recording too short ({:.2}s < {:.2}s), skipping Assistant API",
+                                        duration.as_secs_f64(),
+                                        MIN_RECORDING_DURATION.as_secs_f64()
+                                    );
+                                    // Tell pill/frontend to go back to idle (no transcription_success will be emitted)
+                                    app_handle.emit("recording_skipped", ()).unwrap_or_default();
+                                } else {
+                                    // Process the audio (transcription / Assistant API)
+                                    process_audio(audio_data, app_handle.clone());
+                                }
                                 ctx.transition_to(RecordingPhase::Idle);
                             }
                             Err(e) => {
