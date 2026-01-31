@@ -100,14 +100,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             vocabulary.len()
         );
 
-        // Get cursor context and print app name and selected text
-        let cursor_context = crate::cursor_context::get_cursor_context();
-        let focused_app = cursor_context
-            .as_ref()
-            .and_then(|ctx| ctx.app_name.clone())
-            .unwrap_or_else(|| "Unknown".to_string());
-
-        // Initialize the STT service client and transcribe the audio
+        // Initialize the STT service client and transcribe the audio (cursor context is fetched inside transcribe_audio)
         let stt_service = SttService::new();
 
         let transcription_start = Instant::now();
@@ -117,7 +110,6 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 auth_token,
                 language,
                 enhance_transcription,
-                focused_app,
                 Some(app_handle_for_task.clone()),
                 offline_transcription,
                 vocabulary,
@@ -128,7 +120,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Check if the task was aborted (the JoinHandle will be cancelled)
         // If aborted, the result will be an error, but we should check for cancellation
         match transcription_result {
-            Ok(transcription) => {
+            Ok((transcription, cursor_context)) => {
                 println!(
                     "✅ Transcription completed in {:.2}s: {}",
                     transcription_duration.as_secs_f64(),
@@ -159,7 +151,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     let action_result = if let Some((trigger_phrase, action_command)) =
                         check_action_trigger(&transcription, &active_triggers)
                     {
-                        // Action trigger detected - perform action and use its result
+                        // Action trigger detected - perform action and use its result (cursor context from transcribe_audio)
                         println!(
                             "🎯 Action trigger detected: '{}' (matched: '{}') -> performing action: '{}'",
                             transcription.trim(),

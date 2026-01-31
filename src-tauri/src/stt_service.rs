@@ -22,7 +22,7 @@
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
 use crate::api_endpoints::assistant;
-use crate::commands::auth::get_auth_token_async;
+use crate::cursor_context::{get_cursor_context, CursorContext};
 use crate::utils;
 // use crate::whisper; // COMMENTED OUT: Model execution functionality
 use reqwest::multipart;
@@ -59,13 +59,15 @@ impl SttService {
     /// * `auth_token` - Optional authentication token (Bearer token) for authenticated requests
     /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
     /// * `enhance_transcription` - Whether to enhance the transcription with AI
-    /// * `focused_app` - Name of the currently focused application (required)
     /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
     /// * `offline_transcription` - Whether to use local Whisper model instead of server API
     /// * `vocabulary` - Optional vocabulary array to use as initial prompt for offline transcription
     ///
+    /// Cursor context (focused app, selected text) is fetched inside this function just before
+    /// calling the Assistant API and is returned with the transcription for use by the caller.
+    ///
     /// # Returns
-    /// * `Ok(String)` - The transcribed text on success
+    /// * `Ok((String, Option<CursorContext>))` - The transcribed text and cursor context on success
     /// * `Err(Box<dyn Error>)` - An error if the API call fails or if the request was cancelled
     pub async fn transcribe_audio(
         &self,
@@ -73,11 +75,10 @@ impl SttService {
         auth_token: Option<String>,
         language: String,
         enhance_transcription: bool,
-        focused_app: String,
         app_handle: Option<AppHandle>,
         offline_transcription: bool,
         vocabulary: Vec<String>,
-    ) -> Result<String, Box<dyn Error + Send + Sync>> {
+    ) -> Result<(String, Option<CursorContext>), Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
 
@@ -136,9 +137,9 @@ impl SttService {
         } else {
             // Continue with server API transcription
 
-            // Helper function to build the multipart form
+            // Helper function to build the multipart form (takes focused_app so cursor context can be fetched just before the API call)
             let build_form =
-                |audio_data: &[u8]| -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
+                |audio_data: &[u8], focused_app: &str| -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
                     let part = multipart::Part::bytes(audio_data.to_vec())
                         .file_name("audio.wav")
                         .mime_str("audio/wav")?;
@@ -147,7 +148,7 @@ impl SttService {
                         .part("audio_file", part)
                         .text("language", language.clone())
                         .text("enhance_stt_output", enhance_transcription.to_string())
-                        .text("focused_app", focused_app.clone());
+                        .text("focused_app", focused_app.to_string());
 
                     for word in &vocabulary {
                         form = form.text("vocabulary", word.clone());
@@ -157,7 +158,7 @@ impl SttService {
                 };
 
             // Check if we have a token
-            let mut current_token = if let Some(token) = auth_token {
+            let current_token = if let Some(token) = auth_token {
                 token
             } else {
                 println!("🔍 DEBUG: No auth token provided - emitting login_required event");
@@ -174,8 +175,15 @@ impl SttService {
                 current_token.len()
             );
 
-            // Build the form
-            let form = build_form(&audio_data)?;
+            // Get cursor context just before making the API call
+            let cursor_context = get_cursor_context();
+            let focused_app = cursor_context
+                .as_ref()
+                .and_then(|ctx| ctx.app_name.clone())
+                .unwrap_or_else(|| "Unknown".to_string());
+
+            // Build the form and make the request
+            let form = build_form(&audio_data, &focused_app)?;
 
             // Build the request URL
             let url = assistant::transcribe_url();
@@ -191,72 +199,16 @@ impl SttService {
 
             // Check if the request was successful (status code 200-299)
             if !status.is_success() {
-                // Read the error response body
                 let error_text = res.text().await?;
                 println!("🔍 DEBUG: Server Error response: {}", error_text);
-
-                // If we got a 401 Unauthorized, try to refresh the token and retry once
                 if status == reqwest::StatusCode::UNAUTHORIZED {
-                    println!("🔄 Received 401 Unauthorized, attempting token refresh...");
-
-                    // Try to refresh the token if we have an app handle
                     if let Some(handle) = app_handle {
-                        if let Some(new_token) = get_auth_token_async(&handle).await {
-                            println!("✅ Token refreshed, retrying transcription request...");
-                            current_token = new_token;
-
-                            // Rebuild the form for retry
-                            let retry_form = build_form(&audio_data)?;
-
-                            // Build retry request
-                            utils::log_api_request(
-                                "Retry transcription after token refresh",
-                                "POST",
-                                &url,
-                            );
-                            let mut retry_request = self.client.post(&url).multipart(retry_form);
-                            retry_request = retry_request
-                                .header("Authorization", format!("Bearer {}", current_token));
-
-                            // Retry the request (without cancellation support for retry)
-                            let retry_res = retry_request.send().await?;
-
-                            let retry_status = retry_res.status();
-                            println!("🔍 DEBUG: Retry response status: {}", retry_status);
-
-                            if retry_status.is_success() {
-                                // Parse the plain text response
-                                let text = retry_res.text().await?;
-                                println!("🔍 DEBUG: Server response text: {}", text);
-                                return Ok(text);
-                            } else {
-                                let retry_error_text = retry_res.text().await?;
-                                println!(
-                                    "🔍 DEBUG: Retry Server Error response: {}",
-                                    retry_error_text
-                                );
-                                return Err(format!(
-                                    "Server Error ({}): {}",
-                                    retry_status, retry_error_text
-                                )
-                                .into());
-                            }
-                        } else {
-                            println!("⚠️  Token refresh failed, user needs to re-authenticate");
-                            // Emit login_required event
-                            handle.emit("login_required", ()).unwrap_or_else(|e| {
-                                eprintln!("Failed to emit login_required event: {}", e)
-                            });
-                            return Err("Authentication failed. Please log in again.".into());
-                        }
-                    } else {
-                        // No app handle, can't refresh token
-                        return Err(format!("Server Error ({}): {}", status, error_text).into());
+                        handle.emit("login_required", ()).unwrap_or_else(|e| {
+                            eprintln!("Failed to emit login_required event: {}", e)
+                        });
                     }
-                } else {
-                    // Not a 401 error, return the error as-is
-                    return Err(format!("Server Error ({}): {}", status, error_text).into());
                 }
+                return Err(format!("Server Error ({}): {}", status, error_text).into());
             }
 
             // Parse the plain text response
@@ -264,7 +216,7 @@ impl SttService {
             let text = res.text().await?;
             println!("🔍 DEBUG: Server response text: {}", text);
 
-            Ok(text)
+            Ok((text, cursor_context))
         }
     }
 }
