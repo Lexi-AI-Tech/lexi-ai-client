@@ -229,35 +229,3 @@ pub fn init_pill_window(app: AppHandle) -> Result<(), String> {
         Err("Pill window not found after creation".to_string())
     }
 }
-
-/// Show and position the pill overlay window
-///
-/// This command shows the pill window (creating it if necessary) and positions it at the specified coordinates.
-///
-/// # Arguments
-/// * `app` - The Tauri app handle
-/// * `x` - The x coordinate for the window position
-/// * `y` - The y coordinate for the window position
-///
-/// # Returns
-/// * `Ok(())` - Successfully showed and positioned the window
-/// * `Err(String)` - An error message if the operation failed
-pub fn show_pill_window(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
-    // Ensure the window exists
-    ensure_pill_window_exists(&app)?;
-
-    if let Some(pill_window) = app.get_webview_window("pill") {
-        // Position first, then show to avoid visible repositioning
-        pill_window
-            .set_position(LogicalPosition::new(x, y))
-            .map_err(|e| format!("Failed to position pill window: {}", e))?;
-
-        pill_window
-            .show()
-            .map_err(|e| format!("Failed to show pill window: {}", e))?;
-
-        Ok(())
-    } else {
-        Err("Pill window not found after creation".to_string())
-    }
-}

@@ -103,7 +103,6 @@ use commands::onboarding::{
     complete_onboarding, get_onboarding_state, next_onboarding_step, previous_onboarding_step,
     reset_onboarding, set_onboarding_step,
 };
-use commands::pill::show_pill_window;
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
     stop_room_recording_and_process, update_room, update_speaker,
@@ -259,7 +258,6 @@ pub fn main() {
             check_input_monitoring_permission,
             check_accessibility_permission,
             inject_text,
-            show_pill_window,
             open_devtools,
             start_google_login,
             get_pkce_verifier,
