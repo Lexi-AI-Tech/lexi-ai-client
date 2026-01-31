@@ -620,16 +620,6 @@ pub fn start_listener(
                         if let Err(e) = recording_tx_for_rdev.send(command) {
                             eprintln!("Failed to send recording signal: {:?}", e);
                         }
-                        if let RecordingCommand::Start = command {
-                            std::thread::spawn(|| {
-                                if let Some(context) = crate::cursor_context::get_cursor_context() {
-                                    println!(
-                                        "Cursor context - App: {:?}, PID: {:?}, Text: {:?}",
-                                        context.app_name, context.pid, context.selected_text
-                                    );
-                                }
-                            });
-                        }
                         println!(
                             "Hotkey {} - {} recording",
                             match command {
