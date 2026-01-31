@@ -44,6 +44,8 @@ const Pill: React.FC = () => {
   const isRecordingRef = useRef(false);
   const hasRealAudioRef = useRef(false); // Track if we're receiving real volume data
   const lastVolumeTimeRef = useRef(0); // Track when we last received volume data
+  // Single source of truth for idle position - prevents position drift from accumulated rounding errors
+  const idlePositionRef = useRef<{ x: number; y: number } | null>(null);
 
   // Smooth audio levels for better visual experience
   useEffect(() => {
@@ -120,6 +122,27 @@ const Pill: React.FC = () => {
     };
   }, [status]);
 
+  // Initialize idle position reference on mount
+  useEffect(() => {
+    const initializePosition = async () => {
+      try {
+        const window = getCurrentWindow();
+        const physicalPos = await window.outerPosition();
+        const scaleFactor = await window.scaleFactor();
+        const logicalX = physicalPos.x / scaleFactor;
+        const logicalY = physicalPos.y / scaleFactor;
+        idlePositionRef.current = { x: logicalX, y: logicalY };
+        console.log(
+          "📍 Initialized idle position reference:",
+          idlePositionRef.current,
+        );
+      } catch (e) {
+        console.error("Failed to initialize idle position:", e);
+      }
+    };
+    initializePosition();
+  }, []);
+
   useEffect(() => {
     const setupListeners = async () => {
       try {
@@ -129,24 +152,34 @@ const Pill: React.FC = () => {
           // Play sound immediately for instant feedback (non-blocking)
           // playSound("processing");
 
-          // Expand window upward: move up by height difference, then resize
+          // Expand window upward using absolute positioning from idle reference
           const window = getCurrentWindow();
           try {
-            // outerPosition returns PhysicalPosition, we need to convert to logical
-            const physicalPos = await window.outerPosition();
-            const scaleFactor = await window.scaleFactor();
-            const logicalX = physicalPos.x / scaleFactor;
-            const logicalY = physicalPos.y / scaleFactor;
+            if (!idlePositionRef.current) {
+              console.error("Idle position not initialized");
+              return;
+            }
 
-            // Move window UP so bottom edge stays in place while expanding
-            await window.setPosition(
-              new LogicalPosition(
-                logicalX - (EXPANDED_SIZE.width - IDLE_SIZE.width) / 2, // Center horizontally
-                logicalY - HEIGHT_DIFF, // Move up
-              ),
+            const idleX = idlePositionRef.current.x;
+            const idleY = idlePositionRef.current.y;
+
+            // Calculate absolute position for recording state
+            // Move LEFT to center the wider pill, and move UP so bottom edge stays in place
+            const recordingX =
+              idleX - (EXPANDED_SIZE.width - IDLE_SIZE.width) / 2;
+            const recordingY = idleY - HEIGHT_DIFF;
+
+            console.log(
+              `📍 Recording: idle=(${idleX.toFixed(2)}, ${idleY.toFixed(2)}) → recording=(${recordingX.toFixed(2)}, ${recordingY.toFixed(2)})`,
             );
+
+            // CRITICAL: Resize FIRST, then position SECOND
+            // If we position before resize, the OS may adjust position after resize
             await window.setSize(
               new LogicalSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height),
+            );
+            await window.setPosition(
+              new LogicalPosition(recordingX, recordingY),
             );
           } catch (e) {
             console.error("Failed to expand window:", e);
@@ -159,18 +192,25 @@ const Pill: React.FC = () => {
           // Expand width for processing (to fit bars + loader)
           const window = getCurrentWindow();
           try {
-            const physicalPos = await window.outerPosition();
-            const scaleFactor = await window.scaleFactor();
-            const logicalX = physicalPos.x / scaleFactor;
-            // Adjust position to keep centered while expanding width
-            await window.setPosition(
-              new LogicalPosition(
-                logicalX - (PROCESSING_SIZE.width - EXPANDED_SIZE.width) / 2,
-                physicalPos.y / scaleFactor,
-              ),
-            );
+            if (!idlePositionRef.current) {
+              console.error("Idle position not initialized");
+              return;
+            }
+
+            const idleX = idlePositionRef.current.x;
+            const idleY = idlePositionRef.current.y;
+
+            // Calculate absolute position for processing state
+            const processingX =
+              idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
+            const processingY = idleY - HEIGHT_DIFF;
+
+            // CRITICAL: Resize FIRST, then position SECOND
             await window.setSize(
               new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
+            );
+            await window.setPosition(
+              new LogicalPosition(processingX, processingY),
             );
           } catch (e) {
             console.error("Failed to expand to processing size:", e);
@@ -185,17 +225,25 @@ const Pill: React.FC = () => {
             // Expand width for processing (to fit bars + loader)
             const window = getCurrentWindow();
             try {
-              const physicalPos = await window.outerPosition();
-              const scaleFactor = await window.scaleFactor();
-              const logicalX = physicalPos.x / scaleFactor;
-              await window.setPosition(
-                new LogicalPosition(
-                  logicalX - (PROCESSING_SIZE.width - EXPANDED_SIZE.width) / 2,
-                  physicalPos.y / scaleFactor,
-                ),
-              );
+              if (!idlePositionRef.current) {
+                console.error("Idle position not initialized");
+                return;
+              }
+
+              const idleX = idlePositionRef.current.x;
+              const idleY = idlePositionRef.current.y;
+
+              // Calculate absolute position for processing state
+              const processingX =
+                idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
+              const processingY = idleY - HEIGHT_DIFF;
+
+              // CRITICAL: Resize FIRST, then position SECOND
               await window.setSize(
                 new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
+              );
+              await window.setPosition(
+                new LogicalPosition(processingX, processingY),
               );
             } catch (e) {
               console.error("Failed to expand to processing size:", e);
@@ -211,26 +259,49 @@ const Pill: React.FC = () => {
             // Play done sound immediately for instant feedback
             // playSound("done");
 
-            // Shrink window downward: resize first, then move down
+            // Return to exact idle position - no calculations, just restore reference
             const window = getCurrentWindow();
             try {
-              // outerPosition returns PhysicalPosition, convert to logical
-              const physicalPos = await window.outerPosition();
-              const scaleFactor = await window.scaleFactor();
-              const logicalX = physicalPos.x / scaleFactor;
-              const logicalY = physicalPos.y / scaleFactor;
+              if (!idlePositionRef.current) {
+                console.error("Idle position not initialized");
+                return;
+              }
 
+              console.log(
+                `📍 Returning to idle: (${idlePositionRef.current.x.toFixed(2)}, ${idlePositionRef.current.y.toFixed(2)})`,
+              );
+
+              // CRITICAL: Resize FIRST, then position SECOND
               await window.setSize(
                 new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
               );
-              // Move window DOWN so bottom edge stays in place while shrinking
-              // Use PROCESSING_SIZE since we're coming from processing state
               await window.setPosition(
                 new LogicalPosition(
-                  logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
-                  logicalY + HEIGHT_DIFF,
+                  idlePositionRef.current.x,
+                  idlePositionRef.current.y,
                 ),
               );
+
+              // Verify position after setting and update reference if needed
+              const physicalPos = await window.outerPosition();
+              const scaleFactor = await window.scaleFactor();
+              const actualX = physicalPos.x / scaleFactor;
+              const actualY = physicalPos.y / scaleFactor;
+
+              const dx = Math.abs(actualX - idlePositionRef.current.x);
+              const dy = Math.abs(actualY - idlePositionRef.current.y);
+
+              if (dx > 0.1 || dy > 0.1) {
+                console.warn(
+                  `⚠️  Position drift detected: expected=(${idlePositionRef.current.x.toFixed(2)}, ${idlePositionRef.current.y.toFixed(2)}), actual=(${actualX.toFixed(2)}, ${actualY.toFixed(2)}), diff=(${dx.toFixed(2)}, ${dy.toFixed(2)})`,
+                );
+                // Update reference to actual position to prevent accumulation
+                idlePositionRef.current = { x: actualX, y: actualY };
+              } else {
+                console.log(
+                  `✅ Position verified: drift=(${dx.toFixed(3)}, ${dy.toFixed(3)}) px`,
+                );
+              }
             } catch (e) {
               console.error("Failed to shrink window:", e);
             }
@@ -241,24 +312,22 @@ const Pill: React.FC = () => {
         const unlistenError = await listen("transcription_error", async () => {
           setStatus("idle");
 
-          // Shrink window downward: resize first, then move down
+          // Return to exact idle position
           const window = getCurrentWindow();
           try {
-            // outerPosition returns PhysicalPosition, convert to logical
-            const physicalPos = await window.outerPosition();
-            const scaleFactor = await window.scaleFactor();
-            const logicalX = physicalPos.x / scaleFactor;
-            const logicalY = physicalPos.y / scaleFactor;
+            if (!idlePositionRef.current) {
+              console.error("Idle position not initialized");
+              return;
+            }
 
             await window.setSize(
               new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
             );
-            // Move window DOWN so bottom edge stays in place while shrinking
-            // Use PROCESSING_SIZE since we're coming from processing state
+            // Restore exact idle position from reference
             await window.setPosition(
               new LogicalPosition(
-                logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
-                logicalY + HEIGHT_DIFF,
+                idlePositionRef.current.x,
+                idlePositionRef.current.y,
               ),
             );
           } catch (e) {
@@ -271,17 +340,19 @@ const Pill: React.FC = () => {
           setStatus("idle");
           const window = getCurrentWindow();
           try {
-            const physicalPos = await window.outerPosition();
-            const scaleFactor = await window.scaleFactor();
-            const logicalX = physicalPos.x / scaleFactor;
-            const logicalY = physicalPos.y / scaleFactor;
+            if (!idlePositionRef.current) {
+              console.error("Idle position not initialized");
+              return;
+            }
+
             await window.setSize(
               new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
             );
+            // Restore exact idle position from reference
             await window.setPosition(
               new LogicalPosition(
-                logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
-                logicalY + HEIGHT_DIFF,
+                idlePositionRef.current.x,
+                idlePositionRef.current.y,
               ),
             );
           } catch (e) {
@@ -349,23 +420,22 @@ const Pill: React.FC = () => {
           async () => {
             setStatus("idle");
 
-            // Shrink window downward: resize first, then move down
+            // Return to exact idle position
             const window = getCurrentWindow();
             try {
-              // outerPosition returns PhysicalPosition, convert to logical
-              const physicalPos = await window.outerPosition();
-              const scaleFactor = await window.scaleFactor();
-              const logicalX = physicalPos.x / scaleFactor;
-              const logicalY = physicalPos.y / scaleFactor;
+              if (!idlePositionRef.current) {
+                console.error("Idle position not initialized");
+                return;
+              }
 
               await window.setSize(
                 new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
               );
-              // Use PROCESSING_SIZE since we're coming from processing state
+              // Restore exact idle position from reference
               await window.setPosition(
                 new LogicalPosition(
-                  logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
-                  logicalY + HEIGHT_DIFF,
+                  idlePositionRef.current.x,
+                  idlePositionRef.current.y,
                 ),
               );
             } catch (e) {
@@ -378,23 +448,22 @@ const Pill: React.FC = () => {
         const unlistenActionError = await listen("action_error", async () => {
           setStatus("idle");
 
-          // Shrink window downward: resize first, then move down
+          // Return to exact idle position
           const window = getCurrentWindow();
           try {
-            // outerPosition returns PhysicalPosition, convert to logical
-            const physicalPos = await window.outerPosition();
-            const scaleFactor = await window.scaleFactor();
-            const logicalX = physicalPos.x / scaleFactor;
-            const logicalY = physicalPos.y / scaleFactor;
+            if (!idlePositionRef.current) {
+              console.error("Idle position not initialized");
+              return;
+            }
 
             await window.setSize(
               new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
             );
-            // Use PROCESSING_SIZE since we're coming from processing state
+            // Restore exact idle position from reference
             await window.setPosition(
               new LogicalPosition(
-                logicalX + (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2,
-                logicalY + HEIGHT_DIFF,
+                idlePositionRef.current.x,
+                idlePositionRef.current.y,
               ),
             );
           } catch (e) {
@@ -428,6 +497,10 @@ const Pill: React.FC = () => {
     // Start dragging the window when clicking on the pill
     try {
       const window = getCurrentWindow();
+
+      // Note: startDragging() is async but returns immediately,
+      // it doesn't wait for drag completion. We can't update position here.
+      // Instead, we'll update the reference when returning to idle state.
       await window.startDragging();
     } catch (error) {
       console.error("Failed to start dragging:", error);
