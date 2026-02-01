@@ -12,7 +12,7 @@ use crate::commands::app_config::get_app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::shortcuts::check_command;
 use crate::state::TranscriptionTaskState;
-use super::service::SttService;
+use super::service::AssistantService;
 use crate::text_injector::TextInjector;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
@@ -98,11 +98,11 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             vocabulary.len()
         );
 
-        // Initialize the STT service client and transcribe the audio (cursor context is fetched inside transcribe_audio)
-        let stt_service = SttService::new();
+        // Initialize the Assistant service client and transcribe the audio (cursor context is fetched inside transcribe_audio)
+        let assistant_service = AssistantService::new();
 
         let transcription_start = Instant::now();
-        let transcription_result = stt_service
+        let transcription_result = assistant_service
             .transcribe_audio(
                 audio_data,
                 auth_token,

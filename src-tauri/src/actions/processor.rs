@@ -8,7 +8,7 @@ use crate::actions::perform_action;
 use crate::commands::app_config::get_app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::cursor_context::get_cursor_context;
-use crate::assistant::SttService;
+use crate::assistant::AssistantService;
 use crate::text_injector::TextInjector;
 use crate::tts_service::TtsService;
 
@@ -51,8 +51,8 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
     let cursor_context = get_cursor_context();
 
     // Transcribe the audio
-    let stt_service = SttService::new();
-    match stt_service
+    let assistant_service = AssistantService::new();
+    match assistant_service
         .transcribe_audio(
             audio_data,
             auth_token,

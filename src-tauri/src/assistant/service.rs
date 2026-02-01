@@ -29,16 +29,16 @@ use reqwest::multipart;
 use std::error::Error;
 use tauri::{AppHandle, Emitter};
 
-/// STT (Speech-to-Text) Service client for transcribing audio using Lexi AI Server
+/// Assistant Service client for transcribing audio using Lexi AI Server
 ///
 /// This struct manages HTTP requests to the Lexi AI Server endpoint for speech-to-text conversion.
 /// The server handles the Groq API integration internally.
-pub struct SttService {
+pub struct AssistantService {
     client: reqwest::Client, // HTTP client for making API requests
 }
 
-impl SttService {
-    /// Creates a new SttService instance
+impl AssistantService {
+    /// Creates a new AssistantService instance
     ///
     /// Initializes the HTTP client.
     pub fn new() -> Self {
