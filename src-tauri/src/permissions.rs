@@ -33,7 +33,7 @@
 
 use tauri::AppHandle;
 
-use crate::audio_recorder::AudioRecorder;
+use crate::audio::recorder::AudioRecorder;
 
 /// Check microphone permission on macOS
 #[tauri::command]

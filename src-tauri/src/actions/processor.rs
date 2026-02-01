@@ -1,158 +1,19 @@
-//! Action Recording Thread Module
-//!
-//! This module handles recording and processing for action commands triggered by the action hotkey.
-//! Similar to the main recording thread, but specifically processes actions instead of regular transcriptions.
+//! Action Audio Processor Logic
+//! 
+//! This module contains the logic to process recorded audio for actions.
+//! It handles transcription, action execution, and response handling (TTS/Injection).
 
-use crate::actions::perform_action;
-use crate::audio_recorder::AudioRecorder;
-use crate::RecordingCommand;
-use std::sync::mpsc;
 use tauri::{AppHandle, Emitter};
-
-/// Phase of the action recording lifecycle
-#[derive(Debug, Clone, PartialEq)]
-enum ActionRecordingPhase {
-    Idle,
-    Recording,
-    Error(String),
-}
-
-/// Spawns a dedicated thread to handle action recording triggered by the action hotkey.
-///
-/// This thread:
-/// 1. Listens for ActionStart/ActionStop commands via the action_rx channel
-/// 2. Records audio while the action hotkey is held
-/// 3. Transcribes the audio when the hotkey is released
-/// 4. Calls perform_action with the transcribed command
-/// 5. Handles the action response (inject text or speak via TTS)
-///
-/// # Arguments
-/// * `app_handle` - The Tauri AppHandle for emitting events and accessing state
-/// * `action_rx` - Channel receiver for ActionStart/ActionStop commands
-pub fn spawn_action_recording_thread(
-    app_handle: AppHandle,
-    action_rx: mpsc::Receiver<RecordingCommand>,
-) {
-    std::thread::spawn(move || {
-        println!("🎯 Action recording thread started");
-
-        let mut phase = ActionRecordingPhase::Idle;
-        let mut recorder: Option<AudioRecorder> = None;
-
-        loop {
-            // Wait for commands with a timeout to allow periodic cleanup
-            let command = match action_rx.recv() {
-                Ok(cmd) => cmd,
-                Err(_) => {
-                    println!("🛑 Action recording channel closed, exiting action recording thread");
-                    break;
-                }
-            };
-
-            // Process command based on current phase
-            match (command, &phase) {
-                // ActionStart in Idle or Error state - start new action recording
-                (RecordingCommand::ActionStart, ActionRecordingPhase::Idle | ActionRecordingPhase::Error(_)) => {
-                    println!("🎯 Action hotkey pressed - starting action recording");
-                    // phase = ActionRecordingPhase::Starting;
-
-                    // Emit event to frontend
-                    app_handle
-                        .emit("action_recording_started", ())
-                        .unwrap_or_default();
-
-                    // Initialize audio recorder
-                    let new_recorder = AudioRecorder::new();
-                    recorder = Some(new_recorder);
-                    phase = ActionRecordingPhase::Recording;
-                    println!("✅ Action recording started successfully");
-
-                    // Start recording (ignore errors for now as new() shouldn't fail)
-                    if let Some(rec) = recorder.as_mut() {
-                       if let Err(e) = rec.start_recording(None) {
-                            let error_msg = format!("Failed to start action recording: {}", e);
-                            eprintln!("❌ {}", error_msg);
-                            phase = ActionRecordingPhase::Error(error_msg.clone());
-                            app_handle
-                                .emit("action_recording_error", error_msg)
-                                .unwrap_or_default();
-                            recorder = None;
-                       }
-                    }
-                }
-
-                // ActionStop in Recording state - stop and process
-                (RecordingCommand::ActionStop, ActionRecordingPhase::Recording) => {
-                    println!("🎯 Action hotkey released - stopping action recording");
-                    // phase = ActionRecordingPhase::Stopping;
-
-                    if let Some(mut rec) = recorder.take() {
-                        // Stop recording and get audio data
-                        match rec.stop_recording() {
-                            Ok(audio_data) => {
-                                println!("✅ Action audio captured: {} bytes", audio_data.len());
-                                
-                                // Emit event to frontend
-                                app_handle
-                                    .emit("action_recording_stopped", ())
-                                    .unwrap_or_default();
-
-                                // Process the action in a separate async task
-                                let app_handle_for_action = app_handle.clone();
-                                tauri::async_runtime::spawn(async move {
-                                    process_action_audio(audio_data, app_handle_for_action).await;
-                                });
-
-                                phase = ActionRecordingPhase::Idle;
-                            }
-                            Err(e) => {
-                                let error_msg = format!("Failed to capture action audio: {}", e);
-                                eprintln!("❌ {}", error_msg);
-                                phase = ActionRecordingPhase::Error(error_msg.clone());
-                                app_handle
-                                    .emit("action_recording_error", error_msg)
-                                    .unwrap_or_default();
-                            }
-                        }
-                    } else {
-                        println!("⚠️  No active action recorder to stop");
-                        phase = ActionRecordingPhase::Idle;
-                    }
-                }
-
-                // Ignore duplicate or out-of-order commands
-                (RecordingCommand::ActionStart, ActionRecordingPhase::Recording) => {
-                    println!("⚠️  Ignoring duplicate ActionStart (already recording)");
-                }
-                (RecordingCommand::ActionStop, ActionRecordingPhase::Idle) => {
-                    println!("⚠️  Ignoring ActionStop (not recording)");
-                }
-                (RecordingCommand::ActionStop, ActionRecordingPhase::Error(_)) => {
-                    println!("⚠️  Ignoring ActionStop (in error state)");
-                    phase = ActionRecordingPhase::Idle;
-                }
-
-
-                // Ignore regular Start/Stop commands (they go to the main recording thread)
-                (RecordingCommand::Start, _) | (RecordingCommand::Stop, _) => {
-                    // These should not be sent to this channel, but ignore if they are
-                }
-            }
-        }
-
-        println!("🛑 Action recording thread stopped");
-    });
-}
+use crate::actions::perform_action;
+use crate::commands::app_config::get_app_config;
+use crate::commands::auth::get_auth_token_async;
+use crate::cursor_context::get_cursor_context;
+use crate::assistant::SttService;
+use crate::text_injector::TextInjector;
+use crate::tts_service::TtsService;
 
 /// Process action audio by transcribing it and executing the action
-async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
-    use crate::commands::app_config::get_app_config;
-    use crate::commands::auth::get_auth_token_async;
-    use crate::cursor_context::get_cursor_context;
-    use crate::assistant::SttService;
-    use crate::text_injector::TextInjector;
-    use crate::tts_service::TtsService;
-
+pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
     println!("🎯 Processing action audio, size: {} bytes", audio_data.len());
 
     // Notify frontend that action processing has started

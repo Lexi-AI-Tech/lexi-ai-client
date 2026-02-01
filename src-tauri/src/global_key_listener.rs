@@ -597,14 +597,12 @@ fn key_to_string(key: &Key) -> String {
 pub fn start_listener(
     app: AppHandle,
     recording_tx: mpsc::Sender<RecordingCommand>,
-    action_tx: mpsc::Sender<RecordingCommand>,
     config_rx: watch::Receiver<Vec<String>>,
     action_hotkey_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
 ) {
     let app_for_rdev = app.clone();
     let recording_tx_for_rdev = recording_tx.clone();
-    let action_tx_for_rdev = action_tx.clone();
     let recording_state_for_rdev = recording_state.clone();
     let config_rx_for_rdev = config_rx.clone();
     let action_hotkey_rx_for_rdev = action_hotkey_rx.clone();
@@ -678,7 +676,7 @@ pub fn start_listener(
 
                 match result {
                     HotkeyCommandResult::SendNow(command) => {
-                        if let Err(e) = action_tx_for_rdev.send(command) {
+                        if let Err(e) = recording_tx_for_rdev.send(command) {
                             eprintln!("Failed to send action signal: {:?}", e);
                         }
                         println!(
@@ -696,7 +694,7 @@ pub fn start_listener(
                         );
                     }
                     HotkeyCommandResult::SendStopAfter(delay) => {
-                        let tx = action_tx_for_rdev.clone();
+                        let tx = recording_tx_for_rdev.clone();
                         std::thread::spawn(move || {
                             std::thread::sleep(delay);
                             if let Err(e) = tx.send(RecordingCommand::ActionStop) {
@@ -741,20 +739,8 @@ pub fn start_listener(
 
                 match result {
                     HotkeyCommandResult::SendNow(command) => {
-                        // Check if this is an action command or regular command
-                        let is_action = matches!(
-                            command,
-                            RecordingCommand::ActionStart | RecordingCommand::ActionStop
-                        );
-
-                        if is_action {
-                            if let Err(e) = action_tx_for_rdev.send(command) {
-                                eprintln!("Failed to send action signal: {:?}", e);
-                            }
-                        } else {
-                            if let Err(e) = recording_tx_for_rdev.send(command) {
-                                eprintln!("Failed to send recording signal: {:?}", e);
-                            }
+                        if let Err(e) = recording_tx_for_rdev.send(command) {
+                            eprintln!("Failed to send recording signal: {:?}", e);
                         }
 
                         println!(

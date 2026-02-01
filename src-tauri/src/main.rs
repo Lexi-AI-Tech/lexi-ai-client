@@ -46,7 +46,7 @@ use tokio::sync::watch;
 // Module declarations for core functionality
 mod actions; // Voice actions triggered by action trigger phrases from app config
 mod api_endpoints; // Centralized API endpoint definitions
-mod audio_recorder; // Audio capture from default microphone using cpal, converts to WAV format
+mod audio;
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
 mod cursor_context; // Cursor context retrieval using macOS Accessibility API (AXUIElement)
@@ -67,10 +67,10 @@ mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
-use actions::thread::spawn_action_recording_thread;
+use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
 use google_oauth::OAuthState;
-use assistant::spawn_recording_thread;
+
 use state::{
     ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RecordingChannelState,
     RoomState, TranscriptionTaskState,
@@ -355,9 +355,7 @@ pub fn main() {
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
             let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
 
-            // Channel to communicate with the action recording thread
-            // Separate channel for action commands
-            let (action_tx, action_rx) = mpsc::channel::<RecordingCommand>();
+
 
             // Load hotkeys from Tauri Store (server provides defaults)
             let initial_config = {
@@ -427,7 +425,6 @@ pub fn main() {
             start_listener(
                 app_handle.clone(),
                 recording_tx.clone(),
-                action_tx.clone(),
                 config_rx,
                 action_hotkey_rx,
                 recording_state_arc,
@@ -435,11 +432,8 @@ pub fn main() {
 
             #[cfg(desktop)]
             {
-                // Spawn the dedicated recording thread
+                // Spawn the unified recording thread
                 spawn_recording_thread(app_handle.clone(), recording_rx);
-                
-                // Spawn the dedicated action recording thread
-                spawn_action_recording_thread(app_handle.clone(), action_rx);
             }
 
             Ok(())
