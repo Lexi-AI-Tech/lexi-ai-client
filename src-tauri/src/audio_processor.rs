@@ -8,14 +8,12 @@
 //! 5. Injecting the transcribed text into the active application using TextInjector
 //! 6. Emitting events to the frontend to update UI state
 
-use crate::actions::{check_action_trigger, perform_action, ActionResponse};
 use crate::commands::app_config::get_app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::shortcuts::check_command;
 use crate::state::TranscriptionTaskState;
 use crate::stt_service::SttService;
 use crate::text_injector::TextInjector;
-use crate::tts_service::TtsService;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -134,150 +132,33 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
                 // Only process if transcription is not empty
                 if !transcription.trim().is_empty() {
-                    // Get active action triggers from app config
-                    let active_triggers: Vec<String> = app_config
-                        .action_triggers
-                        .as_ref()
-                        .map(|triggers| {
-                            triggers
-                                .iter()
-                                .filter(|t| t.is_active)
-                                .map(|t| t.trigger_phrase.clone())
-                                .collect()
-                        })
-                        .unwrap_or_default();
+                    // Check if transcription matches a shortcut command
+                    let text_to_inject =
+                        check_command(&transcription).unwrap_or_else(|| transcription.clone());
 
-                    // Check if transcription starts with any action trigger
-                    let action_result = if let Some((trigger_phrase, action_command)) =
-                        check_action_trigger(&transcription, &active_triggers)
-                    {
-                        // Action trigger detected - perform action and use its result (cursor context from transcribe_audio)
+                    if text_to_inject != transcription {
                         println!(
-                            "🎯 Action trigger detected: '{}' (matched: '{}') -> performing action: '{}'",
+                            "🔧 Command detected: '{}' -> '{}'",
                             transcription.trim(),
-                            trigger_phrase,
-                            action_command
+                            text_to_inject
                         );
-                        perform_action(
-                            &action_command,
-                            &app_handle_for_task,
-                            cursor_context.as_ref(),
-                        )
-                        .await
-                    } else {
-                        // No action trigger - check if transcription matches a shortcut command
-                        let text_to_inject =
-                            check_command(&transcription).unwrap_or_else(|| transcription.clone());
+                    }
 
-                        if text_to_inject != transcription {
-                            println!(
-                                "🔧 Command detected: '{}' -> '{}'",
-                                transcription.trim(),
-                                text_to_inject
-                            );
+                    // Inject the text (or shortcut replacement)
+                    let injector = TextInjector::new();
+                    match injector.inject_text(&text_to_inject) {
+                        Ok(_) => {
+                            // Successfully injected text into active application
+                            app_handle_for_task
+                                .emit("injection_success", ())
+                                .unwrap_or_default();
                         }
-
-                        // For non-action transcriptions, create a text action response
-                        Some(ActionResponse {
-                            action_type: "text".to_string(),
-                            value: text_to_inject,
-                        })
-                    };
-
-                    if let Some(action_response) = action_result {
-                        match action_response.action_type.as_str() {
-                            "voice" => {
-                                // Use TTS to read the text
-                                println!("🔊 Voice action detected - reading text using TTS");
-
-                                let tts_service = TtsService::new(app_handle_for_task.clone());
-                                match tts_service.speak(&action_response.value, None).await {
-                                    Ok(_) => {
-                                        println!("✅ Text-to-speech completed successfully");
-                                        app_handle_for_task
-                                            .emit("tts_success", ())
-                                            .unwrap_or_default();
-                                    }
-                                    Err(e) => {
-                                        eprintln!("❌ Failed to convert text to speech: {}", e);
-                                        app_handle_for_task
-                                            .emit("tts_error", e.to_string())
-                                            .unwrap_or_default();
-                                    }
-                                }
-                            }
-                            "text" => {
-                                // Inject text as before
-                                let injector = TextInjector::new();
-                                match injector.inject_text(&action_response.value) {
-                                    Ok(_) => {
-                                        // Successfully injected text into active application
-                                        app_handle_for_task
-                                            .emit("injection_success", ())
-                                            .unwrap_or_default();
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Failed to inject text: {}", e);
-                                        // Notify frontend of injection failure
-                                        app_handle_for_task
-                                            .emit("injection_error", e.to_string())
-                                            .unwrap_or_default();
-                                    }
-                                }
-                            }
-                            "text_and_voice" => {
-                                // Hybrid action: Inject text AND Read it
-                                println!(
-                                    "🗣️📝 Hybrid action detected - injecting and reading text"
-                                );
-
-                                // 1. Start TTS (async but do it first so user hears feedback while text types)
-                                let tts_service = TtsService::new(app_handle_for_task.clone());
-                                let tts_handle = tts_service.speak(&action_response.value, None);
-
-                                // 2. Inject text
-                                let injector = TextInjector::new();
-                                match injector.inject_text(&action_response.value) {
-                                    Ok(_) => {
-                                        app_handle_for_task
-                                            .emit("injection_success", ())
-                                            .unwrap_or_default();
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Failed to inject text: {}", e);
-                                        app_handle_for_task
-                                            .emit("injection_error", e.to_string())
-                                            .unwrap_or_default();
-                                    }
-                                }
-
-                                // 3. Wait for TTS to finish (optional, but good for error handling)
-                                match tts_handle.await {
-                                    Ok(_) => {
-                                        println!("✅ Text-to-speech completed successfully");
-                                        app_handle_for_task
-                                            .emit("tts_success", ())
-                                            .unwrap_or_default();
-                                    }
-                                    Err(e) => {
-                                        eprintln!("❌ Failed to convert text to speech: {}", e);
-                                        app_handle_for_task
-                                            .emit("tts_error", e.to_string())
-                                            .unwrap_or_default();
-                                    }
-                                }
-                            }
-                            _ => {
-                                eprintln!(
-                                    "⚠️  Unknown action type: {}",
-                                    action_response.action_type
-                                );
-                                // Fallback to text injection
-                                let injector = TextInjector::new();
-                                if let Err(e) = injector.inject_text(&action_response.value) {
-                                    eprintln!("Failed to inject text: {}", e);
-                                }
-                            }
+                        Err(e) => {
+                            eprintln!("Failed to inject text: {}", e);
+                            // Notify frontend of injection failure
+                            app_handle_for_task
+                                .emit("injection_error", e.to_string())
+                                .unwrap_or_default();
                         }
                     }
                 }

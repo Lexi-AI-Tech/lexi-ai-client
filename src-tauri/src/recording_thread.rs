@@ -112,6 +112,9 @@ pub fn spawn_recording_thread(
             };
 
             match (command, ctx.phase) {
+                // Ignore Action commands in this thread (handled by action_recording_thread)
+                (RecordingCommand::ActionStart, _) | (RecordingCommand::ActionStop, _) => {}
+
                 // ── Valid transitions ───────────────────────────────
                 (RecordingCommand::Start, RecordingPhase::Idle | RecordingPhase::Error(_)) => {
                     ctx.transition_to(RecordingPhase::Starting);

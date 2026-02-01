@@ -87,7 +87,7 @@ export interface AppConfig {
   enhance_transcription: boolean;
   launch_on_system_startup: boolean;
   vocabulary: string[];
-  action_triggers: ActionTrigger[];
+  action_hotkey: string | null;
   shortcuts: Shortcut[];
 }
 
@@ -102,7 +102,7 @@ export interface AppConfigUpdateRequest {
   enhance_transcription?: boolean;
   launch_on_system_startup?: boolean;
   vocabulary?: string[] | null;
-  action_triggers?: ActionTrigger[] | null;
+  action_hotkey?: string | null;
   shortcuts?: Shortcut[] | null;
 }
 
@@ -112,6 +112,7 @@ export interface AppConfigUpdateRequest {
 export interface TauriAppConfig {
   languages?: string[] | null;
   hotkeys?: string[] | null;
+  action_hotkey?: string | null;
   enhance_transcription?: boolean | null;
   launch_on_system_startup?: boolean | null;
   vocabulary?: string[] | null;
@@ -253,14 +254,14 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-    | "home"
-    | "transcripts"
-    | "settings"
-    | "vocabulary"
-    | "actions"
-    | "shortcuts"
-    | "rooms"
-    | "notes";
+  | "home"
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts"
+  | "rooms"
+  | "notes";
   onNavigate: (
     page:
       | "home"
@@ -298,21 +299,7 @@ export interface PaginatedActionHistoryResponse {
   total_pages: number;
 }
 
-export interface ActionTrigger {
-  id: string;
-  trigger_phrase: string;
-  is_active: boolean;
-}
 
-export interface ActionTriggerCreateRequest {
-  trigger_phrase: string;
-  is_active?: boolean;
-}
-
-export interface ActionTriggerUpdateRequest {
-  trigger_phrase?: string;
-  is_active?: boolean;
-}
 
 export interface Shortcut {
   id: string;

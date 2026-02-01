@@ -20,14 +20,6 @@ use crate::utils;
 
 const STORE_FILE: &str = ".app-config.dat";
 
-/// Action trigger structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActionTrigger {
-    pub id: String,
-    pub trigger_phrase: String,
-    pub is_active: bool,
-}
-
 /// Application configuration structure
 ///
 /// Represents all application settings that are persisted in Tauri Store.
@@ -44,8 +36,8 @@ pub struct AppConfig {
     pub launch_on_system_startup: Option<bool>,
     /// Vocabulary for transcription (array of strings)
     pub vocabulary: Option<Vec<String>>,
-    /// Action triggers for voice commands (array of action trigger items)
-    pub action_triggers: Option<Vec<ActionTrigger>>,
+    /// Hotkey combination for triggering actions (e.g., "Fn+Control")
+    pub action_hotkey: Option<String>,
     /// Shortcuts for text expansion (array of shortcut items)
     pub shortcuts: Option<Vec<Shortcut>>,
 }
@@ -68,7 +60,7 @@ struct ServerAppConfigResponse {
     pub enhance_transcription: bool,
     pub launch_on_system_startup: bool,
     pub vocabulary: Vec<String>,
-    pub action_triggers: Vec<ActionTrigger>,
+    pub action_hotkey: Option<String>,
     pub shortcuts: Vec<Shortcut>,
 }
 
@@ -168,7 +160,7 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
         enhance_transcription: None,
         launch_on_system_startup: Some(true), // Enable autostart by default on first launch
         vocabulary: None,
-        action_triggers: None,
+        action_hotkey: None,
         shortcuts: None,
     };
 
@@ -328,8 +320,8 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.vocabulary.is_some() {
         current.vocabulary = provided.vocabulary;
     }
-    if provided.action_triggers.is_some() {
-        current.action_triggers = provided.action_triggers;
+    if provided.action_hotkey.is_some() {
+        current.action_hotkey = provided.action_hotkey;
     }
     if provided.shortcuts.is_some() {
         current.shortcuts = provided.shortcuts;
@@ -361,7 +353,7 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         enhance_transcription: Some(response.enhance_transcription),
         launch_on_system_startup: Some(response.launch_on_system_startup),
         vocabulary: Some(response.vocabulary),
-        action_triggers: Some(response.action_triggers),
+        action_hotkey: Some(response.action_hotkey),
         shortcuts: Some(response.shortcuts),
     }
 }
@@ -418,10 +410,10 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
             serde_json::to_value(vocabulary).unwrap(),
         );
     }
-    if let Some(ref action_triggers) = config.action_triggers {
+    if let Some(ref action_hotkey) = config.action_hotkey {
         body.insert(
-            "action_triggers".to_string(),
-            serde_json::to_value(action_triggers).unwrap(),
+            "action_hotkey".to_string(),
+            serde_json::to_value(action_hotkey).unwrap(),
         );
     }
     if let Some(ref shortcuts) = config.shortcuts {

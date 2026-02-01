@@ -483,6 +483,55 @@ impl KeyStateTracker {
             }
         }
     }
+
+    /// Process action hotkey events (returns ActionStart/ActionStop instead of Start/Stop)
+    fn process_action_event(
+        &mut self,
+        hotkey: &str,
+        is_press: bool,
+    ) -> Option<HotkeyCommandResult> {
+        let key = hotkey.trim().to_string();
+        if is_press {
+            // "Insert" — only emit ActionStart if hotkey wasn't already in pressed set
+            if self.pressed_hotkeys.insert(key.clone()) {
+                println!("🎯 Action key state: {} pressed", key);
+                self.last_press_at = Some(Instant::now());
+                Some(HotkeyCommandResult::SendNow(RecordingCommand::ActionStart))
+            } else {
+                println!(
+                    "⚠️  Ignoring duplicate KeyPress (action {} already pressed)",
+                    key
+                );
+                None
+            }
+        } else {
+            // "Remove" — only emit ActionStop if hotkey was in pressed set
+            if self.pressed_hotkeys.remove(&key) {
+                println!("🎯 Action key state: {} released", key);
+                let elapsed = self
+                    .last_press_at
+                    .map(|t| t.elapsed())
+                    .unwrap_or(MIN_PRESS_RELEASE_INTERVAL);
+                if elapsed >= MIN_PRESS_RELEASE_INTERVAL {
+                    Some(HotkeyCommandResult::SendNow(RecordingCommand::ActionStop))
+                } else {
+                    let remaining = MIN_PRESS_RELEASE_INTERVAL - elapsed;
+                    println!(
+                        "⏱️  Action release before {:.1}s — will send ActionStop in {:.2}s",
+                        MIN_PRESS_RELEASE_INTERVAL.as_secs_f64(),
+                        remaining.as_secs_f64()
+                    );
+                    Some(HotkeyCommandResult::SendStopAfter(remaining))
+                }
+            } else {
+                println!(
+                    "⚠️  Ignoring duplicate KeyRelease (action {} already released)",
+                    key
+                );
+                None
+            }
+        }
+    }
 }
 
 /// Maps an rdev event to the configured hotkey it matches and whether it's press or release.
@@ -541,18 +590,24 @@ fn key_to_string(key: &Key) -> String {
 /// # Arguments
 /// * `app` - The Tauri AppHandle used to emit events to the frontend
 /// * `recording_tx` - Channel sender to signal start/stop recording
+/// * `action_tx` - Channel sender to signal action hotkey press/release
 /// * `config_rx` - Watch receiver for hotkey config changes (from AppConfig.hotkeys)
+/// * `action_hotkey_rx` - Watch receiver for action hotkey config changes (from AppConfig.action_hotkey)
 /// * `recording_state` - Shared state to check if we're in hotkey recording mode
 pub fn start_listener(
     app: AppHandle,
     recording_tx: mpsc::Sender<RecordingCommand>,
+    action_tx: mpsc::Sender<RecordingCommand>,
     config_rx: watch::Receiver<Vec<String>>,
+    action_hotkey_rx: watch::Receiver<String>,
     recording_state: Arc<Mutex<bool>>,
 ) {
     let app_for_rdev = app.clone();
     let recording_tx_for_rdev = recording_tx.clone();
+    let action_tx_for_rdev = action_tx.clone();
     let recording_state_for_rdev = recording_state.clone();
     let config_rx_for_rdev = config_rx.clone();
+    let action_hotkey_rx_for_rdev = action_hotkey_rx.clone();
 
     // Key state tracker to prevent spurious/duplicate events
     let key_state_tracker = Arc::new(Mutex::new(KeyStateTracker::new()));
@@ -588,6 +643,75 @@ pub fn start_listener(
             let current_hotkeys = config_rx_for_rdev.borrow().clone();
             let current_rdev_hotkeys = rdev_hotkeys(&current_hotkeys);
 
+            // Get current action hotkey
+            let current_action_hotkey = action_hotkey_rx_for_rdev.borrow().clone();
+
+            // Check if this event matches the action hotkey first
+            let action_result =
+                event_to_rdev_hotkey_action(&event.event_type, &[current_action_hotkey]).and_then(
+                    |(hotkey, is_press)| {
+                        key_state_tracker_for_callback
+                            .lock()
+                            .ok()
+                            .and_then(|mut tracker| tracker.process_action_event(&hotkey, is_press))
+                    },
+                );
+
+            // Process action command if we got one
+            if let Some(result) = action_result {
+                match &result {
+                    HotkeyCommandResult::SendNow(cmd) => {
+                        let trigger_type = match cmd {
+                            RecordingCommand::ActionStart => "ACTION_PRESSED",
+                            RecordingCommand::ActionStop => "ACTION_RELEASED",
+                            _ => "UNKNOWN",
+                        };
+                        println!("=== ACTION HOTKEY TRIGGER: {} ===", trigger_type);
+                    }
+                    HotkeyCommandResult::SendStopAfter(d) => {
+                        println!(
+                            "=== ACTION HOTKEY TRIGGER: RELEASED (delayed {:.2}s) ===",
+                            d.as_secs_f64()
+                        );
+                    }
+                }
+
+                match result {
+                    HotkeyCommandResult::SendNow(command) => {
+                        if let Err(e) = action_tx_for_rdev.send(command) {
+                            eprintln!("Failed to send action signal: {:?}", e);
+                        }
+                        println!(
+                            "Action hotkey {} - {} action recording",
+                            match command {
+                                RecordingCommand::ActionStart => "pressed",
+                                RecordingCommand::ActionStop => "released",
+                                _ => "unknown",
+                            },
+                            match command {
+                                RecordingCommand::ActionStart => "Starting",
+                                RecordingCommand::ActionStop => "Stopping",
+                                _ => "Unknown",
+                            }
+                        );
+                    }
+                    HotkeyCommandResult::SendStopAfter(delay) => {
+                        let tx = action_tx_for_rdev.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(delay);
+                            if let Err(e) = tx.send(RecordingCommand::ActionStop) {
+                                eprintln!("Failed to send delayed ActionStop: {:?}", e);
+                            } else {
+                                println!(
+                                    "Action hotkey released - Stopping action recording (after minimum interval)"
+                                );
+                            }
+                        });
+                    }
+                }
+                return; // Don't process as regular recording hotkey
+            }
+
             // Check if this event matches any configured rdev hotkey; use state tracker for press/release
             let result = event_to_rdev_hotkey_action(&event.event_type, &current_rdev_hotkeys)
                 .and_then(|(hotkey, is_press)| {
@@ -602,8 +726,8 @@ pub fn start_listener(
                 match &result {
                     HotkeyCommandResult::SendNow(cmd) => {
                         let trigger_type = match cmd {
-                            RecordingCommand::Start => "PRESSED",
-                            RecordingCommand::Stop => "RELEASED",
+                            RecordingCommand::Start | RecordingCommand::ActionStart => "PRESSED",
+                            RecordingCommand::Stop | RecordingCommand::ActionStop => "RELEASED",
                         };
                         println!("=== HOTKEY TRIGGER: {} ===", trigger_type);
                     }
@@ -617,18 +741,33 @@ pub fn start_listener(
 
                 match result {
                     HotkeyCommandResult::SendNow(command) => {
-                        if let Err(e) = recording_tx_for_rdev.send(command) {
-                            eprintln!("Failed to send recording signal: {:?}", e);
+                        // Check if this is an action command or regular command
+                        let is_action = matches!(
+                            command,
+                            RecordingCommand::ActionStart | RecordingCommand::ActionStop
+                        );
+
+                        if is_action {
+                            if let Err(e) = action_tx_for_rdev.send(command) {
+                                eprintln!("Failed to send action signal: {:?}", e);
+                            }
+                        } else {
+                            if let Err(e) = recording_tx_for_rdev.send(command) {
+                                eprintln!("Failed to send recording signal: {:?}", e);
+                            }
                         }
+
                         println!(
                             "Hotkey {} - {} recording",
                             match command {
-                                RecordingCommand::Start => "pressed",
-                                RecordingCommand::Stop => "released",
+                                RecordingCommand::Start | RecordingCommand::ActionStart =>
+                                    "pressed",
+                                RecordingCommand::Stop | RecordingCommand::ActionStop => "released",
                             },
                             match command {
-                                RecordingCommand::Start => "Starting",
-                                RecordingCommand::Stop => "Stopping",
+                                RecordingCommand::Start | RecordingCommand::ActionStart =>
+                                    "Starting",
+                                RecordingCommand::Stop | RecordingCommand::ActionStop => "Stopping",
                             }
                         );
                     }

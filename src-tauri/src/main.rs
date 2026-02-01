@@ -44,6 +44,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
 // Module declarations for core functionality
+mod action_recording_thread; // Action-specific recording thread (triggered by action hotkey)
 mod actions; // Voice actions triggered by action trigger phrases from app config
 mod api_endpoints; // Centralized API endpoint definitions
 mod audio_processor; // Audio processing and transcription orchestration
@@ -69,6 +70,7 @@ mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
+use action_recording_thread::spawn_action_recording_thread;
 use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
@@ -85,8 +87,7 @@ use permissions::{
 };
 
 use commands::actions::{
-    create_action_trigger, delete_action_history, delete_action_trigger, get_action_history,
-    get_action_triggers, update_action_trigger,
+    delete_action_history, get_action_history,
 };
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{get_app_config, update_app_config};
@@ -117,8 +118,10 @@ use websocket::{start_oauth_websocket, stop_oauth_websocket};
 /// Command to control recording state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecordingCommand {
-    Start,
-    Stop,
+    Start,       // Regular recording hotkey pressed
+    Stop,        // Regular recording hotkey released
+    ActionStart, // Action hotkey pressed
+    ActionStop,  // Action hotkey released
 }
 
 /// Main entry point for the Tauri application
@@ -286,10 +289,6 @@ pub fn main() {
             get_analytics_chart,
             get_action_history,
             delete_action_history,
-            get_action_triggers,
-            create_action_trigger,
-            update_action_trigger,
-            delete_action_trigger,
             get_shortcuts,
             create_shortcut,
             update_shortcut,
@@ -359,6 +358,10 @@ pub fn main() {
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
             let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
 
+            // Channel to communicate with the action recording thread
+            // Separate channel for action commands
+            let (action_tx, action_rx) = mpsc::channel::<RecordingCommand>();
+
             // Load hotkeys from Tauri Store (server provides defaults)
             let initial_config = {
                 let app_handle_for_store = app_handle.clone();
@@ -374,6 +377,22 @@ pub fn main() {
             };
             println!("🔑 Loaded hotkeys from store: {:?}", initial_config);
             let (config_tx, config_rx) = watch::channel(initial_config.clone());
+
+            // Load action hotkey from config (default: "Fn+Control")
+            let initial_action_hotkey = {
+                let app_handle_for_store = app_handle.clone();
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let config = get_app_config(app_handle_for_store).await
+                        .unwrap_or_else(|_| {
+                            println!("⚠️  Config not available, using default action hotkey");
+                            crate::commands::app_config::AppConfig::default()
+                        });
+                    config.action_hotkey.unwrap_or_else(|| "Fn+Control".to_string())
+                })
+            };
+            println!("🎯 Loaded action hotkey from store: {}", initial_action_hotkey);
+            let (action_hotkey_tx, action_hotkey_rx) = watch::channel(initial_action_hotkey);
 
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));
@@ -410,7 +429,9 @@ pub fn main() {
             start_listener(
                 app_handle.clone(),
                 recording_tx.clone(),
+                action_tx.clone(),
                 config_rx,
+                action_hotkey_rx,
                 recording_state_arc,
             );
 
@@ -418,6 +439,9 @@ pub fn main() {
             {
                 // Spawn the dedicated recording thread
                 spawn_recording_thread(app_handle.clone(), recording_rx);
+                
+                // Spawn the dedicated action recording thread
+                spawn_action_recording_thread(app_handle.clone(), action_rx);
             }
 
             Ok(())
