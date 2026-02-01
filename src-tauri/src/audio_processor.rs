@@ -118,7 +118,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Check if the task was aborted (the JoinHandle will be cancelled)
         // If aborted, the result will be an error, but we should check for cancellation
         match transcription_result {
-            Ok((transcription, cursor_context)) => {
+            Ok((transcription, _cursor_context)) => {
                 println!(
                     "✅ Transcription completed in {:.2}s: {}",
                     transcription_duration.as_secs_f64(),

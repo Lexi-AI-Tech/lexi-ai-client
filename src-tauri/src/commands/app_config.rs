@@ -9,13 +9,14 @@
 //! - `update_app_config` - Update app configuration (automatically syncs autostart and cloud)
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
 use crate::api_endpoints::app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::commands::shortcuts::Shortcut;
+use crate::state::{ActionHotkeyWatchState, HotkeyWatchState};
 use crate::utils;
 
 const STORE_FILE: &str = ".app-config.dat";
@@ -342,6 +343,20 @@ fn save_config_to_store(app: &AppHandle, config: &AppConfig) -> Result<(), Strin
         .save()
         .map_err(|_| "Unable to save settings to local storage. Please try again.".to_string())?;
 
+    // Update hotkey watcher state if hotkeys present
+    if let Some(hotkeys) = &config.hotkeys {
+        if let Some(hotkey_state) = app.try_state::<HotkeyWatchState>() {
+            let _ = hotkey_state.0.send(hotkeys.clone());
+        }
+    }
+
+    // Update action hotkey watcher state if present
+    if let Some(action_hotkey) = &config.action_hotkey {
+        if let Some(action_hotkey_state) = app.try_state::<ActionHotkeyWatchState>() {
+            let _ = action_hotkey_state.0.send(action_hotkey.clone());
+        }
+    }
+
     Ok(())
 }
 
@@ -353,7 +368,7 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         enhance_transcription: Some(response.enhance_transcription),
         launch_on_system_startup: Some(response.launch_on_system_startup),
         vocabulary: Some(response.vocabulary),
-        action_hotkey: Some(response.action_hotkey),
+        action_hotkey: response.action_hotkey,
         shortcuts: Some(response.shortcuts),
     }
 }

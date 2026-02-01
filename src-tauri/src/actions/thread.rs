@@ -13,9 +13,7 @@ use tauri::{AppHandle, Emitter};
 #[derive(Debug, Clone, PartialEq)]
 enum ActionRecordingPhase {
     Idle,
-    Starting,
     Recording,
-    Stopping,
     Error(String),
 }
 
@@ -56,7 +54,7 @@ pub fn spawn_action_recording_thread(
                 // ActionStart in Idle or Error state - start new action recording
                 (RecordingCommand::ActionStart, ActionRecordingPhase::Idle | ActionRecordingPhase::Error(_)) => {
                     println!("🎯 Action hotkey pressed - starting action recording");
-                    phase = ActionRecordingPhase::Starting;
+                    // phase = ActionRecordingPhase::Starting;
 
                     // Emit event to frontend
                     app_handle
@@ -83,10 +81,10 @@ pub fn spawn_action_recording_thread(
                     }
                 }
 
-                // ActionStop in Recording or Starting state - stop and process
-                (RecordingCommand::ActionStop, ActionRecordingPhase::Recording | ActionRecordingPhase::Starting) => {
+                // ActionStop in Recording state - stop and process
+                (RecordingCommand::ActionStop, ActionRecordingPhase::Recording) => {
                     println!("🎯 Action hotkey released - stopping action recording");
-                    phase = ActionRecordingPhase::Stopping;
+                    // phase = ActionRecordingPhase::Stopping;
 
                     if let Some(mut rec) = recorder.take() {
                         // Stop recording and get audio data
@@ -123,19 +121,17 @@ pub fn spawn_action_recording_thread(
                 }
 
                 // Ignore duplicate or out-of-order commands
-                (RecordingCommand::ActionStart, ActionRecordingPhase::Starting | ActionRecordingPhase::Recording) => {
+                (RecordingCommand::ActionStart, ActionRecordingPhase::Recording) => {
                     println!("⚠️  Ignoring duplicate ActionStart (already recording)");
                 }
-                (RecordingCommand::ActionStop, ActionRecordingPhase::Idle | ActionRecordingPhase::Stopping) => {
+                (RecordingCommand::ActionStop, ActionRecordingPhase::Idle) => {
                     println!("⚠️  Ignoring ActionStop (not recording)");
                 }
                 (RecordingCommand::ActionStop, ActionRecordingPhase::Error(_)) => {
                     println!("⚠️  Ignoring ActionStop (in error state)");
                     phase = ActionRecordingPhase::Idle;
                 }
-                (RecordingCommand::ActionStart, ActionRecordingPhase::Stopping) => {
-                    println!("⚠️  Ignoring ActionStart while stopping previous action recording");
-                }
+
 
                 // Ignore regular Start/Stop commands (they go to the main recording thread)
                 (RecordingCommand::Start, _) | (RecordingCommand::Stop, _) => {

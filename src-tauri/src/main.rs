@@ -44,7 +44,6 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
 // Module declarations for core functionality
-mod action_recording_thread; // Action-specific recording thread (triggered by action hotkey)
 mod actions; // Voice actions triggered by action trigger phrases from app config
 mod api_endpoints; // Centralized API endpoint definitions
 mod audio_processor; // Audio processing and transcription orchestration
@@ -70,13 +69,13 @@ mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
-use action_recording_thread::spawn_action_recording_thread;
+use actions::thread::spawn_action_recording_thread;
 use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 use recording_thread::spawn_recording_thread;
 use state::{
-    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, RoomState,
-    TranscriptionTaskState,
+    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RecordingChannelState,
+    RoomState, TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
 
@@ -86,7 +85,7 @@ use permissions::{
     request_microphone_permission,
 };
 
-use commands::actions::{
+use actions::commands::{
     delete_action_history, get_action_history,
 };
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
@@ -397,6 +396,7 @@ pub fn main() {
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));
             app.manage(HotkeyWatchState(config_tx));
+            app.manage(ActionHotkeyWatchState(action_hotkey_tx));
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });

@@ -22,6 +22,9 @@ pub struct TranscriptionTaskState {
 /// to the global key listener thread. Uses Vec<String> directly from AppConfig.hotkeys.
 pub struct HotkeyWatchState(pub watch::Sender<Vec<String>>);
 
+/// State for watch sender (to broadcast action hotkey changes)
+pub struct ActionHotkeyWatchState(pub watch::Sender<String>);
+
 /// Hotkey recording state - tracks if we're in recording mode for hotkey selection
 ///
 /// When in recording mode, the global key listener emits key events to the frontend
