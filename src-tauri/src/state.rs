@@ -23,7 +23,7 @@ pub struct TranscriptionTaskState {
 pub struct HotkeyWatchState(pub watch::Sender<Vec<String>>);
 
 /// State for watch sender (to broadcast action hotkey changes)
-pub struct ActionHotkeyWatchState(pub watch::Sender<String>);
+pub struct ActionHotkeyWatchState(pub watch::Sender<Vec<String>>);
 
 /// Hotkey recording state - tracks if we're in recording mode for hotkey selection
 ///

@@ -599,7 +599,7 @@ pub fn start_listener(
     recording_tx: mpsc::Sender<RecordingCommand>,
     action_tx: mpsc::Sender<RecordingCommand>,
     config_rx: watch::Receiver<Vec<String>>,
-    action_hotkey_rx: watch::Receiver<String>,
+    action_hotkey_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
 ) {
     let app_for_rdev = app.clone();
@@ -643,12 +643,12 @@ pub fn start_listener(
             let current_hotkeys = config_rx_for_rdev.borrow().clone();
             let current_rdev_hotkeys = rdev_hotkeys(&current_hotkeys);
 
-            // Get current action hotkey
-            let current_action_hotkey = action_hotkey_rx_for_rdev.borrow().clone();
+            // Get current action hotkeys
+            let current_action_hotkeys = action_hotkey_rx_for_rdev.borrow().clone();
 
             // Check if this event matches the action hotkey first
             let action_result =
-                event_to_rdev_hotkey_action(&event.event_type, &[current_action_hotkey]).and_then(
+                event_to_rdev_hotkey_action(&event.event_type, &current_action_hotkeys).and_then(
                     |(hotkey, is_press)| {
                         key_state_tracker_for_callback
                             .lock()

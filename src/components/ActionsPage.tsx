@@ -9,7 +9,7 @@ export const ActionsPage: React.FC = () => {
   const authStore = useAuthStore();
   const [actionHistory, setActionHistory] =
     useState<PaginatedActionHistoryResponse | null>(null);
-  const [actionHotkey, setActionHotkey] = useState<string | null>(null);
+  const [actionHotkeys, setActionHotkeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export const ActionsPage: React.FC = () => {
     try {
       setIsLoadingConfig(true);
       const config = await invoke<AppConfig>("get_app_config");
-      setActionHotkey(config.action_hotkey);
+      setActionHotkeys(config.action_hotkeys || []);
     } catch (err) {
       console.error("Failed to load app config:", err);
     } finally {
@@ -115,24 +115,21 @@ export const ActionsPage: React.FC = () => {
   };
 
   const handleHotkeyChange = async (newHotkeys: string[]) => {
-    // We only support 1 hotkey for actions
-    const newHotkey = newHotkeys.length > 0 ? newHotkeys[0] : null;
-
     try {
       // Get current config to merge
       const currentConfig = await invoke<AppConfig>("get_app_config");
 
       const updatedConfig = {
         ...currentConfig,
-        action_hotkey: newHotkey
+        action_hotkeys: newHotkeys
       };
 
       await invoke("update_app_config", { config: updatedConfig });
-      setActionHotkey(newHotkey);
-      console.log("Action hotkey updated:", newHotkey);
+      setActionHotkeys(newHotkeys);
+      console.log("Action hotkeys updated:", newHotkeys);
     } catch (err) {
-      console.error("Failed to update action hotkey:", err);
-      setError("Failed to update hotkey");
+      console.error("Failed to update action hotkeys:", err);
+      setError("Failed to update hotkeys");
     }
   };
 
@@ -308,7 +305,7 @@ export const ActionsPage: React.FC = () => {
           Action Hotkey
         </h3>
         <p style={{ fontSize: "14px", color: "#6b7280", marginBottom: "1.5rem" }}>
-          Hold this hotkey to record a voice command for performing an action.
+          Hold this hotkey (or any of these hotkeys) to record a voice command for performing an action.
         </p>
 
         <div style={{
@@ -321,9 +318,9 @@ export const ActionsPage: React.FC = () => {
             <div style={{ color: "#9ca3af", fontSize: "14px" }}>Loading hotkey...</div>
           ) : (
             <HotkeySelector
-              value={{ hotkeys: actionHotkey ? [actionHotkey] : [] }}
+              value={{ hotkeys: actionHotkeys }}
               onChange={(config) => handleHotkeyChange(config.hotkeys)}
-              maxHotkeys={1}
+              maxHotkeys={3}
             />
           )}
         </div>

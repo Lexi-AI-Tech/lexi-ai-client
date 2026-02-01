@@ -87,7 +87,7 @@ export interface AppConfig {
   enhance_transcription: boolean;
   launch_on_system_startup: boolean;
   vocabulary: string[];
-  action_hotkey: string | null;
+  action_hotkeys: string[] | null;
   shortcuts: Shortcut[];
 }
 
@@ -102,7 +102,7 @@ export interface AppConfigUpdateRequest {
   enhance_transcription?: boolean;
   launch_on_system_startup?: boolean;
   vocabulary?: string[] | null;
-  action_hotkey?: string | null;
+  action_hotkeys?: string[] | null;
   shortcuts?: Shortcut[] | null;
 }
 

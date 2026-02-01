@@ -69,7 +69,7 @@ pub async fn update_hotkey(
         enhance_transcription: current_config.enhance_transcription,
         launch_on_system_startup: current_config.launch_on_system_startup,
         vocabulary: current_config.vocabulary,
-        action_hotkey: current_config.action_hotkey,
+        action_hotkeys: current_config.action_hotkeys,
         shortcuts: current_config.shortcuts,
     };
 

@@ -375,8 +375,8 @@ pub fn main() {
             println!("🔑 Loaded hotkeys from store: {:?}", initial_config);
             let (config_tx, config_rx) = watch::channel(initial_config.clone());
 
-            // Load action hotkey from config (default: "Fn+Control")
-            let initial_action_hotkey = {
+            // Load action hotkeys from config (default: empty)
+            let initial_action_hotkeys = {
                 let app_handle_for_store = app_handle.clone();
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
@@ -385,11 +385,11 @@ pub fn main() {
                             println!("⚠️  Config not available, using default action hotkey");
                             crate::commands::app_config::AppConfig::default()
                         });
-                    config.action_hotkey.unwrap_or_else(|| "Fn+Control".to_string())
+                    config.action_hotkeys.unwrap_or_default()
                 })
             };
-            println!("🎯 Loaded action hotkey from store: {}", initial_action_hotkey);
-            let (action_hotkey_tx, action_hotkey_rx) = watch::channel(initial_action_hotkey);
+            println!("🎯 Loaded action hotkeys from store: {:?}", initial_action_hotkeys);
+            let (action_hotkey_tx, action_hotkey_rx) = watch::channel(initial_action_hotkeys);
 
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));

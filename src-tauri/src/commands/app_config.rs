@@ -37,8 +37,8 @@ pub struct AppConfig {
     pub launch_on_system_startup: Option<bool>,
     /// Vocabulary for transcription (array of strings)
     pub vocabulary: Option<Vec<String>>,
-    /// Hotkey combination for triggering actions (e.g., "Fn+Control")
-    pub action_hotkey: Option<String>,
+    /// Hotkey combinations for triggering actions (e.g., ["Fn+Control"])
+    pub action_hotkeys: Option<Vec<String>>,
     /// Shortcuts for text expansion (array of shortcut items)
     pub shortcuts: Option<Vec<Shortcut>>,
 }
@@ -61,7 +61,7 @@ struct ServerAppConfigResponse {
     pub enhance_transcription: bool,
     pub launch_on_system_startup: bool,
     pub vocabulary: Vec<String>,
-    pub action_hotkey: Option<String>,
+    pub action_hotkeys: Option<Vec<String>>,
     pub shortcuts: Vec<Shortcut>,
 }
 
@@ -161,7 +161,7 @@ fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
         enhance_transcription: None,
         launch_on_system_startup: Some(true), // Enable autostart by default on first launch
         vocabulary: None,
-        action_hotkey: None,
+        action_hotkeys: None,
         shortcuts: None,
     };
 
@@ -321,8 +321,8 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.vocabulary.is_some() {
         current.vocabulary = provided.vocabulary;
     }
-    if provided.action_hotkey.is_some() {
-        current.action_hotkey = provided.action_hotkey;
+    if provided.action_hotkeys.is_some() {
+        current.action_hotkeys = provided.action_hotkeys;
     }
     if provided.shortcuts.is_some() {
         current.shortcuts = provided.shortcuts;
@@ -350,10 +350,10 @@ fn save_config_to_store(app: &AppHandle, config: &AppConfig) -> Result<(), Strin
         }
     }
 
-    // Update action hotkey watcher state if present
-    if let Some(action_hotkey) = &config.action_hotkey {
+    // Update action hotkeys watcher state if present
+    if let Some(action_hotkeys) = &config.action_hotkeys {
         if let Some(action_hotkey_state) = app.try_state::<ActionHotkeyWatchState>() {
-            let _ = action_hotkey_state.0.send(action_hotkey.clone());
+            let _ = action_hotkey_state.0.send(action_hotkeys.clone());
         }
     }
 
@@ -368,7 +368,7 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         enhance_transcription: Some(response.enhance_transcription),
         launch_on_system_startup: Some(response.launch_on_system_startup),
         vocabulary: Some(response.vocabulary),
-        action_hotkey: response.action_hotkey,
+        action_hotkeys: response.action_hotkeys,
         shortcuts: Some(response.shortcuts),
     }
 }
@@ -425,10 +425,10 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
             serde_json::to_value(vocabulary).unwrap(),
         );
     }
-    if let Some(ref action_hotkey) = config.action_hotkey {
+    if let Some(ref action_hotkeys) = config.action_hotkeys {
         body.insert(
-            "action_hotkey".to_string(),
-            serde_json::to_value(action_hotkey).unwrap(),
+            "action_hotkeys".to_string(),
+            serde_json::to_value(action_hotkeys).unwrap(),
         );
     }
     if let Some(ref shortcuts) = config.shortcuts {
