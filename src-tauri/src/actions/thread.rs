@@ -149,7 +149,7 @@ async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
     use crate::commands::app_config::get_app_config;
     use crate::commands::auth::get_auth_token_async;
     use crate::cursor_context::get_cursor_context;
-    use crate::stt_service::SttService;
+    use crate::assistant::SttService;
     use crate::text_injector::TextInjector;
     use crate::tts_service::TtsService;
 

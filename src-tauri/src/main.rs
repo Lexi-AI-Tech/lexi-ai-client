@@ -46,7 +46,6 @@ use tokio::sync::watch;
 // Module declarations for core functionality
 mod actions; // Voice actions triggered by action trigger phrases from app config
 mod api_endpoints; // Centralized API endpoint definitions
-mod audio_processor; // Audio processing and transcription orchestration
 mod audio_recorder; // Audio capture from default microphone using cpal, converts to WAV format
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
@@ -56,12 +55,11 @@ mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key f
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
-mod recording_thread; // Recording thread management
+mod assistant; // Recording thread management
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
-mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod tray; // System tray icon creation and event handling
 mod tts_service; // Text-to-speech service using ElevenLabs API
@@ -72,7 +70,7 @@ mod window; // Window management utilities (show, focus, activate) // Tauri comm
 use actions::thread::spawn_action_recording_thread;
 use global_key_listener::start_listener;
 use google_oauth::OAuthState;
-use recording_thread::spawn_recording_thread;
+use assistant::spawn_recording_thread;
 use state::{
     ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RecordingChannelState,
     RoomState, TranscriptionTaskState,
@@ -109,7 +107,7 @@ use commands::rooms::{
 };
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
-use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
+use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::utils::{format_date_relative, format_date_time, get_system_type};
 use commands::window::open_devtools;
 use websocket::{start_oauth_websocket, stop_oauth_websocket};

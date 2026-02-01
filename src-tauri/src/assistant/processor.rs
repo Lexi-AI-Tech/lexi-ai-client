@@ -12,7 +12,7 @@ use crate::commands::app_config::get_app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::shortcuts::check_command;
 use crate::state::TranscriptionTaskState;
-use crate::stt_service::SttService;
+use super::service::SttService;
 use crate::text_injector::TextInjector;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};

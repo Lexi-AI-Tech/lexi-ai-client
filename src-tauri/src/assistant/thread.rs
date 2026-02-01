@@ -4,7 +4,7 @@
 //! It receives start/stop commands from the global key listener and manages
 //! the AudioRecorder lifecycle using an explicit state machine.
 
-use crate::audio_processor::process_audio;
+use super::processor::process_audio;
 use crate::audio_recorder::AudioRecorder;
 use crate::RecordingCommand;
 use std::sync::mpsc;

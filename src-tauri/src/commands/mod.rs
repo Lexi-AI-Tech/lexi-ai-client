@@ -12,6 +12,5 @@ pub mod onboarding;
 pub mod rooms;
 pub mod shortcuts;
 pub mod text;
-pub mod transcripts;
 pub mod utils;
 pub mod window;
