@@ -254,14 +254,14 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-  | "home"
-  | "transcripts"
-  | "settings"
-  | "vocabulary"
-  | "actions"
-  | "shortcuts"
-  | "rooms"
-  | "notes";
+    | "home"
+    | "transcripts"
+    | "settings"
+    | "vocabulary"
+    | "actions"
+    | "shortcuts"
+    | "rooms"
+    | "notes";
   onNavigate: (
     page:
       | "home"
@@ -298,8 +298,6 @@ export interface PaginatedActionHistoryResponse {
   page_size: number;
   total_pages: number;
 }
-
-
 
 export interface Shortcut {
   id: string;

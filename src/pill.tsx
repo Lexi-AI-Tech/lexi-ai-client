@@ -647,13 +647,13 @@ export const Pill: React.FC = () => {
     const resampledLevels =
       audioLevels.length > 0
         ? Array(numBars)
-          .fill(0)
-          .map((_, i) => {
-            const sourceIndex = Math.floor(
-              (i / numBars) * audioLevels.length,
-            );
-            return audioLevels[sourceIndex] || 0.3;
-          })
+            .fill(0)
+            .map((_, i) => {
+              const sourceIndex = Math.floor(
+                (i / numBars) * audioLevels.length,
+              );
+              return audioLevels[sourceIndex] || 0.3;
+            })
         : Array(numBars).fill(0.35);
 
     const barHeights = resampledLevels.map((level) => {

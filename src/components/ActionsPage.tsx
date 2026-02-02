@@ -14,7 +14,9 @@ export const ActionsPage: React.FC = () => {
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [formattedDates, setFormattedDates] = useState<Record<string, string>>({});
+  const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
+    {},
+  );
 
   const pageSize = 20;
 
@@ -121,7 +123,7 @@ export const ActionsPage: React.FC = () => {
 
       const updatedConfig = {
         ...currentConfig,
-        action_hotkeys: newHotkeys
+        action_hotkeys: newHotkeys,
       };
 
       await invoke("update_app_config", { config: updatedConfig });
@@ -304,18 +306,25 @@ export const ActionsPage: React.FC = () => {
         >
           Action Hotkey
         </h3>
-        <p style={{ fontSize: "14px", color: "#6b7280", marginBottom: "1.5rem" }}>
-          Hold this hotkey (or any of these hotkeys) to record a voice command for performing an action.
+        <p
+          style={{ fontSize: "14px", color: "#6b7280", marginBottom: "1.5rem" }}
+        >
+          Hold this hotkey (or any of these hotkeys) to record a voice command
+          for performing an action.
         </p>
 
-        <div style={{
-          backgroundColor: "#1f2937",
-          padding: "1.5rem",
-          borderRadius: "0.75rem",
-          maxWidth: "600px"
-        }}>
+        <div
+          style={{
+            backgroundColor: "#1f2937",
+            padding: "1.5rem",
+            borderRadius: "0.75rem",
+            maxWidth: "600px",
+          }}
+        >
           {isLoadingConfig ? (
-            <div style={{ color: "#9ca3af", fontSize: "14px" }}>Loading hotkey...</div>
+            <div style={{ color: "#9ca3af", fontSize: "14px" }}>
+              Loading hotkey...
+            </div>
           ) : (
             <HotkeySelector
               value={{ hotkeys: actionHotkeys }}
@@ -536,9 +545,13 @@ export const ActionsPage: React.FC = () => {
                     border: "1px solid #e5e7eb",
                     borderRadius: "0.5rem",
                     background:
-                      page === actionHistory.total_pages ? "#f3f4f6" : "#ffffff",
+                      page === actionHistory.total_pages
+                        ? "#f3f4f6"
+                        : "#ffffff",
                     color:
-                      page === actionHistory.total_pages ? "#9ca3af" : "#374151",
+                      page === actionHistory.total_pages
+                        ? "#9ca3af"
+                        : "#374151",
                     cursor:
                       page === actionHistory.total_pages
                         ? "not-allowed"

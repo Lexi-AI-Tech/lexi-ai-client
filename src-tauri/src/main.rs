@@ -324,7 +324,7 @@ pub fn main() {
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });
-            
+
             app.manage(RoomState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
