@@ -131,7 +131,7 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
     })?;
 
     let config = server_response_to_app_config(server_response);
-    
+
     Ok(config)
 }
 
@@ -142,9 +142,9 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
 #[tauri::command]
 pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
     // Since we don't store locally, "current config" is just what we have from the last fetch
-    // essentially. But here we should probably re-fetch or just apply the changes to 
+    // essentially. But here we should probably re-fetch or just apply the changes to
     // what we assume is current.
-    
+
     // Fetch current to merge properly
     let mut current_config = fetch_config_from_server(&app).await?;
 
@@ -159,7 +159,7 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
 
     // Update hotkey watcher state
     update_hotkey_state(&app, &current_config);
-    
+
     println!("✅ App config updated in memory");
 
     // Sync to cloud
@@ -391,4 +391,3 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
         }
     }
 }
-

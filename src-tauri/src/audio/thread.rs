@@ -5,9 +5,9 @@
 //! the AudioRecorder lifecycle using an explicit state machine.
 //! Now optimized to handle both Assistant (Speech-to-Text) and Action modes.
 
-use crate::assistant::processor::process_audio;
-use crate::actions::processor::process_action_audio;
 use super::recorder::AudioRecorder;
+use crate::actions::processor::process_action_audio;
+use crate::assistant::processor::process_audio;
 use crate::RecordingCommand;
 use std::sync::mpsc;
 use std::thread;
@@ -125,11 +125,12 @@ pub fn spawn_recording_thread(
             // Map command to simple start/stop logic and mode
             // We unify Start/ActionStart and Stop/ActionStop logic here
             match (command, ctx.phase) {
-                
                 // ── START RECORDING ─────────────────────────────────
-                (RecordingCommand::Start, RecordingPhase::Idle | RecordingPhase::Error(_)) |
-                (RecordingCommand::ActionStart, RecordingPhase::Idle | RecordingPhase::Error(_)) => {
-                    
+                (RecordingCommand::Start, RecordingPhase::Idle | RecordingPhase::Error(_))
+                | (
+                    RecordingCommand::ActionStart,
+                    RecordingPhase::Idle | RecordingPhase::Error(_),
+                ) => {
                     // distinct mode setup
                     ctx.mode = match command {
                         RecordingCommand::ActionStart => RecordingMode::Action,
@@ -167,14 +168,16 @@ pub fn spawn_recording_thread(
                             ctx.started_at = Some(Instant::now());
                             ctx.transition_to(RecordingPhase::Recording);
                             println!("✅ Recording started successfully");
-                            
+
                             // Emit events based on mode
                             match ctx.mode {
                                 RecordingMode::Assistant => {
                                     app_handle.emit("recording_started", ()).unwrap_or_default();
                                 }
                                 RecordingMode::Action => {
-                                    app_handle.emit("action_recording_started", ()).unwrap_or_default();
+                                    app_handle
+                                        .emit("action_recording_started", ())
+                                        .unwrap_or_default();
                                 }
                             }
                         }
@@ -185,7 +188,7 @@ pub fn spawn_recording_thread(
                             ));
                             let event_name = match ctx.mode {
                                 RecordingMode::Action => "action_recording_error",
-                                _ => "recording_error"
+                                _ => "recording_error",
                             };
                             app_handle
                                 .emit(event_name, e.to_string())
@@ -195,13 +198,15 @@ pub fn spawn_recording_thread(
                 }
 
                 // ── STOP RECORDING ──────────────────────────────────
-                (RecordingCommand::Stop, RecordingPhase::Recording | RecordingPhase::Starting) |
-                (RecordingCommand::ActionStop, RecordingPhase::Recording | RecordingPhase::Starting) => {
-                    
-                    // Verify command matches mode? 
+                (RecordingCommand::Stop, RecordingPhase::Recording | RecordingPhase::Starting)
+                | (
+                    RecordingCommand::ActionStop,
+                    RecordingPhase::Recording | RecordingPhase::Starting,
+                ) => {
+                    // Verify command matches mode?
                     // Ideally yes, but for unified thread, simply stopping whatever is running is safer
                     // to prevent "stuck in recording" if key release event type mismatch happened.
-                    
+
                     ctx.transition_to(RecordingPhase::Stopping);
                     println!("🛑 Stopping recording...");
 
@@ -219,10 +224,14 @@ pub fn spawn_recording_thread(
                                 // Emit events based on mode
                                 match ctx.mode {
                                     RecordingMode::Assistant => {
-                                        app_handle.emit("recording_stopped", ()).unwrap_or_default();
+                                        app_handle
+                                            .emit("recording_stopped", ())
+                                            .unwrap_or_default();
                                     }
                                     RecordingMode::Action => {
-                                        app_handle.emit("action_recording_stopped", ()).unwrap_or_default();
+                                        app_handle
+                                            .emit("action_recording_stopped", ())
+                                            .unwrap_or_default();
                                     }
                                 }
 
@@ -244,7 +253,8 @@ pub fn spawn_recording_thread(
                                             // Process action asynchronously embedded or in processor
                                             let app_handle_clone = app_handle.clone();
                                             tauri::async_runtime::spawn(async move {
-                                                process_action_audio(audio_data, app_handle_clone).await;
+                                                process_action_audio(audio_data, app_handle_clone)
+                                                    .await;
                                             });
                                         }
                                     }
@@ -258,7 +268,7 @@ pub fn spawn_recording_thread(
                                 ));
                                 let event_name = match ctx.mode {
                                     RecordingMode::Action => "action_recording_error",
-                                    _ => "recording_error"
+                                    _ => "recording_error",
                                 };
                                 app_handle
                                     .emit(event_name, e.to_string())
@@ -277,16 +287,15 @@ pub fn spawn_recording_thread(
                 }
 
                 // ── ERROR HANDLING / IGNORED STATES ─────────────────
-                
+
                 // Ignoring duplicates
                 (RecordingCommand::Start, _) | (RecordingCommand::ActionStart, _) => {
-                     // Already recording/starting/stopping
+                    // Already recording/starting/stopping
                 }
-                
+
                 (RecordingCommand::Stop, _) | (RecordingCommand::ActionStop, _) => {
                     // Not recording, nothing to stop
                 }
-
             }
         }
     });

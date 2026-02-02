@@ -8,11 +8,11 @@
 //! 5. Injecting the transcribed text into the active application using TextInjector
 //! 6. Emitting events to the frontend to update UI state
 
+use super::service::AssistantService;
 use crate::commands::app_config::get_app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::shortcuts::check_command;
 use crate::state::TranscriptionTaskState;
-use super::service::AssistantService;
 use crate::text_injector::TextInjector;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};

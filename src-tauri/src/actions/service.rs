@@ -62,14 +62,27 @@ impl ActionService {
     ///
     /// # Returns
     /// * `Option<ActionResponse>` - The action response with action_type and value, or None if the action failed
+    /// Performs an action based on the audio data and returns the action response.
+    ///
+    /// # Arguments
+    /// * `audio_data` - The recorded audio data
+    /// * `app_handle` - Tauri AppHandle for accessing state and making API calls
+    /// * `cursor_context` - Optional cursor context (contains app name and selected text)
+    ///
+    /// # Returns
+    /// * `Option<ActionResponse>` - The action response with action_type and value, or None if the action failed
     pub async fn perform_action(
         &self,
-        action_command: &str,
+        audio_data: Option<Vec<u8>>,
         app_handle: &AppHandle,
         cursor_context: Option<&CursorContext>,
     ) -> Option<ActionResponse> {
         let action_start = Instant::now();
-        println!("🎯 Performing action: '{}'", action_command);
+
+        println!(
+            "🎯 Performing voice action (audio size: {} bytes)",
+            audio_data.as_ref().map(|d| d.len()).unwrap_or(0)
+        );
 
         // Notify frontend that action processing has started
         app_handle.emit("processing_start", ()).unwrap_or_default();
@@ -109,7 +122,10 @@ impl ActionService {
         }
 
         // Send action request to server
-        match self.send_action_request(action_command, &app_name, selected_text, auth_token).await {
+        match self
+            .send_action_request(audio_data, &app_name, selected_text, auth_token)
+            .await
+        {
             Ok(action_response) => {
                 let action_duration = action_start.elapsed();
                 println!(
@@ -142,27 +158,23 @@ impl ActionService {
     }
 
     /// Sends an action request to the Lexi AI Server
-    ///
-    /// # Arguments
-    /// * `action_command` - The action command to execute
-    /// * `app_name` - Name of the currently focused application
-    /// * `selected_text` - Optional selected text that the action can operate on
-    /// * `auth_token` - Authentication token for the request
-    ///
-    /// # Returns
-    /// * `Ok(ActionResponse)` - The action response from the server
-    /// * `Err(Box<dyn Error>)` - An error if the API call fails
     async fn send_action_request(
         &self,
-        action_command: &str,
+        audio_data: Option<Vec<u8>>,
         app_name: &str,
         selected_text: Option<String>,
         auth_token: Option<String>,
     ) -> Result<ActionResponse, Box<dyn Error>> {
         // Build multipart form
-        let mut form = multipart::Form::new()
-            .text("action_command", action_command.to_string())
-            .text("app_name", app_name.to_string());
+        let mut form = multipart::Form::new().text("app_name", app_name.to_string());
+
+        // Add audio file if provided
+        if let Some(data) = audio_data {
+            let part = multipart::Part::bytes(data)
+                .file_name("action.wav")
+                .mime_str("audio/wav")?;
+            form = form.part("audio_file", part);
+        }
 
         // Add selected text if provided
         if let Some(text) = selected_text {

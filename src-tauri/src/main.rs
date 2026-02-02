@@ -46,6 +46,7 @@ use tokio::sync::watch;
 // Module declarations for core functionality
 mod actions; // Voice actions (triggered by hotkeys)
 mod api_endpoints; // Centralized API endpoint definitions
+mod assistant; // Recording thread management
 mod audio;
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
@@ -55,7 +56,6 @@ mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key f
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
-mod assistant; // Recording thread management
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
@@ -83,9 +83,8 @@ use permissions::{
     request_microphone_permission,
 };
 
-use actions::commands::{
-    delete_action_history, get_action_history,
-};
+use actions::commands::{delete_action_history, get_action_history};
+use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
@@ -107,7 +106,6 @@ use commands::rooms::{
 };
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
-use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::utils::{format_date_relative, format_date_time, get_system_type};
 use commands::window::open_devtools;
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
@@ -157,7 +155,6 @@ pub fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
         ))
-
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             println!("🔄 Second instance launch detected (e.g., from Spotlight or app icon)");
             show_and_focus_main_window(&app.app_handle());

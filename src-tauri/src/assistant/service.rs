@@ -138,24 +138,25 @@ impl AssistantService {
             // Continue with server API transcription
 
             // Helper function to build the multipart form (takes focused_app so cursor context can be fetched just before the API call)
-            let build_form =
-                |audio_data: &[u8], focused_app: &str| -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
-                    let part = multipart::Part::bytes(audio_data.to_vec())
-                        .file_name("audio.wav")
-                        .mime_str("audio/wav")?;
+            let build_form = |audio_data: &[u8],
+                              focused_app: &str|
+             -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
+                let part = multipart::Part::bytes(audio_data.to_vec())
+                    .file_name("audio.wav")
+                    .mime_str("audio/wav")?;
 
-                    let mut form = multipart::Form::new()
-                        .part("audio_file", part)
-                        .text("language", language.clone())
-                        .text("enhance_stt_output", enhance_transcription.to_string())
-                        .text("focused_app", focused_app.to_string());
+                let mut form = multipart::Form::new()
+                    .part("audio_file", part)
+                    .text("language", language.clone())
+                    .text("enhance_stt_output", enhance_transcription.to_string())
+                    .text("focused_app", focused_app.to_string());
 
-                    for word in &vocabulary {
-                        form = form.text("vocabulary", word.clone());
-                    }
+                for word in &vocabulary {
+                    form = form.text("vocabulary", word.clone());
+                }
 
-                    Ok(form)
-                };
+                Ok(form)
+            };
 
             // Check if we have a token
             let current_token = if let Some(token) = auth_token {
