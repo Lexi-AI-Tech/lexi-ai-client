@@ -186,6 +186,49 @@ const Pill: React.FC = () => {
           }
         });
 
+        // Listen for action recording started (same behavior as regular recording)
+        const unlistenActionStarted = await listen(
+          "action_recording_started",
+          async () => {
+            setStatus("recording");
+            // Play sound immediately for instant feedback (non-blocking)
+            // playSound("processing");
+
+            // Expand window upward using absolute positioning from idle reference
+            const window = getCurrentWindow();
+            try {
+              if (!idlePositionRef.current) {
+                console.error("Idle position not initialized");
+                return;
+              }
+
+              const idleX = idlePositionRef.current.x;
+              const idleY = idlePositionRef.current.y;
+
+              // Calculate absolute position for recording state
+              // Move LEFT to center the wider pill, and move UP so bottom edge stays in place
+              const recordingX =
+                idleX - (EXPANDED_SIZE.width - IDLE_SIZE.width) / 2;
+              const recordingY = idleY - HEIGHT_DIFF;
+
+              console.log(
+                `📍 Action Recording: idle=(${idleX.toFixed(2)}, ${idleY.toFixed(2)}) → recording=(${recordingX.toFixed(2)}, ${recordingY.toFixed(2)})`,
+              );
+
+              // CRITICAL: Resize FIRST, then position SECOND
+              // If we position before resize, the OS may adjust position after resize
+              await window.setSize(
+                new LogicalSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height),
+              );
+              await window.setPosition(
+                new LogicalPosition(recordingX, recordingY),
+              );
+            } catch (e) {
+              console.error("Failed to expand window:", e);
+            }
+          },
+        );
+
         // Listen for recording stopped
         const unlistenStopped = await listen("recording_stopped", async () => {
           setStatus("processing");
@@ -216,6 +259,40 @@ const Pill: React.FC = () => {
             console.error("Failed to expand to processing size:", e);
           }
         });
+
+        // Listen for action recording stopped (same behavior as regular recording)
+        const unlistenActionStopped = await listen(
+          "action_recording_stopped",
+          async () => {
+            setStatus("processing");
+            // Expand width for processing (to fit bars + loader)
+            const window = getCurrentWindow();
+            try {
+              if (!idlePositionRef.current) {
+                console.error("Idle position not initialized");
+                return;
+              }
+
+              const idleX = idlePositionRef.current.x;
+              const idleY = idlePositionRef.current.y;
+
+              // Calculate absolute position for processing state
+              const processingX =
+                idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
+              const processingY = idleY - HEIGHT_DIFF;
+
+              // CRITICAL: Resize FIRST, then position SECOND
+              await window.setSize(
+                new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
+              );
+              await window.setPosition(
+                new LogicalPosition(processingX, processingY),
+              );
+            } catch (e) {
+              console.error("Failed to expand to processing size:", e);
+            }
+          },
+        );
 
         // Listen for processing start
         const unlistenProcessing = await listen(
@@ -471,6 +548,36 @@ const Pill: React.FC = () => {
           }
         });
 
+        // Listen for action recording error (from recording thread)
+        const unlistenActionRecordingError = await listen(
+          "action_recording_error",
+          async () => {
+            setStatus("idle");
+
+            // Return to exact idle position
+            const window = getCurrentWindow();
+            try {
+              if (!idlePositionRef.current) {
+                console.error("Idle position not initialized");
+                return;
+              }
+
+              await window.setSize(
+                new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
+              );
+              // Restore exact idle position from reference
+              await window.setPosition(
+                new LogicalPosition(
+                  idlePositionRef.current.x,
+                  idlePositionRef.current.y,
+                ),
+              );
+            } catch (e) {
+              console.error("Failed to shrink window:", e);
+            }
+          },
+        );
+
         // Cleanup function
         return () => {
           unlistenStarted();
@@ -484,6 +591,9 @@ const Pill: React.FC = () => {
           }
           unlistenActionSuccess();
           unlistenActionError();
+          unlistenActionStarted();
+          unlistenActionStopped();
+          unlistenActionRecordingError();
         };
       } catch (error) {
         console.error("Failed to set up event listeners:", error);
@@ -537,13 +647,13 @@ const Pill: React.FC = () => {
     const resampledLevels =
       audioLevels.length > 0
         ? Array(numBars)
-            .fill(0)
-            .map((_, i) => {
-              const sourceIndex = Math.floor(
-                (i / numBars) * audioLevels.length,
-              );
-              return audioLevels[sourceIndex] || 0.3;
-            })
+          .fill(0)
+          .map((_, i) => {
+            const sourceIndex = Math.floor(
+              (i / numBars) * audioLevels.length,
+            );
+            return audioLevels[sourceIndex] || 0.3;
+          })
         : Array(numBars).fill(0.35);
 
     const barHeights = resampledLevels.map((level) => {
