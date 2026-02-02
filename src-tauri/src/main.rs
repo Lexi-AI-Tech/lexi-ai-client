@@ -39,7 +39,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::{mpsc, Arc, Mutex};
-use tauri::{Emitter, Listener, Manager, RunEvent};
+use tauri::{Emitter, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 

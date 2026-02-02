@@ -31,7 +31,7 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
     }
 
     // Get app config
-    let app_config = match get_app_config(app_handle.clone()).await {
+    let _app_config = match get_app_config(app_handle.clone()).await {
         Ok(config) => config,
         Err(e) => {
             let error_msg = format!("Failed to load app config: {}", e);

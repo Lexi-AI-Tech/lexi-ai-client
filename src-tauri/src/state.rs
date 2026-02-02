@@ -31,7 +31,7 @@ pub struct ActionHotkeyWatchState(pub watch::Sender<Vec<String>>);
 /// so users can interactively select their desired hotkey.
 pub struct HotkeyRecordingState {
     /// Whether hotkey recording mode is currently active
-    pub is_recording: std::sync::Arc<Mutex<bool>>,
+    pub is_recording: Arc<Mutex<bool>>,
 }
 
 /// Room recording state
