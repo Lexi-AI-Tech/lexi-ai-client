@@ -4,9 +4,7 @@
 //! Hotkeys are managed via app config (server-synced) and runtime listeners.
 
 use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
-use crate::global_key_listener::{
-    register_hotkeys, tauri_hotkeys, unregister_all_hotkeys, validate_hotkey,
-};
+use crate::global_key_listener::validate_hotkey;
 use crate::state::{HotkeyRecordingState, HotkeyWatchState};
 use serde::Deserialize;
 use serde_json;
@@ -44,19 +42,12 @@ pub async fn update_hotkey(
         return Err("Maximum of 3 hotkeys allowed".to_string());
     }
 
-    // Validate each hotkey (check for system-reserved shortcuts, modifier-only, etc.)
+    // Validate each hotkey
     for hotkey in &new_hotkeys {
         if let Err(e) = validate_hotkey(hotkey) {
             return Err(e);
         }
     }
-
-    // Get old hotkeys from watch state to unregister old shortcuts
-    let old_hotkeys = state.0.borrow().clone();
-    let old_tauri = tauri_hotkeys(&old_hotkeys);
-
-    // Unregister old Tauri hotkeys (rdev hotkeys are managed by listener restart)
-    unregister_all_hotkeys(&app, &old_tauri);
 
     // Get current config to preserve other fields
     let current_config = get_app_config(app.clone())
@@ -80,25 +71,6 @@ pub async fn update_hotkey(
     // Update watch state to notify listener thread (single source of truth)
     if state.0.send(new_hotkeys.clone()).is_err() {
         return Err("Failed to update hotkey watch state".to_string());
-    }
-
-    // Register new hotkeys (Tauri will try first, fall back to rdev if needed)
-    let tauri_hotkeys_list = tauri_hotkeys(&new_hotkeys);
-    if !tauri_hotkeys_list.is_empty() {
-        match register_hotkeys(&app, &tauri_hotkeys_list) {
-            Ok(rdev_fallback) => {
-                if !rdev_fallback.is_empty() {
-                    println!(
-                        "ℹ️  {} hotkey(s) will be handled by rdev: {:?}",
-                        rdev_fallback.len(),
-                        rdev_fallback
-                    );
-                }
-            }
-            Err(e) => {
-                return Err(format!("Failed to register global shortcuts: {}", e));
-            }
-        }
     }
 
     // Note: rdev hotkeys are automatically handled by the rdev listener when config changes

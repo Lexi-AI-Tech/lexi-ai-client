@@ -72,8 +72,8 @@ use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 
 use state::{
-    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RecordingChannelState,
-    RoomState, TranscriptionTaskState,
+    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState,
+    TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
 
@@ -157,76 +157,7 @@ pub fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
         ))
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, shortcut, event| {
-                    let event_state = event.state();
-                    println!(
-                        "🔑 Global shortcut triggered: {:?}, state: {:?}",
-                        shortcut, event_state
-                    );
 
-                    // Get the recording channel from app state
-                    let app_handle = app.app_handle();
-                    let recording_state = app_handle.state::<RecordingChannelState>();
-
-                    // Clone the Arc to avoid lifetime issues
-                    let tx_arc = recording_state.tx.clone();
-                    let is_recording_arc = recording_state.is_recording.clone();
-
-                    // Determine command based on event state and current recording state
-                    let command = match event_state {
-                        tauri_plugin_global_shortcut::ShortcutState::Pressed => {
-                            // On press: check current state and toggle
-                            let is_currently_recording = {
-                                let guard = is_recording_arc.lock().ok();
-                                guard.map(|g| *g).unwrap_or(false)
-                            };
-
-                            if is_currently_recording {
-                                println!("🛑 Recording is active, sending Stop command");
-                                RecordingCommand::Stop
-                            } else {
-                                println!("🎙️  Recording is idle, sending Start command");
-                                RecordingCommand::Start
-                            }
-                        }
-                        tauri_plugin_global_shortcut::ShortcutState::Released => {
-                            // On release: only stop if currently recording (push-to-talk behavior)
-                            let is_currently_recording = {
-                                let guard = is_recording_arc.lock().ok();
-                                guard.map(|g| *g).unwrap_or(false)
-                            };
-
-                            if is_currently_recording {
-                                println!("🛑 Key released while recording, sending Stop command");
-                                RecordingCommand::Stop
-                            } else {
-                                // Not recording, ignore release event
-                                return;
-                            }
-                        }
-                    };
-
-                    let send_result = {
-                        let tx_guard = tx_arc.lock().ok();
-                        tx_guard.and_then(|guard| guard.as_ref().map(|tx| tx.send(command)))
-                    };
-
-                    match send_result {
-                        Some(Ok(_)) => {
-                            println!("✅ Sent {:?} command via global shortcut", command);
-                        }
-                        Some(Err(e)) => {
-                            eprintln!("❌ Failed to send recording command: {:?}", e);
-                        }
-                        None => {
-                            eprintln!("❌ Recording channel not available");
-                        }
-                    }
-                })
-                .build(),
-        )
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             println!("🔄 Second instance launch detected (e.g., from Spotlight or app icon)");
             show_and_focus_main_window(&app.app_handle());
@@ -396,29 +327,10 @@ pub fn main() {
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });
-            let recording_state_tracker = Arc::new(Mutex::new(false));
-            app.manage(RecordingChannelState {
-                tx: Arc::new(Mutex::new(Some(recording_tx.clone()))),
-                is_recording: recording_state_tracker.clone(),
-            });
+            
             app.manage(RoomState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
-            });
-
-            // Listen to recording events to update state tracker
-            let app_handle_for_events = app_handle.clone();
-            let recording_state_tracker_clone = recording_state_tracker.clone();
-            app_handle.listen("recording_started", move |_| {
-                if let Ok(mut state) = recording_state_tracker_clone.lock() {
-                    *state = true;
-                }
-            });
-            let recording_state_tracker_clone2 = recording_state_tracker.clone();
-            app_handle_for_events.listen("recording_stopped", move |_| {
-                if let Ok(mut state) = recording_state_tracker_clone2.lock() {
-                    *state = false;
-                }
             });
 
             // Start listeners (rdev always running, manager thread handles Tauri shortcuts)

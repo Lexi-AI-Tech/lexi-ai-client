@@ -34,16 +34,6 @@ pub struct HotkeyRecordingState {
     pub is_recording: std::sync::Arc<Mutex<bool>>,
 }
 
-/// Recording channel state - stores the sender for recording commands
-///
-/// This allows the global shortcut handler to trigger recording
-pub struct RecordingChannelState {
-    /// Sender for recording commands (Start/Stop)
-    pub tx: std::sync::Arc<Mutex<Option<std::sync::mpsc::Sender<crate::RecordingCommand>>>>,
-    /// Current recording state (true if recording, false if idle)
-    pub is_recording: Arc<Mutex<bool>>,
-}
-
 /// Room recording state
 ///
 /// Note: AudioRecorder and RoomWebSocket cannot be stored here because they contain
