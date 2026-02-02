@@ -184,7 +184,7 @@ pub async fn start_room_recording(
     let (recorder_tx, recorder_rx) = mpsc::channel::<()>();
 
     thread::spawn(move || {
-        let mut recorder = crate::audio_recorder::AudioRecorder::new();
+        let mut recorder = crate::audio::recorder::AudioRecorder::new();
 
         if let Err(e) = recorder.start_recording(Some(audio_tx)) {
             eprintln!("Failed to start recording: {}", e);

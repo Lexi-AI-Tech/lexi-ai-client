@@ -1,36 +1,25 @@
 //! Application Configuration Module
 //!
 //! This module provides unified commands for managing application configuration.
-//! All configuration is stored in Tauri Store and synced with OS-level settings (autostart).
-//! Configuration changes are also synced with the cloud API.
+//! Configuration is fetched from the server and synced with OS-level settings (autostart).
 //!
 //! ## Unified Commands
 //! - `get_app_config` - Get complete app configuration
 //! - `update_app_config` - Update app configuration (automatically syncs autostart and cloud)
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_autostart::ManagerExt;
-use tauri_plugin_store::StoreExt;
 
 use crate::api_endpoints::app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::commands::shortcuts::Shortcut;
+use crate::state::{ActionHotkeyWatchState, HotkeyWatchState};
 use crate::utils;
-
-const STORE_FILE: &str = ".app-config.dat";
-
-/// Action trigger structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActionTrigger {
-    pub id: String,
-    pub trigger_phrase: String,
-    pub is_active: bool,
-}
 
 /// Application configuration structure
 ///
-/// Represents all application settings that are persisted in Tauri Store.
+/// Represents all application settings.
 /// All fields are optional to allow for partial updates and backward compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
@@ -44,8 +33,8 @@ pub struct AppConfig {
     pub launch_on_system_startup: Option<bool>,
     /// Vocabulary for transcription (array of strings)
     pub vocabulary: Option<Vec<String>>,
-    /// Action triggers for voice commands (array of action trigger items)
-    pub action_triggers: Option<Vec<ActionTrigger>>,
+    /// Hotkey combinations for triggering actions (e.g., ["Fn+Control"])
+    pub action_hotkeys: Option<Vec<String>>,
     /// Shortcuts for text expansion (array of shortcut items)
     pub shortcuts: Option<Vec<Shortcut>>,
 }
@@ -53,9 +42,8 @@ pub struct AppConfig {
 // ============================================================================
 // App Configuration Storage Commands
 //
-// These commands provide low-level access to the Tauri Store for reading and
-// writing application configuration. They handle serialization, deserialization,
-// and error handling for the persistent storage layer.
+// These commands provide access to the configuration.
+// They handle fetching from server and syncing.
 // ============================================================================
 
 /// Server response structure for app config
@@ -68,126 +56,40 @@ struct ServerAppConfigResponse {
     pub enhance_transcription: bool,
     pub launch_on_system_startup: bool,
     pub vocabulary: Vec<String>,
-    pub action_triggers: Vec<ActionTrigger>,
+    pub action_hotkeys: Option<Vec<String>>,
     pub shortcuts: Vec<Shortcut>,
 }
 
-/// Get the complete app configuration from Tauri Store or server
+/// Get the complete app configuration from server
 ///
-/// First tries to load from Tauri Store. If not found:
-/// - If user is authenticated: fetches from server
-/// - If user is not authenticated (first launch): creates minimal config with autostart enabled
-/// Config will be synced from server when user logs in (handled in store_auth_data).
+/// Always attempts to fetch fresh config from server.
 /// Syncs autostart status from OS-level settings.
 #[tauri::command]
 pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|_| "Unable to access local storage. Please try again.".to_string())?;
+    println!("🔄 Fetching app config from server...");
 
-    let mut config = match store.get("config") {
-        Some(config_value) => match serde_json::from_value::<AppConfig>(config_value.clone()) {
-            Ok(config) => {
-                println!("✅ Loaded app config from Tauri Store");
-                println!("🔍 Config details - hotkeys: {:?}, languages: {:?}, enhance_transcription: {:?}", 
-                    config.hotkeys, config.languages, config.enhance_transcription);
+    let mut config = fetch_config_from_server(&app).await.map_err(|e| {
+        println!("⚠️  Failed to fetch from server: {}", e);
+        e
+    })?;
 
-                // Check if hotkeys are missing or empty - if so, try to fetch from server
-                let has_empty_hotkeys = config.hotkeys.is_none()
-                    || config
-                        .hotkeys
-                        .as_ref()
-                        .map(|h| h.is_empty())
-                        .unwrap_or(true);
-
-                if has_empty_hotkeys {
-                    println!(
-                        "⚠️  Config has empty/missing hotkeys, attempting to fetch from server"
-                    );
-                    match fetch_config_from_server(&app).await {
-                        Ok(server_config) => {
-                            println!(
-                                "✅ Fetched config from server with hotkeys: {:?}",
-                                server_config.hotkeys
-                            );
-                            server_config
-                        }
-                        Err(e) => {
-                            println!(
-                                "⚠️  Failed to fetch from server ({}), using existing config",
-                                e
-                            );
-                            config
-                        }
-                    }
-                } else {
-                    println!("✅ Config has valid hotkeys: {:?}", config.hotkeys);
-                    config
-                }
-            }
-            Err(_) => {
-                println!("⚠️  Failed to deserialize config from store, fetching from server");
-                match fetch_config_from_server(&app).await {
-                    Ok(config) => config,
-                    Err(_) => {
-                        // No auth - first launch, create minimal config with autostart enabled
-                        println!("🔧 First launch detected (no auth), creating minimal config with autostart enabled");
-                        create_first_launch_config(&app)?
-                    }
-                }
-            }
-        },
-        None => {
-            println!("📝 No config found in Tauri Store");
-            match fetch_config_from_server(&app).await {
-                Ok(config) => config,
-                Err(_) => {
-                    // No auth - first launch, create minimal config with autostart enabled
-                    println!("🔧 First launch detected (no auth), creating minimal config with autostart enabled");
-                    create_first_launch_config(&app)?
-                }
-            }
-        }
-    };
+    println!(
+        "✅ Fetched config from server with hotkeys: {:?}",
+        config.hotkeys
+    );
 
     // Sync launch_on_system_startup with actual OS autostart status
     // This will enable autostart if config has launch_on_system_startup: Some(true) or None (defaults to true)
     sync_autostart_status(&app, &mut config);
 
+    // Update in-memory state for hotkeys
+    update_hotkey_state(&app, &config);
+
     Ok(config)
 }
 
-/// Create minimal config for first launch (no auth)
-/// Only sets autostart to true - other settings will come from server when user logs in
-fn create_first_launch_config(app: &AppHandle) -> Result<AppConfig, String> {
-    println!("🔧 Creating first launch config with autostart enabled");
-
-    let first_launch_config = AppConfig {
-        languages: None,
-        hotkeys: None,
-        enhance_transcription: None,
-        launch_on_system_startup: Some(true), // Enable autostart by default on first launch
-        vocabulary: None,
-        action_triggers: None,
-        shortcuts: None,
-    };
-
-    // Save minimal config to store
-    save_config_to_store(app, &first_launch_config)?;
-
-    // Enable autostart on OS immediately
-    let autolaunch = app.autolaunch();
-    if let Err(e) = autolaunch.enable() {
-        eprintln!("⚠️  Failed to enable autostart: {}", e);
-    } else {
-        println!("✅ Enabled autostart on OS (first launch)");
-    }
-
-    Ok(first_launch_config)
-}
-
-/// Fetch app configuration from server and save to local store
-/// This bypasses the local store and always fetches fresh config from server
+/// Fetch app configuration from server
+/// This always fetches fresh config from server
 pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> {
     let auth_token = match get_auth_token_async(app).await {
         Some(token) => token,
@@ -229,19 +131,22 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
     })?;
 
     let config = server_response_to_app_config(server_response);
-    save_config_to_store(app, &config)?;
 
-    println!("✅ Fetched and saved app config from server");
     Ok(config)
 }
 
-/// Update the app configuration in Tauri Store and sync with cloud API
+/// Update the app configuration and sync with cloud API
 ///
 /// Merges the provided config with existing config (partial updates supported).
-/// Updates local storage and syncs with cloud API.
+/// Syncs with cloud API and updates in-memory state.
 #[tauri::command]
 pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
-    let mut current_config = get_app_config(app.clone()).await?;
+    // Since we don't store locally, "current config" is just what we have from the last fetch
+    // essentially. But here we should probably re-fetch or just apply the changes to
+    // what we assume is current.
+
+    // Fetch current to merge properly
+    let mut current_config = fetch_config_from_server(&app).await?;
 
     // Merge provided config with current config
     merge_config(&mut current_config, config);
@@ -252,9 +157,12 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
             .map_err(|e| format!("Unable to update startup settings: {}", e))?;
     }
 
-    save_config_to_store(&app, &current_config)?;
-    println!("✅ App config saved to Tauri Store");
+    // Update hotkey watcher state
+    update_hotkey_state(&app, &current_config);
 
+    println!("✅ App config updated in memory");
+
+    // Sync to cloud
     sync_config_to_cloud(&app, &current_config).await;
 
     Ok(current_config)
@@ -328,29 +236,29 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.vocabulary.is_some() {
         current.vocabulary = provided.vocabulary;
     }
-    if provided.action_triggers.is_some() {
-        current.action_triggers = provided.action_triggers;
+    if provided.action_hotkeys.is_some() {
+        current.action_hotkeys = provided.action_hotkeys;
     }
     if provided.shortcuts.is_some() {
         current.shortcuts = provided.shortcuts;
     }
 }
 
-/// Save config to Tauri Store
-fn save_config_to_store(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|_| "Unable to access local storage. Please try again.".to_string())?;
+/// Update in-memory state for hotkey watchers
+fn update_hotkey_state(app: &AppHandle, config: &AppConfig) {
+    // Update hotkey watcher state if hotkeys present
+    if let Some(hotkeys) = &config.hotkeys {
+        if let Some(hotkey_state) = app.try_state::<HotkeyWatchState>() {
+            let _ = hotkey_state.0.send(hotkeys.clone());
+        }
+    }
 
-    let config_json = serde_json::to_value(config)
-        .map_err(|_| "Unable to save settings. Please try again.".to_string())?;
-
-    store.set("config", config_json);
-    store
-        .save()
-        .map_err(|_| "Unable to save settings to local storage. Please try again.".to_string())?;
-
-    Ok(())
+    // Update action hotkeys watcher state if present
+    if let Some(action_hotkeys) = &config.action_hotkeys {
+        if let Some(action_hotkey_state) = app.try_state::<ActionHotkeyWatchState>() {
+            let _ = action_hotkey_state.0.send(action_hotkeys.clone());
+        }
+    }
 }
 
 /// Convert server response to local AppConfig format
@@ -361,7 +269,7 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         enhance_transcription: Some(response.enhance_transcription),
         launch_on_system_startup: Some(response.launch_on_system_startup),
         vocabulary: Some(response.vocabulary),
-        action_triggers: Some(response.action_triggers),
+        action_hotkeys: response.action_hotkeys,
         shortcuts: Some(response.shortcuts),
     }
 }
@@ -418,10 +326,10 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
             serde_json::to_value(vocabulary).unwrap(),
         );
     }
-    if let Some(ref action_triggers) = config.action_triggers {
+    if let Some(ref action_hotkeys) = config.action_hotkeys {
         body.insert(
-            "action_triggers".to_string(),
-            serde_json::to_value(action_triggers).unwrap(),
+            "action_hotkeys".to_string(),
+            serde_json::to_value(action_hotkeys).unwrap(),
         );
     }
     if let Some(ref shortcuts) = config.shortcuts {

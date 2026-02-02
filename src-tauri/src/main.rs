@@ -39,15 +39,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::{mpsc, Arc, Mutex};
-use tauri::{Emitter, Listener, Manager, RunEvent};
+use tauri::{Emitter, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
 // Module declarations for core functionality
-mod actions; // Voice actions triggered by action trigger phrases from app config
+mod actions; // Voice actions (triggered by hotkeys)
 mod api_endpoints; // Centralized API endpoint definitions
-mod audio_processor; // Audio processing and transcription orchestration
-mod audio_recorder; // Audio capture from default microphone using cpal, converts to WAV format
+mod assistant; // Recording thread management
+mod audio;
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
 mod cursor_context; // Cursor context retrieval using macOS Accessibility API (AXUIElement)
@@ -56,12 +56,10 @@ mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key f
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
-mod recording_thread; // Recording thread management
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
-mod stt_service; // HTTP client for Lexi AI Server API (speech-to-text transcription)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod tray; // System tray icon creation and event handling
 mod tts_service; // Text-to-speech service using ElevenLabs API
@@ -69,11 +67,12 @@ mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
+use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
 use google_oauth::OAuthState;
-use recording_thread::spawn_recording_thread;
+
 use state::{
-    HotkeyRecordingState, HotkeyWatchState, RecordingChannelState, RoomState,
+    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState,
     TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
@@ -84,10 +83,8 @@ use permissions::{
     request_microphone_permission,
 };
 
-use commands::actions::{
-    create_action_trigger, delete_action_history, delete_action_trigger, get_action_history,
-    get_action_triggers, update_action_trigger,
-};
+use actions::commands::{delete_action_history, get_action_history};
+use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{get_app_config, update_app_config};
 use commands::auth::{
@@ -109,7 +106,6 @@ use commands::rooms::{
 };
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
-use commands::transcripts::{delete_transcript, get_transcript, get_transcripts};
 use commands::utils::{format_date_relative, format_date_time, get_system_type};
 use commands::window::open_devtools;
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
@@ -117,8 +113,10 @@ use websocket::{start_oauth_websocket, stop_oauth_websocket};
 /// Command to control recording state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecordingCommand {
-    Start,
-    Stop,
+    Start,       // Regular recording hotkey pressed
+    Stop,        // Regular recording hotkey released
+    ActionStart, // Action hotkey pressed
+    ActionStop,  // Action hotkey released
 }
 
 /// Main entry point for the Tauri application
@@ -157,76 +155,6 @@ pub fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
         ))
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, shortcut, event| {
-                    let event_state = event.state();
-                    println!(
-                        "🔑 Global shortcut triggered: {:?}, state: {:?}",
-                        shortcut, event_state
-                    );
-
-                    // Get the recording channel from app state
-                    let app_handle = app.app_handle();
-                    let recording_state = app_handle.state::<RecordingChannelState>();
-
-                    // Clone the Arc to avoid lifetime issues
-                    let tx_arc = recording_state.tx.clone();
-                    let is_recording_arc = recording_state.is_recording.clone();
-
-                    // Determine command based on event state and current recording state
-                    let command = match event_state {
-                        tauri_plugin_global_shortcut::ShortcutState::Pressed => {
-                            // On press: check current state and toggle
-                            let is_currently_recording = {
-                                let guard = is_recording_arc.lock().ok();
-                                guard.map(|g| *g).unwrap_or(false)
-                            };
-
-                            if is_currently_recording {
-                                println!("🛑 Recording is active, sending Stop command");
-                                RecordingCommand::Stop
-                            } else {
-                                println!("🎙️  Recording is idle, sending Start command");
-                                RecordingCommand::Start
-                            }
-                        }
-                        tauri_plugin_global_shortcut::ShortcutState::Released => {
-                            // On release: only stop if currently recording (push-to-talk behavior)
-                            let is_currently_recording = {
-                                let guard = is_recording_arc.lock().ok();
-                                guard.map(|g| *g).unwrap_or(false)
-                            };
-
-                            if is_currently_recording {
-                                println!("🛑 Key released while recording, sending Stop command");
-                                RecordingCommand::Stop
-                            } else {
-                                // Not recording, ignore release event
-                                return;
-                            }
-                        }
-                    };
-
-                    let send_result = {
-                        let tx_guard = tx_arc.lock().ok();
-                        tx_guard.and_then(|guard| guard.as_ref().map(|tx| tx.send(command)))
-                    };
-
-                    match send_result {
-                        Some(Ok(_)) => {
-                            println!("✅ Sent {:?} command via global shortcut", command);
-                        }
-                        Some(Err(e)) => {
-                            eprintln!("❌ Failed to send recording command: {:?}", e);
-                        }
-                        None => {
-                            eprintln!("❌ Recording channel not available");
-                        }
-                    }
-                })
-                .build(),
-        )
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             println!("🔄 Second instance launch detected (e.g., from Spotlight or app icon)");
             show_and_focus_main_window(&app.app_handle());
@@ -286,10 +214,6 @@ pub fn main() {
             get_analytics_chart,
             get_action_history,
             delete_action_history,
-            get_action_triggers,
-            create_action_trigger,
-            update_action_trigger,
-            delete_action_trigger,
             get_shortcuts,
             create_shortcut,
             update_shortcut,
@@ -359,6 +283,8 @@ pub fn main() {
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
             let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
 
+
+
             // Load hotkeys from Tauri Store (server provides defaults)
             let initial_config = {
                 let app_handle_for_store = app_handle.clone();
@@ -375,35 +301,33 @@ pub fn main() {
             println!("🔑 Loaded hotkeys from store: {:?}", initial_config);
             let (config_tx, config_rx) = watch::channel(initial_config.clone());
 
+            // Load action hotkeys from config (default: empty)
+            let initial_action_hotkeys = {
+                let app_handle_for_store = app_handle.clone();
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let config = get_app_config(app_handle_for_store).await
+                        .unwrap_or_else(|_| {
+                            println!("⚠️  Config not available, using default action hotkey");
+                            crate::commands::app_config::AppConfig::default()
+                        });
+                    config.action_hotkeys.unwrap_or_default()
+                })
+            };
+            println!("🎯 Loaded action hotkeys from store: {:?}", initial_action_hotkeys);
+            let (action_hotkey_tx, action_hotkey_rx) = watch::channel(initial_action_hotkeys);
+
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));
             app.manage(HotkeyWatchState(config_tx));
+            app.manage(ActionHotkeyWatchState(action_hotkey_tx));
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });
-            let recording_state_tracker = Arc::new(Mutex::new(false));
-            app.manage(RecordingChannelState {
-                tx: Arc::new(Mutex::new(Some(recording_tx.clone()))),
-                is_recording: recording_state_tracker.clone(),
-            });
+
             app.manage(RoomState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
-            });
-
-            // Listen to recording events to update state tracker
-            let app_handle_for_events = app_handle.clone();
-            let recording_state_tracker_clone = recording_state_tracker.clone();
-            app_handle.listen("recording_started", move |_| {
-                if let Ok(mut state) = recording_state_tracker_clone.lock() {
-                    *state = true;
-                }
-            });
-            let recording_state_tracker_clone2 = recording_state_tracker.clone();
-            app_handle_for_events.listen("recording_stopped", move |_| {
-                if let Ok(mut state) = recording_state_tracker_clone2.lock() {
-                    *state = false;
-                }
             });
 
             // Start listeners (rdev always running, manager thread handles Tauri shortcuts)
@@ -411,12 +335,13 @@ pub fn main() {
                 app_handle.clone(),
                 recording_tx.clone(),
                 config_rx,
+                action_hotkey_rx,
                 recording_state_arc,
             );
 
             #[cfg(desktop)]
             {
-                // Spawn the dedicated recording thread
+                // Spawn the unified recording thread
                 spawn_recording_thread(app_handle.clone(), recording_rx);
             }
 
