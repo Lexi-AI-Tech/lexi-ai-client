@@ -34,7 +34,7 @@ const HEIGHT_DIFF = EXPANDED_SIZE.height - IDLE_SIZE.height;
  * to ensure it's positioned before becoming visible.
  * This prevents the visible repositioning issue.
  */
-const Pill: React.FC = () => {
+export const Pill: React.FC = () => {
   const [status, setStatus] = useState<"idle" | "recording" | "processing">(
     "idle",
   );

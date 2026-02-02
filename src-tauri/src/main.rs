@@ -44,7 +44,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
 // Module declarations for core functionality
-mod actions; // Voice actions triggered by action trigger phrases from app config
+mod actions; // Voice actions (triggered by hotkeys)
 mod api_endpoints; // Centralized API endpoint definitions
 mod audio;
 mod commands;

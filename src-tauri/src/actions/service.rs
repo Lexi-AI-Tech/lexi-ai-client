@@ -6,7 +6,7 @@
 //!
 //! ## Implementation
 //!
-//! - **Action Triggers**: Fetched from app config (server-managed)
+//! - **Action Triggers**: Triggered via configured hotkeys
 //! - **Action Processing**: Extracts the action command from the transcription and
 //!   calls `perform_action` to get the result text to inject
 //! - **Text Injection**: The result from `perform_action` is injected instead of the
