@@ -536,24 +536,30 @@ impl KeyStateTracker {
 
 /// Maps an rdev event to the configured hotkey it matches and whether it's press or release.
 /// Returns None if the event doesn't match any configured rdev hotkey.
+/// Maps an rdev event to the configured hotkey it matches and whether it's press or release.
+/// Returns None if the event doesn't match any configured rdev hotkey.
 fn event_to_rdev_hotkey_action(
     event_type: &EventType,
     rdev_hotkeys: &[String],
 ) -> Option<(String, bool)> {
+    let (key, is_press) = match event_type {
+        EventType::KeyPress(k) => (k, true),
+        EventType::KeyRelease(k) => (k, false),
+        _ => return None,
+    };
+
+    let event_key_str = key_to_string(key);
+
     for hotkey in rdev_hotkeys {
         let trimmed = hotkey.trim();
+        let normalized_config = normalize_rdev_string(trimmed);
 
-        // Fn key
-        if trimmed.eq_ignore_ascii_case("Fn") {
-            match event_type {
-                EventType::KeyPress(Key::Function) => return Some((trimmed.to_string(), true)),
-                EventType::KeyRelease(Key::Function) => return Some((trimmed.to_string(), false)),
-                _ => {} // not Fn event, try next hotkey
-            }
+        // Debug prints for troubleshooting
+        // println!("Comparing config '{}' (norm: '{}') with event '{}'", trimmed, normalized_config, event_key_str);
+
+        if normalized_config == event_key_str {
+            return Some((trimmed.to_string(), is_press));
         }
-
-        // Extend here for other rdev hotkeys (modifier-only, single keys, etc.)
-        // e.g. map Key::CapsLock, modifier combinations, etc. to (hotkey_string, is_press)
     }
 
     None
@@ -571,13 +577,37 @@ fn event_type_to_string(event_type: &EventType) -> Option<String> {
 
 /// Convert rdev Key to string representation for frontend
 /// Normalizes key names to match frontend expectations
+/// Convert rdev Key to string representation for frontend/logic
+/// Normalizes key names to match frontend expectations and our internal normalization
 fn key_to_string(key: &Key) -> String {
     match key {
         Key::MetaLeft | Key::MetaRight => "Command".to_string(),
         Key::ControlLeft | Key::ControlRight => "Control".to_string(),
         Key::Alt => "Option".to_string(),
         Key::ShiftLeft | Key::ShiftRight => "Shift".to_string(),
+        Key::Function => "Fn".to_string(),
         _ => format!("{:?}", key),
+    }
+}
+
+/// Normalize config hotkey string for rdev comparison
+/// Maps "cmd", "command" -> "Command", etc. to match key_to_string output
+fn normalize_rdev_string(key: &str) -> String {
+    match key.to_lowercase().as_str() {
+        "cmd" | "command" | "meta" | "super" => "Command".to_string(),
+        "ctrl" | "control" => "Control".to_string(),
+        "option" | "alt" => "Option".to_string(),
+        "shift" => "Shift".to_string(),
+        "fn" => "Fn".to_string(),
+        _ => {
+            // For single letter keys, uppercase them
+            if key.len() == 1 && key.chars().all(|c| c.is_alphabetic()) {
+                key.to_uppercase()
+            } else {
+                // Return as is for others (assuming config matches Debug output casing usually)
+                key.to_string()
+            }
+        }
     }
 }
 

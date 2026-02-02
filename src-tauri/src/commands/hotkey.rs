@@ -1,7 +1,7 @@
 //! Hotkey Commands
 //!
 //! This module provides Tauri commands for managing hotkey configuration.
-//! All hotkeys are stored in Tauri Store as `hotkeys`.
+//! Hotkeys are managed via app config (server-synced) and runtime listeners.
 
 use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
 use crate::global_key_listener::{
@@ -14,7 +14,7 @@ use tauri::{AppHandle, Emitter, State};
 
 /// Update the hotkey configuration dynamically
 ///
-/// This command saves hotkeys to Tauri Store and updates the runtime listener.
+/// This command updates hotkeys in app config and updates the runtime listener.
 /// Supports up to 3 hotkeys. Fn key is handled via rdev, others via Tauri global shortcuts.
 ///
 /// # Arguments
@@ -58,7 +58,7 @@ pub async fn update_hotkey(
     // Unregister old Tauri hotkeys (rdev hotkeys are managed by listener restart)
     unregister_all_hotkeys(&app, &old_tauri);
 
-    // Save to Tauri Store (single source of truth)
+    // Get current config to preserve other fields
     let current_config = get_app_config(app.clone())
         .await
         .unwrap_or_else(|_| AppConfig::default());
@@ -75,7 +75,7 @@ pub async fn update_hotkey(
 
     update_app_config(app.clone(), app_config_update)
         .await
-        .map_err(|e| format!("Failed to save hotkeys to store: {}", e))?;
+        .map_err(|e| format!("Failed to update hotkeys: {}", e))?;
 
     // Update watch state to notify listener thread (single source of truth)
     if state.0.send(new_hotkeys.clone()).is_err() {
@@ -111,12 +111,13 @@ pub async fn update_hotkey(
     Ok(())
 }
 
-/// Get the current hotkey configuration from Tauri Store
+/// Get the current hotkey configuration
 ///
-/// Returns hotkeys from store. If no config exists, fetches from server (which provides defaults).
+/// Returns hotkeys from app config.
 ///
 /// # Returns
 /// * `String` - JSON string with `hotkeys` array (e.g., `{"hotkeys": ["Fn", "Cmd+Shift+R"]}`)
+
 #[tauri::command]
 pub async fn get_current_hotkey(app: AppHandle) -> Result<String, String> {
     let config = get_app_config(app).await?;
