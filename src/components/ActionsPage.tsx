@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
-import { HotkeySelector } from "./HotkeySelector";
+
 
 export const ActionsPage: React.FC = () => {
   const authStore = useAuthStore();
@@ -116,24 +116,7 @@ export const ActionsPage: React.FC = () => {
     }
   };
 
-  const handleHotkeyChange = async (newHotkeys: string[]) => {
-    try {
-      // Get current config to merge
-      const currentConfig = await invoke<AppConfig>("get_app_config");
 
-      const updatedConfig = {
-        ...currentConfig,
-        action_hotkeys: newHotkeys,
-      };
-
-      await invoke("update_app_config", { config: updatedConfig });
-      setActionHotkeys(newHotkeys);
-      console.log("Action hotkeys updated:", newHotkeys);
-    } catch (err) {
-      console.error("Failed to update action hotkeys:", err);
-      setError("Failed to update hotkeys");
-    }
-  };
 
   // Format dates for all actions
   useEffect(() => {
@@ -326,11 +309,44 @@ export const ActionsPage: React.FC = () => {
               Loading hotkey...
             </div>
           ) : (
-            <HotkeySelector
-              value={{ hotkeys: actionHotkeys }}
-              onChange={(config) => handleHotkeyChange(config.hotkeys)}
-              maxHotkeys={3}
-            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {actionHotkeys && actionHotkeys.length > 0 ? (
+                actionHotkeys.map((hotkey, index) => (
+                  <div
+                    key={`action-${index}-${hotkey}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "8px 12px",
+                      background: "rgba(168, 85, 247, 0.1)",
+                      color: "#c084fc",
+                      borderRadius: "6px",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                      border: "1px solid rgba(168, 85, 247, 0.2)",
+                      fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                    }}
+                  >
+                    {hotkey}
+                  </div>
+                ))
+              ) : (
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                    color: "#9ca3af",
+                    display: "inline-block",
+                  }}
+                >
+                  No action hotkeys configured
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

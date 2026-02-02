@@ -18,7 +18,6 @@ import {
 import type { TauriAppConfig, HotkeyConfig } from "../types";
 
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
-import { HotkeySelector } from "./HotkeySelector";
 import { useAuthStore } from "../store/authStore";
 
 // Supported languages for transcription
@@ -47,12 +46,6 @@ export const SettingsPage: React.FC = () => {
   const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
     hotkeys: [],
   });
-  const [selectedHotkeys, setSelectedHotkeys] = useState<HotkeyConfig>({
-    hotkeys: [],
-  });
-  const [isUpdatingHotkeys, setIsUpdatingHotkeys] = useState(false);
-  const [hotkeyError, setHotkeyError] = useState<string | null>(null);
-  const [hotkeySuccess, setHotkeySuccess] = useState(false);
   const [activeSection, setActiveSection] = useState<
     "account" | "transcription" | "general" | "hotkeys"
   >("account");
@@ -63,7 +56,7 @@ export const SettingsPage: React.FC = () => {
   const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
   const autostartEnabled = config?.launch_on_system_startup;
   const enhanceTranscription = config?.enhance_transcription;
-  const vocabulary = config?.vocabulary;
+
   const configHotkeys = config?.hotkeys || [];
 
   // Load app config on mount
@@ -131,7 +124,6 @@ export const SettingsPage: React.FC = () => {
           hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
         }
         setCurrentHotkeys(hotkey);
-        setSelectedHotkeys(hotkey);
       } catch (hotkeyErr) {
         console.warn("Failed to load hotkeys:", hotkeyErr);
         // If hotkeys are in config, use those
@@ -140,7 +132,6 @@ export const SettingsPage: React.FC = () => {
             hotkeys: configHotkeys.slice(0, 3),
           };
           setCurrentHotkeys(hotkey);
-          setSelectedHotkeys(hotkey);
         }
       }
     };
@@ -160,13 +151,6 @@ export const SettingsPage: React.FC = () => {
             hotkey.hotkeys = hotkey.hotkeys.slice(0, 3);
           }
           setCurrentHotkeys(hotkey);
-          setSelectedHotkeys(hotkey);
-          setHotkeySuccess(true);
-          setIsUpdatingHotkeys(false);
-          setHotkeyError(null);
-
-          // Clear success message after 2 seconds
-          setTimeout(() => setHotkeySuccess(false), 2000);
         } catch (err) {
           console.error("Failed to parse hotkey update:", err);
         }
@@ -306,60 +290,6 @@ export const SettingsPage: React.FC = () => {
     const currentValue =
       selectedEnhanceTranscription ?? enhanceTranscription ?? false;
     setSelectedEnhanceTranscription(!currentValue);
-  };
-
-  const handleSaveHotkeys = async () => {
-    const hotkeysChanged =
-      JSON.stringify(selectedHotkeys.hotkeys) !==
-      JSON.stringify(currentHotkeys.hotkeys);
-
-    if (!hotkeysChanged) {
-      return; // No changes needed
-    }
-
-    setIsUpdatingHotkeys(true);
-    setHotkeyError(null);
-    setHotkeySuccess(false);
-
-    try {
-      // Validate hotkeys
-      if (selectedHotkeys.hotkeys.length > 3) {
-        setHotkeyError("Maximum of 3 hotkeys allowed");
-        setIsUpdatingHotkeys(false);
-        return;
-      }
-      if (selectedHotkeys.hotkeys.length === 0) {
-        setHotkeyError("At least one hotkey is required");
-        setIsUpdatingHotkeys(false);
-        return;
-      }
-
-      // Update hotkey configuration
-      const configJson = JSON.stringify(selectedHotkeys);
-      await invoke("update_hotkey", { configJson });
-      setCurrentHotkeys(selectedHotkeys);
-
-      setHotkeySuccess(true);
-      setTimeout(() => setHotkeySuccess(false), 2000);
-    } catch (err: any) {
-      console.error("Failed to update hotkeys:", err);
-      setHotkeyError(err?.message || "Failed to update hotkeys");
-    } finally {
-      setIsUpdatingHotkeys(false);
-    }
-  };
-
-  const hasHotkeyChanges = () => {
-    return (
-      JSON.stringify(selectedHotkeys.hotkeys) !==
-      JSON.stringify(currentHotkeys.hotkeys)
-    );
-  };
-
-  const handleHotkeySelectorChange = (config: HotkeyConfig) => {
-    // Limit to 3 hotkeys
-    const limitedHotkeys = config.hotkeys.slice(0, 3);
-    setSelectedHotkeys({ hotkeys: limitedHotkeys });
   };
 
   const ToggleSwitch: React.FC<{
@@ -700,8 +630,8 @@ export const SettingsPage: React.FC = () => {
                   <span>
                     {selectedLanguage
                       ? SUPPORTED_LANGUAGES.find(
-                          (l) => l.value === selectedLanguage,
-                        )?.label || "Select language"
+                        (l) => l.value === selectedLanguage,
+                      )?.label || "Select language"
                       : "Auto Detect Language"}
                   </span>
                   <ChevronDown
@@ -1014,69 +944,7 @@ export const SettingsPage: React.FC = () => {
         {/* Hotkeys Section */}
         {activeSection === "hotkeys" && (
           <div>
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#9ca3af",
-                  marginBottom: "12px",
-                }}
-              >
-                Current Hotkey
-              </div>
-              {currentHotkeys.hotkeys.length > 0 ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "8px",
-                  }}
-                >
-                  {currentHotkeys.hotkeys.map((hotkey, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        padding: "6px 12px",
-                        background: "#f3f4f6",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "6px",
-                        fontSize: "13px",
-                        fontFamily:
-                          'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
-                        color: "#111827",
-                      }}
-                    >
-                      {hotkey}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    background: "#f3f4f6",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                    color: "#9ca3af",
-                    display: "inline-block",
-                  }}
-                >
-                  No hotkeys configured
-                </div>
-              )}
-            </div>
+
 
             <div
               style={{
@@ -1087,6 +955,7 @@ export const SettingsPage: React.FC = () => {
                 marginBottom: "24px",
               }}
             >
+              {/* Transcription Hotkeys */}
               <div
                 style={{
                   fontSize: "11px",
@@ -1097,136 +966,101 @@ export const SettingsPage: React.FC = () => {
                   marginBottom: "12px",
                 }}
               >
-                Configure Hotkeys
+                Transcription Hotkeys
               </div>
-              <HotkeySelector
-                value={selectedHotkeys}
-                onChange={handleHotkeySelectorChange}
-                maxHotkeys={3}
-                disabled={isUpdatingHotkeys}
-              />
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
+                {currentHotkeys.hotkeys.length > 0 ? (
+                  currentHotkeys.hotkeys.map((hotkey, index) => (
+                    <div
+                      key={`transcription-${index}-${hotkey}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "6px 10px",
+                        background: "rgba(0, 122, 255, 0.1)",
+                        color: "#007aff",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        whiteSpace: "nowrap",
+                        border: "1px solid rgba(0, 122, 255, 0.2)",
+                        fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                      }}
+                    >
+                      {hotkey}
+                    </div>
+                  ))
+                ) : (
+                  <div
+                    style={{
+                      padding: "8px 12px",
+                      background: "#f3f4f6",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      color: "#9ca3af",
+                      display: "inline-block",
+                    }}
+                  >
+                    No hotkeys configured
+                  </div>
+                )}
+              </div>
+
+              {/* Action Hotkeys */}
               <div
                 style={{
-                  fontSize: "12px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
                   color: "#9ca3af",
-                  marginTop: "12px",
+                  marginBottom: "12px",
                 }}
               >
-                Note: Fn key is handled separately and works on Mac. Other
-                hotkeys use Tauri global shortcuts.
+                Action Hotkeys
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {config?.action_hotkeys && config.action_hotkeys.length > 0 ? (
+                  config.action_hotkeys.map((hotkey, index) => (
+                    <div
+                      key={`action-${index}-${hotkey}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "6px 10px",
+                        background: "rgba(168, 85, 247, 0.1)",
+                        color: "#9333ea",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        whiteSpace: "nowrap",
+                        border: "1px solid rgba(168, 85, 247, 0.2)",
+                        fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                      }}
+                    >
+                      {hotkey}
+                    </div>
+                  ))
+                ) : (
+                  <div
+                    style={{
+                      padding: "8px 12px",
+                      background: "#f3f4f6",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      color: "#9ca3af",
+                      display: "inline-block",
+                    }}
+                  >
+                    No action hotkeys configured
+                  </div>
+                )}
               </div>
             </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                justifyContent: "flex-end",
-              }}
-            >
-              <button
-                onClick={() => {
-                  // Reset to default hotkeys
-                  const defaultHotkeys: HotkeyConfig = { hotkeys: ["Fn"] };
-                  setSelectedHotkeys(defaultHotkeys);
-                }}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  background: "#ffffff",
-                  color: "#6b7280",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#f3f4f6";
-                  e.currentTarget.style.borderColor = "#d1d5db";
-                  e.currentTarget.style.color = "#111827";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#ffffff";
-                  e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.color = "#6b7280";
-                }}
-              >
-                Reset Default
-              </button>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
-                    handleSaveHotkeys();
-                  }
-                }}
-                disabled={isUpdatingHotkeys || !hasHotkeyChanges() || isLoading}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  background: "#111827",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "6px",
-                  opacity:
-                    isUpdatingHotkeys || !hasHotkeyChanges() || isLoading
-                      ? 0.5
-                      : 1,
-                  cursor:
-                    isUpdatingHotkeys || !hasHotkeyChanges() || isLoading
-                      ? "not-allowed"
-                      : "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#374151";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isUpdatingHotkeys && hasHotkeyChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#111827";
-                  }
-                }}
-              >
-                {isUpdatingHotkeys ? "Saving..." : "Update Hotkey"}
-              </button>
-            </div>
-
-            {hotkeyError && (
-              <div
-                style={{
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#b91c1c",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
-                {hotkeyError}
-              </div>
-            )}
-
-            {hotkeySuccess && (
-              <div
-                style={{
-                  background: "#ecfdf5",
-                  border: "1px solid #a7f3d0",
-                  color: "#047857",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
-                Hotkeys saved successfully!
-              </div>
-            )}
           </div>
         )}
       </div>

@@ -112,7 +112,7 @@ export interface AppConfigUpdateRequest {
 export interface TauriAppConfig {
   languages?: string[] | null;
   hotkeys?: string[] | null;
-  action_hotkey?: string | null;
+  action_hotkeys?: string[] | null;
   enhance_transcription?: boolean | null;
   launch_on_system_startup?: boolean | null;
   vocabulary?: string[] | null;
@@ -254,14 +254,13 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-    | "home"
-    | "transcripts"
-    | "settings"
-    | "vocabulary"
-    | "actions"
-    | "shortcuts"
-    | "rooms"
-    | "notes";
+  | "home"
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts"
+  | "notes";
   onNavigate: (
     page:
       | "home"
@@ -270,8 +269,7 @@ export interface SidebarProps {
       | "vocabulary"
       | "actions"
       | "shortcuts"
-      | "notes"
-      | "rooms",
+      | "notes",
   ) => void;
 }
 
