@@ -9,7 +9,7 @@
 //! 6. Emitting events to the frontend to update UI state
 
 use super::service::AssistantService;
-use crate::commands::app_config::get_app_config;
+
 use crate::commands::auth::get_auth_token_async;
 use crate::shortcuts::check_command;
 use crate::state::TranscriptionTaskState;
@@ -60,43 +60,9 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             return;
         }
 
-        // Get app config for transcription settings
-        let app_config = match get_app_config(app_handle_for_task.clone()).await {
-            Ok(config) => config,
-            Err(e) => {
-                let error_msg = format!("Failed to load app config: {}", e);
-                app_handle_for_task
-                    .emit("error", error_msg.as_str())
-                    .unwrap_or_default();
-                return;
-            }
-        };
-
-        // Get first language from languages array
-        // Default to "auto" if not set
-        let language = app_config
-            .languages
-            .and_then(|langs| langs.first().cloned())
-            .unwrap_or_else(|| "auto".to_string());
-
-        // Get transcription settings from app config
-        let enhance_transcription = app_config.enhance_transcription.unwrap_or(false);
-
         // TODO: Implement this as on demand download feature on paid plans
         // offline_transcription is not in app config, keep as hardcoded for now
         let offline_transcription = false;
-
-        // RESEARCH: Passing certain examples to vocabulary can trick the model into generating the style of transcript.
-        // Do more experiment on how we can use this trick to manipulate the model behavior.
-        // Get vocabulary from app config
-        let vocabulary: Vec<String> = app_config.vocabulary.clone().unwrap_or_default();
-
-        println!(
-            "⚙️  Transcription settings: enhance={}, offline={}, vocabulary_size={}",
-            enhance_transcription,
-            offline_transcription,
-            vocabulary.len()
-        );
 
         // Initialize the Assistant service client and transcribe the audio (cursor context is fetched inside transcribe_audio)
         let assistant_service = AssistantService::new();
@@ -106,11 +72,8 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .transcribe_audio(
                 audio_data,
                 auth_token,
-                language,
-                enhance_transcription,
                 Some(app_handle_for_task.clone()),
                 offline_transcription,
-                vocabulary,
             )
             .await;
         let transcription_duration = transcription_start.elapsed();

@@ -73,11 +73,8 @@ impl AssistantService {
         &self,
         audio_data: Vec<u8>,
         auth_token: Option<String>,
-        language: String,
-        enhance_transcription: bool,
         app_handle: Option<AppHandle>,
         offline_transcription: bool,
-        vocabulary: Vec<String>,
     ) -> Result<(String, Option<CursorContext>), Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
@@ -137,7 +134,6 @@ impl AssistantService {
         } else {
             // Continue with server API transcription
 
-            // Helper function to build the multipart form (takes focused_app so cursor context can be fetched just before the API call)
             let build_form = |audio_data: &[u8],
                               focused_app: &str|
              -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
@@ -145,15 +141,9 @@ impl AssistantService {
                     .file_name("audio.wav")
                     .mime_str("audio/wav")?;
 
-                let mut form = multipart::Form::new()
+                let form = multipart::Form::new()
                     .part("audio_file", part)
-                    .text("language", language.clone())
-                    .text("enhance_stt_output", enhance_transcription.to_string())
                     .text("focused_app", focused_app.to_string());
-
-                for word in &vocabulary {
-                    form = form.text("vocabulary", word.clone());
-                }
 
                 Ok(form)
             };

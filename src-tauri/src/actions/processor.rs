@@ -4,7 +4,7 @@
 //! It handles transcription, action execution, and response handling (TTS/Injection).
 
 use crate::actions::service::ActionService;
-use crate::commands::app_config::get_app_config;
+
 use crate::commands::auth::get_auth_token_async;
 use crate::cursor_context::get_cursor_context;
 use tauri::{AppHandle, Emitter};
@@ -29,18 +29,6 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         app_handle.emit("error", error_msg).unwrap_or_default();
         return;
     }
-
-    // Get app config
-    let _app_config = match get_app_config(app_handle.clone()).await {
-        Ok(config) => config,
-        Err(e) => {
-            let error_msg = format!("Failed to load app config: {}", e);
-            app_handle
-                .emit("error", error_msg.as_str())
-                .unwrap_or_default();
-            return;
-        }
-    };
 
     // Get cursor context
     let cursor_context = get_cursor_context();
