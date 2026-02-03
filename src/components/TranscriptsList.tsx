@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw, Check } from "lucide-react";
 import type { Transcript } from "../types";
 import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
@@ -24,6 +24,7 @@ export const TranscriptsList: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Clear error on mount to prevent stale error messages
   useEffect(() => {
@@ -228,14 +229,16 @@ export const TranscriptsList: React.FC = () => {
     return formattedDates[transcriptId] || "Loading...";
   };
 
-  const handleCopyToClipboard = async (text: string) => {
+  const handleCopyToClipboard = async (text: string, transcriptId: string) => {
     try {
-      await navigator.clipboard.writeText(text);
-      // You could add a toast notification here if needed
+      await invoke("copy_to_clipboard", { text });
+      setCopiedId(transcriptId);
+      setTimeout(() => setCopiedId(null), 250);
     } catch (err) {
       console.error("Failed to copy to clipboard:", err);
     }
   };
+
 
   const getStatusColor = (status: string): string => {
     switch (status.toLowerCase()) {
@@ -482,7 +485,10 @@ export const TranscriptsList: React.FC = () => {
                   {transcript.original_text && (
                     <button
                       onClick={() =>
-                        handleCopyToClipboard(transcript.original_text || "")
+                        handleCopyToClipboard(
+                          transcript.original_text || "",
+                          transcript.id,
+                        )
                       }
                       style={{
                         display: "flex",
@@ -491,26 +497,43 @@ export const TranscriptsList: React.FC = () => {
                         width: "32px",
                         height: "32px",
                         padding: 0,
-                        background: "#ffffff",
-                        border: "1px solid #e5e7eb",
+                        background:
+                          copiedId === transcript.id ? "#dcfce7" : "#ffffff",
+                        border:
+                          copiedId === transcript.id
+                            ? "1px solid #22c55e"
+                            : "1px solid #e5e7eb",
                         borderRadius: "0.5rem",
                         cursor: "pointer",
                         transition: "all 0.2s ease",
-                        color: "#6b7280",
+                        color:
+                          copiedId === transcript.id ? "#16a34a" : "#6b7280",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#f9fafb";
-                        e.currentTarget.style.borderColor = "#d1d5db";
-                        e.currentTarget.style.color = "#111827";
+                        if (copiedId !== transcript.id) {
+                          e.currentTarget.style.background = "#f9fafb";
+                          e.currentTarget.style.borderColor = "#d1d5db";
+                          e.currentTarget.style.color = "#111827";
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "#ffffff";
-                        e.currentTarget.style.borderColor = "#e5e7eb";
-                        e.currentTarget.style.color = "#6b7280";
+                        if (copiedId !== transcript.id) {
+                          e.currentTarget.style.background = "#ffffff";
+                          e.currentTarget.style.borderColor = "#e5e7eb";
+                          e.currentTarget.style.color = "#6b7280";
+                        }
                       }}
-                      title="Copy transcript"
+                      title={
+                        copiedId === transcript.id
+                          ? "Copied!"
+                          : "Copy transcript"
+                      }
                     >
-                      <Copy size={16} />
+                      {copiedId === transcript.id ? (
+                        <Check size={16} strokeWidth={2.5} />
+                      ) : (
+                        <Copy size={16} />
+                      )}
                     </button>
                   )}
                   <button
