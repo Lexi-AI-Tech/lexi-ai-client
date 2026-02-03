@@ -230,12 +230,13 @@ export const TranscriptsList: React.FC = () => {
 
   const handleCopyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await invoke("copy_to_clipboard", { text });
       // You could add a toast notification here if needed
     } catch (err) {
       console.error("Failed to copy to clipboard:", err);
     }
   };
+
 
   const getStatusColor = (status: string): string => {
     switch (status.toLowerCase()) {
