@@ -95,9 +95,10 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
                 // Only process if transcription is not empty
                 if !transcription.trim().is_empty() {
-                    // Check if transcription matches a shortcut command
-                    let text_to_inject =
-                        check_command(&transcription).unwrap_or_else(|| transcription.clone());
+                    // Check if transcription matches a shortcut command (from app config)
+                    let text_to_inject = check_command(&app_handle_for_task, &transcription)
+                        .await
+                        .unwrap_or_else(|| transcription.clone());
 
                     if text_to_inject != transcription {
                         println!(
