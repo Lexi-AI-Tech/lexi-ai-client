@@ -279,7 +279,7 @@ export function PermissionsStep({
       {onSkip && (
         <button
           type="button"
-          className="btn-skip-onboarding"
+          className="btn btn-outline btn-full btn-skip-onboarding"
           onClick={onSkip}
         >
           Skip onboarding

@@ -314,17 +314,6 @@
 
 .btn-skip-onboarding {
   margin-top: 1rem;
-  padding: 0.5rem 0;
-  background: none;
-  border: none;
-  font-size: 0.875rem;
-  color: #6b7280;
-  cursor: pointer;
-}
-
-.btn-skip-onboarding:hover {
-  color: #374151;
-  text-decoration: underline;
 }
 
 /* Divider */
