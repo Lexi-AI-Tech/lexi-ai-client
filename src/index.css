@@ -125,6 +125,14 @@ body::before {
   z-index: 1;
 }
 
+/* Transcripts page only: fill main content height so loading and list are consistent */
+.container--transcripts {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .settings-page {
   width: 100%;
   max-width: 600px;
@@ -633,10 +641,13 @@ body::before {
   color: #111827;
 }
 
-/* Transcripts List Styles - no max-height/overflow so main-content scrolls the page */
+/* Transcripts List Styles - fill remaining height and scroll inside (consistent with loading state) */
 .transcripts-list {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   border: 1px solid #f3f4f6;
   border-radius: 8px;
 }

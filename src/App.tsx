@@ -76,7 +76,7 @@ function App() {
           />
         )}
         {currentPage === "transcripts" && (
-          <div className="container">
+          <div className="container container--transcripts">
             <TranscriptsList />
           </div>
         )}

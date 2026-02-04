@@ -192,7 +192,15 @@ export const TranscriptsList: React.FC = () => {
     authStore.isInitialized && !authStore.isAuthenticated;
 
   return (
-    <div className="settings">
+    <div
+      className="settings"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -269,7 +277,7 @@ export const TranscriptsList: React.FC = () => {
           className="loading-state"
           style={{
             width: "100%",
-            minHeight: "60vh",
+            flex: 1,
             justifyContent: "center",
           }}
         >
