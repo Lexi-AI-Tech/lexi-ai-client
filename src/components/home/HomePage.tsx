@@ -35,6 +35,10 @@ interface ChartData {
 
 type AnalyticsPeriod = "1d" | "7d" | "30d";
 
+interface HomePageProps {
+  onViewAllTranscripts?: () => void;
+}
+
 // Animation variants
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -125,7 +129,7 @@ const PeriodButton: React.FC<PeriodButtonProps> = ({
   </button>
 );
 
-export const HomePage: React.FC = () => {
+export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
   const { user, isAuthenticated, tokens } = useAuthStore();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
@@ -281,7 +285,13 @@ export const HomePage: React.FC = () => {
         >
           <div className="section-header">
             <h2 className="section-title">Recent Transcriptions</h2>
-            <button className="view-all-btn">View all</button>
+            <button
+              type="button"
+              className="view-all-btn"
+              onClick={onViewAllTranscripts}
+            >
+              View all
+            </button>
           </div>
 
           <div className="transcriptions-list">
