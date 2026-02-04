@@ -14,25 +14,19 @@ import Logo from "../../assets/light_mode_without_text.png";
 const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];
 
 export const OnboardingFlow: React.FC = () => {
-  const { currentStep, nextStep, completeOnboarding } = useOnboardingStore();
+  const { currentStep, nextStep, previousStep, completeOnboarding } =
+    useOnboardingStore();
   const hotkey: string | null = null;
-
-  const getStepIndex = () => {
+  const currentStepIndex = (() => {
     switch (currentStep) {
-      case "welcome":
-        return 0;
-      case "permissions":
-        return 1;
-      case "hotkey-test":
-        return 2;
-      case "microphone-test":
-        return 3;
-      default:
-        return 0;
+      case "welcome": return 0;
+      case "permissions": return 1;
+      case "hotkey-test": return 2;
+      case "microphone-test": return 3;
+      default: return 0;
     }
-  };
-
-  const currentStepIndex = getStepIndex();
+  })();
+  const showBack = currentStepIndex > 0;
 
   return (
     <div className="onboarding-container">
@@ -56,15 +50,27 @@ export const OnboardingFlow: React.FC = () => {
           <div className="onboarding-form-wrapper">
             <AnimatePresence mode="wait">
               {currentStepIndex === 0 && (
-                <WelcomeStep key="welcome" onNext={nextStep} />
+                <WelcomeStep
+                  key="welcome"
+                  onNext={nextStep}
+                  onBack={previousStep}
+                  showBack={showBack}
+                />
               )}
               {currentStepIndex === 1 && (
-                <PermissionsStep key="permissions" onNext={nextStep} />
+                <PermissionsStep
+                  key="permissions"
+                  onNext={nextStep}
+                  onBack={previousStep}
+                  showBack={showBack}
+                />
               )}
               {currentStepIndex === 2 && (
                 <SetupStep
                   key="setup"
                   onNext={nextStep}
+                  onBack={previousStep}
+                  showBack={showBack}
                   hotkey={hotkey}
                 />
               )}
@@ -72,6 +78,8 @@ export const OnboardingFlow: React.FC = () => {
                 <TryItStep
                   key="tryit"
                   onComplete={completeOnboarding}
+                  onBack={previousStep}
+                  showBack={showBack}
                   hotkey={hotkey}
                 />
               )}

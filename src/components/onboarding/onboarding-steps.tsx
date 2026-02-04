@@ -15,8 +15,12 @@ const stepVariants = {
 // Step 1: Welcome
 export function WelcomeStep({
   onNext,
+  onBack,
+  showBack,
 }: {
   onNext: () => void | Promise<void>;
+  onBack?: () => void | Promise<void>;
+  showBack?: boolean;
 }) {
   const { isAuthenticated, error } = useAuthStore();
 
@@ -37,18 +41,9 @@ export function WelcomeStep({
 
       <div className="features-list">
         {[
-          {
-            icon: Keyboard,
-            text: "Global Shortcut",
-          },
-          {
-            icon: Mic,
-            text: "Natural Speech",
-          },
-          {
-            icon: Sparkles,
-            text: "Instant Result",
-          },
+          { icon: Keyboard, text: "Global Shortcut" },
+          { icon: Mic, text: "Natural Speech" },
+          { icon: Sparkles, text: "Instant Result" },
         ].map((item, i) => (
           <div key={i} className="feature-item">
             <item.icon className="feature-icon" />
@@ -60,23 +55,29 @@ export function WelcomeStep({
       </div>
 
       <div className="step-actions">
-        {isAuthenticated ? (
-          <button className="btn btn-primary" onClick={onNext}>
-            Continue
-          </button>
-        ) : (
-          <>
-            <GoogleLoginButton
-              onSuccess={() => {
-                console.log("Login successful");
-              }}
-              onError={(err) => {
-                console.error("Login error:", err);
-              }}
-            />
-            {error && <div className="auth-error">{error}</div>}
-          </>
-        )}
+        <div className="step-actions-row">
+          {showBack && onBack && (
+            <button type="button" className="btn btn-outline" onClick={onBack}>
+              Back
+            </button>
+          )}
+          {isAuthenticated ? (
+            <button
+              className={`btn btn-primary ${showBack ? "btn-flex-2" : ""}`}
+              onClick={onNext}
+            >
+              Continue
+            </button>
+          ) : (
+            <>
+              <GoogleLoginButton
+                onSuccess={() => console.log("Login successful")}
+                onError={(err) => console.error("Login error:", err)}
+              />
+              {error && <div className="auth-error">{error}</div>}
+            </>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -90,8 +91,12 @@ interface PermissionState {
 
 export function PermissionsStep({
   onNext,
+  onBack,
+  showBack,
 }: {
   onNext: () => void | Promise<void>;
+  onBack?: () => void | Promise<void>;
+  showBack?: boolean;
 }) {
   const [microphone, setMicrophone] = useState<PermissionState>({
     granted: false,
@@ -238,13 +243,20 @@ export function PermissionsStep({
         ))}
       </div>
 
-      <button
-        disabled={!allGranted}
-        className="btn btn-primary btn-full"
-        onClick={onNext}
-      >
-        Continue
-      </button>
+      <div className="step-actions-row">
+        {showBack && onBack && (
+          <button type="button" className="btn btn-outline" onClick={onBack}>
+            Back
+          </button>
+        )}
+        <button
+          disabled={!allGranted}
+          className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
+          onClick={onNext}
+        >
+          Continue
+        </button>
+      </div>
     </motion.div>
   );
 }
@@ -252,9 +264,13 @@ export function PermissionsStep({
 // Step 3: Setup (Global Shortcut) – display only, no reassignment
 export function SetupStep({
   onNext,
+  onBack,
+  showBack,
   hotkey,
 }: {
   onNext: () => void | Promise<void>;
+  onBack?: () => void | Promise<void>;
+  showBack?: boolean;
   hotkey: string | null;
 }) {
   return (
@@ -280,9 +296,19 @@ export function SetupStep({
       </div>
 
       <div className="step-actions">
-        <button className="btn btn-primary" onClick={onNext}>
-          Continue
-        </button>
+        <div className="step-actions-row">
+          {showBack && onBack && (
+            <button type="button" className="btn btn-outline" onClick={onBack}>
+              Back
+            </button>
+          )}
+          <button
+            className={`btn btn-primary ${showBack ? "btn-flex-2" : ""}`}
+            onClick={onNext}
+          >
+            Continue
+          </button>
+        </div>
       </div>
     </motion.div>
   );
@@ -291,9 +317,13 @@ export function SetupStep({
 // Step 4: Try It
 export function TryItStep({
   onComplete,
+  onBack,
+  showBack,
   hotkey,
 }: {
   onComplete: () => void | Promise<void>;
+  onBack?: () => void | Promise<void>;
+  showBack?: boolean;
   hotkey: string | null;
 }) {
   const [isListening, setIsListening] = useState(false);
@@ -376,9 +406,19 @@ export function TryItStep({
         )}
       </div>
 
-      <button className="btn btn-primary btn-full" onClick={onComplete}>
-        Complete Setup
-      </button>
+      <div className="step-actions-row">
+        {showBack && onBack && (
+          <button type="button" className="btn btn-outline" onClick={onBack}>
+            Back
+          </button>
+        )}
+        <button
+          className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
+          onClick={onComplete}
+        >
+          Complete Setup
+        </button>
+      </div>
     </motion.div>
   );
 }
