@@ -62,6 +62,7 @@ export const OnboardingFlow: React.FC = () => {
                   key="permissions"
                   onNext={nextStep}
                   onBack={previousStep}
+                  onSkip={completeOnboarding}
                   showBack={showBack}
                 />
               )}

@@ -104,10 +104,12 @@ interface PermissionState {
 export function PermissionsStep({
   onNext,
   onBack,
+  onSkip,
   showBack,
 }: {
   onNext: () => void | Promise<void>;
   onBack?: () => void | Promise<void>;
+  onSkip?: () => void | Promise<void>;
   showBack?: boolean;
 }) {
   const [microphone, setMicrophone] = useState<PermissionState>({
@@ -274,6 +276,15 @@ export function PermissionsStep({
           Continue
         </button>
       </div>
+      {onSkip && (
+        <button
+          type="button"
+          className="btn-skip-onboarding"
+          onClick={onSkip}
+        >
+          Skip onboarding
+        </button>
+      )}
     </motion.div>
   );
 }
