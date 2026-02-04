@@ -9,14 +9,11 @@ import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, RefreshCw, Check } from "lucide-react";
 import type { Transcript } from "../types";
-import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
-import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();
-  const networkStatus = useNetworkStatus();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,9 +109,7 @@ export const TranscriptsList: React.FC = () => {
 
   // Fetch transcripts when authenticated and page changes
   useEffect(() => {
-    let cancelled = false;
-
-    const loadTranscripts = async () => {
+    const loadTranscripts = () => {
       // Step 1: Wait for auth store to initialize
       if (!authStore.isInitialized) {
         setLoading(true);
@@ -133,29 +128,8 @@ export const TranscriptsList: React.FC = () => {
       setError(null);
 
       if (authStore.isAuthenticated && authStore.tokens?.access_token) {
-        // Ready to fetch - user is authenticated and tokens are loaded
-        // Wait for network to be available (especially important on auto-startup)
         setLoading(true);
-
-        // Give network time to connect on startup
-        await waitForStartupDelay(2000);
-        if (cancelled) return;
-
-        // Check network connectivity before making API call
-        const isOnline = await waitForNetwork(3, 1000);
-        if (cancelled) return;
-
-        if (isOnline) {
-          fetchTranscripts();
-        } else {
-          // Network not available - set loading to false so UI can show network message
-          console.debug("Network not available, skipping transcript fetch");
-          setTranscripts([]);
-          setError(null);
-          setLoading(false);
-          // Trigger network status check to update UI
-          networkStatus.retry();
-        }
+        fetchTranscripts();
       } else {
         // Not authenticated - clear and show login prompt
         setTranscripts([]);
@@ -165,10 +139,6 @@ export const TranscriptsList: React.FC = () => {
     };
 
     loadTranscripts();
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     authStore.isAuthenticated,
     authStore.isInitialized,
@@ -195,38 +165,23 @@ export const TranscriptsList: React.FC = () => {
     }
   };
 
-  // Format dates for all transcripts
-  const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
-    {},
-  );
+  // Format relative date in JS to avoid N Tauri invokes (was a major slowdown)
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
 
-  useEffect(() => {
-    const formatAllDates = async () => {
-      const formatted: Record<string, string> = {};
-      for (const transcript of transcripts) {
-        try {
-          const formattedDate = await invoke<string>("format_date_relative", {
-            dateString: transcript.created_at,
-          });
-          formatted[transcript.id] = formattedDate;
-        } catch (error) {
-          console.error("Failed to format date:", error);
-          // Fallback to simple date string
-          formatted[transcript.id] = new Date(
-            transcript.created_at,
-          ).toLocaleDateString();
-        }
-      }
-      setFormattedDates(formatted);
-    };
-
-    if (transcripts.length > 0) {
-      formatAllDates();
-    }
-  }, [transcripts]);
-
-  const formatDate = (transcriptId: string): string => {
-    return formattedDates[transcriptId] || "Loading...";
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60)
+      return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
+    if (diffHours < 24)
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+    if (diffDays < 7)
+      return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+    return date.toLocaleDateString();
   };
 
   const handleCopyToClipboard = async (text: string, transcriptId: string) => {
@@ -356,55 +311,6 @@ export const TranscriptsList: React.FC = () => {
         )}
       </div>
 
-      {/* Show network offline message if not online */}
-      {!networkStatus.isOnline && authStore.isAuthenticated && (
-        <div
-          className="permission-message"
-          style={{
-            background: "#fef3c7",
-            borderColor: "#fde68a",
-            color: "#92400e",
-            marginBottom: "16px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "12px",
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  marginBottom: "4px",
-                }}
-              >
-                Internet Connection Required
-              </div>
-              <div style={{ fontSize: "11px", opacity: 0.8 }}>
-                Please check your internet connection to load transcripts.
-              </div>
-            </div>
-            <button
-              className="transcript-btn"
-              onClick={networkStatus.retry}
-              disabled={networkStatus.isChecking}
-              style={{
-                fontSize: "11px",
-                padding: "6px 12px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {networkStatus.isChecking ? "Checking..." : "Retry"}
-            </button>
-          </div>
-        </div>
-      )}
-
       {loading && transcripts.length === 0 && (
         <div
           style={{
@@ -458,7 +364,7 @@ export const TranscriptsList: React.FC = () => {
               className="transcript-item transcripts-table-row"
             >
               <div className="transcript-cell transcript-cell-date">
-                {formatDate(transcript.id)}
+                {formatDate(transcript.created_at)}
               </div>
               <div className="transcript-cell transcript-cell-text">
                 {transcript.original_text ? (
