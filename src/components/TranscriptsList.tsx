@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, RefreshCw, Check } from "lucide-react";
+import { Copy, RefreshCw, Check, Trash2 } from "lucide-react";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
@@ -24,6 +24,7 @@ export const TranscriptsList: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Clear error on mount to prevent stale error messages
   useEffect(() => {
@@ -155,15 +156,21 @@ export const TranscriptsList: React.FC = () => {
     page,
   ]);
 
-  const handleDelete = async (transcriptId: string) => {
-    if (!confirm("Are you sure you want to delete this transcript?")) {
-      return;
-    }
+  const openDeleteConfirm = (transcriptId: string) => {
+    setDeleteConfirmId(transcriptId);
+  };
 
-    setDeletingId(transcriptId);
+  const closeDeleteConfirm = () => {
+    if (!deletingId) setDeleteConfirmId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmId) return;
+
+    setDeletingId(deleteConfirmId);
     try {
-      await invoke("delete_transcript", { transcriptId });
-      // Refresh the list
+      await invoke("delete_transcript", { transcriptId: deleteConfirmId });
+      setDeleteConfirmId(null);
       await fetchTranscripts();
     } catch (err: any) {
       console.error("Failed to delete transcript:", err);
@@ -456,6 +463,42 @@ export const TranscriptsList: React.FC = () => {
                   >
                     <RefreshCw size={16} />
                   </button>
+                  <button
+                    onClick={() => openDeleteConfirm(transcript.id)}
+                    disabled={!!deletingId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "32px",
+                      height: "32px",
+                      padding: 0,
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      cursor: deletingId ? "not-allowed" : "pointer",
+                      transition: "all 0.2s ease",
+                      color: "#6b7280",
+                      opacity: deletingId ? 0.6 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!deletingId) {
+                        e.currentTarget.style.background = "#fef2f2";
+                        e.currentTarget.style.borderColor = "#fecaca";
+                        e.currentTarget.style.color = "#dc2626";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!deletingId) {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.borderColor = "#e5e7eb";
+                        e.currentTarget.style.color = "#6b7280";
+                      }
+                    }}
+                    title="Delete transcript"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                   {transcript.audio_file_url && (
                     <audio
                       src={transcript.audio_file_url as string}
@@ -470,6 +513,42 @@ export const TranscriptsList: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {deleteConfirmId && (
+        <div
+          className="delete-modal-overlay"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Delete transcript?</h3>
+            <p>
+              This action cannot be undone. The transcript will be permanently
+              removed.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={closeDeleteConfirm}
+                disabled={!!deletingId}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleConfirmDelete}
+                disabled={!!deletingId}
+              >
+                {deletingId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
