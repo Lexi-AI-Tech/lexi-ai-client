@@ -133,12 +133,8 @@ export interface Transcript {
   enhanced_text: string | null;
   enhanced_text_word_count: number | null;
   enhanced_text_character_count: number | null;
-  llm_enhancement_provider: string | null;
-  llm_model: string | null;
   audio_file_url: string | null;
   audio_file_size: number | null;
-  asr_provider: string;
-  asr_model: string;
   focused_app: string;
   status: string;
   created_at: string;
@@ -241,6 +237,8 @@ export interface OnboardingState {
   previousStep: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
   resetOnboarding: () => Promise<void>;
+  /** Re-fetch onboarding state from backend (e.g. after auth_expired reset). */
+  refreshState: () => Promise<void>;
 }
 
 // ============================================================================

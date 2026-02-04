@@ -7,16 +7,15 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, RefreshCw, Check } from "lucide-react";
+import { Copy, RefreshCw, Check, Trash2, Sparkles } from "lucide-react";
 import type { Transcript } from "../types";
-import { waitForNetwork, waitForStartupDelay } from "../lib/networkUtils";
-import { useNetworkStatus } from "../hooks/useNetworkStatus";
+import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import "./home/home.css";
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();
-  const networkStatus = useNetworkStatus();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +24,8 @@ export const TranscriptsList: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [originalTooltipId, setOriginalTooltipId] = useState<string | null>(null);
 
   // Clear error on mount to prevent stale error messages
   useEffect(() => {
@@ -110,82 +111,67 @@ export const TranscriptsList: React.FC = () => {
     page,
   ]);
 
-  // Fetch transcripts when authenticated and page changes
+  // Fetch transcripts when authenticated and page changes (same pattern as HomePage: single effect, no callback in deps to avoid double fetch)
   useEffect(() => {
-    let cancelled = false;
-
-    const loadTranscripts = async () => {
-      // Step 1: Wait for auth store to initialize
-      if (!authStore.isInitialized) {
-        setLoading(true);
-        setError(null);
-        return; // Show loading while waiting for initialization
-      }
-
-      // Step 2: If authenticated, wait for tokens to be loaded
-      if (authStore.isAuthenticated && !authStore.tokens?.access_token) {
-        setLoading(true);
-        setError(null);
-        return; // Show loading while waiting for tokens
-      }
-
-      // Step 3: Now we know the auth state - either authenticated with tokens, or not authenticated
+    if (!authStore.isInitialized) return;
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setTranscripts([]);
       setError(null);
+      setLoading(false);
+      return;
+    }
 
-      if (authStore.isAuthenticated && authStore.tokens?.access_token) {
-        // Ready to fetch - user is authenticated and tokens are loaded
-        // Wait for network to be available (especially important on auto-startup)
-        setLoading(true);
+    setLoading(true);
+    setError(null);
 
-        // Give network time to connect on startup
-        await waitForStartupDelay(2000);
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await invoke<{
+          transcripts: Transcript[];
+          total: number;
+          page: number;
+          page_size: number;
+          total_pages: number;
+        }>("get_transcripts", { page, pageSize: 10 });
+
         if (cancelled) return;
-
-        // Check network connectivity before making API call
-        const isOnline = await waitForNetwork(3, 1000);
+        setTranscripts(response.transcripts);
+        setTotalPages(response.total_pages);
+        setTotal(response.total);
+      } catch (err: any) {
         if (cancelled) return;
-
-        if (isOnline) {
-          fetchTranscripts();
-        } else {
-          // Network not available - set loading to false so UI can show network message
-          console.debug("Network not available, skipping transcript fetch");
-          setTranscripts([]);
-          setError(null);
-          setLoading(false);
-          // Trigger network status check to update UI
-          networkStatus.retry();
-        }
-      } else {
-        // Not authenticated - clear and show login prompt
-        setTranscripts([]);
-        setError(null);
-        setLoading(false);
+        console.error("Failed to fetch transcripts:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    };
-
-    loadTranscripts();
+    })();
 
     return () => {
       cancelled = true;
     };
   }, [
-    authStore.isAuthenticated,
     authStore.isInitialized,
+    authStore.isAuthenticated,
     authStore.tokens?.access_token,
     page,
-    fetchTranscripts,
   ]);
 
-  const handleDelete = async (transcriptId: string) => {
-    if (!confirm("Are you sure you want to delete this transcript?")) {
-      return;
-    }
+  const openDeleteConfirm = (transcriptId: string) => {
+    setDeleteConfirmId(transcriptId);
+  };
 
-    setDeletingId(transcriptId);
+  const closeDeleteConfirm = () => {
+    if (!deletingId) setDeleteConfirmId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmId) return;
+
+    setDeletingId(deleteConfirmId);
     try {
-      await invoke("delete_transcript", { transcriptId });
-      // Refresh the list
+      await invoke("delete_transcript", { transcriptId: deleteConfirmId });
+      setDeleteConfirmId(null);
       await fetchTranscripts();
     } catch (err: any) {
       console.error("Failed to delete transcript:", err);
@@ -193,40 +179,6 @@ export const TranscriptsList: React.FC = () => {
     } finally {
       setDeletingId(null);
     }
-  };
-
-  // Format dates for all transcripts
-  const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
-    {},
-  );
-
-  useEffect(() => {
-    const formatAllDates = async () => {
-      const formatted: Record<string, string> = {};
-      for (const transcript of transcripts) {
-        try {
-          const formattedDate = await invoke<string>("format_date_relative", {
-            dateString: transcript.created_at,
-          });
-          formatted[transcript.id] = formattedDate;
-        } catch (error) {
-          console.error("Failed to format date:", error);
-          // Fallback to simple date string
-          formatted[transcript.id] = new Date(
-            transcript.created_at,
-          ).toLocaleDateString();
-        }
-      }
-      setFormattedDates(formatted);
-    };
-
-    if (transcripts.length > 0) {
-      formatAllDates();
-    }
-  }, [transcripts]);
-
-  const formatDate = (transcriptId: string): string => {
-    return formattedDates[transcriptId] || "Loading...";
   };
 
   const handleCopyToClipboard = async (text: string, transcriptId: string) => {
@@ -240,77 +192,23 @@ export const TranscriptsList: React.FC = () => {
   };
 
 
-  const getStatusColor = (status: string): string => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "rgba(52, 199, 89, 0.2)";
-      case "processing":
-        return "rgba(255, 193, 7, 0.2)";
-      case "failed":
-        return "rgba(255, 59, 48, 0.2)";
-      default:
-        return "rgba(255, 255, 255, 0.05)";
-    }
-  };
-
-  const getStatusBorderColor = (status: string): string => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "rgba(52, 199, 89, 0.4)";
-      case "processing":
-        return "rgba(255, 193, 7, 0.4)";
-      case "failed":
-        return "rgba(255, 59, 48, 0.4)";
-      default:
-        return "rgba(255, 255, 255, 0.1)";
-    }
-  };
-
-  // Show loading while waiting for auth to initialize or tokens to load
-  if (
-    !authStore.isInitialized ||
-    (authStore.isAuthenticated && !authStore.tokens?.access_token)
-  ) {
-    return (
-      <div className="settings">
-        <h3>Transcripts</h3>
-        <div
-          style={{
-            textAlign: "center",
-            padding: "24px",
-            color: "#6b7280",
-          }}
-        >
-          Loading...
-        </div>
-      </div>
-    );
-  }
-
-  // Show login prompt if not authenticated (only after we've confirmed auth state)
-  if (!authStore.isAuthenticated) {
-    return (
-      <div className="settings">
-        <h3>Transcripts</h3>
-        <div style={{ textAlign: "center", padding: "16px 0" }}>
-          <p className="permission-text" style={{ marginBottom: "16px" }}>
-            Sign in to view your transcription history
-          </p>
-          <GoogleLoginButton
-            onSuccess={() => {
-              // Transcripts will be fetched automatically via useEffect
-            }}
-            onError={(err) => {
-              setError(err || "Authentication failed");
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
+  // Same as HomePage: always show the page shell; show loading/login/content inside (no full-page gate)
+  const showContent =
+    authStore.isInitialized &&
+    (!authStore.isAuthenticated || !!authStore.tokens?.access_token);
+  const showLogin =
+    authStore.isInitialized && !authStore.isAuthenticated;
 
   return (
-    <div className="settings">
+    <div
+      className="settings"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -356,56 +254,7 @@ export const TranscriptsList: React.FC = () => {
         )}
       </div>
 
-      {/* Show network offline message if not online */}
-      {!networkStatus.isOnline && authStore.isAuthenticated && (
-        <div
-          className="permission-message"
-          style={{
-            background: "#fef3c7",
-            borderColor: "#fde68a",
-            color: "#92400e",
-            marginBottom: "16px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "12px",
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  marginBottom: "4px",
-                }}
-              >
-                Internet Connection Required
-              </div>
-              <div style={{ fontSize: "11px", opacity: 0.8 }}>
-                Please check your internet connection to load transcripts.
-              </div>
-            </div>
-            <button
-              className="transcript-btn"
-              onClick={networkStatus.retry}
-              disabled={networkStatus.isChecking}
-              style={{
-                fontSize: "11px",
-                padding: "6px 12px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {networkStatus.isChecking ? "Checking..." : "Retry"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {loading && transcripts.length === 0 && (
+      {!showContent && (
         <div
           style={{
             textAlign: "center",
@@ -413,11 +262,38 @@ export const TranscriptsList: React.FC = () => {
             color: "#6b7280",
           }}
         >
-          Loading transcripts...
+          Loading...
         </div>
       )}
 
-      {error && (
+      {showLogin && showContent && (
+        <div style={{ textAlign: "center", padding: "16px 0" }}>
+          <p className="permission-text" style={{ marginBottom: "16px" }}>
+            Sign in to view your transcription history
+          </p>
+          <GoogleLoginButton
+            onSuccess={() => {}}
+            onError={(err) => {
+              setError(err || "Authentication failed");
+            }}
+          />
+        </div>
+      )}
+
+      {showContent && !showLogin && loading && transcripts.length === 0 && (
+        <div
+          className="loading-state"
+          style={{
+            width: "100%",
+            flex: 1,
+            justifyContent: "center",
+          }}
+        >
+          <div className="loading-spinner" />
+        </div>
+      )}
+
+      {showContent && !showLogin && error && (
         <div
           className="permission-message"
           style={{
@@ -430,7 +306,7 @@ export const TranscriptsList: React.FC = () => {
         </div>
       )}
 
-      {!loading && !error && transcripts.length === 0 && (
+      {showContent && !showLogin && !loading && !error && transcripts.length === 0 && (
         <div
           style={{
             textAlign: "center",
@@ -445,8 +321,24 @@ export const TranscriptsList: React.FC = () => {
         </div>
       )}
 
-      {!loading && transcripts.length > 0 && (
-        <div className="transcripts-list transcripts-table">
+      {showContent && !showLogin && transcripts.length > 0 && (
+        <div className="transcripts-list transcripts-table" style={{ position: "relative" }}>
+          {loading && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(255, 255, 255, 0.7)",
+                borderRadius: "8px",
+                zIndex: 10,
+              }}
+            >
+              <div className="loading-spinner" />
+            </div>
+          )}
           <div className="transcripts-table-header">
             <span>Date</span>
             <span>Transcript</span>
@@ -458,20 +350,75 @@ export const TranscriptsList: React.FC = () => {
               className="transcript-item transcripts-table-row"
             >
               <div className="transcript-cell transcript-cell-date">
-                {formatDate(transcript.id)}
+                {formatDateRelative(transcript.created_at)}
               </div>
               <div className="transcript-cell transcript-cell-text">
-                {transcript.original_text ? (
-                  <span className="transcript-item-text">
-                    {transcript.original_text}
-                  </span>
-                ) : (
-                  <span className="transcript-item-empty">
-                    {transcript.status === "processing"
-                      ? "Processing..."
-                      : "No text available"}
-                  </span>
-                )}
+                {(() => {
+                  const isEnhanced =
+                    transcript.is_enhanced && !!transcript.enhanced_text;
+                  const displayText = isEnhanced
+                    ? transcript.enhanced_text!
+                    : transcript.original_text || "";
+                  const hasText = !!displayText;
+
+                  return (
+                    <div className="transcript-display-cell">
+                      {hasText ? (
+                        <>
+                          <span className="transcript-item-text">
+                            {displayText}
+                          </span>
+                          {isEnhanced && (
+                            <div className="transcript-enhanced-badges">
+                              <span
+                                className="transcript-enhanced-badge"
+                                title="This is an enhanced version of the transcript (improved grammar and clarity)"
+                              >
+                                <Sparkles size={12} />
+                                Enhanced
+                              </span>
+                              <span
+                                className="transcript-view-original-trigger"
+                                onMouseEnter={() =>
+                                  setOriginalTooltipId(transcript.id)
+                                }
+                                onMouseLeave={() =>
+                                  setOriginalTooltipId(null)
+                                }
+                              >
+                                View original
+                                {originalTooltipId === transcript.id && (
+                                  <div
+                                    className="transcript-original-tooltip"
+                                    onMouseEnter={() =>
+                                      setOriginalTooltipId(transcript.id)
+                                    }
+                                    onMouseLeave={() =>
+                                      setOriginalTooltipId(null)
+                                    }
+                                  >
+                                    <div className="transcript-original-tooltip-label">
+                                      Original transcription
+                                    </div>
+                                    <div className="transcript-original-tooltip-text">
+                                      {transcript.original_text}
+                                    </div>
+                                  </div>
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="transcript-item-empty">
+                          {transcript.status === "processing"
+                            ? "Processing..."
+                            : "No text available"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="transcript-cell transcript-cell-meta">
                 <div
@@ -482,13 +429,17 @@ export const TranscriptsList: React.FC = () => {
                     flexWrap: "wrap",
                   }}
                 >
-                  {transcript.original_text && (
+                  {(() => {
+                    const isEnhanced =
+                      transcript.is_enhanced && !!transcript.enhanced_text;
+                    const copyText =
+                      isEnhanced && transcript.enhanced_text
+                        ? transcript.enhanced_text
+                        : transcript.original_text || "";
+                    return copyText ? (
                     <button
                       onClick={() =>
-                        handleCopyToClipboard(
-                          transcript.original_text || "",
-                          transcript.id,
-                        )
+                        handleCopyToClipboard(copyText, transcript.id)
                       }
                       style={{
                         display: "flex",
@@ -535,7 +486,8 @@ export const TranscriptsList: React.FC = () => {
                         <Copy size={16} />
                       )}
                     </button>
-                  )}
+                    ) : null;
+                  })()}
                   <button
                     onClick={() => {
                       // Regenerate action - placeholder for now
@@ -572,6 +524,42 @@ export const TranscriptsList: React.FC = () => {
                   >
                     <RefreshCw size={16} />
                   </button>
+                  <button
+                    onClick={() => openDeleteConfirm(transcript.id)}
+                    disabled={!!deletingId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "32px",
+                      height: "32px",
+                      padding: 0,
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      cursor: deletingId ? "not-allowed" : "pointer",
+                      transition: "all 0.2s ease",
+                      color: "#6b7280",
+                      opacity: deletingId ? 0.6 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!deletingId) {
+                        e.currentTarget.style.background = "#fef2f2";
+                        e.currentTarget.style.borderColor = "#fecaca";
+                        e.currentTarget.style.color = "#dc2626";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!deletingId) {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.borderColor = "#e5e7eb";
+                        e.currentTarget.style.color = "#6b7280";
+                      }
+                    }}
+                    title="Delete transcript"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                   {transcript.audio_file_url && (
                     <audio
                       src={transcript.audio_file_url as string}
@@ -586,6 +574,42 @@ export const TranscriptsList: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {deleteConfirmId && (
+        <div
+          className="delete-modal-overlay"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Delete transcript?</h3>
+            <p>
+              This action cannot be undone. The transcript will be permanently
+              removed.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={closeDeleteConfirm}
+                disabled={!!deletingId}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleConfirmDelete}
+                disabled={!!deletingId}
+              >
+                {deletingId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

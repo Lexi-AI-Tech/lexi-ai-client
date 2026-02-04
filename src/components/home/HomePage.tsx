@@ -35,6 +35,10 @@ interface ChartData {
 
 type AnalyticsPeriod = "1d" | "7d" | "30d";
 
+interface HomePageProps {
+  onViewAllTranscripts?: () => void;
+}
+
 // Animation variants
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -62,22 +66,6 @@ const getGreeting = (): string => {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
-};
-
-// Helper to format relative time
-const formatRelativeTime = (dateString: string): string => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
 };
 
 // Stats card component
@@ -125,7 +113,7 @@ const PeriodButton: React.FC<PeriodButtonProps> = ({
   </button>
 );
 
-export const HomePage: React.FC = () => {
+export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
   const { user, isAuthenticated, tokens } = useAuthStore();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
@@ -281,7 +269,13 @@ export const HomePage: React.FC = () => {
         >
           <div className="section-header">
             <h2 className="section-title">Recent Transcriptions</h2>
-            <button className="view-all-btn">View all</button>
+            <button
+              type="button"
+              className="view-all-btn"
+              onClick={onViewAllTranscripts}
+            >
+              View all
+            </button>
           </div>
 
           <div className="transcriptions-list">
@@ -320,8 +314,8 @@ export const HomePage: React.FC = () => {
                     <span>
                       {transcript.original_text_word_count || 0} words
                     </span>
-                    {transcript.asr_provider && (
-                      <span>• {transcript.asr_provider}</span>
+                    {transcript.focused_app && (
+                      <span>• {transcript.focused_app}</span>
                     )}
                   </div>
                 </motion.div>

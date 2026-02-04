@@ -119,6 +119,16 @@ export const onboardingStore: OnboardingState = {
       console.error("Failed to reset onboarding:", e);
     }
   },
+  refreshState: async () => {
+    try {
+      const state = await invoke<RustOnboardingState>("get_onboarding_state");
+      currentStep = normalizeStep(state.current_step);
+      isCompleted = state.is_completed;
+      notifyListeners();
+    } catch (e) {
+      console.error("Failed to refresh onboarding state:", e);
+    }
+  },
 };
 
 export const useOnboardingStore = () => {

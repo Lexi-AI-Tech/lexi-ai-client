@@ -57,21 +57,23 @@ const initializeFromRust = async () => {
 initializeFromRust();
 
 // Listen for auth_expired events from Rust backend
-// This is emitted when token refresh fails (after attempting refresh)
-listen("auth_expired", () => {
+// Rust already cleared auth and reset onboarding; we sync in-memory state and refresh onboarding UI.
+listen("auth_expired", async () => {
   console.log("🔴 Auth expired event received, clearing auth state");
   isAuthenticated = false;
   user = null;
   tokens = null;
   error = null;
 
-  // Clear from Rust backend
-  invoke("clear_auth_data").catch((err: any) => {
+  invoke("clear_auth_data").catch((err: unknown) => {
     console.error("Failed to clear auth data:", err);
   });
 
+  const { onboardingStore } = await import("./onboardingStore");
+  await onboardingStore.refreshState();
+
   notifyListeners();
-}).catch((err: any) => {
+}).catch((err: unknown) => {
   console.error("Failed to setup auth_expired listener:", err);
 });
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { AnimatePresence } from "framer-motion";
 import { useOnboardingStore } from "../../store/onboardingStore";
 import {
@@ -14,25 +14,19 @@ import Logo from "../../assets/light_mode_without_text.png";
 const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];
 
 export const OnboardingFlow: React.FC = () => {
-  const { currentStep, nextStep, completeOnboarding } = useOnboardingStore();
-  const [hotkey, setHotkey] = useState<string | null>(null);
-
-  const getStepIndex = () => {
+  const { currentStep, nextStep, previousStep, completeOnboarding } =
+    useOnboardingStore();
+  const hotkey: string | null = null;
+  const currentStepIndex = (() => {
     switch (currentStep) {
-      case "welcome":
-        return 0;
-      case "permissions":
-        return 1;
-      case "hotkey-test":
-        return 2;
-      case "microphone-test":
-        return 3;
-      default:
-        return 0;
+      case "welcome": return 0;
+      case "permissions": return 1;
+      case "hotkey-test": return 2;
+      case "microphone-test": return 3;
+      default: return 0;
     }
-  };
-
-  const currentStepIndex = getStepIndex();
+  })();
+  const showBack = currentStepIndex > 0;
 
   return (
     <div className="onboarding-container">
@@ -56,38 +50,43 @@ export const OnboardingFlow: React.FC = () => {
           <div className="onboarding-form-wrapper">
             <AnimatePresence mode="wait">
               {currentStepIndex === 0 && (
-                <WelcomeStep key="welcome" onNext={nextStep} />
+                <WelcomeStep
+                  key="welcome"
+                  onNext={nextStep}
+                  onBack={previousStep}
+                  showBack={showBack}
+                />
               )}
               {currentStepIndex === 1 && (
-                <PermissionsStep key="permissions" onNext={nextStep} />
+                <PermissionsStep
+                  key="permissions"
+                  onNext={nextStep}
+                  onBack={previousStep}
+                  onSkip={completeOnboarding}
+                  showBack={showBack}
+                />
               )}
               {currentStepIndex === 2 && (
                 <SetupStep
                   key="setup"
                   onNext={nextStep}
+                  onBack={previousStep}
+                  showBack={showBack}
                   hotkey={hotkey}
-                  setHotkey={setHotkey}
                 />
               )}
               {currentStepIndex === 3 && (
                 <TryItStep
                   key="tryit"
                   onComplete={completeOnboarding}
+                  onBack={previousStep}
+                  showBack={showBack}
                   hotkey={hotkey}
                 />
               )}
             </AnimatePresence>
           </div>
         </main>
-
-        {/* Footer */}
-        <footer className="onboarding-footer">
-          <div className="footer-links">
-            <span className="footer-link">Privacy</span>
-            <span className="footer-link">Terms</span>
-            <span className="footer-link">Support</span>
-          </div>
-        </footer>
       </div>
 
       {/* Visual Area */}

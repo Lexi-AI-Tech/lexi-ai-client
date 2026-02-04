@@ -1,11 +1,16 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Mic, Keyboard, Sparkles, Check, Monitor } from "lucide-react";
+import {
+  Mic,
+  Keyboard,
+  Sparkles,
+  Check,
+  Monitor,
+  ChevronLeft,
+} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useOnboardingStore } from "../../store/onboardingStore";
 import { useAuthStore } from "../../store/authStore";
-import { clearAuthStorage } from "../../lib/storageUtils";
 import { GoogleLoginButton } from "../auth/GoogleLoginButton";
 
 const stepVariants = {
@@ -17,42 +22,14 @@ const stepVariants = {
 // Step 1: Welcome
 export function WelcomeStep({
   onNext,
+  onBack,
+  showBack,
 }: {
   onNext: () => void | Promise<void>;
+  onBack?: () => void | Promise<void>;
+  showBack?: boolean;
 }) {
   const { isAuthenticated, error } = useAuthStore();
-  const { resetOnboarding } = useOnboardingStore();
-  const { clearAuth } = useAuthStore();
-  const [showDebugMenu, setShowDebugMenu] = useState(false);
-
-  const handleClearAll = async () => {
-    if (
-      confirm("Clear all app data? This will log you out and reset onboarding.")
-    ) {
-      clearAuth();
-      await resetOnboarding();
-      setShowDebugMenu(false);
-      alert("All data cleared! Page will refresh.");
-      window.location.reload();
-    }
-  };
-
-  const handleClearAuth = () => {
-    if (confirm("Clear authentication data? You will be logged out.")) {
-      clearAuthStorage();
-      clearAuth();
-      setShowDebugMenu(false);
-      alert("Auth data cleared!");
-    }
-  };
-
-  const handleClearOnboarding = async () => {
-    if (confirm("Reset onboarding? You will need to go through setup again.")) {
-      await resetOnboarding();
-      setShowDebugMenu(false);
-      alert("Onboarding reset!");
-    }
-  };
 
   return (
     <motion.div
@@ -71,85 +48,48 @@ export function WelcomeStep({
 
       <div className="features-list">
         {[
-          {
-            icon: Keyboard,
-            text: "Global Shortcut",
-            sub: "Works in every application",
-          },
-          {
-            icon: Mic,
-            text: "Natural Speech",
-            sub: "Powered by OpenAI Whisper",
-          },
-          {
-            icon: Sparkles,
-            text: "Instant Result",
-            sub: "Zero-latency transcription",
-          },
+          { icon: Keyboard, text: "Global Shortcut" },
+          { icon: Mic, text: "Natural Speech" },
+          { icon: Sparkles, text: "Instant Result" },
         ].map((item, i) => (
           <div key={i} className="feature-item">
             <item.icon className="feature-icon" />
             <div>
               <p className="feature-title">{item.text}</p>
-              <p className="feature-sub">{item.sub}</p>
             </div>
           </div>
         ))}
       </div>
 
       <div className="step-actions">
-        <button className="btn btn-primary" onClick={onNext}>
-          {isAuthenticated ? "Continue" : "Get Started"}
-        </button>
-
-        {!isAuthenticated && (
-          <>
-            <div className="divider">
-              <span>or</span>
-            </div>
-            <GoogleLoginButton
-              onSuccess={() => {
-                console.log("Login successful");
-              }}
-              onError={(err) => {
-                console.error("Login error:", err);
-              }}
-            />
-            {error && <div className="auth-error">{error}</div>}
-          </>
-        )}
-      </div>
-
-      {/* Debug Menu */}
-      <div className="debug-menu-container">
-        <button
-          className="debug-toggle"
-          onClick={() => setShowDebugMenu(!showDebugMenu)}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            setShowDebugMenu(!showDebugMenu);
-          }}
-        >
-          {showDebugMenu ? "▼" : "▶"} Debug Menu
-        </button>
-
-        {showDebugMenu && (
-          <div className="debug-menu">
-            <p className="debug-menu-title">Clear Storage:</p>
-            <button className="debug-btn" onClick={handleClearAuth}>
-              Clear Auth Data
-            </button>
-            <button className="debug-btn" onClick={handleClearOnboarding}>
-              Clear Onboarding Data
-            </button>
+        <div className="step-actions-row">
+          {showBack && onBack && (
             <button
-              className="debug-btn debug-btn-danger"
-              onClick={handleClearAll}
+              type="button"
+              className="btn btn-outline btn-icon"
+              onClick={onBack}
+              aria-label="Back"
             >
-              Clear All Data
+              <ChevronLeft className="btn-icon-svg" />
             </button>
-          </div>
-        )}
+          )}
+          {isAuthenticated ? (
+            <button
+              className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
+              onClick={onNext}
+            >
+              Continue
+            </button>
+          ) : (
+            <>
+              <GoogleLoginButton
+                onSuccess={() => console.log("Login successful")}
+                onError={(err) => console.error("Login error:", err)}
+              />
+              {error && <div className="auth-error">{error}</div>}
+            </>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -163,8 +103,14 @@ interface PermissionState {
 
 export function PermissionsStep({
   onNext,
+  onBack,
+  onSkip,
+  showBack,
 }: {
   onNext: () => void | Promise<void>;
+  onBack?: () => void | Promise<void>;
+  onSkip?: () => void | Promise<void>;
+  showBack?: boolean;
 }) {
   const [microphone, setMicrophone] = useState<PermissionState>({
     granted: false,
@@ -311,51 +257,50 @@ export function PermissionsStep({
         ))}
       </div>
 
-      <button
-        disabled={!allGranted}
-        className="btn btn-primary btn-full"
-        onClick={onNext}
-      >
-        Continue
-      </button>
+      <div className="step-actions-row">
+        {showBack && onBack && (
+          <button
+            type="button"
+            className="btn btn-outline btn-icon"
+            onClick={onBack}
+            aria-label="Back"
+          >
+            <ChevronLeft className="btn-icon-svg" />
+          </button>
+        )}
+        <button
+          disabled={!allGranted}
+          className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
+          onClick={onNext}
+        >
+          Continue
+        </button>
+      </div>
+      {onSkip && (
+        <button
+          type="button"
+          className="btn btn-outline btn-full btn-skip-onboarding"
+          onClick={onSkip}
+        >
+          Skip onboarding
+        </button>
+      )}
     </motion.div>
   );
 }
 
-// Step 3: Setup (Global Shortcut)
+// Step 3: Setup (Global Shortcut) – display only, no reassignment
 export function SetupStep({
   onNext,
+  onBack,
+  showBack,
   hotkey,
-  setHotkey,
 }: {
   onNext: () => void | Promise<void>;
+  onBack?: () => void | Promise<void>;
+  showBack?: boolean;
   hotkey: string | null;
-  setHotkey: (k: string) => void;
 }) {
-  const [isRecording, setIsRecording] = useState(false);
-
-  useEffect(() => {
-    if (isRecording) {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        e.preventDefault();
-        const keys = [];
-        if (e.metaKey) keys.push("⌘");
-        if (e.ctrlKey) keys.push("Ctrl");
-        if (e.altKey) keys.push("Alt");
-        if (e.shiftKey) keys.push("Shift");
-        if (e.key && !["Meta", "Control", "Alt", "Shift"].includes(e.key)) {
-          keys.push(e.key.toUpperCase());
-        }
-        if (keys.length > 0) {
-          setHotkey(keys.join(" + "));
-          setIsRecording(false);
-        }
-      };
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
-    }
-  }, [isRecording, setHotkey]);
-
   return (
     <motion.div
       variants={stepVariants}
@@ -371,29 +316,32 @@ export function SetupStep({
         </p>
       </div>
 
-      <div
-        className={`hotkey-recorder ${isRecording ? "recording" : ""}`}
-        onClick={() => setIsRecording(true)}
-      >
+      <div className="hotkey-recorder hotkey-recorder-readonly">
         <div className="hotkey-content">
-          <div className="hotkey-label">
-            {isRecording ? "Listening..." : "Current Key"}
-          </div>
+          <div className="hotkey-label">Shortcut</div>
           <div className="hotkey-value">{hotkey || "Fn"}</div>
-          {!isRecording && <p className="hotkey-hint">Click to reassign</p>}
         </div>
       </div>
 
-      <div className="step-actions-row">
-        <button
-          className="btn btn-outline btn-flex"
-          onClick={() => setHotkey("Fn")}
-        >
-          Reset
-        </button>
-        <button className="btn btn-primary btn-flex-2" onClick={onNext}>
-          Apply and Continue
-        </button>
+      <div className="step-actions">
+        <div className="step-actions-row">
+          {showBack && onBack && (
+            <button
+              type="button"
+              className="btn btn-outline btn-icon"
+              onClick={onBack}
+              aria-label="Back"
+            >
+              <ChevronLeft className="btn-icon-svg" />
+            </button>
+          )}
+          <button
+            className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
+            onClick={onNext}
+          >
+            Continue
+          </button>
+        </div>
       </div>
     </motion.div>
   );
@@ -402,75 +350,46 @@ export function SetupStep({
 // Step 4: Try It
 export function TryItStep({
   onComplete,
+  onBack,
+  showBack,
   hotkey,
 }: {
   onComplete: () => void | Promise<void>;
+  onBack?: () => void | Promise<void>;
+  showBack?: boolean;
   hotkey: string | null;
 }) {
   const [isListening, setIsListening] = useState(false);
-  const [text, setText] = useState("");
-  const [hasDetectedFn, setHasDetectedFn] = useState(false);
-  const fullText =
-    "Welcome to the future of typing. This is Lexi AI transcribing your voice in real-time with zero latency.";
+  const [setupWorking, setSetupWorking] = useState(false);
 
-  // Listen for Fn key events
   useEffect(() => {
-    const setupListener = async () => {
+    let unlisten: (() => void) | undefined;
+    (async () => {
       const unlistenGlobal = await listen("global-input", (event: any) => {
-        const eventString = event.payload as string;
-        if (eventString.includes("Function")) {
-          if (eventString.includes("key_press")) {
-            setIsListening(true);
-            setHasDetectedFn(true);
-          } else if (eventString.includes("key_release")) {
-            setIsListening(false);
-          }
+        const s = event.payload as string;
+        if (s.includes("Function")) {
+          setIsListening(s.includes("key_press"));
         }
       });
-
-      const unlistenRecording = await listen("recording_started", () => {
-        setIsListening(true);
-        setHasDetectedFn(true);
-      });
-
-      const unlistenStopped = await listen("recording_stopped", () => {
-        setIsListening(false);
-      });
-
-      return () => {
+      const unlistenRecording = await listen("recording_started", () =>
+        setIsListening(true),
+      );
+      const unlistenStopped = await listen("recording_stopped", () =>
+        setIsListening(false),
+      );
+      const unlistenTranscription = await listen(
+        "transcription_success",
+        () => setSetupWorking(true),
+      );
+      unlisten = () => {
         unlistenGlobal();
         unlistenRecording();
         unlistenStopped();
+        unlistenTranscription();
       };
-    };
-
-    let unlistenFn: (() => void) | undefined;
-    setupListener().then((unlisten) => {
-      unlistenFn = unlisten;
-    });
-
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
+    })();
+    return () => unlisten?.();
   }, []);
-
-  // Simulate transcription when listening
-  useEffect(() => {
-    if (isListening) {
-      let i = 0;
-      setText("");
-      const interval = setInterval(() => {
-        setText(fullText.slice(0, i + 1));
-        i++;
-        if (i >= fullText.length) {
-          clearInterval(interval);
-        }
-      }, 40);
-      return () => clearInterval(interval);
-    }
-  }, [isListening]);
 
   return (
     <motion.div
@@ -483,17 +402,18 @@ export function TryItStep({
       <div className="step-header">
         <h1 className="step-title">Give it a try</h1>
         <p className="step-description">
-          Hold <span className="hotkey-badge">{hotkey || "Fn"}</span> and speak
-          to see Lexi AI in action.
+          Click in the box below, then hold{" "}
+          <span className="hotkey-badge">{hotkey || "Fn"}</span> and speak to
+          try a transcription.
         </p>
       </div>
 
       <div className="tryit-textarea-wrapper">
         <textarea
           className="tryit-textarea"
-          placeholder="Your voice will appear here..."
-          value={text}
-          readOnly
+          placeholder="Hold Fn and speak — your transcription will appear here"
+          defaultValue=""
+          spellCheck={false}
         />
         {isListening && (
           <div className="listening-indicator">
@@ -512,25 +432,31 @@ export function TryItStep({
             ></span>
           </div>
         )}
-      </div>
-
-      <div className="mic-button-container">
-        <button
-          className={`mic-button ${isListening ? "active" : ""}`}
-          onClick={() => setIsListening(!isListening)}
-        >
-          <Mic className="mic-icon" />
-        </button>
-        {hasDetectedFn && (
-          <p className="mic-success">
+        {setupWorking && (
+          <p className="tryit-success">
             <Check className="check-icon-small" /> Great! Your setup is working.
           </p>
         )}
       </div>
 
-      <button className="btn btn-primary btn-full" onClick={onComplete}>
-        Complete Setup
-      </button>
+      <div className="step-actions-row">
+        {showBack && onBack && (
+          <button
+            type="button"
+            className="btn btn-outline btn-icon"
+            onClick={onBack}
+            aria-label="Back"
+          >
+            <ChevronLeft className="btn-icon-svg" />
+          </button>
+        )}
+        <button
+          className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
+          onClick={onComplete}
+        >
+          Complete Setup
+        </button>
+      </div>
     </motion.div>
   );
 }

@@ -5,7 +5,7 @@
 use crate::commands::auth::get_auth_token_async;
 use crate::utils;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Transcript {
@@ -19,12 +19,8 @@ pub struct Transcript {
     pub enhanced_text: Option<String>,
     pub enhanced_text_word_count: Option<i32>,
     pub enhanced_text_character_count: Option<i32>,
-    pub llm_enhancement_provider: Option<String>,
-    pub llm_model: Option<String>,
     pub audio_file_url: Option<String>,
     pub audio_file_size: Option<i32>,
-    pub asr_provider: String,
-    pub asr_model: String,
     pub focused_app: String,
     pub status: String,
     pub created_at: String,
@@ -53,9 +49,7 @@ pub async fn get_transcripts(
     let auth_token = match get_auth_token_async(&app).await {
         Some(token) => token,
         None => {
-            // Token refresh failed - emit event to notify frontend
-            app.emit("auth_expired", ())
-                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }
     };
@@ -129,9 +123,7 @@ pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Tra
     let auth_token = match get_auth_token_async(&app).await {
         Some(token) => token,
         None => {
-            // Token refresh failed - emit event to notify frontend
-            app.emit("auth_expired", ())
-                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }
     };
@@ -183,9 +175,7 @@ pub async fn delete_transcript(app: AppHandle, transcript_id: String) -> Result<
     let auth_token = match get_auth_token_async(&app).await {
         Some(token) => token,
         None => {
-            // Token refresh failed - emit event to notify frontend
-            app.emit("auth_expired", ())
-                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }
     };
