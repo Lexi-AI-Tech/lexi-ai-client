@@ -64,15 +64,12 @@ export function WelcomeStep({
       </div>
 
       <div className="step-actions">
-        <button className="btn btn-primary" onClick={onNext}>
-          {isAuthenticated ? "Continue" : "Get Started"}
-        </button>
-
-        {!isAuthenticated && (
+        {isAuthenticated ? (
+          <button className="btn btn-primary" onClick={onNext}>
+            Continue
+          </button>
+        ) : (
           <>
-            <div className="divider">
-              <span>or</span>
-            </div>
             <GoogleLoginButton
               onSuccess={() => {
                 console.log("Login successful");
