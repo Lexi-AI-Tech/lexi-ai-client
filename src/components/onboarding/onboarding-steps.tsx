@@ -3,9 +3,7 @@ import { motion } from "framer-motion";
 import { Mic, Keyboard, Sparkles, Check, Monitor } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useOnboardingStore } from "../../store/onboardingStore";
 import { useAuthStore } from "../../store/authStore";
-import { clearAuthStorage } from "../../lib/storageUtils";
 import { GoogleLoginButton } from "../auth/GoogleLoginButton";
 
 const stepVariants = {
@@ -21,38 +19,6 @@ export function WelcomeStep({
   onNext: () => void | Promise<void>;
 }) {
   const { isAuthenticated, error } = useAuthStore();
-  const { resetOnboarding } = useOnboardingStore();
-  const { clearAuth } = useAuthStore();
-  const [showDebugMenu, setShowDebugMenu] = useState(false);
-
-  const handleClearAll = async () => {
-    if (
-      confirm("Clear all app data? This will log you out and reset onboarding.")
-    ) {
-      clearAuth();
-      await resetOnboarding();
-      setShowDebugMenu(false);
-      alert("All data cleared! Page will refresh.");
-      window.location.reload();
-    }
-  };
-
-  const handleClearAuth = () => {
-    if (confirm("Clear authentication data? You will be logged out.")) {
-      clearAuthStorage();
-      clearAuth();
-      setShowDebugMenu(false);
-      alert("Auth data cleared!");
-    }
-  };
-
-  const handleClearOnboarding = async () => {
-    if (confirm("Reset onboarding? You will need to go through setup again.")) {
-      await resetOnboarding();
-      setShowDebugMenu(false);
-      alert("Onboarding reset!");
-    }
-  };
 
   return (
     <motion.div
@@ -117,38 +83,6 @@ export function WelcomeStep({
             />
             {error && <div className="auth-error">{error}</div>}
           </>
-        )}
-      </div>
-
-      {/* Debug Menu */}
-      <div className="debug-menu-container">
-        <button
-          className="debug-toggle"
-          onClick={() => setShowDebugMenu(!showDebugMenu)}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            setShowDebugMenu(!showDebugMenu);
-          }}
-        >
-          {showDebugMenu ? "▼" : "▶"} Debug Menu
-        </button>
-
-        {showDebugMenu && (
-          <div className="debug-menu">
-            <p className="debug-menu-title">Clear Storage:</p>
-            <button className="debug-btn" onClick={handleClearAuth}>
-              Clear Auth Data
-            </button>
-            <button className="debug-btn" onClick={handleClearOnboarding}>
-              Clear Onboarding Data
-            </button>
-            <button
-              className="debug-btn debug-btn-danger"
-              onClick={handleClearAll}
-            >
-              Clear All Data
-            </button>
-          </div>
         )}
       </div>
     </motion.div>
