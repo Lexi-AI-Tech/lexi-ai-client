@@ -18,7 +18,7 @@ use crate::utils;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, OnceLock};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 // ============================================================================
 // Background Refresh Synchronization
@@ -199,6 +199,17 @@ pub async fn get_auth_data(app: AppHandle) -> Result<Option<AuthDataRequest>, St
 pub async fn clear_auth_data(app: AppHandle) -> Result<(), String> {
     secure_storage::clear_auth_data(&app)?;
     Ok(())
+}
+
+/// Called when auth is invalid (e.g. token refresh failed). Clears auth storage,
+/// resets onboarding so the user is sent back to re-authenticate, then emits auth_expired.
+pub fn handle_auth_expired(app: &AppHandle) {
+    let _ = secure_storage::clear_auth_data(app);
+    if let Err(e) = crate::commands::onboarding::reset_onboarding(app.clone()) {
+        eprintln!("Failed to reset onboarding on auth expiry: {}", e);
+    }
+    app.emit("auth_expired", ())
+        .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired: {}", e));
 }
 
 /// Check if authentication data exists
@@ -655,8 +666,11 @@ pub async fn logout(app: AppHandle) -> Result<(), String> {
         eprintln!("⚠️  Backend logout failed, clearing local auth anyway");
     }
 
-    // Clear local auth data
+    // Clear local auth data and reset onboarding so user sees onboarding on next launch
     secure_storage::clear_auth_data(&app)?;
+    if let Err(e) = crate::commands::onboarding::reset_onboarding(app.clone()) {
+        eprintln!("Failed to reset onboarding on logout: {}", e);
+    }
 
     Ok(())
 }

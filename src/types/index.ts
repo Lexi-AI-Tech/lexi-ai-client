@@ -241,6 +241,8 @@ export interface OnboardingState {
   previousStep: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
   resetOnboarding: () => Promise<void>;
+  /** Re-fetch onboarding state from backend (e.g. after auth_expired reset). */
+  refreshState: () => Promise<void>;
 }
 
 // ============================================================================

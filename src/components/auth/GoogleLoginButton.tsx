@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAuthStore, authStore } from "../../store/authStore";
+import { onboardingStore } from "../../store/onboardingStore";
 import type { GoogleLoginButtonProps } from "../../types";
 
 import "./auth.css";
@@ -149,14 +150,16 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       setLocalLoading(true);
       setLoading(true);
 
-      // Logout from backend (revokes sessions) and clear local state
+      // Logout from backend (revokes sessions), clears auth and resets onboarding in Rust
       await invoke("logout");
       clearAuth();
+      await onboardingStore.refreshState();
 
       console.log("✅ Logout successful");
     } catch (error) {
       console.error("Logout Failed:", error);
       clearAuth();
+      await onboardingStore.refreshState();
     } finally {
       setLocalLoading(false);
       setLoading(false);

@@ -2,6 +2,8 @@
  * Main App Component
  *
  * Main app with home dashboard, transcripts, and settings.
+ * When Rust detects auth errors (e.g. token refresh fails), it clears auth and resets
+ * onboarding, then emits auth_expired; the frontend syncs state and shows onboarding.
  */
 
 import { useState } from "react";
@@ -27,7 +29,6 @@ type Page =
   | "notes"
 
 function App() {
-  // Check if onboarding is completed
   const { isCompleted, isInitialized } = useOnboardingStore();
   const [currentPage, setCurrentPage] = useState<Page>("home");
 

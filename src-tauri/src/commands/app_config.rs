@@ -8,7 +8,7 @@
 //! - `update_app_config` - Update app configuration (automatically syncs autostart and cloud)
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::api_endpoints::app_config;
@@ -94,9 +94,7 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
     let auth_token = match get_auth_token_async(app).await {
         Some(token) => token,
         None => {
-            // Token refresh failed - emit event to notify frontend
-            app.emit("auth_expired", ())
-                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            crate::commands::auth::handle_auth_expired(&app);
             return Err("Please sign in to sync your settings".to_string());
         }
     };

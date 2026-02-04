@@ -5,7 +5,7 @@
 use crate::commands::auth::get_auth_token_async;
 use crate::utils;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Transcript {
@@ -53,9 +53,7 @@ pub async fn get_transcripts(
     let auth_token = match get_auth_token_async(&app).await {
         Some(token) => token,
         None => {
-            // Token refresh failed - emit event to notify frontend
-            app.emit("auth_expired", ())
-                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }
     };
@@ -129,9 +127,7 @@ pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Tra
     let auth_token = match get_auth_token_async(&app).await {
         Some(token) => token,
         None => {
-            // Token refresh failed - emit event to notify frontend
-            app.emit("auth_expired", ())
-                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }
     };
@@ -183,9 +179,7 @@ pub async fn delete_transcript(app: AppHandle, transcript_id: String) -> Result<
     let auth_token = match get_auth_token_async(&app).await {
         Some(token) => token,
         None => {
-            // Token refresh failed - emit event to notify frontend
-            app.emit("auth_expired", ())
-                .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired event: {}", e));
+            crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }
     };
