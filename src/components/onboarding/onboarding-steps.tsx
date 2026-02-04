@@ -297,56 +297,35 @@ export function TryItStep({
   hotkey: string | null;
 }) {
   const [isListening, setIsListening] = useState(false);
-  const [text, setText] = useState("");
   const [setupWorking, setSetupWorking] = useState(false);
 
-  // Listen for Fn key, recording, and transcription events. Rust handles the paste.
   useEffect(() => {
-    const setupListener = async () => {
+    let unlisten: (() => void) | undefined;
+    (async () => {
       const unlistenGlobal = await listen("global-input", (event: any) => {
-        const eventString = event.payload as string;
-        if (eventString.includes("Function")) {
-          if (eventString.includes("key_press")) {
-            setIsListening(true);
-          } else if (eventString.includes("key_release")) {
-            setIsListening(false);
-          }
+        const s = event.payload as string;
+        if (s.includes("Function")) {
+          setIsListening(s.includes("key_press"));
         }
       });
-
-      const unlistenRecording = await listen("recording_started", () => {
-        setIsListening(true);
-      });
-
-      const unlistenStopped = await listen("recording_stopped", () => {
-        setIsListening(false);
-      });
-
+      const unlistenRecording = await listen("recording_started", () =>
+        setIsListening(true),
+      );
+      const unlistenStopped = await listen("recording_stopped", () =>
+        setIsListening(false),
+      );
       const unlistenTranscription = await listen(
         "transcription_success",
-        () => {
-          setSetupWorking(true);
-        },
+        () => setSetupWorking(true),
       );
-
-      return () => {
+      unlisten = () => {
         unlistenGlobal();
         unlistenRecording();
         unlistenStopped();
         unlistenTranscription();
       };
-    };
-
-    let unlistenFn: (() => void) | undefined;
-    setupListener().then((unlisten) => {
-      unlistenFn = unlisten;
-    });
-
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
+    })();
+    return () => unlisten?.();
   }, []);
 
   return (
@@ -370,8 +349,7 @@ export function TryItStep({
         <textarea
           className="tryit-textarea"
           placeholder="Hold Fn and speak — your transcription will appear here"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+          defaultValue=""
           spellCheck={false}
         />
         {isListening && (
