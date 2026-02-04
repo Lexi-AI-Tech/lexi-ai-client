@@ -320,8 +320,8 @@ export const HomePage: React.FC = () => {
                     <span>
                       {transcript.original_text_word_count || 0} words
                     </span>
-                    {transcript.asr_provider && (
-                      <span>• {transcript.asr_provider}</span>
+                    {transcript.focused_app && (
+                      <span>• {transcript.focused_app}</span>
                     )}
                   </div>
                 </motion.div>
