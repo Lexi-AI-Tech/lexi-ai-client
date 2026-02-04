@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, RefreshCw, Check, Trash2 } from "lucide-react";
+import { Copy, RefreshCw, Check, Trash2, Sparkles } from "lucide-react";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
@@ -25,6 +25,7 @@ export const TranscriptsList: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [originalTooltipId, setOriginalTooltipId] = useState<string | null>(null);
 
   // Clear error on mount to prevent stale error messages
   useEffect(() => {
@@ -352,17 +353,72 @@ export const TranscriptsList: React.FC = () => {
                 {formatDateRelative(transcript.created_at)}
               </div>
               <div className="transcript-cell transcript-cell-text">
-                {transcript.original_text ? (
-                  <span className="transcript-item-text">
-                    {transcript.original_text}
-                  </span>
-                ) : (
-                  <span className="transcript-item-empty">
-                    {transcript.status === "processing"
-                      ? "Processing..."
-                      : "No text available"}
-                  </span>
-                )}
+                {(() => {
+                  const isEnhanced =
+                    transcript.is_enhanced && !!transcript.enhanced_text;
+                  const displayText = isEnhanced
+                    ? transcript.enhanced_text!
+                    : transcript.original_text || "";
+                  const hasText = !!displayText;
+
+                  return (
+                    <div className="transcript-display-cell">
+                      {hasText ? (
+                        <>
+                          <span className="transcript-item-text">
+                            {displayText}
+                          </span>
+                          {isEnhanced && (
+                            <div className="transcript-enhanced-badges">
+                              <span
+                                className="transcript-enhanced-badge"
+                                title="This is an enhanced version of the transcript (improved grammar and clarity)"
+                              >
+                                <Sparkles size={12} />
+                                Enhanced
+                              </span>
+                              <span
+                                className="transcript-view-original-trigger"
+                                onMouseEnter={() =>
+                                  setOriginalTooltipId(transcript.id)
+                                }
+                                onMouseLeave={() =>
+                                  setOriginalTooltipId(null)
+                                }
+                              >
+                                View original
+                                {originalTooltipId === transcript.id && (
+                                  <div
+                                    className="transcript-original-tooltip"
+                                    onMouseEnter={() =>
+                                      setOriginalTooltipId(transcript.id)
+                                    }
+                                    onMouseLeave={() =>
+                                      setOriginalTooltipId(null)
+                                    }
+                                  >
+                                    <div className="transcript-original-tooltip-label">
+                                      Original transcription
+                                    </div>
+                                    <div className="transcript-original-tooltip-text">
+                                      {transcript.original_text}
+                                    </div>
+                                  </div>
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="transcript-item-empty">
+                          {transcript.status === "processing"
+                            ? "Processing..."
+                            : "No text available"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="transcript-cell transcript-cell-meta">
                 <div
@@ -373,13 +429,17 @@ export const TranscriptsList: React.FC = () => {
                     flexWrap: "wrap",
                   }}
                 >
-                  {transcript.original_text && (
+                  {(() => {
+                    const isEnhanced =
+                      transcript.is_enhanced && !!transcript.enhanced_text;
+                    const copyText =
+                      isEnhanced && transcript.enhanced_text
+                        ? transcript.enhanced_text
+                        : transcript.original_text || "";
+                    return copyText ? (
                     <button
                       onClick={() =>
-                        handleCopyToClipboard(
-                          transcript.original_text || "",
-                          transcript.id,
-                        )
+                        handleCopyToClipboard(copyText, transcript.id)
                       }
                       style={{
                         display: "flex",
@@ -426,7 +486,8 @@ export const TranscriptsList: React.FC = () => {
                         <Copy size={16} />
                       )}
                     </button>
-                  )}
+                    ) : null;
+                  })()}
                   <button
                     onClick={() => {
                       // Regenerate action - placeholder for now
