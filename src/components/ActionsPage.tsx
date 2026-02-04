@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
+import { formatDateTime } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
@@ -14,9 +15,6 @@ export const ActionsPage: React.FC = () => {
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [formattedDates, setFormattedDates] = useState<Record<string, string>>(
-    {},
-  );
 
   const pageSize = 20;
 
@@ -117,36 +115,6 @@ export const ActionsPage: React.FC = () => {
   };
 
 
-
-  // Format dates for all actions
-  useEffect(() => {
-    const formatAllDates = async () => {
-      if (!actionHistory) return;
-
-      const formatted: Record<string, string> = {};
-      for (const action of actionHistory.actions) {
-        try {
-          const formattedDate = await invoke<string>("format_date_time", {
-            dateString: action.created_at,
-          });
-          formatted[action.id] = formattedDate;
-        } catch (error) {
-          console.error("Failed to format date:", error);
-          // Fallback to simple date string
-          formatted[action.id] = new Date(action.created_at).toLocaleString();
-        }
-      }
-      setFormattedDates(formatted);
-    };
-
-    if (actionHistory && actionHistory.actions.length > 0) {
-      formatAllDates();
-    }
-  }, [actionHistory]);
-
-  const formatDate = (actionId: string): string => {
-    return formattedDates[actionId] || "Loading...";
-  };
 
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
@@ -504,7 +472,7 @@ export const ActionsPage: React.FC = () => {
                       paddingTop: "0.75rem",
                     }}
                   >
-                    <span>{formatDate(action.id)}</span>
+                    <span>{formatDateTime(action.created_at)}</span>
                     <span>•</span>
                     <span style={{ textTransform: "capitalize" }}>
                       {action.action_type.replace("_", " ")}

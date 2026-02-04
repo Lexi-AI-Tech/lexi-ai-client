@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, RefreshCw, Check } from "lucide-react";
 import type { Transcript } from "../types";
+import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 
@@ -165,25 +166,6 @@ export const TranscriptsList: React.FC = () => {
     }
   };
 
-  // Format relative date in JS to avoid N Tauri invokes (was a major slowdown)
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60)
-      return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
-    if (diffHours < 24)
-      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
-    if (diffDays < 7)
-      return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
-    return date.toLocaleDateString();
-  };
-
   const handleCopyToClipboard = async (text: string, transcriptId: string) => {
     try {
       await invoke("copy_to_clipboard", { text });
@@ -194,32 +176,6 @@ export const TranscriptsList: React.FC = () => {
     }
   };
 
-
-  const getStatusColor = (status: string): string => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "rgba(52, 199, 89, 0.2)";
-      case "processing":
-        return "rgba(255, 193, 7, 0.2)";
-      case "failed":
-        return "rgba(255, 59, 48, 0.2)";
-      default:
-        return "rgba(255, 255, 255, 0.05)";
-    }
-  };
-
-  const getStatusBorderColor = (status: string): string => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "rgba(52, 199, 89, 0.4)";
-      case "processing":
-        return "rgba(255, 193, 7, 0.4)";
-      case "failed":
-        return "rgba(255, 59, 48, 0.4)";
-      default:
-        return "rgba(255, 255, 255, 0.1)";
-    }
-  };
 
   // Show loading while waiting for auth to initialize or tokens to load
   if (
@@ -364,7 +320,7 @@ export const TranscriptsList: React.FC = () => {
               className="transcript-item transcripts-table-row"
             >
               <div className="transcript-cell transcript-cell-date">
-                {formatDate(transcript.created_at)}
+                {formatDateRelative(transcript.created_at)}
               </div>
               <div className="transcript-cell transcript-cell-text">
                 {transcript.original_text ? (
