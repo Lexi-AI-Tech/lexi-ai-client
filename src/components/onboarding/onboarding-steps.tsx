@@ -298,11 +298,9 @@ export function TryItStep({
 }) {
   const [isListening, setIsListening] = useState(false);
   const [text, setText] = useState("");
-  const [hasDetectedFn, setHasDetectedFn] = useState(false);
-  const fullText =
-    "Welcome to the future of typing. This is Lexi AI transcribing your voice in real-time with zero latency.";
+  const [setupWorking, setSetupWorking] = useState(false);
 
-  // Listen for Fn key events
+  // Listen for Fn key, recording, and transcription events. Rust handles the paste.
   useEffect(() => {
     const setupListener = async () => {
       const unlistenGlobal = await listen("global-input", (event: any) => {
@@ -310,7 +308,6 @@ export function TryItStep({
         if (eventString.includes("Function")) {
           if (eventString.includes("key_press")) {
             setIsListening(true);
-            setHasDetectedFn(true);
           } else if (eventString.includes("key_release")) {
             setIsListening(false);
           }
@@ -319,17 +316,24 @@ export function TryItStep({
 
       const unlistenRecording = await listen("recording_started", () => {
         setIsListening(true);
-        setHasDetectedFn(true);
       });
 
       const unlistenStopped = await listen("recording_stopped", () => {
         setIsListening(false);
       });
 
+      const unlistenTranscription = await listen(
+        "transcription_success",
+        () => {
+          setSetupWorking(true);
+        },
+      );
+
       return () => {
         unlistenGlobal();
         unlistenRecording();
         unlistenStopped();
+        unlistenTranscription();
       };
     };
 
@@ -345,22 +349,6 @@ export function TryItStep({
     };
   }, []);
 
-  // Simulate transcription when listening
-  useEffect(() => {
-    if (isListening) {
-      let i = 0;
-      setText("");
-      const interval = setInterval(() => {
-        setText(fullText.slice(0, i + 1));
-        i++;
-        if (i >= fullText.length) {
-          clearInterval(interval);
-        }
-      }, 40);
-      return () => clearInterval(interval);
-    }
-  }, [isListening]);
-
   return (
     <motion.div
       variants={stepVariants}
@@ -372,17 +360,19 @@ export function TryItStep({
       <div className="step-header">
         <h1 className="step-title">Give it a try</h1>
         <p className="step-description">
-          Hold <span className="hotkey-badge">{hotkey || "Fn"}</span> and speak
-          to see Lexi AI in action.
+          Click in the box below, then hold{" "}
+          <span className="hotkey-badge">{hotkey || "Fn"}</span> and speak to
+          try a transcription.
         </p>
       </div>
 
       <div className="tryit-textarea-wrapper">
         <textarea
           className="tryit-textarea"
-          placeholder="Your voice will appear here..."
+          placeholder="Hold Fn and speak — your transcription will appear here"
           value={text}
-          readOnly
+          onChange={(e) => setText(e.target.value)}
+          spellCheck={false}
         />
         {isListening && (
           <div className="listening-indicator">
@@ -401,17 +391,8 @@ export function TryItStep({
             ></span>
           </div>
         )}
-      </div>
-
-      <div className="mic-button-container">
-        <button
-          className={`mic-button ${isListening ? "active" : ""}`}
-          onClick={() => setIsListening(!isListening)}
-        >
-          <Mic className="mic-icon" />
-        </button>
-        {hasDetectedFn && (
-          <p className="mic-success">
+        {setupWorking && (
+          <p className="tryit-success">
             <Check className="check-icon-small" /> Great! Your setup is working.
           </p>
         )}
