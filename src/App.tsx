@@ -6,7 +6,7 @@
  * onboarding, then emits auth_expired; the frontend syncs state and shows onboarding.
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { HomePage } from "./components/home/HomePage";
@@ -31,6 +31,15 @@ type Page =
 function App() {
   const { isCompleted, isInitialized } = useOnboardingStore();
   const [currentPage, setCurrentPage] = useState<Page>("home");
+  const prevCompletedRef = useRef(isCompleted);
+
+  // Whenever we land in the main app (complete/skip onboarding or load with onboarding done), show home
+  useEffect(() => {
+    if (isCompleted && !prevCompletedRef.current) {
+      setCurrentPage("home");
+    }
+    prevCompletedRef.current = isCompleted;
+  }, [isCompleted]);
 
   // Wait for onboarding state to initialize before deciding what to show
   if (!isInitialized) {
