@@ -40,24 +40,20 @@ export function WelcomeStep({
           {
             icon: Keyboard,
             text: "Global Shortcut",
-            sub: "Works in every application",
           },
           {
             icon: Mic,
             text: "Natural Speech",
-            sub: "Powered by OpenAI Whisper",
           },
           {
             icon: Sparkles,
             text: "Instant Result",
-            sub: "Zero-latency transcription",
           },
         ].map((item, i) => (
           <div key={i} className="feature-item">
             <item.icon className="feature-icon" />
             <div>
               <p className="feature-title">{item.text}</p>
-              <p className="feature-sub">{item.sub}</p>
             </div>
           </div>
         ))}

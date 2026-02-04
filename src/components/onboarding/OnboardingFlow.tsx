@@ -79,15 +79,6 @@ export const OnboardingFlow: React.FC = () => {
             </AnimatePresence>
           </div>
         </main>
-
-        {/* Footer */}
-        <footer className="onboarding-footer">
-          <div className="footer-links">
-            <span className="footer-link">Privacy</span>
-            <span className="footer-link">Terms</span>
-            <span className="footer-link">Support</span>
-          </div>
-        </footer>
       </div>
 
       {/* Visual Area */}
