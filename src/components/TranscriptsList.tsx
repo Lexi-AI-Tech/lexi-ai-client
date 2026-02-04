@@ -313,8 +313,24 @@ export const TranscriptsList: React.FC = () => {
         </div>
       )}
 
-      {showContent && !showLogin && !loading && transcripts.length > 0 && (
-        <div className="transcripts-list transcripts-table">
+      {showContent && !showLogin && transcripts.length > 0 && (
+        <div className="transcripts-list transcripts-table" style={{ position: "relative" }}>
+          {loading && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(255, 255, 255, 0.7)",
+                borderRadius: "8px",
+                zIndex: 10,
+              }}
+            >
+              <div className="loading-spinner" />
+            </div>
+          )}
           <div className="transcripts-table-header">
             <span>Date</span>
             <span>Transcript</span>
