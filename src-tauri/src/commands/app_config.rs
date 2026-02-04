@@ -136,34 +136,26 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
 /// Update the app configuration and sync with cloud API
 ///
 /// Merges the provided config with existing config (partial updates supported).
-/// Syncs with cloud API and updates in-memory state.
+/// Pushes to cloud, then re-fetches the updated config and syncs OS/hotkey state from it.
 #[tauri::command]
 pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
-    // Since we don't store locally, "current config" is just what we have from the last fetch
-    // essentially. But here we should probably re-fetch or just apply the changes to
-    // what we assume is current.
-
     // Fetch current to merge properly
     let mut current_config = fetch_config_from_server(&app).await?;
 
     // Merge provided config with current config
     merge_config(&mut current_config, config);
 
-    // Sync autostart with OS if launch_on_system_startup was updated
-    if current_config.launch_on_system_startup.is_some() {
-        sync_autostart_setting(&app, current_config.launch_on_system_startup.unwrap())
-            .map_err(|e| format!("Unable to update startup settings: {}", e))?;
-    }
-
-    // Update hotkey watcher state
-    update_hotkey_state(&app, &current_config);
-
     println!("✅ App config updated in memory");
 
-    // Sync to cloud
+    // Sync to cloud first
     sync_config_to_cloud(&app, &current_config).await;
 
-    Ok(current_config)
+    // Re-fetch from server to get the updated config (source of truth), then sync status from it
+    let mut updated_config = fetch_config_from_server(&app).await?;
+    sync_autostart_status(&app, &mut updated_config);
+    update_hotkey_state(&app, &updated_config);
+
+    Ok(updated_config)
 }
 
 // ============================================================================
@@ -199,23 +191,6 @@ pub(crate) fn sync_autostart_status(app: &AppHandle, config: &mut AppConfig) {
     if let Ok(enabled) = autolaunch.is_enabled() {
         config.launch_on_system_startup = Some(enabled);
     }
-}
-
-/// Sync autostart setting with OS
-fn sync_autostart_setting(app: &AppHandle, should_enable: bool) -> Result<(), String> {
-    let autolaunch = app.autolaunch();
-    if should_enable {
-        autolaunch
-            .enable()
-            .map_err(|_| "Unable to enable startup on login".to_string())?;
-        println!("✅ Auto-startup enabled");
-    } else {
-        autolaunch
-            .disable()
-            .map_err(|_| "Unable to disable startup on login".to_string())?;
-        println!("❌ Auto-startup disabled");
-    }
-    Ok(())
 }
 
 /// Merge provided config into current config (only updates provided fields)
