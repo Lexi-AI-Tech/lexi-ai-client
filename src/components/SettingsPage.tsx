@@ -900,6 +900,7 @@ export const SettingsPage: React.FC = () => {
                 border: "1px solid #e5e7eb",
                 borderRadius: "12px",
                 padding: "24px",
+                marginBottom: "24px",
               }}
             >
               <div
@@ -938,6 +939,84 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
             </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!isUpdating && hasChanges() && !isLoading) {
+                    handleSaveSettings();
+                  }
+                }}
+                disabled={isUpdating || !hasChanges() || isLoading}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  background: "#111827",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "6px",
+                  opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
+                  cursor:
+                    isUpdating || !hasChanges() || isLoading
+                      ? "not-allowed"
+                      : "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isUpdating && hasChanges() && !isLoading) {
+                    e.currentTarget.style.background = "#374151";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isUpdating && hasChanges() && !isLoading) {
+                    e.currentTarget.style.background = "#111827";
+                  }
+                }}
+              >
+                {isUpdating ? "Saving..." : "Save Settings"}
+              </button>
+            </div>
+
+            {error && (
+              <div
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  color: "#b91c1c",
+                  fontSize: "13px",
+                  padding: "12px 16px",
+                  marginTop: "16px",
+                  borderRadius: "8px",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            {success && (
+              <div
+                style={{
+                  background: "#ecfdf5",
+                  border: "1px solid #a7f3d0",
+                  color: "#047857",
+                  fontSize: "13px",
+                  padding: "12px 16px",
+                  marginTop: "16px",
+                  borderRadius: "8px",
+                }}
+              >
+                Settings saved successfully!
+              </div>
+            )}
           </div>
         )}
 
