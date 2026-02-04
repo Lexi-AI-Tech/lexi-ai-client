@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { AnimatePresence } from "framer-motion";
 import { useOnboardingStore } from "../../store/onboardingStore";
 import {
@@ -15,7 +15,7 @@ const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];
 
 export const OnboardingFlow: React.FC = () => {
   const { currentStep, nextStep, completeOnboarding } = useOnboardingStore();
-  const [hotkey, setHotkey] = useState<string | null>(null);
+  const hotkey: string | null = null;
 
   const getStepIndex = () => {
     switch (currentStep) {
@@ -66,7 +66,6 @@ export const OnboardingFlow: React.FC = () => {
                   key="setup"
                   onNext={nextStep}
                   hotkey={hotkey}
-                  setHotkey={setHotkey}
                 />
               )}
               {currentStepIndex === 3 && (

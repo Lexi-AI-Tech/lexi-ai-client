@@ -425,6 +425,14 @@
   background: rgba(0, 0, 0, 0.03);
 }
 
+.hotkey-recorder-readonly {
+  cursor: default;
+}
+
+.hotkey-recorder-readonly:hover {
+  background: #f9fafb;
+}
+
 .hotkey-content {
   text-align: center;
   display: flex;

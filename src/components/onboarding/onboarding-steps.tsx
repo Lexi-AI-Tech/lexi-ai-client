@@ -249,40 +249,14 @@ export function PermissionsStep({
   );
 }
 
-// Step 3: Setup (Global Shortcut)
+// Step 3: Setup (Global Shortcut) – display only, no reassignment
 export function SetupStep({
   onNext,
   hotkey,
-  setHotkey,
 }: {
   onNext: () => void | Promise<void>;
   hotkey: string | null;
-  setHotkey: (k: string) => void;
 }) {
-  const [isRecording, setIsRecording] = useState(false);
-
-  useEffect(() => {
-    if (isRecording) {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        e.preventDefault();
-        const keys = [];
-        if (e.metaKey) keys.push("⌘");
-        if (e.ctrlKey) keys.push("Ctrl");
-        if (e.altKey) keys.push("Alt");
-        if (e.shiftKey) keys.push("Shift");
-        if (e.key && !["Meta", "Control", "Alt", "Shift"].includes(e.key)) {
-          keys.push(e.key.toUpperCase());
-        }
-        if (keys.length > 0) {
-          setHotkey(keys.join(" + "));
-          setIsRecording(false);
-        }
-      };
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
-    }
-  }, [isRecording, setHotkey]);
-
   return (
     <motion.div
       variants={stepVariants}
@@ -298,28 +272,16 @@ export function SetupStep({
         </p>
       </div>
 
-      <div
-        className={`hotkey-recorder ${isRecording ? "recording" : ""}`}
-        onClick={() => setIsRecording(true)}
-      >
+      <div className="hotkey-recorder hotkey-recorder-readonly">
         <div className="hotkey-content">
-          <div className="hotkey-label">
-            {isRecording ? "Listening..." : "Current Key"}
-          </div>
+          <div className="hotkey-label">Shortcut</div>
           <div className="hotkey-value">{hotkey || "Fn"}</div>
-          {!isRecording && <p className="hotkey-hint">Click to reassign</p>}
         </div>
       </div>
 
-      <div className="step-actions-row">
-        <button
-          className="btn btn-outline btn-flex"
-          onClick={() => setHotkey("Fn")}
-        >
-          Reset
-        </button>
-        <button className="btn btn-primary btn-flex-2" onClick={onNext}>
-          Apply and Continue
+      <div className="step-actions">
+        <button className="btn btn-primary" onClick={onNext}>
+          Continue
         </button>
       </div>
     </motion.div>
