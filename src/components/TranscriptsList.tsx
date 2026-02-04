@@ -12,6 +12,7 @@ import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import "./home/home.css";
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();
@@ -108,44 +109,50 @@ export const TranscriptsList: React.FC = () => {
     page,
   ]);
 
-  // Fetch transcripts when authenticated and page changes
+  // Fetch transcripts when authenticated and page changes (same pattern as HomePage: single effect, no callback in deps to avoid double fetch)
   useEffect(() => {
-    const loadTranscripts = () => {
-      // Step 1: Wait for auth store to initialize
-      if (!authStore.isInitialized) {
-        setLoading(true);
-        setError(null);
-        return; // Show loading while waiting for initialization
-      }
-
-      // Step 2: If authenticated, wait for tokens to be loaded
-      if (authStore.isAuthenticated && !authStore.tokens?.access_token) {
-        setLoading(true);
-        setError(null);
-        return; // Show loading while waiting for tokens
-      }
-
-      // Step 3: Now we know the auth state - either authenticated with tokens, or not authenticated
+    if (!authStore.isInitialized) return;
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setTranscripts([]);
       setError(null);
+      setLoading(false);
+      return;
+    }
 
-      if (authStore.isAuthenticated && authStore.tokens?.access_token) {
-        setLoading(true);
-        fetchTranscripts();
-      } else {
-        // Not authenticated - clear and show login prompt
-        setTranscripts([]);
-        setError(null);
-        setLoading(false);
+    setLoading(true);
+    setError(null);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await invoke<{
+          transcripts: Transcript[];
+          total: number;
+          page: number;
+          page_size: number;
+          total_pages: number;
+        }>("get_transcripts", { page, pageSize: 10 });
+
+        if (cancelled) return;
+        setTranscripts(response.transcripts);
+        setTotalPages(response.total_pages);
+        setTotal(response.total);
+      } catch (err: any) {
+        if (cancelled) return;
+        console.error("Failed to fetch transcripts:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    };
+    })();
 
-    loadTranscripts();
+    return () => {
+      cancelled = true;
+    };
   }, [
-    authStore.isAuthenticated,
     authStore.isInitialized,
+    authStore.isAuthenticated,
     authStore.tokens?.access_token,
     page,
-    fetchTranscripts,
   ]);
 
   const handleDelete = async (transcriptId: string) => {
@@ -177,48 +184,12 @@ export const TranscriptsList: React.FC = () => {
   };
 
 
-  // Show loading while waiting for auth to initialize or tokens to load
-  if (
-    !authStore.isInitialized ||
-    (authStore.isAuthenticated && !authStore.tokens?.access_token)
-  ) {
-    return (
-      <div className="settings">
-        <h3>Transcripts</h3>
-        <div
-          style={{
-            textAlign: "center",
-            padding: "24px",
-            color: "#6b7280",
-          }}
-        >
-          Loading...
-        </div>
-      </div>
-    );
-  }
-
-  // Show login prompt if not authenticated (only after we've confirmed auth state)
-  if (!authStore.isAuthenticated) {
-    return (
-      <div className="settings">
-        <h3>Transcripts</h3>
-        <div style={{ textAlign: "center", padding: "16px 0" }}>
-          <p className="permission-text" style={{ marginBottom: "16px" }}>
-            Sign in to view your transcription history
-          </p>
-          <GoogleLoginButton
-            onSuccess={() => {
-              // Transcripts will be fetched automatically via useEffect
-            }}
-            onError={(err) => {
-              setError(err || "Authentication failed");
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
+  // Same as HomePage: always show the page shell; show loading/login/content inside (no full-page gate)
+  const showContent =
+    authStore.isInitialized &&
+    (!authStore.isAuthenticated || !!authStore.tokens?.access_token);
+  const showLogin =
+    authStore.isInitialized && !authStore.isAuthenticated;
 
   return (
     <div className="settings">
@@ -267,7 +238,7 @@ export const TranscriptsList: React.FC = () => {
         )}
       </div>
 
-      {loading && transcripts.length === 0 && (
+      {!showContent && (
         <div
           style={{
             textAlign: "center",
@@ -275,11 +246,38 @@ export const TranscriptsList: React.FC = () => {
             color: "#6b7280",
           }}
         >
-          Loading transcripts...
+          Loading...
         </div>
       )}
 
-      {error && (
+      {showLogin && showContent && (
+        <div style={{ textAlign: "center", padding: "16px 0" }}>
+          <p className="permission-text" style={{ marginBottom: "16px" }}>
+            Sign in to view your transcription history
+          </p>
+          <GoogleLoginButton
+            onSuccess={() => {}}
+            onError={(err) => {
+              setError(err || "Authentication failed");
+            }}
+          />
+        </div>
+      )}
+
+      {showContent && !showLogin && loading && transcripts.length === 0 && (
+        <div
+          className="loading-state"
+          style={{
+            width: "100%",
+            minHeight: "60vh",
+            justifyContent: "center",
+          }}
+        >
+          <div className="loading-spinner" />
+        </div>
+      )}
+
+      {showContent && !showLogin && error && (
         <div
           className="permission-message"
           style={{
@@ -292,7 +290,7 @@ export const TranscriptsList: React.FC = () => {
         </div>
       )}
 
-      {!loading && !error && transcripts.length === 0 && (
+      {showContent && !showLogin && !loading && !error && transcripts.length === 0 && (
         <div
           style={{
             textAlign: "center",
@@ -307,7 +305,7 @@ export const TranscriptsList: React.FC = () => {
         </div>
       )}
 
-      {!loading && transcripts.length > 0 && (
+      {showContent && !showLogin && !loading && transcripts.length > 0 && (
         <div className="transcripts-list transcripts-table">
           <div className="transcripts-table-header">
             <span>Date</span>

@@ -633,12 +633,10 @@ body::before {
   color: #111827;
 }
 
-/* Transcripts List Styles */
+/* Transcripts List Styles - no max-height/overflow so main-content scrolls the page */
 .transcripts-list {
   display: flex;
   flex-direction: column;
-  max-height: 400px;
-  overflow-y: auto;
   border: 1px solid #f3f4f6;
   border-radius: 8px;
 }
