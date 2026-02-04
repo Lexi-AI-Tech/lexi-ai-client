@@ -3,6 +3,7 @@
 //! Handles WebSocket connections for OAuth flow.
 //! Listens for OAuth completion notifications and emits Tauri events to the frontend.
 
+use crate::commands::app_config;
 use crate::secure_storage::{self, AuthData, UserData};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -160,6 +161,16 @@ pub async fn start_oauth_websocket(app: AppHandle, state: String) -> Result<(), 
                                                             .emit("oauth-error", "Failed to store authentication data")
                                                             .unwrap_or_default();
                                                     } else {
+                                                        // Fetch app config from server (first time after login)
+                                                        match app_config::fetch_config_from_server(&app_clone).await {
+                                                            Ok(mut config) => {
+                                                                println!("✅ App config fetched and synced after login");
+                                                                app_config::sync_autostart_status(&app_clone, &mut config);
+                                                            }
+                                                            Err(e) => {
+                                                                eprintln!("⚠️  Failed to fetch app config after login: {}", e);
+                                                            }
+                                                        }
                                                         // Emit success event with user data
                                                         app_clone
                                                             .emit("oauth-completed", &user)

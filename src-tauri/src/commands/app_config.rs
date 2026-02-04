@@ -179,6 +179,7 @@ pub(crate) fn sync_autostart_status(app: &AppHandle, config: &mut AppConfig) {
 
     // Get current OS autostart status
     let os_enabled = autolaunch.is_enabled().unwrap_or(false);
+    println!("OS autostart status: {}", os_enabled);
 
     // Get desired status from config (default to true if not set, matching database default)
     let config_enabled = config.launch_on_system_startup.unwrap_or(true);
