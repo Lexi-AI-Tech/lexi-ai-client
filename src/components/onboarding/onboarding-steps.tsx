@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Mic, Keyboard, Sparkles, Check, Monitor } from "lucide-react";
+import {
+  Mic,
+  Keyboard,
+  Sparkles,
+  Check,
+  Monitor,
+  ChevronLeft,
+} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAuthStore } from "../../store/authStore";
@@ -57,13 +64,18 @@ export function WelcomeStep({
       <div className="step-actions">
         <div className="step-actions-row">
           {showBack && onBack && (
-            <button type="button" className="btn btn-outline" onClick={onBack}>
-              Back
+            <button
+              type="button"
+              className="btn btn-outline btn-icon"
+              onClick={onBack}
+              aria-label="Back"
+            >
+              <ChevronLeft className="btn-icon-svg" />
             </button>
           )}
           {isAuthenticated ? (
             <button
-              className={`btn btn-primary ${showBack ? "btn-flex-2" : ""}`}
+              className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
               onClick={onNext}
             >
               Continue
@@ -245,8 +257,13 @@ export function PermissionsStep({
 
       <div className="step-actions-row">
         {showBack && onBack && (
-          <button type="button" className="btn btn-outline" onClick={onBack}>
-            Back
+          <button
+            type="button"
+            className="btn btn-outline btn-icon"
+            onClick={onBack}
+            aria-label="Back"
+          >
+            <ChevronLeft className="btn-icon-svg" />
           </button>
         )}
         <button
@@ -298,12 +315,17 @@ export function SetupStep({
       <div className="step-actions">
         <div className="step-actions-row">
           {showBack && onBack && (
-            <button type="button" className="btn btn-outline" onClick={onBack}>
-              Back
+            <button
+              type="button"
+              className="btn btn-outline btn-icon"
+              onClick={onBack}
+              aria-label="Back"
+            >
+              <ChevronLeft className="btn-icon-svg" />
             </button>
           )}
           <button
-            className={`btn btn-primary ${showBack ? "btn-flex-2" : ""}`}
+            className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
             onClick={onNext}
           >
             Continue
@@ -408,8 +430,13 @@ export function TryItStep({
 
       <div className="step-actions-row">
         {showBack && onBack && (
-          <button type="button" className="btn btn-outline" onClick={onBack}>
-            Back
+          <button
+            type="button"
+            className="btn btn-outline btn-icon"
+            onClick={onBack}
+            aria-label="Back"
+          >
+            <ChevronLeft className="btn-icon-svg" />
           </button>
         )}
         <button
