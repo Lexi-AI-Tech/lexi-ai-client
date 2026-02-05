@@ -11,6 +11,7 @@ import ReactDOM from "react-dom/client";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
+import "./pill.css";
 // import { playSound } from "./lib/soundUtils";
 // Note: Do NOT import index.css here - it adds opaque backgrounds that break transparency
 
@@ -37,6 +38,9 @@ const HEIGHT_DIFF = EXPANDED_SIZE.height - IDLE_SIZE.height;
 export const Pill: React.FC = () => {
   const [status, setStatus] = useState<"idle" | "recording" | "processing">(
     "idle",
+  );
+  const [recordingMode, setRecordingMode] = useState<"assistant" | "action">(
+    "assistant",
   );
   const [isHovered, setIsHovered] = useState(false);
   const [audioLevels, setAudioLevels] = useState<number[]>([]);
@@ -148,6 +152,7 @@ export const Pill: React.FC = () => {
       try {
         // Listen for recording started
         const unlistenStarted = await listen("recording_started", async () => {
+          setRecordingMode("assistant");
           setStatus("recording");
           // Play sound immediately for instant feedback (non-blocking)
           // playSound("processing");
@@ -186,10 +191,24 @@ export const Pill: React.FC = () => {
           }
         });
 
+        // Listen for recording mode change (unified flow: real-time switch while holding hotkeys)
+        const unlistenModeChanged = await listen(
+          "recording_mode_changed",
+          (event: { payload?: unknown }) => {
+            try {
+              const payload = event?.payload;
+              if (typeof payload === "string" && (payload === "action" || payload === "assistant")) {
+                setRecordingMode(payload);
+              }
+            } catch (_) {}
+          },
+        );
+
         // Listen for action recording started (same behavior as regular recording)
         const unlistenActionStarted = await listen(
           "action_recording_started",
           async () => {
+            setRecordingMode("action");
             setStatus("recording");
             // Play sound immediately for instant feedback (non-blocking)
             // playSound("processing");
@@ -591,6 +610,7 @@ export const Pill: React.FC = () => {
           }
           unlistenActionSuccess();
           unlistenActionError();
+          unlistenModeChanged();
           unlistenActionStarted();
           unlistenActionStopped();
           unlistenActionRecordingError();
@@ -617,33 +637,27 @@ export const Pill: React.FC = () => {
     }
   };
 
-  // Waveform icon SVG - individual bars that respond to audio levels
+  // Waveform icon SVG - individual bars that respond to audio levels (color from CSS .pill__icon-wrap)
   const WaveformIcon = ({
     size = 20,
-    color = "white",
     audioLevels = [],
   }: {
     size?: number;
-    color?: string;
     audioLevels?: number[];
   }) => {
-    // Configuration for balanced bars
     const numBars = 5;
     const barWidth = 2.8;
     const barSpacing = 2;
     const maxBarHeight = size * 0.75;
-    const minBarHeight = size * 0.22; // Moderate idle height
+    const minBarHeight = size * 0.22;
     const containerWidth = size * 0.95;
     const containerHeight = size * 0.85;
     const startX = (size - containerWidth) / 2;
     const startY = (size - containerHeight) / 2;
 
-    // Use audio levels if available, otherwise use static default heights
-    // hasAudio is true when bars should be actively animating (voice detected)
     const hasAudio =
       audioLevels.length > 0 && audioLevels.some((level) => level > 0.25);
 
-    // Resample audio levels to match numBars if needed
     const resampledLevels =
       audioLevels.length > 0
         ? Array(numBars)
@@ -672,7 +686,6 @@ export const Pill: React.FC = () => {
         viewBox={`0 0 ${size} ${size}`}
         fill="none"
       >
-        {/* Individual vertical bars */}
         {barHeights.map((height, index) => {
           const x = barsStartX + index * (barWidth + barSpacing);
           const y = startY + (containerHeight - height) / 2;
@@ -683,13 +696,9 @@ export const Pill: React.FC = () => {
               y={y}
               width={barWidth}
               height={height}
-              fill={color}
+              fill="currentColor"
               rx={barWidth / 2}
-              style={{
-                transition: hasAudio
-                  ? "height 0.15s cubic-bezier(0.4, 0, 0.2, 1), y 0.15s cubic-bezier(0.4, 0, 0.2, 1)"
-                  : "none",
-              }}
+              className={hasAudio ? "pill__waveform-bar--animated" : undefined}
             />
           );
         })}
@@ -697,143 +706,52 @@ export const Pill: React.FC = () => {
     );
   };
 
-  // Loader icon SVG (spinning)
-  const LoaderIcon = ({
-    size = 20,
-    color = "white",
-  }: {
-    size?: number;
-    color?: string;
-  }) => (
+  // Loader icon SVG (color from CSS .pill__icon-wrap)
+  const LoaderIcon = ({ size = 20 }: { size?: number }) => (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={color}
+      stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{
-        animation: "spin 1s linear infinite",
-      }}
+      className="pill__loader"
     >
       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
     </svg>
   );
 
-  // Get background color - black background for all states
-  const getBackgroundColor = () => {
-    if (isHovered) {
-      return "rgba(0, 0, 0, 0.95)"; // Slightly lighter black on hover
-    }
-    // Consistent black background for all states
-    return "rgba(0, 0, 0, 0.9)";
-  };
-
-  // Build base style object
-  const baseStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "move",
-    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", // Smooth, natural easing
-    transform: isHovered ? "scale(1.02)" : "scale(1)", // Subtle scale on hover
-    transformOrigin: "center bottom", // Expand from bottom to top
-    userSelect: "none",
-    backgroundColor: getBackgroundColor(),
-    pointerEvents: "auto",
-    position: "relative",
-    overflow: "visible",
-    boxSizing: "border-box",
-    flexShrink: 0,
-  };
-
-  // Apply state-specific styles
-  if (status === "idle") {
-    // Idle: tiny and small pill shape
-    baseStyle.width = "40px";
-    baseStyle.height = "6.6px";
-    baseStyle.minWidth = "40px";
-    baseStyle.minHeight = "6.6px";
-    baseStyle.maxWidth = "40px";
-    baseStyle.maxHeight = "6.6px";
-    baseStyle.borderRadius = "3.3px";
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.2)";
-    baseStyle.boxShadow = isHovered
-      ? "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)"
-      : "0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.2)";
-  } else if (status === "recording") {
-    // Recording: expand to bigger rounded rectangle with more width and height
-    baseStyle.width = "60px";
-    baseStyle.height = "40px";
-    baseStyle.minWidth = "60px";
-    baseStyle.minHeight = "40px";
-    baseStyle.maxWidth = "60px";
-    baseStyle.maxHeight = "40px";
-    baseStyle.borderRadius = "20px"; // Rounded rectangle
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.15)";
-    baseStyle.boxShadow = isHovered
-      ? "0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.4)"
-      : "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)";
-  } else if (status === "processing") {
-    // Processing: wider to fit bars + loader
-    baseStyle.width = "80px";
-    baseStyle.height = "40px";
-    baseStyle.minWidth = "80px";
-    baseStyle.minHeight = "40px";
-    baseStyle.maxWidth = "80px";
-    baseStyle.maxHeight = "40px";
-    baseStyle.borderRadius = "20px"; // Rounded rectangle
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.15)";
-    baseStyle.boxShadow = isHovered
-      ? "0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.4)"
-      : "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)";
-  }
+  const pillClassName = [
+    "pill",
+    status === "idle" && "pill--idle",
+    status === "recording" && "pill--recording",
+    status === "processing" && "pill--processing",
+    isHovered && "pill--hovered",
+    (status === "recording" || status === "processing") &&
+      recordingMode === "action" &&
+      "pill--action-mode",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
+      className={pillClassName}
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={baseStyle}
     >
-      {/* No rippling effects - clean design */}
-
-      {/* Processing spinner - no rings, just the loader icon */}
-
-      {/* Icon container - only show for recording/processing */}
       {status !== "idle" && (
-        <div
-          style={{
-            position: "relative",
-            zIndex: 10,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "white",
-            width: "100%",
-            height: "100%",
-            gap: "8px", // Space between bars and loader
-          }}
-        >
+        <div className="pill__icon-wrap">
           {status === "processing" ? (
             <>
-              {/* Static bars during processing */}
-              <WaveformIcon
-                size={22}
-                color="white"
-                audioLevels={[]} // Empty array will show static bars
-              />
-              {/* Loader next to bars */}
-              <LoaderIcon size={14} color="white" />
+              <WaveformIcon size={22} audioLevels={[]} />
+              <LoaderIcon size={14} />
             </>
           ) : (
-            <WaveformIcon
-              size={26}
-              color="white"
-              audioLevels={smoothedLevels}
-            />
+            <WaveformIcon size={26} audioLevels={smoothedLevels} />
           )}
         </div>
       )}
@@ -847,28 +765,7 @@ export const Pill: React.FC = () => {
  */
 const PillApp: React.FC = () => {
   return (
-    <div
-      style={{
-        margin: 0,
-        padding: 0,
-        background: "transparent",
-        height: "100%",
-        width: "100%",
-        display: "flex",
-        alignItems: "flex-end", // Align to bottom so pill expands upward
-        justifyContent: "center",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif",
-        overflow: "hidden",
-        pointerEvents: "none",
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderRadius: "20px", // Match the pill's maximum border radius
-      }}
-    >
+    <div className="pill-app">
       <Pill />
     </div>
   );
