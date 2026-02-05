@@ -88,7 +88,7 @@ pub fn spawn_recording_thread(
         const TIMEOUT_CHECK_INTERVAL: Duration = Duration::from_millis(10); // Ultra fast check
         const STUCK_THRESHOLD: Duration = Duration::from_secs(8);
         /// Recordings shorter than this are not sent to the API
-        const MIN_RECORDING_DURATION: Duration = Duration::from_millis(300); // 0.3 seconds
+        const MIN_RECORDING_DURATION: Duration = Duration::from_millis(500); // 0.5 seconds
 
         loop {
             let command = match recording_rx.recv_timeout(TIMEOUT_CHECK_INTERVAL) {

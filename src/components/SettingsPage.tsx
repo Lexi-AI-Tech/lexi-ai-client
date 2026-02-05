@@ -1048,29 +1048,74 @@ export const SettingsPage: React.FC = () => {
                 Transcription Hotkeys
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginBottom: "24px" }}>
                 {currentHotkeys.hotkeys.length > 0 ? (
-                  currentHotkeys.hotkeys.map((hotkey, index) => (
-                    <div
-                      key={`transcription-${index}-${hotkey}`}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "6px 10px",
-                        background: "rgba(0, 122, 255, 0.1)",
-                        color: "#007aff",
-                        borderRadius: "6px",
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        whiteSpace: "nowrap",
-                        border: "1px solid rgba(0, 122, 255, 0.2)",
-                        fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
-                      }}
-                    >
-                      {hotkey}
-                    </div>
-                  ))
+                  currentHotkeys.hotkeys.map((hotkey, index) => {
+                    const keySymbols: Record<string, { symbol: string; label: string }> = {
+                      'fn': { symbol: 'fn', label: '🌐' },
+                      'control': { symbol: '^', label: 'control' },
+                      'ctrl': { symbol: '^', label: 'control' },
+                      'command': { symbol: '⌘', label: 'command' },
+                      'cmd': { symbol: '⌘', label: 'command' },
+                      'option': { symbol: '⌥', label: 'option' },
+                      'alt': { symbol: '⌥', label: 'option' },
+                      'shift': { symbol: '⇧', label: 'shift' },
+                    };
+                    return (
+                      <div
+                        style={{
+                          backgroundColor: "#1f2937",
+                          padding: "1.5rem",
+                          borderRadius: "0.75rem",
+                          maxWidth: "600px",
+                        }}
+                      >
+                        <div
+                          key={`transcription-${index}-${hotkey}`}
+                          style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                        >
+                          {hotkey.split("+").map((key, keyIndex, arr) => {
+                            const keyName = key.trim().toLowerCase();
+                            const keyInfo = keySymbols[keyName];
+                            return (
+                              <React.Fragment key={`${index}-${keyIndex}-${key}`}>
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    flexDirection: "column",
+                                    alignItems: "flex-start",
+                                    justifyContent: "space-between",
+                                    padding: "6px 8px",
+                                    minWidth: "54px",
+                                    minHeight: "48px",
+                                    background: "linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)",
+                                    color: "#fff",
+                                    borderRadius: "6px",
+                                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+                                    boxShadow: "0 1px 0 1px #1a1a1a, 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
+                                    border: "1px solid #4a4a4c",
+                                    position: "relative",
+                                  }}
+                                >
+                                  {keyInfo && (
+                                    <span style={{ fontSize: "13px", position: "absolute", top: "8px", right: "10px", color: "rgba(255,255,255,0.9)" }}>
+                                      {keyInfo.symbol}
+                                    </span>
+                                  )}
+                                  <span style={{ fontSize: "10px", fontWeight: 400, color: "rgba(255,255,255,0.85)", marginTop: "auto" }}>
+                                    {keyInfo ? keyInfo.label : key.trim()}
+                                  </span>
+                                </span>
+                                {keyIndex < arr.length - 1 && (
+                                  <span style={{ color: "#9ca3af", fontSize: "14px", fontWeight: 400 }}>+</span>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
                   <div
                     style={{
@@ -1101,43 +1146,87 @@ export const SettingsPage: React.FC = () => {
                 Action Hotkeys
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {config?.action_hotkeys && config.action_hotkeys.length > 0 ? (
-                  config.action_hotkeys.map((hotkey, index) => (
+              <div
+                style={{
+                  backgroundColor: "#1f2937",
+                  padding: "1.5rem",
+                  borderRadius: "0.75rem",
+                  maxWidth: "600px",
+                }}
+              >              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+                  {config?.action_hotkeys && config.action_hotkeys.length > 0 ? (
+                    config.action_hotkeys.map((hotkey, index) => {
+                      const keySymbols: Record<string, { symbol: string; label: string }> = {
+                        'fn': { symbol: 'fn', label: '🌐' },
+                        'control': { symbol: '^', label: 'control' },
+                        'ctrl': { symbol: '^', label: 'control' },
+                        'command': { symbol: '⌘', label: 'command' },
+                        'cmd': { symbol: '⌘', label: 'command' },
+                        'option': { symbol: '⌥', label: 'option' },
+                        'alt': { symbol: '⌥', label: 'option' },
+                        'shift': { symbol: '⇧', label: 'shift' },
+                      };
+                      return (
+                        <div
+                          key={`action-${index}-${hotkey}`}
+                          style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                        >
+                          {hotkey.split("+").map((key, keyIndex, arr) => {
+                            const keyName = key.trim().toLowerCase();
+                            const keyInfo = keySymbols[keyName];
+                            return (
+                              <React.Fragment key={`${index}-${keyIndex}-${key}`}>
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    flexDirection: "column",
+                                    alignItems: "flex-start",
+                                    justifyContent: "space-between",
+                                    padding: "6px 8px",
+                                    minWidth: "54px",
+                                    minHeight: "48px",
+                                    background: "linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)",
+                                    color: "#fff",
+                                    borderRadius: "6px",
+                                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+                                    boxShadow: "0 1px 0 1px #1a1a1a, 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
+                                    border: "1px solid #4a4a4c",
+                                    position: "relative",
+                                  }}
+                                >
+                                  {keyInfo && (
+                                    <span style={{ fontSize: "13px", position: "absolute", top: "8px", right: "10px", color: "rgba(255,255,255,0.9)" }}>
+                                      {keyInfo.symbol}
+                                    </span>
+                                  )}
+                                  <span style={{ fontSize: "10px", fontWeight: 400, color: "rgba(255,255,255,0.85)", marginTop: "auto" }}>
+                                    {keyInfo ? keyInfo.label : key.trim()}
+                                  </span>
+                                </span>
+                                {keyIndex < arr.length - 1 && (
+                                  <span style={{ color: "#9ca3af", fontSize: "14px", fontWeight: 400 }}>+</span>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      );
+                    })
+                  ) : (
                     <div
-                      key={`action-${index}-${hotkey}`}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "6px 10px",
-                        background: "rgba(168, 85, 247, 0.1)",
-                        color: "#9333ea",
+                        padding: "8px 12px",
+                        background: "#f3f4f6",
                         borderRadius: "6px",
                         fontSize: "13px",
-                        fontWeight: 500,
-                        whiteSpace: "nowrap",
-                        border: "1px solid rgba(168, 85, 247, 0.2)",
-                        fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                        color: "#9ca3af",
+                        display: "inline-block",
                       }}
                     >
-                      {hotkey}
+                      No action hotkeys configured
                     </div>
-                  ))
-                ) : (
-                  <div
-                    style={{
-                      padding: "8px 12px",
-                      background: "#f3f4f6",
-                      borderRadius: "6px",
-                      fontSize: "13px",
-                      color: "#9ca3af",
-                      display: "inline-block",
-                    }}
-                  >
-                    No action hotkeys configured
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>

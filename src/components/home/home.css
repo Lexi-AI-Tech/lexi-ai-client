@@ -8,7 +8,8 @@
   width: 100%;
   margin: 0 auto;
   padding: 2rem 2.5rem;
-  min-height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
   background: #ffffff;
   font-family:
     -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
@@ -40,7 +41,8 @@
 }
 
 .user-name {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  /* background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%); */
+  background: #bfa688;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -84,7 +86,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000000;
+  background: #1C1C1C;
   border-radius: 0.5rem;
   color: #ffffff;
   flex-shrink: 0;
