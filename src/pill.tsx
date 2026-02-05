@@ -150,36 +150,16 @@ export const Pill: React.FC = () => {
   useEffect(() => {
     const setupListeners = async () => {
       try {
-        // Listen for recording started
-        const unlistenStarted = await listen("recording_started", async () => {
-          setRecordingMode("assistant");
-          setStatus("recording");
-          // Play sound immediately for instant feedback (non-blocking)
-          // playSound("processing");
-
-          // Expand window upward using absolute positioning from idle reference
+        // Listen for recording triggered (instant pill animation when key is pressed; mode decided later by backend)
+        const expandPillToRecording = async () => {
           const window = getCurrentWindow();
           try {
-            if (!idlePositionRef.current) {
-              console.error("Idle position not initialized");
-              return;
-            }
-
+            if (!idlePositionRef.current) return;
             const idleX = idlePositionRef.current.x;
             const idleY = idlePositionRef.current.y;
-
-            // Calculate absolute position for recording state
-            // Move LEFT to center the wider pill, and move UP so bottom edge stays in place
             const recordingX =
               idleX - (EXPANDED_SIZE.width - IDLE_SIZE.width) / 2;
             const recordingY = idleY - HEIGHT_DIFF;
-
-            console.log(
-              `📍 Recording: idle=(${idleX.toFixed(2)}, ${idleY.toFixed(2)}) → recording=(${recordingX.toFixed(2)}, ${recordingY.toFixed(2)})`,
-            );
-
-            // CRITICAL: Resize FIRST, then position SECOND
-            // If we position before resize, the OS may adjust position after resize
             await window.setSize(
               new LogicalSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height),
             );
@@ -189,6 +169,38 @@ export const Pill: React.FC = () => {
           } catch (e) {
             console.error("Failed to expand window:", e);
           }
+        };
+
+        const unlistenTriggered = await listen("recording_triggered", async () => {
+          setRecordingMode("assistant");
+          setStatus("recording");
+          await expandPillToRecording();
+        });
+
+        const unlistenCancelled = await listen("recording_cancelled", async () => {
+          setStatus("idle");
+          const window = getCurrentWindow();
+          try {
+            if (!idlePositionRef.current) return;
+            await window.setSize(
+              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
+            );
+            await window.setPosition(
+              new LogicalPosition(
+                idlePositionRef.current.x,
+                idlePositionRef.current.y,
+              ),
+            );
+          } catch (e) {
+            console.error("Failed to shrink window:", e);
+          }
+        });
+
+        // Listen for recording started (from backend after grace window; pill may already be expanded)
+        const unlistenStarted = await listen("recording_started", async () => {
+          setRecordingMode("assistant");
+          setStatus("recording");
+          await expandPillToRecording();
         });
 
         // Listen for recording mode change (unified flow: real-time switch while holding hotkeys)
@@ -204,47 +216,13 @@ export const Pill: React.FC = () => {
           },
         );
 
-        // Listen for action recording started (same behavior as regular recording)
+        // Listen for action recording started (pill may already be expanded from recording_triggered)
         const unlistenActionStarted = await listen(
           "action_recording_started",
           async () => {
             setRecordingMode("action");
             setStatus("recording");
-            // Play sound immediately for instant feedback (non-blocking)
-            // playSound("processing");
-
-            // Expand window upward using absolute positioning from idle reference
-            const window = getCurrentWindow();
-            try {
-              if (!idlePositionRef.current) {
-                console.error("Idle position not initialized");
-                return;
-              }
-
-              const idleX = idlePositionRef.current.x;
-              const idleY = idlePositionRef.current.y;
-
-              // Calculate absolute position for recording state
-              // Move LEFT to center the wider pill, and move UP so bottom edge stays in place
-              const recordingX =
-                idleX - (EXPANDED_SIZE.width - IDLE_SIZE.width) / 2;
-              const recordingY = idleY - HEIGHT_DIFF;
-
-              console.log(
-                `📍 Action Recording: idle=(${idleX.toFixed(2)}, ${idleY.toFixed(2)}) → recording=(${recordingX.toFixed(2)}, ${recordingY.toFixed(2)})`,
-              );
-
-              // CRITICAL: Resize FIRST, then position SECOND
-              // If we position before resize, the OS may adjust position after resize
-              await window.setSize(
-                new LogicalSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height),
-              );
-              await window.setPosition(
-                new LogicalPosition(recordingX, recordingY),
-              );
-            } catch (e) {
-              console.error("Failed to expand window:", e);
-            }
+            await expandPillToRecording();
           },
         );
 
@@ -599,6 +577,8 @@ export const Pill: React.FC = () => {
 
         // Cleanup function
         return () => {
+          unlistenTriggered();
+          unlistenCancelled();
           unlistenStarted();
           unlistenStopped();
           unlistenProcessing();

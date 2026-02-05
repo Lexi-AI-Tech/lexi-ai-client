@@ -20,9 +20,10 @@
 use crate::RecordingCommand;
 use rdev::{listen, Event, EventType, Key};
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::watch;
 
 // ============================================================================
@@ -104,6 +105,11 @@ pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
 
 /// Minimum time between Start and Stop events.
 const MIN_PRESS_RELEASE_INTERVAL: Duration = Duration::from_millis(500);
+
+/// Grace window: wait this long after recording hotkey (e.g. Fn) is pressed before sending Start.
+/// If action hotkey (e.g. Fn+Control) is matched within this window, send ActionStart instead.
+/// Pill shows recording animation immediately on key down; only mode/backend start is delayed.
+const START_GRACE_WINDOW: Duration = Duration::from_millis(100);
 
 /// Result of processing a hotkey event
 #[derive(Debug, Clone)]
@@ -261,9 +267,12 @@ pub fn start_listener(
 
     // Key state tracker
     let key_state_tracker = Arc::new(Mutex::new(KeyStateTracker::new()));
+    // Cancel flag for delayed Start (100ms grace): when true, the pending Start must not fire
+    let pending_start_cancelled = Arc::new(AtomicBool::new(true));
 
     std::thread::spawn(move || {
         let key_state_tracker_local = key_state_tracker.clone();
+        let pending_start_cancelled_local = pending_start_cancelled.clone();
 
         let callback = move |event: Event| {
             // We only care about keyboard events
@@ -321,15 +330,13 @@ pub fn start_listener(
                 }
             }
 
-            // 4. Dispatch Commands
-            // Clone triggered_action_cmd so it can be used in both .or() and is_some() check if needed logic was complex,
-            // but actually we just need 'cmd_to_send'. The delayed stop logic needs to know WHICH command type.
-            let cmd_to_send = triggered_action_cmd.clone().or(triggered_rec_cmd);
-
-            // We determine command type for delayed stop based on what was triggered
-            let is_action_triggered = triggered_action_cmd.is_some();
-
-            if let Some(result) = cmd_to_send {
+            // 4. Dispatch Commands (grace window delays only backend/mode; pill shows recording immediately)
+            // If action hotkey matched (e.g. Fn+Control): cancel any pending Start, show pill now, send ActionStart
+            if let Some(result) = triggered_action_cmd {
+                pending_start_cancelled_local.store(true, Ordering::SeqCst);
+                if let Some(pill) = app_for_rdev.get_webview_window("pill") {
+                    let _ = pill.emit("recording_triggered", ());
+                }
                 match result {
                     HotkeyCommandResult::SendNow(cmd) => {
                         if let Err(e) = recording_tx_for_rdev.send(cmd) {
@@ -338,20 +345,58 @@ pub fn start_listener(
                     }
                     HotkeyCommandResult::SendStopAfter(delay) => {
                         let tx = recording_tx_for_rdev.clone();
-                        // Determine correct stop command
-                        let stop_cmd = if is_action_triggered {
-                            RecordingCommand::ActionStop
-                        } else {
-                            RecordingCommand::Stop
-                        };
-
                         std::thread::spawn(move || {
                             std::thread::sleep(delay);
-                            if let Err(e) = tx.send(stop_cmd) {
+                            if let Err(e) = tx.send(RecordingCommand::ActionStop) {
                                 eprintln!("Failed to send delayed stop: {:?}", e);
                             }
                         });
                     }
+                }
+            }
+            // If recording hotkey matched (e.g. Fn only): show pill immediately, send Start after grace window
+            else if let Some(result) = triggered_rec_cmd {
+                match result {
+                    HotkeyCommandResult::SendNow(RecordingCommand::Start) => {
+                        if let Some(pill) = app_for_rdev.get_webview_window("pill") {
+                            let _ = pill.emit("recording_triggered", ());
+                        }
+                        pending_start_cancelled_local.store(true, Ordering::SeqCst);
+                        pending_start_cancelled_local.store(false, Ordering::SeqCst);
+                        let tx = recording_tx_for_rdev.clone();
+                        let cancel = pending_start_cancelled_local.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(START_GRACE_WINDOW);
+                            if !cancel.swap(true, Ordering::SeqCst) {
+                                if let Err(e) = tx.send(RecordingCommand::Start) {
+                                    eprintln!("Failed to send delayed Start: {:?}", e);
+                                }
+                            }
+                        });
+                    }
+                    HotkeyCommandResult::SendNow(RecordingCommand::Stop) => {
+                        pending_start_cancelled_local.store(true, Ordering::SeqCst);
+                        if let Some(pill) = app_for_rdev.get_webview_window("pill") {
+                            let _ = pill.emit("recording_cancelled", ());
+                        }
+                        if let Err(e) = recording_tx_for_rdev.send(RecordingCommand::Stop) {
+                            eprintln!("Failed to send command: {:?}", e);
+                        }
+                    }
+                    HotkeyCommandResult::SendStopAfter(delay) => {
+                        pending_start_cancelled_local.store(true, Ordering::SeqCst);
+                        if let Some(pill) = app_for_rdev.get_webview_window("pill") {
+                            let _ = pill.emit("recording_cancelled", ());
+                        }
+                        let tx = recording_tx_for_rdev.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(delay);
+                            if let Err(e) = tx.send(RecordingCommand::Stop) {
+                                eprintln!("Failed to send delayed stop: {:?}", e);
+                            }
+                        });
+                    }
+                    _ => {}
                 }
             }
 
