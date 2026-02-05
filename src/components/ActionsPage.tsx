@@ -277,7 +277,7 @@ export const ActionsPage: React.FC = () => {
               Loading hotkey...
             </div>
           ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
               {actionHotkeys && actionHotkeys.length > 0 ? (
                 actionHotkeys.map((hotkey, index) => (
                   <div
@@ -285,19 +285,95 @@ export const ActionsPage: React.FC = () => {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "6px",
-                      padding: "8px 12px",
-                      background: "rgba(168, 85, 247, 0.1)",
-                      color: "#c084fc",
-                      borderRadius: "6px",
-                      fontSize: "14px",
-                      fontWeight: 500,
-                      whiteSpace: "nowrap",
-                      border: "1px solid rgba(168, 85, 247, 0.2)",
-                      fontFamily: 'SF Mono, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                      gap: "8px",
                     }}
                   >
-                    {hotkey}
+                    {hotkey.split("+").map((key, keyIndex, arr) => {
+                      const keyName = key.trim().toLowerCase();
+                      // symbolTop: true = symbol on top, false = symbol on bottom (like fn key)
+                      const keySymbols: Record<string, { symbol: string; label: string; symbolTop: boolean }> = {
+                        'fn': { symbol: 'fn', label: '🌐', symbolTop: true },
+                        'control': { symbol: '^', label: 'control', symbolTop: true },
+                        'ctrl': { symbol: '^', label: 'control', symbolTop: true },
+                        'command': { symbol: '⌘', label: 'command', symbolTop: true },
+                        'cmd': { symbol: '⌘', label: 'command', symbolTop: true },
+                        'option': { symbol: '⌥', label: 'option', symbolTop: true },
+                        'alt': { symbol: '⌥', label: 'option', symbolTop: true },
+                        'shift': { symbol: '⇧', label: 'shift', symbolTop: true },
+                        'caps': { symbol: '⇪', label: 'caps', symbolTop: true },
+                        'capslock': { symbol: '⇪', label: 'caps lock', symbolTop: true },
+                        'tab': { symbol: '⇥', label: 'tab', symbolTop: true },
+                        'escape': { symbol: '⎋', label: 'esc', symbolTop: true },
+                        'esc': { symbol: '⎋', label: 'esc', symbolTop: true },
+                        'return': { symbol: '↩', label: 'return', symbolTop: true },
+                        'enter': { symbol: '↩', label: 'enter', symbolTop: true },
+                        'delete': { symbol: '⌫', label: 'delete', symbolTop: true },
+                        'backspace': { symbol: '⌫', label: 'delete', symbolTop: true },
+                        'space': { symbol: '␣', label: 'space', symbolTop: true },
+                      };
+                      const keyInfo = keySymbols[keyName];
+                      
+                      return (
+                        <React.Fragment key={`${index}-${keyIndex}-${key}`}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              flexDirection: "column",
+                              alignItems: "flex-start",
+                              justifyContent: "space-between",
+                              padding: "8px 12px",
+                              minWidth: "60px",
+                              minHeight: "52px",
+                              background: "linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)",
+                              color: "#fff",
+                              borderRadius: "6px",
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif',
+                              boxShadow: "0 1px 0 1px #1a1a1a, 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
+                              border: "1px solid #4a4a4c",
+                              position: "relative",
+                            }}
+                          >
+                            {keyInfo?.symbolTop !== false && keyInfo && (
+                              <span style={{ 
+                                fontSize: "14px", 
+                                lineHeight: 1, 
+                                color: "rgba(255,255,255,0.9)",
+                                position: "absolute",
+                                top: "8px",
+                                right: "10px",
+                              }}>
+                                {keyInfo.symbol}
+                              </span>
+                            )}
+                            <span style={{ 
+                              fontSize: "11px", 
+                              fontWeight: 400, 
+                              letterSpacing: "0.02em",
+                              color: "rgba(255,255,255,0.85)",
+                              marginTop: "auto",
+                            }}>
+                              {keyInfo ? keyInfo.label : key.trim()}
+                            </span>
+                            {keyInfo?.symbolTop === false && (
+                              <span style={{ fontSize: "16px", lineHeight: 1, color: "rgba(255,255,255,0.7)", marginTop: "2px" }}>
+                                {keyInfo.symbol}
+                              </span>
+                            )}
+                          </span>
+                          {keyIndex < arr.length - 1 && (
+                            <span
+                              style={{
+                                color: "#6b7280",
+                                fontSize: "16px",
+                                fontWeight: 400,
+                              }}
+                            >
+                              +
+                            </span>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </div>
                 ))
               ) : (

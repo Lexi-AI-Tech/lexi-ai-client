@@ -5,9 +5,9 @@
  * Requires authentication to view transcripts.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, RefreshCw, Check, Trash2, Sparkles } from "lucide-react";
+import { Copy, RefreshCw, Check, Trash2, Sparkles, Play, Pause, Square } from "lucide-react";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
@@ -26,6 +26,11 @@ export const TranscriptsList: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [originalTooltipId, setOriginalTooltipId] = useState<string | null>(null);
+  
+  // Audio playback state
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [audioProgress, setAudioProgress] = useState<number>(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Clear error on mount to prevent stale error messages
   useEffect(() => {
@@ -191,6 +196,49 @@ export const TranscriptsList: React.FC = () => {
     }
   };
 
+  // Audio playback handlers
+  const handlePlayAudio = (transcriptId: string, audioUrl: string) => {
+    // If same audio is playing, pause it
+    if (playingId === transcriptId && audioRef.current) {
+      audioRef.current.pause();
+      setPlayingId(null);
+      return;
+    }
+    
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    
+    // Create new audio element
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration) {
+        setAudioProgress((audio.currentTime / audio.duration) * 100);
+      }
+    });
+    
+    audio.addEventListener('ended', () => {
+      setPlayingId(null);
+      setAudioProgress(0);
+    });
+    
+    audio.play();
+    setPlayingId(transcriptId);
+    setAudioProgress(0);
+  };
+
+  const handleStopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setPlayingId(null);
+    setAudioProgress(0);
+  };
+
 
   // Same as HomePage: always show the page shell; show loading/login/content inside (no full-page gate)
   const showContent =
@@ -207,6 +255,7 @@ export const TranscriptsList: React.FC = () => {
         flexDirection: "column",
         flex: 1,
         minHeight: 0,
+        padding: "32px",
       }}
     >
       <div
@@ -360,62 +409,148 @@ export const TranscriptsList: React.FC = () => {
                     ? transcript.enhanced_text!
                     : transcript.original_text || "";
                   const hasText = !!displayText;
+                  const isPlaying = playingId === transcript.id;
 
                   return (
-                    <div className="transcript-display-cell">
-                      {hasText ? (
-                        <>
-                          <span className="transcript-item-text">
-                            {displayText}
-                          </span>
-                          {isEnhanced && (
-                            <div className="transcript-enhanced-badges">
-                              <span
-                                className="transcript-enhanced-badge"
-                                title="This is an enhanced version of the transcript (improved grammar and clarity)"
+                    <div className="transcript-display-cell" style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                      {/* Minimal Audio Player */}
+                      {transcript.audio_file_url && (
+                        <div 
+                          style={{ 
+                            display: "flex", 
+                            alignItems: "center", 
+                            gap: "4px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <button
+                            onClick={() => handlePlayAudio(transcript.id, transcript.audio_file_url as string)}
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "50%",
+                              border: "none",
+                              background: isPlaying 
+                                ? "#1a1a1a" 
+                                : "#f3f4f6",
+                              color: isPlaying ? "#fff" : "#6b7280",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              position: "relative",
+                              overflow: "hidden",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isPlaying) {
+                                e.currentTarget.style.background = "#e5e7eb";
+                                e.currentTarget.style.color = "#374151";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isPlaying) {
+                                e.currentTarget.style.background = "#f3f4f6";
+                                e.currentTarget.style.color = "#6b7280";
+                              }
+                            }}
+                            title={isPlaying ? "Pause" : "Play audio"}
+                          >
+                            {/* Progress ring when playing */}
+                            {isPlaying && (
+                              <svg
+                                style={{
+                                  position: "absolute",
+                                  width: "28px",
+                                  height: "28px",
+                                  transform: "rotate(-90deg)",
+                                }}
                               >
-                                <Sparkles size={12} />
-                                Enhanced
-                              </span>
-                              <span
-                                className="transcript-view-original-trigger"
-                                onMouseEnter={() =>
-                                  setOriginalTooltipId(transcript.id)
-                                }
-                                onMouseLeave={() =>
-                                  setOriginalTooltipId(null)
-                                }
-                              >
-                                View original
-                                {originalTooltipId === transcript.id && (
-                                  <div
-                                    className="transcript-original-tooltip"
-                                    onMouseEnter={() =>
-                                      setOriginalTooltipId(transcript.id)
-                                    }
-                                    onMouseLeave={() =>
-                                      setOriginalTooltipId(null)
-                                    }
-                                  >
-                                    <div className="transcript-original-tooltip-label">
-                                      Original transcription
-                                    </div>
-                                    <div className="transcript-original-tooltip-text">
-                                      {transcript.original_text}
-                                    </div>
-                                  </div>
-                                )}
-                              </span>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="transcript-item-empty">
-                          {transcript.status === "processing"
-                            ? "Processing..."
-                            : "No text available"}
-                        </span>
+                                <circle
+                                  cx="14"
+                                  cy="14"
+                                  r="12"
+                                  fill="none"
+                                  stroke="rgba(255,255,255,0.2)"
+                                  strokeWidth="2"
+                                />
+                                <circle
+                                  cx="14"
+                                  cy="14"
+                                  r="12"
+                                  fill="none"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  strokeDasharray={`${audioProgress * 0.754} 75.4`}
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            )}
+                            {isPlaying ? (
+                              <Pause size={12} fill="currentColor" />
+                            ) : (
+                              <Play size={12} fill="currentColor" style={{ marginLeft: "2px" }} />
+                            )}
+                          </button>
+                        </div>
                       )}
+                      
+                      {/* Transcript Text */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {hasText ? (
+                          <>
+                            <span className="transcript-item-text">
+                              {displayText}
+                            </span>
+                            {isEnhanced && (
+                              <div className="transcript-enhanced-badges">
+                                <span
+                                  className="transcript-enhanced-badge"
+                                  title="This is an enhanced version of the transcript (improved grammar and clarity)"
+                                >
+                                  <Sparkles size={12} />
+                                  Enhanced
+                                </span>
+                                <span
+                                  className="transcript-view-original-trigger"
+                                  onMouseEnter={() =>
+                                    setOriginalTooltipId(transcript.id)
+                                  }
+                                  onMouseLeave={() =>
+                                    setOriginalTooltipId(null)
+                                  }
+                                >
+                                  View original
+                                  {originalTooltipId === transcript.id && (
+                                    <div
+                                      className="transcript-original-tooltip"
+                                      onMouseEnter={() =>
+                                        setOriginalTooltipId(transcript.id)
+                                      }
+                                      onMouseLeave={() =>
+                                        setOriginalTooltipId(null)
+                                      }
+                                    >
+                                      <div className="transcript-original-tooltip-label">
+                                        Original transcription
+                                      </div>
+                                      <div className="transcript-original-tooltip-text">
+                                        {transcript.original_text}
+                                      </div>
+                                    </div>
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="transcript-item-empty">
+                            {transcript.status === "processing"
+                              ? "Processing..."
+                              : "No text available"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })()}
@@ -560,16 +695,6 @@ export const TranscriptsList: React.FC = () => {
                   >
                     <Trash2 size={16} />
                   </button>
-                  {transcript.audio_file_url && (
-                    <audio
-                      src={transcript.audio_file_url as string}
-                      controls
-                      style={{
-                        height: "32px",
-                        maxWidth: "200px",
-                      }}
-                    />
-                  )}
                 </div>
               </div>
             </div>

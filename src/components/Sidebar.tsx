@@ -25,36 +25,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         <div
           style={{
-            width: "24px",
-            borderRadius: "8px",
+            width: "36px",
+            height: "36px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             marginRight: "10px",
             flexShrink: 0,
-            overflow: "hidden",
+            backgroundColor: "#1C1C1C",
+            borderRadius: "10px",
           }}
         >
-          <img
-            src={logoImage}
-            alt="Lexi Logo"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-          />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "20px", height: "20px", color: "#ffffff" }}>
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          </svg>
         </div>
         <span
           style={{
-            fontSize: "24px",
-            fontWeight: 500,
-            color: "#111827",
-            letterSpacing: "1.5px",
-            lineHeight: "24px",
+            fontSize: "28px",
+            fontWeight: 600,
+            letterSpacing: "-0.01em ",
+            lineHeight: "32px",
+            fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            color: "#1C1C1C",
           }}
         >
-          Lexi
+          Lexi AI
         </span>
       </div>
       <nav className="sidebar-nav">

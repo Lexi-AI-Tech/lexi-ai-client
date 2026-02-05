@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lexi AI - Voice to Text for macOS</title>
+  <meta name="description" content="Transform your voice into text anywhere on your Mac. Lexi AI is the most elegant speech-to-text overlay that works system-wide.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Gradient Orbs Background -->
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+  
+  <!-- Grid Pattern Overlay -->
+  <div class="grid-pattern"></div>
+
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="#" class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          </svg>
+        </div>
+        <span>Lexi AI</span>
+      </a>
+      <div class="nav-center">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it Works</a>
+        <a href="#languages">Languages</a>
+        <a href="#" class="nav-link-outline">Pricing</a>
+      </div>
+      <a href="#download" class="nav-download-btn">
+        Download for macOS
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <!-- Floating Speech Text Background -->
+    <!-- <div class="speech-background">
+      <div class="speech-line line-1">so basically I was thinking we could maybe like revisit the whole strategy thing because honestly</div>
+      <div class="speech-line line-2">um yeah so the meeting went well I guess, there's been a lot of back and forth about the timeline</div>
+      <div class="speech-line line-3">and like I mentioned before we should probably circle back on that proposal whenever you get a chance</div>
+      <div class="speech-line line-4">the thing is um we need to figure out the budget situation before Friday's deadline</div>
+    </div> -->
+    
+    <div class="hero-container">
+      <h1 class="hero-title">
+        <span class="title-light">Skip the keyboard,</span>
+        <span class="title-bold">Write 5× faster.</span>
+      </h1>
+      
+      <p class="hero-subtitle">
+        AI-powered voice dictation that turns your thoughts into text instantly. 
+        One key to record, release to transcribe — works everywhere on your Mac.
+      </p>
+      
+      <div class="hero-cta">
+        <a href="#download" class="btn btn-large btn-dark">
+          <svg viewBox="0 0 24 24" fill="currentColor" class="apple-icon">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+          </svg>
+          Download for Mac
+        </a>
+        <span class="hero-note">Free • macOS 12+</span>
+      </div>
+      
+      <!-- Hero Visual: Lexi Pill with Waveform -->
+      <div class="hero-pill-container">
+        <div class="hero-pill">
+          <div class="hero-waveform">
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+              </div>
+  </section>
+
+  <!-- Works Anywhere Section -->
+  <section id="works-anywhere" class="works-anywhere-section">
+    <div class="section-container">
+      <div class="wa-layout">
+        <div class="wa-visual">
+          <div class="wa-card">
+            <div class="wa-mic-icon">
+              <div class="wa-waveform">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <span class="wa-hello">hello</span>
+            </div>
+            <svg class="wa-lines" viewBox="0 0 300 120" fill="none">
+              <path d="M150 0 L150 40 Q150 60 100 80 L50 100" stroke="currentColor" stroke-width="2" fill="none"/>
+              <path d="M150 0 L150 40 Q150 60 150 80 L150 100" stroke="currentColor" stroke-width="2" fill="none"/>
+              <path d="M150 0 L150 40 Q150 60 200 80 L250 100" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+            <div class="wa-apps">
+              <div class="wa-app">
+                <div class="wa-app-icon gmail">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
+                  </svg>
+                </div>
+                <span class="wa-app-text"><span class="highlight">H</span>ello.</span>
+              </div>
+              <div class="wa-app">
+                <div class="wa-app-icon slack">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+                  </svg>
+                </div>
+                <span class="wa-app-text"><span class="highlight">H</span>ello</span>
+              </div>
+              <div class="wa-app">
+                <div class="wa-app-icon messages">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                  </svg>
+                </div>
+                <span class="wa-app-text"><span class="highlight-teal">h</span>ello</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="wa-content">
+          <h2 class="section-title-serif">Different tones<br><em>for each app</em></h2>
+          <p class="section-subtitle">Lexi automatically adjusts tone based on the app you're using. Sound like you—not a robot.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Custom Vocabulary Section -->
+  <section id="vocabulary" class="vocabulary-section">
+    <div class="section-container">
+      <div class="vocab-layout">
+        <div class="vocab-content">
+          <h2 class="section-title-serif">Personal dictionary</h2>
+          <p class="section-subtitle">Lexi automatically learns your unique words and adds them to your personal dictionary.</p>
+        </div>
+        <div class="vocab-visual">
+          <div class="vocab-card">
+            <div class="vocab-header">
+              <span>Your Dictionary</span>
+              <button class="vocab-add-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+              </button>
+            </div>
+            <div class="vocab-list">
+              <div class="vocab-item">Anthropic</div>
+              <div class="vocab-item">Satoshi</div>
+              <div class="vocab-item">GraphQL</div>
+              <div class="vocab-item">Kubernetes</div>
+              <div class="vocab-item">Vercel</div>
+              <div class="vocab-item">PostgreSQL</div>
+              <div class="vocab-item faded">Tauri</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Shortcuts Section -->
+  <section id="shortcuts" class="actions-section">
+    <div class="section-container">
+      <div class="actions-layout">
+        <div class="actions-visual">
+          <div class="actions-card">
+            <div class="actions-header">
+              <span>Your Shortcuts</span>
+              <button class="actions-add-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+            </div>
+            <div class="actions-list">
+              <div class="action-item">
+                <span class="action-trigger">Meeting link</span>
+              </div>
+              <div class="action-item expanded">
+                <span class="action-trigger">Email signature</span>
+                <div class="action-preview">
+                  <svg class="action-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M7 17L17 7M17 7H7M17 7V17"/>
+                  </svg>
+                  <span class="action-output">Best regards,<br>Your Name<br>Lexi AI Team</span>
+                </div>
+              </div>
+              <div class="action-item">
+                <span class="action-trigger">Support hours</span>
+              </div>
+              <div class="action-item">
+                <span class="action-trigger">FAQ response</span>
+              </div>
+              <div class="action-item">
+                <span class="action-trigger">Pricing info</span>
+              </div>
+              <div class="action-item faded">
+                <span class="action-trigger">Address</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="actions-content">
+          <h2 class="section-title-serif">Shortcuts</h2>
+          <p class="section-subtitle">Create voice shortcuts for phrases you use every day. From meeting links to email signatures, just speak a trigger word and get the full text instantly.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI Auto Edits Section -->
+  <section id="ai-edits" class="ai-edits-section">
+    <div class="section-container">
+      <div class="ai-edits-layout">
+        <div class="ai-edits-visual">
+          <div class="ai-edits-demo">
+            <div class="ai-edit-before">
+              <div class="edit-tag removed">Removed filler</div>
+              <p class="edit-text">
+                <span class="strikethrough">uh yeah</span> so I think we should probably <span class="strikethrough">like</span> reach out to 
+                <span class="edit-tag added">Added to Dictionary</span>
+                Jenny from legal I think she said some<span class="strikethrough">thing about</span>
+                the NDA being <span class="strikethrough">like</span> not ready yet or maybe she <span class="strikethrough">uh</span>
+                <span class="edit-tag fixed">Fixed spelling</span>
+                send it<span class="strikethrough">, not</span> sure, and <span class="strikethrough">um</span> we should cc Da<span class="highlight-word">v</span>ee
+                <span class="strikethrough">maybe</span> be sure to update the Q2 <span class="strikethrough">um</span>
+                goals sl<span class="highlight-word">i</span>dez before Friday's thing, I forget the link but
+                it's probably in Slack somewhere...
+              </p>
+            </div>
+            <div class="ai-edit-after">
+              <p class="edit-result">
+                Let's reach out to Jenny from Legal—she may have mentioned the NDA isn't finalized yet, or possibly already sent it. Let's also CC Dave. Finally, make sure the Q2 Goals slide is updated before Friday's review. The link should be in Slack.
+              </p>
+              <div class="edit-toolbar">
+                <span class="toolbar-btn"><strong>B</strong></span>
+                <span class="toolbar-btn"><em>I</em></span>
+                <span class="toolbar-btn"><s>S</s></span>
+                <span class="toolbar-btn">∞</span>
+                <span class="toolbar-btn">•</span>
+                <span class="toolbar-btn">1.</span>
+                <span class="toolbar-btn">&lt;/&gt;</span>
+                <button class="send-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+            </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ai-edits-content">
+          <div class="sparkles">✦ ✦ ✦</div>
+          <h2 class="section-title-serif"><em>AI Auto Edits</em></h2>
+          <p class="section-subtitle">Speak naturally and Lexi transcribes and edits your voice, instantly. Rambled thoughts become clear, perfectly formatted text, without the filler words or typos.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Languages Section -->
+  <section id="languages" class="languages-section">
+    <div class="section-container">
+      <div class="languages-layout">
+        <div class="languages-content">
+          <h2 class="section-title-serif">20+ languages</h2>
+          <p class="section-subtitle">Lexi automatically detects and transcribes in your language, letting you move between them—just like you do.</p>
+        </div>
+        <div class="languages-visual">
+          <div class="flags-circle">
+            <div class="flag-item" style="--i: 0;">🇺🇸</div>
+            <div class="flag-item" style="--i: 1;">🇲🇽</div>
+            <div class="flag-item" style="--i: 2;">🇪🇸</div>
+            <div class="flag-item" style="--i: 3;">🇬🇧</div>
+            <div class="flag-item" style="--i: 4;">🇰🇷</div>
+            <div class="flag-item" style="--i: 5;">🇷🇺</div>
+            <div class="flag-item" style="--i: 6;">🇨🇳</div>
+            <div class="flag-item" style="--i: 7;">🇧🇷</div>
+            <div class="flag-item" style="--i: 8;">🇩🇪</div>
+            <div class="flag-item" style="--i: 9;">🇨🇦</div>
+            <div class="flag-item" style="--i: 10;">🇫🇷</div>
+            <div class="flag-item" style="--i: 11;">🇯🇵</div>
+            <div class="flag-item" style="--i: 12;">🇹🇷</div>
+            <div class="flag-item" style="--i: 13;">🇵🇱</div>
+            <div class="center-text">20+ Languages</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it Works Section -->
+  <section id="how-it-works" class="how-it-works">
+    <div class="section-container">
+      <div class="section-header">
+        <span class="section-label">How it Works</span>
+        <h2 class="section-title">Three steps to freedom.</h2>
+        <p class="section-subtitle">Stop typing everything. Start speaking your mind.</p>
+      </div>
+      
+      <div class="steps-container">
+        <div class="step">
+          <div class="step-number">01</div>
+          <div class="step-visual">
+            <div class="step-icon-wrapper">
+              <kbd>Fn</kbd>
+            </div>
+          </div>
+          <h3>Press & Hold</h3>
+          <p>Hold down the Fn key (or your custom hotkey) to activate recording.</p>
+        </div>
+        
+        <div class="step-connector">
+          <svg viewBox="0 0 100 20" fill="none">
+            <path d="M0 10 H100" stroke="rgba(0,0,0,0.15)" stroke-width="2" stroke-dasharray="6 4"/>
+          </svg>
+        </div>
+        
+        <div class="step">
+          <div class="step-number">02</div>
+          <div class="step-visual">
+            <div class="step-icon-wrapper speaking">
+              <div class="sound-waves">
+                <span></span><span></span><span></span>
+              </div>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              </svg>
+            </div>
+          </div>
+          <h3>Speak Naturally</h3>
+          <p>Talk at your normal pace. Lexi AI understands natural speech patterns.</p>
+        </div>
+        
+        <div class="step-connector">
+          <svg viewBox="0 0 100 20" fill="none">
+            <path d="M0 10 H100" stroke="rgba(0,0,0,0.15)" stroke-width="2" stroke-dasharray="6 4"/>
+          </svg>
+        </div>
+        
+        <div class="step">
+          <div class="step-number">03</div>
+          <div class="step-visual">
+            <div class="step-icon-wrapper typing">
+              <div class="typing-cursor"></div>
+              <span class="typed-text">Hello world!</span>
+            </div>
+          </div>
+          <h3>Text Appears</h3>
+          <p>Release the key and your words are instantly typed wherever your cursor is.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Platforms Section -->
+  <section id="platforms" class="platforms-section">
+    <div class="section-container">
+      <div class="platforms-layout">
+        <div class="platforms-content">
+          <div class="platform-badges">
+            <span class="platform-badge">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+              </svg>
+              Mac
+            </span>
+          </div>
+          <h2 class="section-title-serif">On-the-go or at<br><em>your desk</em></h2>
+          <p class="section-subtitle">Built for macOS with native performance. Your personal dictionary and notes sync seamlessly across all your devices.</p>
+          <a href="#download" class="btn btn-outline">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="apple-icon">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+            </svg>
+            Download for macOS
+          </a>
+        </div>
+        <div class="platforms-visual">
+          <div class="laptop-mockup">
+            <div class="laptop-screen">
+              <div class="laptop-notch"></div>
+              <div class="laptop-content">
+                <!-- Browser/App Window -->
+                <div class="laptop-window">
+                  <div class="laptop-window-header">
+                    <div class="laptop-window-controls">
+                      <span class="ctrl close"></span>
+                      <span class="ctrl minimize"></span>
+                      <span class="ctrl maximize"></span>
+                    </div>
+                    <span class="laptop-window-title">Notes — Lexi AI</span>
+                  </div>
+                  <div class="laptop-window-body">
+                    <div class="laptop-text-content">
+                      <p class="laptop-typing">Meeting notes for Q1 planning session...</p>
+                      <p class="laptop-typed">Discussed roadmap priorities and team allocation.</p>
+                      <p class="laptop-typed faded">Action items: Review budget by Friday.</p>
+                    </div>
+                  </div>
+                </div>
+                <!-- Lexi Pill -->
+                <div class="lexi-pill-overlay">
+                  <div class="lexi-pill recording">
+                    <div class="pill-pulse"></div>
+                    <div class="pill-pulse delay-1"></div>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    </svg>
+                    <span class="pill-text">Recording...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="laptop-base">
+              <div class="laptop-keyboard"></div>
+            </div>
+          </div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section id="download" class="cta-section">
+    <div class="cta-container">
+      <div class="cta-glow"></div>
+      <div class="cta-content">
+        <h2>Ready to speak your mind?</h2>
+        <p>Download Lexi AI and start dictating today. It's free.</p>
+        <a href="#" class="btn btn-large btn-dark">
+          <svg viewBox="0 0 24 24" fill="currentColor" class="apple-icon">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+          </svg>
+          Download for macOS
+        </a>
+        <span class="cta-note">Requires macOS 12 (Monterey) or later</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </div>
+          <span>Lexi AI</span>
+        </div>
+        <p>Voice-to-text that just works.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-column">
+          <h4>Product</h4>
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How it Works</a>
+          <a href="#download">Download</a>
+        </div>
+        <div class="footer-column">
+          <h4>Legal</h4>
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Service</a>
+        </div>
+        <div class="footer-column">
+          <h4>Connect</h4>
+          <a href="#">GitHub</a>
+          <a href="#">Twitter</a>
+          <a href="#">Discord</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 Lexi AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
