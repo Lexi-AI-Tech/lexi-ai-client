@@ -47,6 +47,7 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 "voice" => {
                     // Use TTS to read the text
                     println!("🔊 Voice action - reading text using TTS");
+                    app_handle.emit("tts_speaking", ()).unwrap_or_default();
                     let tts_service = TtsService::new(app_handle.clone());
                     match tts_service.speak(&action_response.value, None).await {
                         Ok(_) => {
@@ -79,6 +80,7 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 "text_and_voice" => {
                     // Hybrid action: Inject text AND Read it
                     println!("🗣️📝 Hybrid action - injecting and reading text");
+                    app_handle.emit("tts_speaking", ()).unwrap_or_default();
 
                     // Start TTS
                     let tts_service = TtsService::new(app_handle.clone());

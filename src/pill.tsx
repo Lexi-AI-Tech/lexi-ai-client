@@ -14,12 +14,13 @@ import { LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 // import { playSound } from "./lib/soundUtils";
 // Note: Do NOT import index.css here - it adds opaque backgrounds that break transparency
 
-// Window size constants
-const IDLE_SIZE = { width: 40, height: 6.6 };
-const EXPANDED_SIZE = { width: 60, height: 40 }; // Recording state
-const PROCESSING_SIZE = { width: 80, height: 40 }; // Processing state (wider for bars + loader)
+// Window size constants — window matches pill exactly in each state (no extra space)
+const IDLE_SIZE = { width: 50, height: 6.6 };
+const RECORDING_SIZE = { width: 80, height: 36 };
+const PROCESSING_SIZE = { width: 100, height: 36 };
+const SPEAKING_SIZE = { width: 90, height: 36 }; // Speaking/TTS state
 // Height difference for position adjustment (to make pill grow upward)
-const HEIGHT_DIFF = EXPANDED_SIZE.height - IDLE_SIZE.height;
+const HEIGHT_DIFF = RECORDING_SIZE.height - IDLE_SIZE.height;
 
 /**
  * Pill Component
@@ -35,9 +36,10 @@ const HEIGHT_DIFF = EXPANDED_SIZE.height - IDLE_SIZE.height;
  * This prevents the visible repositioning issue.
  */
 export const Pill: React.FC = () => {
-  const [status, setStatus] = useState<"idle" | "recording" | "processing">(
+  const [status, setStatus] = useState<"idle" | "recording" | "processing" | "speaking">(
     "idle",
   );
+  const [isActionMode, setIsActionMode] = useState(false); // Track if action hotkey is active
   const [isHovered, setIsHovered] = useState(false);
   const [audioLevels, setAudioLevels] = useState<number[]>([]);
   const [smoothedLevels, setSmoothedLevels] = useState<number[]>([]);
@@ -80,42 +82,24 @@ export const Pill: React.FC = () => {
       return;
     }
 
-    const numBars = 5; // Match WaveformIcon numBars
-    // Start with static idle bars at moderate height
+    const numBars = 7; // Match WaveformIcon numBars
+    // Start with static idle bars at fixed height — no animation
     setAudioLevels(Array(numBars).fill(0.35));
 
-    // Fallback: if we don't receive real audio data after 500ms, show gentle idle animation
-    const fallbackTimeout = setTimeout(() => {
-      if (!hasRealAudioRef.current) {
-        console.log("No real audio data received, using subtle idle animation");
-      }
-    }, 500);
-
-    // Gentle idle pulse animation (only used when no voice detected)
+    // Fallback: if we don't receive real audio data, keep bars static
     let animationFrameId: number;
-    const idleAnimation = () => {
-      // Only run idle animation if we haven't received real audio recently
+    const idleCheck = () => {
       const timeSinceLastVolume = Date.now() - lastVolumeTimeRef.current;
       if (timeSinceLastVolume > 150) {
-        // No recent audio data - show subtle idle bars with gentle breathing
-        const time = Date.now() * 0.001;
-        const idleLevels = Array(numBars)
-          .fill(0)
-          .map((_, i) => {
-            // Gentle breathing effect for idle state
-            const phase = (i / numBars) * Math.PI;
-            const breath = Math.sin(time * 0.8 + phase) * 0.05;
-            return 0.35 + breath;
-          });
-        setAudioLevels(idleLevels);
+        // No recent audio data — keep bars at fixed static height
+        setAudioLevels(Array(numBars).fill(0.35));
       }
-      animationFrameId = requestAnimationFrame(idleAnimation);
+      animationFrameId = requestAnimationFrame(idleCheck);
     };
 
-    animationFrameId = requestAnimationFrame(idleAnimation);
+    animationFrameId = requestAnimationFrame(idleCheck);
 
     return () => {
-      clearTimeout(fallbackTimeout);
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
@@ -163,38 +147,32 @@ export const Pill: React.FC = () => {
             const idleX = idlePositionRef.current.x;
             const idleY = idlePositionRef.current.y;
 
-            // Calculate absolute position for recording state
-            // Move LEFT to center the wider pill, and move UP so bottom edge stays in place
-            const recordingX =
-              idleX - (EXPANDED_SIZE.width - IDLE_SIZE.width) / 2;
-            const recordingY = idleY - HEIGHT_DIFF;
+            const recX =
+              idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
+            const recY = idleY - HEIGHT_DIFF;
 
             console.log(
-              `📍 Recording: idle=(${idleX.toFixed(2)}, ${idleY.toFixed(2)}) → recording=(${recordingX.toFixed(2)}, ${recordingY.toFixed(2)})`,
+              `📍 Recording: idle=(${idleX.toFixed(2)}, ${idleY.toFixed(2)}) → rec=(${recX.toFixed(2)}, ${recY.toFixed(2)})`,
             );
 
-            // CRITICAL: Resize FIRST, then position SECOND
-            // If we position before resize, the OS may adjust position after resize
             await window.setSize(
-              new LogicalSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height),
+              new LogicalSize(RECORDING_SIZE.width, RECORDING_SIZE.height),
             );
             await window.setPosition(
-              new LogicalPosition(recordingX, recordingY),
+              new LogicalPosition(recX, recY),
             );
           } catch (e) {
             console.error("Failed to expand window:", e);
           }
         });
 
-        // Listen for action recording started (same behavior as regular recording)
+        // Listen for action recording started
         const unlistenActionStarted = await listen(
           "action_recording_started",
           async () => {
             setStatus("recording");
-            // Play sound immediately for instant feedback (non-blocking)
-            // playSound("processing");
+            setIsActionMode(true);
 
-            // Expand window upward using absolute positioning from idle reference
             const window = getCurrentWindow();
             try {
               if (!idlePositionRef.current) {
@@ -205,23 +183,15 @@ export const Pill: React.FC = () => {
               const idleX = idlePositionRef.current.x;
               const idleY = idlePositionRef.current.y;
 
-              // Calculate absolute position for recording state
-              // Move LEFT to center the wider pill, and move UP so bottom edge stays in place
-              const recordingX =
-                idleX - (EXPANDED_SIZE.width - IDLE_SIZE.width) / 2;
-              const recordingY = idleY - HEIGHT_DIFF;
+              const recX =
+                idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
+              const recY = idleY - HEIGHT_DIFF;
 
-              console.log(
-                `📍 Action Recording: idle=(${idleX.toFixed(2)}, ${idleY.toFixed(2)}) → recording=(${recordingX.toFixed(2)}, ${recordingY.toFixed(2)})`,
-              );
-
-              // CRITICAL: Resize FIRST, then position SECOND
-              // If we position before resize, the OS may adjust position after resize
               await window.setSize(
-                new LogicalSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height),
+                new LogicalSize(RECORDING_SIZE.width, RECORDING_SIZE.height),
               );
               await window.setPosition(
-                new LogicalPosition(recordingX, recordingY),
+                new LogicalPosition(recX, recY),
               );
             } catch (e) {
               console.error("Failed to expand window:", e);
@@ -229,101 +199,71 @@ export const Pill: React.FC = () => {
           },
         );
 
-        // Listen for recording stopped
+        // Listen for recording stopped — resize window to processing size
         const unlistenStopped = await listen("recording_stopped", async () => {
           setStatus("processing");
-          // Expand width for processing (to fit bars + loader)
           const window = getCurrentWindow();
           try {
-            if (!idlePositionRef.current) {
-              console.error("Idle position not initialized");
-              return;
-            }
-
+            if (!idlePositionRef.current) return;
             const idleX = idlePositionRef.current.x;
             const idleY = idlePositionRef.current.y;
-
-            // Calculate absolute position for processing state
-            const processingX =
-              idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
-            const processingY = idleY - HEIGHT_DIFF;
-
-            // CRITICAL: Resize FIRST, then position SECOND
+            const procX = idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
+            const procY = idleY - HEIGHT_DIFF;
             await window.setSize(
               new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
             );
             await window.setPosition(
-              new LogicalPosition(processingX, processingY),
+              new LogicalPosition(procX, procY),
             );
           } catch (e) {
-            console.error("Failed to expand to processing size:", e);
+            console.error("Failed to resize to processing:", e);
           }
         });
 
-        // Listen for action recording stopped (same behavior as regular recording)
+        // Listen for action recording stopped
         const unlistenActionStopped = await listen(
           "action_recording_stopped",
           async () => {
             setStatus("processing");
-            // Expand width for processing (to fit bars + loader)
             const window = getCurrentWindow();
             try {
-              if (!idlePositionRef.current) {
-                console.error("Idle position not initialized");
-                return;
-              }
-
+              if (!idlePositionRef.current) return;
               const idleX = idlePositionRef.current.x;
               const idleY = idlePositionRef.current.y;
-
-              // Calculate absolute position for processing state
-              const processingX =
-                idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
-              const processingY = idleY - HEIGHT_DIFF;
-
-              // CRITICAL: Resize FIRST, then position SECOND
+              const procX = idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
+              const procY = idleY - HEIGHT_DIFF;
               await window.setSize(
                 new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
               );
               await window.setPosition(
-                new LogicalPosition(processingX, processingY),
+                new LogicalPosition(procX, procY),
               );
             } catch (e) {
-              console.error("Failed to expand to processing size:", e);
+              console.error("Failed to resize to processing:", e);
             }
           },
         );
 
-        // Listen for processing start
+        // Listen for processing start — resize window to processing size
         const unlistenProcessing = await listen(
           "processing_start",
           async () => {
             setStatus("processing");
-            // Expand width for processing (to fit bars + loader)
             const window = getCurrentWindow();
             try {
-              if (!idlePositionRef.current) {
-                console.error("Idle position not initialized");
-                return;
-              }
-
+              if (!idlePositionRef.current) return;
               const idleX = idlePositionRef.current.x;
               const idleY = idlePositionRef.current.y;
-
-              // Calculate absolute position for processing state
-              const processingX =
-                idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
-              const processingY = idleY - HEIGHT_DIFF;
-
-              // CRITICAL: Resize FIRST, then position SECOND
+              const procX = idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
+              const procY = idleY - HEIGHT_DIFF;
               await window.setSize(
                 new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
               );
               await window.setPosition(
-                new LogicalPosition(processingX, processingY),
+                new LogicalPosition(procX, procY),
               );
             } catch (e) {
-              console.error("Failed to expand to processing size:", e);
+              console.error("Failed to resize to processing:", e);
             }
           },
         );
@@ -452,7 +392,7 @@ export const Pill: React.FC = () => {
               lastVolumeTimeRef.current = Date.now();
 
               // Generate individual bar levels based on real volume
-              const numBars = 5; // Match WaveformIcon numBars
+              const numBars = 7; // Match WaveformIcon numBars
               const normalizedVolume = Math.max(0, Math.min(1, volume));
 
               // Voice detection threshold - adjust based on your mic sensitivity
@@ -496,6 +436,7 @@ export const Pill: React.FC = () => {
           "action_success",
           async () => {
             setStatus("idle");
+            setIsActionMode(false); // Disable action mode indicator
 
             // Return to exact idle position
             const window = getCurrentWindow();
@@ -524,6 +465,7 @@ export const Pill: React.FC = () => {
         // Listen for action error
         const unlistenActionError = await listen("action_error", async () => {
           setStatus("idle");
+          setIsActionMode(false); // Disable action mode indicator
 
           // Return to exact idle position
           const window = getCurrentWindow();
@@ -553,6 +495,7 @@ export const Pill: React.FC = () => {
           "action_recording_error",
           async () => {
             setStatus("idle");
+            setIsActionMode(false); // Disable action mode indicator
 
             // Return to exact idle position
             const window = getCurrentWindow();
@@ -578,6 +521,69 @@ export const Pill: React.FC = () => {
           },
         );
 
+        // Listen for TTS speaking — Lexi is speaking back
+        const unlistenTtsSpeaking = await listen("tts_speaking", async () => {
+          setStatus("speaking");
+          const window = getCurrentWindow();
+          try {
+            if (!idlePositionRef.current) return;
+            const idleX = idlePositionRef.current.x;
+            const idleY = idlePositionRef.current.y;
+            const speakX = idleX - (SPEAKING_SIZE.width - IDLE_SIZE.width) / 2;
+            const speakY = idleY - HEIGHT_DIFF;
+            await window.setSize(
+              new LogicalSize(SPEAKING_SIZE.width, SPEAKING_SIZE.height),
+            );
+            await window.setPosition(
+              new LogicalPosition(speakX, speakY),
+            );
+          } catch (e) {
+            console.error("Failed to resize for speaking:", e);
+          }
+        });
+
+        // Listen for TTS success — done speaking, return to idle
+        const unlistenTtsSuccess = await listen("tts_success", async () => {
+          setStatus("idle");
+          setIsActionMode(false);
+          const window = getCurrentWindow();
+          try {
+            if (!idlePositionRef.current) return;
+            await window.setSize(
+              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
+            );
+            await window.setPosition(
+              new LogicalPosition(
+                idlePositionRef.current.x,
+                idlePositionRef.current.y,
+              ),
+            );
+          } catch (e) {
+            console.error("Failed to shrink after TTS:", e);
+          }
+        });
+
+        // Listen for TTS error — done speaking (failed), return to idle
+        const unlistenTtsError = await listen("tts_error", async () => {
+          setStatus("idle");
+          setIsActionMode(false);
+          const window = getCurrentWindow();
+          try {
+            if (!idlePositionRef.current) return;
+            await window.setSize(
+              new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height),
+            );
+            await window.setPosition(
+              new LogicalPosition(
+                idlePositionRef.current.x,
+                idlePositionRef.current.y,
+              ),
+            );
+          } catch (e) {
+            console.error("Failed to shrink after TTS error:", e);
+          }
+        });
+
         // Cleanup function
         return () => {
           unlistenStarted();
@@ -594,6 +600,9 @@ export const Pill: React.FC = () => {
           unlistenActionStarted();
           unlistenActionStopped();
           unlistenActionRecordingError();
+          unlistenTtsSpeaking();
+          unlistenTtsSuccess();
+          unlistenTtsError();
         };
       } catch (error) {
         console.error("Failed to set up event listeners:", error);
@@ -618,32 +627,26 @@ export const Pill: React.FC = () => {
   };
 
   // Waveform icon SVG - individual bars that respond to audio levels
+  // Uses separate width/height so bars fill the pill properly
   const WaveformIcon = ({
-    size = 20,
-    color = "white",
+    width: svgWidth = 48,
+    height: svgHeight = 24,
     audioLevels = [],
   }: {
-    size?: number;
+    width?: number;
+    height?: number;
     color?: string;
     audioLevels?: number[];
   }) => {
-    // Configuration for balanced bars
-    const numBars = 5;
-    const barWidth = 2.8;
-    const barSpacing = 2;
-    const maxBarHeight = size * 0.75;
-    const minBarHeight = size * 0.22; // Moderate idle height
-    const containerWidth = size * 0.95;
-    const containerHeight = size * 0.85;
-    const startX = (size - containerWidth) / 2;
-    const startY = (size - containerHeight) / 2;
+    const numBars = 7;
+    const barWidth = 3;
+    const barSpacing = 2.5;
+    const maxBarHeight = svgHeight * 0.9;
+    const minBarHeight = svgHeight * 0.18;
 
-    // Use audio levels if available, otherwise use static default heights
-    // hasAudio is true when bars should be actively animating (voice detected)
     const hasAudio =
       audioLevels.length > 0 && audioLevels.some((level) => level > 0.25);
 
-    // Resample audio levels to match numBars if needed
     const resampledLevels =
       audioLevels.length > 0
         ? Array(numBars)
@@ -656,26 +659,29 @@ export const Pill: React.FC = () => {
             })
         : Array(numBars).fill(0.35);
 
-    const barHeights = resampledLevels.map((level) => {
+    const barHeights = resampledLevels.map((level, i) => {
+      // Natural curve — middle bars taller
+      const curveFactor = Math.sin((i / (numBars - 1)) * Math.PI);
+      const curvedLevel = level * (0.65 + curveFactor * 0.35);
       return (
-        minBarHeight + (maxBarHeight - minBarHeight) * Math.max(0.2, level)
+        minBarHeight + (maxBarHeight - minBarHeight) * Math.max(0.12, curvedLevel)
       );
     });
 
     const totalBarsWidth = numBars * barWidth + (numBars - 1) * barSpacing;
-    const barsStartX = startX + (containerWidth - totalBarsWidth) / 2;
+    const barsStartX = (svgWidth - totalBarsWidth) / 2;
 
     return (
       <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
+        width={svgWidth}
+        height={svgHeight}
+        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
         fill="none"
       >
-        {/* Individual vertical bars */}
         {barHeights.map((height, index) => {
           const x = barsStartX + index * (barWidth + barSpacing);
-          const y = startY + (containerHeight - height) / 2;
+          const y = (svgHeight - height) / 2;
+
           return (
             <rect
               key={index}
@@ -683,11 +689,11 @@ export const Pill: React.FC = () => {
               y={y}
               width={barWidth}
               height={height}
-              fill={color}
+              fill="rgba(255, 255, 255, 0.9)"
               rx={barWidth / 2}
               style={{
                 transition: hasAudio
-                  ? "height 0.15s cubic-bezier(0.4, 0, 0.2, 1), y 0.15s cubic-bezier(0.4, 0, 0.2, 1)"
+                  ? "height 0.08s cubic-bezier(0.4, 0, 0.2, 1), y 0.08s cubic-bezier(0.4, 0, 0.2, 1)"
                   : "none",
               }}
             />
@@ -725,9 +731,8 @@ export const Pill: React.FC = () => {
   // Get background color - black background for all states
   const getBackgroundColor = () => {
     if (isHovered) {
-      return "rgba(0, 0, 0, 0.95)"; // Slightly lighter black on hover
+      return "rgba(0, 0, 0, 0.95)";
     }
-    // Consistent black background for all states
     return "rgba(0, 0, 0, 0.9)";
   };
 
@@ -737,9 +742,19 @@ export const Pill: React.FC = () => {
     alignItems: "center",
     justifyContent: "center",
     cursor: "move",
-    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", // Smooth, natural easing
-    transform: isHovered ? "scale(1.02)" : "scale(1)", // Subtle scale on hover
-    transformOrigin: "center bottom", // Expand from bottom to top
+    // Separate transitions for smooth size + shadow changes
+    transition: [
+      "width 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+      "height 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+      "border-radius 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+      "box-shadow 0.3s ease-out",
+      "border 0.3s ease-out",
+      "background-color 0.3s ease-out",
+      "transform 0.2s ease-out",
+      "opacity 0.3s ease-out",
+    ].join(", "),
+    transform: isHovered ? "scale(1.02)" : "scale(1)",
+    transformOrigin: "center bottom",
     userSelect: "none",
     backgroundColor: getBackgroundColor(),
     pointerEvents: "auto",
@@ -749,46 +764,31 @@ export const Pill: React.FC = () => {
     flexShrink: 0,
   };
 
-  // Apply state-specific styles
+  // Apply state-specific styles — pill fills 100% of window (window = pill)
   if (status === "idle") {
-    // Idle: tiny and small pill shape
-    baseStyle.width = "40px";
+    baseStyle.width = "50px";
     baseStyle.height = "6.6px";
-    baseStyle.minWidth = "40px";
-    baseStyle.minHeight = "6.6px";
-    baseStyle.maxWidth = "40px";
-    baseStyle.maxHeight = "6.6px";
     baseStyle.borderRadius = "3.3px";
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.2)";
-    baseStyle.boxShadow = isHovered
-      ? "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)"
-      : "0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.2)";
+    baseStyle.border = "none";
+    baseStyle.boxShadow = "none";
   } else if (status === "recording") {
-    // Recording: expand to bigger rounded rectangle with more width and height
-    baseStyle.width = "60px";
-    baseStyle.height = "40px";
-    baseStyle.minWidth = "60px";
-    baseStyle.minHeight = "40px";
-    baseStyle.maxWidth = "60px";
-    baseStyle.maxHeight = "40px";
-    baseStyle.borderRadius = "20px"; // Rounded rectangle
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.15)";
-    baseStyle.boxShadow = isHovered
-      ? "0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.4)"
-      : "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)";
+    baseStyle.width = "100%";
+    baseStyle.height = "100%";
+    baseStyle.borderRadius = "18px";
+    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
+    baseStyle.boxShadow = "none";
   } else if (status === "processing") {
-    // Processing: wider to fit bars + loader
-    baseStyle.width = "80px";
-    baseStyle.height = "40px";
-    baseStyle.minWidth = "80px";
-    baseStyle.minHeight = "40px";
-    baseStyle.maxWidth = "80px";
-    baseStyle.maxHeight = "40px";
-    baseStyle.borderRadius = "20px"; // Rounded rectangle
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.15)";
-    baseStyle.boxShadow = isHovered
-      ? "0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.4)"
-      : "0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3)";
+    baseStyle.width = "100%";
+    baseStyle.height = "100%";
+    baseStyle.borderRadius = "18px";
+    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
+    baseStyle.boxShadow = "none";
+  } else if (status === "speaking") {
+    baseStyle.width = "100%";
+    baseStyle.height = "100%";
+    baseStyle.borderRadius = "18px";
+    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
+    baseStyle.boxShadow = "none";
   }
 
   return (
@@ -798,11 +798,81 @@ export const Pill: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
       style={baseStyle}
     >
-      {/* No rippling effects - clean design */}
+      {/* Chasing border light — color changes based on state */}
+      {status !== "idle" && (() => {
+        // Pick colors based on state
+        let color1: string, color2: string, color3: string, speed: string;
+        if (status === "speaking") {
+          // Speaking/TTS: purple
+          color1 = "#a855f7";   // Purple
+          color2 = "#d8b4fe";   // Light purple
+          color3 = "rgba(168, 85, 247, 0.1)";
+          speed = "1.8s";
+        } else if (status === "processing") {
+          // Processing: cool blue/cyan
+          color1 = "#3b82f6";   // Blue
+          color2 = "#93c5fd";   // Light blue
+          color3 = "rgba(59, 130, 246, 0.1)";
+          speed = "1.5s";
+        } else if (isActionMode) {
+          // Smart actions: warm orange
+          color1 = "#f97316";   // Orange
+          color2 = "#fdba74";   // Light orange
+          color3 = "rgba(249, 115, 22, 0.1)";
+          speed = "2s";
+        } else {
+          // Normal recording: green
+          color1 = "#22c55e";   // Green
+          color2 = "#86efac";   // Light green
+          color3 = "rgba(34, 197, 94, 0.1)";
+          speed = "2s";
+        }
 
-      {/* Processing spinner - no rings, just the loader icon */}
+        return (
+          <>
+            <style>
+              {`
+                @keyframes borderFlow {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}
+            </style>
+            {/* Outer glow container */}
+            <div
+              style={{
+                position: "absolute",
+                inset: "-2px",
+                borderRadius: "20px",
+                overflow: "hidden",
+                pointerEvents: "none",
+              }}
+            >
+              {/* Rotating gradient that creates the chasing effect */}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: "-50%",
+                  background: `conic-gradient(from 0deg, transparent 0deg, transparent 30deg, ${color3} 80deg, ${color1} 150deg, ${color2} 180deg, ${color1} 210deg, ${color3} 280deg, transparent 330deg, transparent 360deg)`,
+                  animation: `borderFlow ${speed} linear infinite`,
+                }}
+              />
+            </div>
+            {/* Inner black fill to mask center, creating border effect */}
+            <div
+              style={{
+                position: "absolute",
+                inset: "0",
+                borderRadius: "18px",
+                backgroundColor: "rgba(0, 0, 0, 0.9)",
+                pointerEvents: "none",
+              }}
+            />
+          </>
+        );
+      })()}
 
-      {/* Icon container - only show for recording/processing */}
+      {/* Icon container - only show for active states */}
       {status !== "idle" && (
         <div
           style={{
@@ -814,24 +884,82 @@ export const Pill: React.FC = () => {
             color: "white",
             width: "100%",
             height: "100%",
-            gap: "8px", // Space between bars and loader
+            gap: "6px",
+            padding: "0 4px",
           }}
         >
-          {status === "processing" ? (
+          {status === "speaking" ? (
+            /* Speaking: Lexi is talking — speaker icon with animated sound arcs */
             <>
-              {/* Static bars during processing */}
+              <style>
+                {`
+                  @keyframes speakPulse1 {
+                    0%, 100% { opacity: 0.3; transform: scale(0.95); }
+                    50% { opacity: 1; transform: scale(1.05); }
+                  }
+                  @keyframes speakPulse2 {
+                    0%, 100% { opacity: 0.2; transform: scale(0.9); }
+                    50% { opacity: 0.8; transform: scale(1.1); }
+                  }
+                `}
+              </style>
+              <svg width={50} height={26} viewBox="0 0 50 26" fill="none">
+                {/* Speaker icon */}
+                <path
+                  d="M12 8L8 11H5v4h3l4 3V8z"
+                  fill="white"
+                  opacity={0.9}
+                />
+                {/* Sound arc 1 — close */}
+                <path
+                  d="M18 9.5c1.5 1.2 2.5 3 2.5 5s-1 3.8-2.5 5"
+                  stroke="white"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  fill="none"
+                  opacity={0.8}
+                  style={{
+                    animation: "speakPulse1 1.2s ease-in-out infinite",
+                    transformOrigin: "16px 13px",
+                  }}
+                />
+                {/* Sound arc 2 — far */}
+                <path
+                  d="M22 6.5c2.5 2 4 5 4 7.5s-1.5 5.5-4 7.5"
+                  stroke="white"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  fill="none"
+                  opacity={0.5}
+                  style={{
+                    animation: "speakPulse2 1.2s ease-in-out 0.3s infinite",
+                    transformOrigin: "20px 13px",
+                  }}
+                />
+                {/* Dots that pulse — representing speech */}
+                <circle cx="33" cy="10" r="1.5" fill="white" opacity={0.6}
+                  style={{ animation: "speakPulse1 0.8s ease-in-out infinite" }} />
+                <circle cx="37" cy="13" r="1.5" fill="white" opacity={0.8}
+                  style={{ animation: "speakPulse1 0.8s ease-in-out 0.15s infinite" }} />
+                <circle cx="41" cy="10" r="1.5" fill="white" opacity={0.6}
+                  style={{ animation: "speakPulse1 0.8s ease-in-out 0.3s infinite" }} />
+              </svg>
+            </>
+          ) : status === "processing" ? (
+            <>
+              {/* Processing: bars + loader */}
               <WaveformIcon
-                size={22}
-                color="white"
-                audioLevels={[]} // Empty array will show static bars
+                width={52}
+                height={22}
+                audioLevels={[]}
               />
-              {/* Loader next to bars */}
               <LoaderIcon size={14} color="white" />
             </>
           ) : (
+            /* Recording: bars fill the pill */
             <WaveformIcon
-              size={26}
-              color="white"
+              width={56}
+              height={26}
               audioLevels={smoothedLevels}
             />
           )}
@@ -866,7 +994,7 @@ const PillApp: React.FC = () => {
         left: 0,
         right: 0,
         bottom: 0,
-        borderRadius: "20px", // Match the pill's maximum border radius
+        borderRadius: "18px",
       }}
     >
       <Pill />
