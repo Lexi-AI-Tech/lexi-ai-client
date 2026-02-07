@@ -26,9 +26,11 @@ use tauri::{AppHandle, Emitter};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionResponse {
     pub action_type: String,
-    pub value: String,
-    /// Base64-encoded MP3 when action_type is voice.
+    /// Result text (for text actions; empty for voice when server returns audio).
     #[serde(default)]
+    pub value: String,
+    /// Base64-encoded MP3 for voice actions (server runs TTS; key in JSON is "audio").
+    #[serde(default, alias = "audio")]
     pub audio_base64: Option<String>,
 }
 

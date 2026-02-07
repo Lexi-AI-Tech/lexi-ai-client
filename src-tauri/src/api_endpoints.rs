@@ -102,13 +102,15 @@ pub mod action {
     }
 }
 
-/// TTS endpoints (normal speak only: POST form, full audio response).
+/// TTS endpoints (used when TTS is requested separately; voice actions get audio in action response).
 pub mod tts {
     use super::*;
 
+    #[allow(dead_code)]
     pub const SPEAK: &str = "/tts/speak";
 
     /// Build TTS speak endpoint URL (POST form: text).
+    #[allow(dead_code)]
     pub fn speak_url() -> String {
         format!(
             "{}{}{}",

@@ -22,8 +22,7 @@ impl TtsService {
         }
     }
 
-    /// Play audio from base64-encoded string (e.g. legacy action response).
-    #[allow(dead_code)]
+    /// Play audio from base64-encoded string (e.g. voice action response from server).
     pub fn play_audio_base64(&self, audio_base64: &str) -> Result<(), Box<dyn Error>> {
         let audio_bytes = STANDARD.decode(audio_base64.trim())?;
         self.play_audio_bytes(&audio_bytes)
@@ -69,7 +68,8 @@ impl TtsService {
         Ok(())
     }
 
-    /// Fetches TTS from POST /tts/speak (form body), waits for complete audio, then plays.
+    /// Fetches TTS from POST /tts/speak (form body). Kept for optional standalone use; voice actions use server-returned audio.
+    #[allow(dead_code)]
     pub async fn play_tts_speak(
         &self,
         text: &str,
