@@ -5,6 +5,7 @@ import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { formatDateTime } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import "./home/home.css";
 
 
 export const ActionsPage: React.FC = () => {
@@ -19,8 +20,51 @@ export const ActionsPage: React.FC = () => {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioProgress, setAudioProgress] = useState<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const pageSize = 20;
+
+  const openDeleteConfirm = (actionId: string) => {
+    setDeleteConfirmId(actionId);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (!deletingId) setDeleteConfirmId(null);
+  };
+
+  const handleConfirmDeleteAction = async () => {
+    if (!deleteConfirmId) return;
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setError("Please sign in to delete actions");
+      return;
+    }
+
+    setDeletingId(deleteConfirmId);
+    try {
+      await invoke("delete_action_history", { actionId: deleteConfirmId });
+      setDeleteConfirmId(null);
+      await loadActionHistory();
+    } catch (err: any) {
+      const errorMessage = err?.message || "Failed to delete action";
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("Not authenticated");
+
+      if (isAuthError) {
+        console.log("Auth error deleting action, clearing auth");
+        authStore.clearAuth();
+        setError(null);
+      } else {
+        setError(errorMessage);
+      }
+      alert(errorMessage);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handlePlayActionAudio = (actionId: string, audioUrl: string) => {
     if (playingId === actionId && audioRef.current) {
@@ -111,39 +155,6 @@ export const ActionsPage: React.FC = () => {
   useEffect(() => {
     loadConfig();
   }, []);
-
-  const handleDeleteAction = async (actionId: string) => {
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      setError("Please sign in to delete actions");
-      return;
-    }
-
-    if (!confirm("Are you sure you want to delete this action?")) {
-      return;
-    }
-
-    try {
-      await invoke("delete_action_history", { actionId });
-      await loadActionHistory();
-    } catch (err: any) {
-      const errorMessage = err?.message || "Failed to delete action";
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("403") ||
-        errorMessage.includes("Unauthorized") ||
-        errorMessage.includes("Not authenticated");
-
-      if (isAuthError) {
-        console.log("Auth error deleting action, clearing auth");
-        authStore.clearAuth();
-        setError(null);
-      } else {
-        setError(errorMessage);
-      }
-    }
-  };
-
-
 
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
@@ -540,7 +551,8 @@ export const ActionsPage: React.FC = () => {
                     </div>
                     <button
                       className="transcript-btn"
-                      onClick={() => handleDeleteAction(action.id)}
+                      onClick={() => openDeleteConfirm(action.id)}
+                      disabled={!!deletingId}
                       style={{
                         padding: "0.5rem 1rem",
                         fontSize: "0.8125rem",
@@ -549,18 +561,23 @@ export const ActionsPage: React.FC = () => {
                         border: "1px solid #fecaca",
                         borderRadius: "0.5rem",
                         color: "#b91c1c",
-                        cursor: "pointer",
+                        cursor: deletingId ? "not-allowed" : "pointer",
                         transition: "all 0.2s ease",
                         whiteSpace: "nowrap",
                         marginLeft: "1rem",
+                        opacity: deletingId ? 0.6 : 1,
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#fef2f2";
-                        e.currentTarget.style.borderColor = "#fca5a5";
+                        if (!deletingId) {
+                          e.currentTarget.style.background = "#fef2f2";
+                          e.currentTarget.style.borderColor = "#fca5a5";
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "#ffffff";
-                        e.currentTarget.style.borderColor = "#fecaca";
+                        if (!deletingId) {
+                          e.currentTarget.style.background = "#ffffff";
+                          e.currentTarget.style.borderColor = "#fecaca";
+                        }
                       }}
                     >
                       Delete
@@ -814,6 +831,42 @@ export const ActionsPage: React.FC = () => {
             )}
           </>
         )}
+
+      {deleteConfirmId && (
+        <div
+          className="delete-modal-overlay"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Delete action?</h3>
+            <p>
+              This action cannot be undone. The action history entry will be
+              permanently removed.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={closeDeleteConfirm}
+                disabled={!!deletingId}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleConfirmDeleteAction}
+                disabled={!!deletingId}
+              >
+                {deletingId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
