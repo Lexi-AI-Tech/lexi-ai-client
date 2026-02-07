@@ -16,6 +16,10 @@ pub struct ActionHistory {
     pub app_name: Option<String>,
     pub selected_text: Option<String>,
     pub action_type: String,
+    pub output_value: Option<String>,
+    pub output_audio_file_path: Option<String>,
+    pub output_audio_file_size: Option<i32>,
+    pub output_audio_file_url: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Play, Pause } from "lucide-react";
 import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { formatDateTime } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import "./home/home.css";
 
 
 export const ActionsPage: React.FC = () => {
@@ -15,8 +17,79 @@ export const ActionsPage: React.FC = () => {
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [audioProgress, setAudioProgress] = useState<number>(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const pageSize = 20;
+
+  const openDeleteConfirm = (actionId: string) => {
+    setDeleteConfirmId(actionId);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (!deletingId) setDeleteConfirmId(null);
+  };
+
+  const handleConfirmDeleteAction = async () => {
+    if (!deleteConfirmId) return;
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+      setError("Please sign in to delete actions");
+      return;
+    }
+
+    setDeletingId(deleteConfirmId);
+    try {
+      await invoke("delete_action_history", { actionId: deleteConfirmId });
+      setDeleteConfirmId(null);
+      await loadActionHistory();
+    } catch (err: any) {
+      const errorMessage = err?.message || "Failed to delete action";
+      const isAuthError =
+        errorMessage.includes("401") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("Not authenticated");
+
+      if (isAuthError) {
+        console.log("Auth error deleting action, clearing auth");
+        authStore.clearAuth();
+        setError(null);
+      } else {
+        setError(errorMessage);
+      }
+      alert(errorMessage);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handlePlayActionAudio = (actionId: string, audioUrl: string) => {
+    if (playingId === actionId && audioRef.current) {
+      audioRef.current.pause();
+      setPlayingId(null);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    audio.addEventListener("timeupdate", () => {
+      if (audio.duration) {
+        setAudioProgress((audio.currentTime / audio.duration) * 100);
+      }
+    });
+    audio.addEventListener("ended", () => {
+      setPlayingId(null);
+      setAudioProgress(0);
+    });
+    audio.play();
+    setPlayingId(actionId);
+    setAudioProgress(0);
+  };
 
   // Load action history
   const loadActionHistory = async () => {
@@ -82,39 +155,6 @@ export const ActionsPage: React.FC = () => {
   useEffect(() => {
     loadConfig();
   }, []);
-
-  const handleDeleteAction = async (actionId: string) => {
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      setError("Please sign in to delete actions");
-      return;
-    }
-
-    if (!confirm("Are you sure you want to delete this action?")) {
-      return;
-    }
-
-    try {
-      await invoke("delete_action_history", { actionId });
-      await loadActionHistory();
-    } catch (err: any) {
-      const errorMessage = err?.message || "Failed to delete action";
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("403") ||
-        errorMessage.includes("Unauthorized") ||
-        errorMessage.includes("Not authenticated");
-
-      if (isAuthError) {
-        console.log("Auth error deleting action, clearing auth");
-        authStore.clearAuth();
-        setError(null);
-      } else {
-        setError(errorMessage);
-      }
-    }
-  };
-
-
 
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
@@ -260,7 +300,7 @@ export const ActionsPage: React.FC = () => {
         <p
           style={{ fontSize: "14px", color: "#6b7280", marginBottom: "1.5rem" }}
         >
-          Hold this hotkey (or any of these hotkeys) to record a voice command
+          Hold this hotkey combination to record a voice command
           for performing an action.
         </p>
 
@@ -511,7 +551,8 @@ export const ActionsPage: React.FC = () => {
                     </div>
                     <button
                       className="transcript-btn"
-                      onClick={() => handleDeleteAction(action.id)}
+                      onClick={() => openDeleteConfirm(action.id)}
+                      disabled={!!deletingId}
                       style={{
                         padding: "0.5rem 1rem",
                         fontSize: "0.8125rem",
@@ -520,23 +561,188 @@ export const ActionsPage: React.FC = () => {
                         border: "1px solid #fecaca",
                         borderRadius: "0.5rem",
                         color: "#b91c1c",
-                        cursor: "pointer",
+                        cursor: deletingId ? "not-allowed" : "pointer",
                         transition: "all 0.2s ease",
                         whiteSpace: "nowrap",
                         marginLeft: "1rem",
+                        opacity: deletingId ? 0.6 : 1,
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#fef2f2";
-                        e.currentTarget.style.borderColor = "#fca5a5";
+                        if (!deletingId) {
+                          e.currentTarget.style.background = "#fef2f2";
+                          e.currentTarget.style.borderColor = "#fca5a5";
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "#ffffff";
-                        e.currentTarget.style.borderColor = "#fecaca";
+                        if (!deletingId) {
+                          e.currentTarget.style.background = "#ffffff";
+                          e.currentTarget.style.borderColor = "#fecaca";
+                        }
                       }}
                     >
                       Delete
                     </button>
                   </div>
+
+                  {action.selected_text && (
+                    <div
+                      style={{
+                        marginTop: "0.5rem",
+                        paddingTop: "0.5rem",
+                        borderTop: "1px solid #f3f4f6",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "0.75rem",
+                          color: "#9ca3af",
+                          fontWeight: 500,
+                          marginBottom: "0.25rem",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.025em",
+                        }}
+                      >
+                        Input
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.8125rem",
+                          color: "#4b5563",
+                          lineHeight: 1.5,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: "vertical" as const,
+                        }}
+                      >
+                        {action.selected_text}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Text action: show output value. Voice action: show output value + audio player (transcripts-style) */}
+                  {(action.output_value || action.output_audio_file_url) && (
+                    <div
+                      style={{
+                        marginTop: "0.75rem",
+                        paddingTop: "0.75rem",
+                        borderTop: "1px solid #f3f4f6",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "10px",
+                      }}
+                    >
+                      {action.output_audio_file_url && (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <button
+                            onClick={() =>
+                              handlePlayActionAudio(
+                                action.id,
+                                action.output_audio_file_url!
+                              )
+                            }
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "50%",
+                              border: "none",
+                              background:
+                                playingId === action.id ? "#1a1a1a" : "#f3f4f6",
+                              color:
+                                playingId === action.id ? "#fff" : "#6b7280",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              position: "relative",
+                              overflow: "hidden",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (playingId !== action.id) {
+                                e.currentTarget.style.background = "#e5e7eb";
+                                e.currentTarget.style.color = "#374151";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (playingId !== action.id) {
+                                e.currentTarget.style.background = "#f3f4f6";
+                                e.currentTarget.style.color = "#6b7280";
+                              }
+                            }}
+                            title={
+                              playingId === action.id ? "Pause" : "Play audio"
+                            }
+                          >
+                            {playingId === action.id && (
+                              <svg
+                                style={{
+                                  position: "absolute",
+                                  width: "28px",
+                                  height: "28px",
+                                  transform: "rotate(-90deg)",
+                                }}
+                              >
+                                <circle
+                                  cx="14"
+                                  cy="14"
+                                  r="12"
+                                  fill="none"
+                                  stroke="rgba(255,255,255,0.2)"
+                                  strokeWidth="2"
+                                />
+                                <circle
+                                  cx="14"
+                                  cy="14"
+                                  r="12"
+                                  fill="none"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  strokeDasharray={`${audioProgress * 0.754} 75.4`}
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            )}
+                            {playingId === action.id ? (
+                              <Pause size={12} fill="currentColor" />
+                            ) : (
+                              <Play
+                                size={12}
+                                fill="currentColor"
+                                style={{ marginLeft: "2px" }}
+                              />
+                            )}
+                          </button>
+                        </div>
+                      )}
+                      {action.output_value && (
+                        <div
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: "0.8125rem",
+                            color: "#4b5563",
+                            lineHeight: 1.5,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 4,
+                            WebkitBoxOrient: "vertical" as const,
+                          }}
+                        >
+                          {action.output_value}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div
                     style={{
@@ -546,6 +752,7 @@ export const ActionsPage: React.FC = () => {
                       color: "#9ca3af",
                       borderTop: "1px solid #f3f4f6",
                       paddingTop: "0.75rem",
+                      marginTop: "0.75rem",
                     }}
                   >
                     <span>{formatDateTime(action.created_at)}</span>
@@ -624,6 +831,42 @@ export const ActionsPage: React.FC = () => {
             )}
           </>
         )}
+
+      {deleteConfirmId && (
+        <div
+          className="delete-modal-overlay"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Delete action?</h3>
+            <p>
+              This action cannot be undone. The action history entry will be
+              permanently removed.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={closeDeleteConfirm}
+                disabled={!!deletingId}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleConfirmDeleteAction}
+                disabled={!!deletingId}
+              >
+                {deletingId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

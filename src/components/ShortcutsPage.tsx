@@ -4,6 +4,7 @@ import { Search, RefreshCw, Plus, X, Edit, Trash2 } from "lucide-react";
 import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import "./home/home.css";
 
 export const ShortcutsPage: React.FC = () => {
   const authStore = useAuthStore();
@@ -19,6 +20,8 @@ export const ShortcutsPage: React.FC = () => {
   const [hoveredShortcutId, setHoveredShortcutId] = useState<string | null>(
     null,
   );
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Load shortcuts
   const loadShortcuts = async () => {
@@ -168,21 +171,28 @@ export const ShortcutsPage: React.FC = () => {
     }
   };
 
-  const handleDeleteShortcut = async (shortcutId: string) => {
+  const openDeleteConfirm = (shortcutId: string) => {
+    setDeleteConfirmId(shortcutId);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (!deletingId) setDeleteConfirmId(null);
+  };
+
+  const handleConfirmDeleteShortcut = async () => {
+    if (!deleteConfirmId) return;
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
       setError("Please sign in to delete shortcuts");
       return;
     }
 
-    if (!confirm("Are you sure you want to delete this shortcut?")) {
-      return;
-    }
-
+    setDeletingId(deleteConfirmId);
     try {
       setError(null);
       await invoke("delete_shortcut", {
-        shortcutId,
+        shortcutId: deleteConfirmId,
       });
+      setDeleteConfirmId(null);
       await loadShortcuts();
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to delete shortcut";
@@ -199,6 +209,9 @@ export const ShortcutsPage: React.FC = () => {
       } else {
         setError(errorMessage);
       }
+      alert(errorMessage);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -856,24 +869,30 @@ export const ShortcutsPage: React.FC = () => {
                           <Edit size={14} />
                         </button>
                         <button
-                          onClick={() => handleDeleteShortcut(shortcut.id)}
+                          onClick={() => openDeleteConfirm(shortcut.id)}
+                          disabled={!!deletingId}
                           style={{
                             padding: "6px",
                             backgroundColor: "#fef2f2",
                             border: "none",
                             borderRadius: "4px",
-                            cursor: "pointer",
+                            cursor: deletingId ? "not-allowed" : "pointer",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             color: "#ef4444",
                             transition: "all 0.2s ease",
+                            opacity: deletingId ? 0.6 : 1,
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "#fee2e2";
+                            if (!deletingId) {
+                              e.currentTarget.style.backgroundColor = "#fee2e2";
+                            }
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "#fef2f2";
+                            if (!deletingId) {
+                              e.currentTarget.style.backgroundColor = "#fef2f2";
+                            }
                           }}
                         >
                           <Trash2 size={14} />
@@ -907,6 +926,42 @@ export const ShortcutsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {deleteConfirmId && (
+        <div
+          className="delete-modal-overlay"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Delete shortcut?</h3>
+            <p>
+              This action cannot be undone. The shortcut will be permanently
+              removed.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={closeDeleteConfirm}
+                disabled={!!deletingId}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleConfirmDeleteShortcut}
+                disabled={!!deletingId}
+              >
+                {deletingId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

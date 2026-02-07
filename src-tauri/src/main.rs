@@ -284,36 +284,36 @@ pub fn main() {
 
 
 
-            // Load hotkeys from Tauri Store (server provides defaults)
+            // Load hotkeys from server (no local persistence; empty if server unreachable)
             let initial_config = {
                 let app_handle_for_store = app_handle.clone();
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
                     let config = get_app_config(app_handle_for_store).await
-                        .unwrap_or_else(|_| {
-                            println!("⚠️  Config not available, using empty hotkeys");
+                        .unwrap_or_else(|e| {
+                            println!("⚠️  Server config unavailable ({}), using empty hotkeys", e);
                             crate::commands::app_config::AppConfig::default()
                         });
                     config.hotkeys.unwrap_or_default()
                 })
             };
-            println!("🔑 Loaded hotkeys from store: {:?}", initial_config);
+            println!("🔑 Recording hotkeys: {:?}", initial_config);
             let (config_tx, config_rx) = watch::channel(initial_config.clone());
 
-            // Load action hotkeys from config (default: empty)
+            // Load action hotkeys from server (empty if server unreachable)
             let initial_action_hotkeys = {
                 let app_handle_for_store = app_handle.clone();
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
                     let config = get_app_config(app_handle_for_store).await
-                        .unwrap_or_else(|_| {
-                            println!("⚠️  Config not available, using default action hotkey");
+                        .unwrap_or_else(|e| {
+                            println!("⚠️  Server config unavailable ({}), using empty action hotkeys", e);
                             crate::commands::app_config::AppConfig::default()
                         });
                     config.action_hotkeys.unwrap_or_default()
                 })
             };
-            println!("🎯 Loaded action hotkeys from store: {:?}", initial_action_hotkeys);
+            println!("🎯 Action hotkeys: {:?}", initial_action_hotkeys);
             let (action_hotkey_tx, action_hotkey_rx) = watch::channel(initial_action_hotkeys);
 
             // Create recording state and manage it

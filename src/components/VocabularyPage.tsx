@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Search, RefreshCw, Plus, X, Trash2 } from "lucide-react";
 import type { TauriAppConfig } from "../types";
+import "./home/home.css";
 
 export const VocabularyPage: React.FC = () => {
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
@@ -15,6 +16,10 @@ export const VocabularyPage: React.FC = () => {
   const [hoveredVocabularyValue, setHoveredVocabularyValue] = useState<
     string | null
   >(null);
+  const [deleteConfirmValue, setDeleteConfirmValue] = useState<string | null>(
+    null,
+  );
+  const [deletingValue, setDeletingValue] = useState<string | null>(null);
 
   const vocabulary = config?.vocabulary || [];
 
@@ -93,18 +98,34 @@ export const VocabularyPage: React.FC = () => {
     }
   };
 
-  // Delete vocabulary item
-  const handleDeleteVocabulary = async (value: string) => {
+  const openDeleteConfirm = (value: string) => {
+    setDeleteConfirmValue(value);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (!deletingValue) setDeleteConfirmValue(null);
+  };
+
+  const handleConfirmDeleteVocabulary = async () => {
+    if (!deleteConfirmValue) return;
+
     const currentVocabulary = vocabulary || [];
     const updatedVocabulary = currentVocabulary.filter(
-      (item) => item !== value,
+      (item) => item !== deleteConfirmValue,
     );
 
+    setDeletingValue(deleteConfirmValue);
     try {
       await updateConfig({ vocabulary: updatedVocabulary });
+      setDeleteConfirmValue(null);
       setError(null);
     } catch (err) {
       // Error already set by updateConfig
+      alert(
+        (err as Error)?.message || "Failed to remove vocabulary item",
+      );
+    } finally {
+      setDeletingValue(null);
     }
   };
 
@@ -522,28 +543,29 @@ export const VocabularyPage: React.FC = () => {
                   }}
                 >
                   <button
-                    onClick={() => handleDeleteVocabulary(item)}
-                    disabled={isUpdating}
+                    onClick={() => openDeleteConfirm(item)}
+                    disabled={isUpdating || !!deletingValue}
                     style={{
                       padding: "6px",
                       backgroundColor: "#fef2f2",
                       border: "none",
                       borderRadius: "4px",
-                      cursor: isUpdating ? "not-allowed" : "pointer",
+                      cursor:
+                        isUpdating || deletingValue ? "not-allowed" : "pointer",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       color: "#ef4444",
                       transition: "all 0.2s ease",
-                      opacity: isUpdating ? 0.5 : 1,
+                      opacity: isUpdating || deletingValue ? 0.5 : 1,
                     }}
                     onMouseEnter={(e) => {
-                      if (!isUpdating) {
+                      if (!isUpdating && !deletingValue) {
                         e.currentTarget.style.backgroundColor = "#fee2e2";
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!isUpdating) {
+                      if (!isUpdating && !deletingValue) {
                         e.currentTarget.style.backgroundColor = "#fef2f2";
                       }
                     }}
@@ -568,6 +590,42 @@ export const VocabularyPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {deleteConfirmValue && (
+        <div
+          className="delete-modal-overlay"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Remove vocabulary item?</h3>
+            <p>
+              This will permanently remove &quot;{deleteConfirmValue}&quot; from
+              your vocabulary.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={closeDeleteConfirm}
+                disabled={!!deletingValue}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleConfirmDeleteVocabulary}
+                disabled={!!deletingValue}
+              >
+                {deletingValue ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

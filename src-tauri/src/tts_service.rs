@@ -1,108 +1,51 @@
-//! Text-to-Speech Service Module
+//! Audio playback for voice actions.
 //!
-//! This module handles text-to-speech conversion by calling the Lexi AI Server TTS endpoint.
-//! It converts text to speech and plays the audio output.
+//! Plays base64 audio from the action response (TTS is done on the server).
 
-use crate::api_endpoints::tts;
-use crate::commands::auth::get_auth_token_async;
-use crate::utils;
-use reqwest::multipart;
+use base64::{engine::general_purpose::STANDARD, Engine};
 use std::error::Error;
 use std::fs;
 use std::process::Command;
 use tauri::AppHandle;
 use tempfile::TempDir;
 
-/// Text-to-Speech service using Lexi AI Server
 pub struct TtsService {
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
 }
 
 impl TtsService {
-    /// Creates a new TTS service instance
-    ///
-    /// # Arguments
-    /// * `app_handle` - Tauri AppHandle for accessing auth token and config
-    ///
-    /// # Returns
-    /// * `TtsService` - A new TTS service instance
     pub fn new(app_handle: AppHandle) -> Self {
-        Self { app_handle }
+        Self {
+            _app_handle: app_handle,
+        }
     }
 
-    /// Converts text to speech and plays it
-    ///
-    /// # Arguments
-    /// * `text` - The text to convert to speech
-    /// * `voice_id` - Optional voice ID (not used currently, server uses default)
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the text was successfully converted and played
-    /// * `Err(Box<dyn Error>)` - If there was an error during conversion or playback
-    pub async fn speak(&self, text: &str, _voice_id: Option<String>) -> Result<(), Box<dyn Error>> {
-        if text.trim().is_empty() {
+    /// Play audio from base64-encoded string (e.g. voice action response from server).
+    pub fn play_audio_base64(&self, audio_base64: &str) -> Result<(), Box<dyn Error>> {
+        let audio_bytes = STANDARD.decode(audio_base64.trim())?;
+        self.play_audio_bytes(&audio_bytes)
+    }
+
+    /// Plays raw audio bytes (e.g. MP3). No network call.
+    pub fn play_audio_bytes(&self, audio_bytes: &[u8]) -> Result<(), Box<dyn Error>> {
+        if audio_bytes.is_empty() {
             return Ok(());
         }
-
-        println!("🔊 Converting text to speech: '{}'", text);
-
-        // Get authentication token (with automatic refresh if needed)
-        let auth_token = get_auth_token_async(&self.app_handle).await;
-        if auth_token.is_none() {
-            return Err("Authentication required. Please log in.".into());
-        }
-
-        // Create HTTP client
-        let client = reqwest::Client::new();
-
-        // Build multipart form
-        let form = multipart::Form::new().text("text", text.to_string());
-
-        // Build the request URL using centralized endpoint
-        let url = tts::speak_url();
-        utils::log_api_request("Convert text to speech", "POST", &url);
-        let mut request = client.post(&url).multipart(form);
-
-        // Add authorization header
-        if let Some(token) = &auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
-        }
-
-        // Make API request
-        let response = request.send().await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(format!("TTS API error ({}): {}", status, error_text).into());
-        }
-
-        // Get audio bytes
-        let audio_bytes = response.bytes().await?;
-
-        // Save to temporary file and play
         let temp_dir = TempDir::new()?;
         let audio_path = temp_dir.path().join("tts_output.mp3");
-        fs::write(&audio_path, &audio_bytes)?;
+        fs::write(&audio_path, audio_bytes)?;
 
-        // Play audio using macOS `afplay` command
         #[cfg(target_os = "macos")]
         {
             let output = Command::new("afplay").arg(&audio_path).output()?;
-
             if !output.status.success() {
                 let error = String::from_utf8_lossy(&output.stderr);
                 return Err(format!("Failed to play audio: {}", error).into());
             }
         }
 
-        // For other platforms, you might want to use different audio players
         #[cfg(not(target_os = "macos"))]
         {
-            // Try to use system default audio player
             #[cfg(target_os = "linux")]
             {
                 Command::new("mpg123").arg(&audio_path).output()?;
@@ -120,8 +63,6 @@ impl TtsService {
                     .output()?;
             }
         }
-
-        println!("✅ Text-to-speech completed successfully");
         Ok(())
     }
 }
