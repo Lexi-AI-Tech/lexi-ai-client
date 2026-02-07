@@ -27,7 +27,7 @@ use tauri::{AppHandle, Emitter};
 pub struct ActionResponse {
     pub action_type: String,
     pub value: String,
-    /// Base64-encoded MP3 when action_type is voice or text_and_voice.
+    /// Base64-encoded MP3 when action_type is voice.
     #[serde(default)]
     pub audio_base64: Option<String>,
 }
