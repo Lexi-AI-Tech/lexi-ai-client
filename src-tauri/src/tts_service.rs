@@ -1,7 +1,9 @@
 //! TTS playback for actions.
 //!
-//! Decodes and plays base64-encoded audio from the action response.
+//! Supports playing base64-encoded audio or fetching and playing streamed TTS
+//! from the server (POST /api/v1/tts/stream).
 
+use crate::api_endpoints::tts;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::error::Error;
 use std::fs;
@@ -20,6 +22,8 @@ impl TtsService {
         }
     }
 
+    /// Play audio from base64-encoded string (e.g. legacy action response).
+    #[allow(dead_code)]
     pub fn play_audio_base64(&self, audio_base64: &str) -> Result<(), Box<dyn Error>> {
         let audio_bytes = STANDARD.decode(audio_base64.trim())?;
         self.play_audio_bytes(&audio_bytes)
@@ -63,5 +67,33 @@ impl TtsService {
             }
         }
         Ok(())
+    }
+
+    /// Fetches streamed TTS from the server for the given text and plays the audio.
+    /// Uses POST /api/v1/tts/stream; response is streamed and collected then played.
+    pub async fn play_tts_stream(
+        &self,
+        text: &str,
+        auth_token: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        if text.trim().is_empty() {
+            return Ok(());
+        }
+        let url = tts::stream_url();
+        let client = reqwest::Client::new();
+        let res = client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", auth_token))
+            .json(&serde_json::json!({ "text": text }))
+            .send()
+            .await?;
+        if !res.status().is_success() {
+            let status = res.status();
+            let body = res.text().await.unwrap_or_default();
+            return Err(format!("TTS stream failed ({}): {}", status, body).into());
+        }
+        let bytes = res.bytes().await?;
+        let slice: &[u8] = bytes.as_ref();
+        self.play_audio_bytes(slice)
     }
 }

@@ -101,3 +101,20 @@ pub mod action {
         )
     }
 }
+
+/// TTS endpoints
+pub mod tts {
+    use super::*;
+
+    pub const STREAM: &str = "/tts/stream";
+
+    /// Build TTS stream endpoint URL (POST with JSON body { "text": "..." })
+    pub fn stream_url() -> String {
+        format!(
+            "{}{}{}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            STREAM
+        )
+    }
+}
