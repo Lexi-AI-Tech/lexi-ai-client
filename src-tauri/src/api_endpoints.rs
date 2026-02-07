@@ -101,20 +101,3 @@ pub mod action {
         )
     }
 }
-
-/// Text-to-Speech (TTS) endpoints
-pub mod tts {
-    use super::*;
-
-    pub const SPEAK: &str = "/tts/speak";
-
-    /// Build speak endpoint URL
-    pub fn speak_url() -> String {
-        format!(
-            "{}{}{}",
-            config::api_base_url(),
-            super::API_V1_PREFIX,
-            SPEAK
-        )
-    }
-}

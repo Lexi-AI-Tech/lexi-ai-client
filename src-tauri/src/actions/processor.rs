@@ -1,36 +1,23 @@
-//! Action Audio Processor Logic
+//! Action Audio Processor
 //!
-//! This module contains the logic to process recorded audio for actions.
-//! It handles transcription, action execution, and response handling (TTS/Injection).
+//! Processes recorded action audio: sends to server for transcription and action execution.
+//! Handles response by type: play audio (voice), inject text (text), or both (text_and_voice).
 
 use crate::actions::service::ActionService;
-
-use crate::commands::auth::get_auth_token_async;
 use crate::cursor_context::get_cursor_context;
-use tauri::{AppHandle, Emitter};
-
 use crate::text_injector::TextInjector;
 use crate::tts_service::TtsService;
+use tauri::{AppHandle, Emitter};
 
-/// Process action audio by transcribing it and executing the action
+/// Process recorded action audio: send to server, then handle response by action type.
 pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
     println!(
         "🎯 Processing action audio, size: {} bytes",
         audio_data.len()
     );
 
-    // Notify frontend that action processing has started
     app_handle.emit("processing_start", ()).unwrap_or_default();
 
-    // Get authentication token
-    let auth_token = get_auth_token_async(&app_handle).await;
-    if auth_token.is_none() {
-        let error_msg = "Authentication required for actions. Please log in.";
-        app_handle.emit("error", error_msg).unwrap_or_default();
-        return;
-    }
-
-    // Get cursor context
     let cursor_context = get_cursor_context();
 
     // Perform the action directly with audio data
@@ -45,23 +32,21 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             // Handle the response based on action type
             match action_response.action_type.as_str() {
                 "voice" => {
-                    // Play audio from single-trip response if present, else fall back to TTS API
-                    println!("🔊 Voice action - reading text");
+                    println!("🔊 Voice action - playing audio from response");
                     app_handle.emit("tts_speaking", ()).unwrap_or_default();
                     let tts_service = TtsService::new(app_handle.clone());
-                    let played = if let Some(ref b64) = action_response.audio_base64 {
-                        tts_service.play_audio_base64(b64)
-                    } else {
-                        tts_service.speak(&action_response.value, None).await
-                    };
-                    match played {
-                        Ok(_) => {
-                            app_handle.emit("tts_success", ()).unwrap_or_default();
-                        }
-                        Err(e) => {
-                            eprintln!("❌ TTS/playback failed: {}", e);
+                    match action_response.audio_base64.as_deref() {
+                        Some(b64) => match tts_service.play_audio_base64(b64) {
+                            Ok(_) => app_handle.emit("tts_success", ()).unwrap_or_default(),
+                            Err(e) => {
+                                eprintln!("❌ Playback failed: {}", e);
+                                app_handle.emit("tts_error", e.to_string()).unwrap_or_default();
+                            }
+                        },
+                        None => {
+                            eprintln!("❌ No audio in response");
                             app_handle
-                                .emit("tts_error", e.to_string())
+                                .emit("tts_error", "No audio in response")
                                 .unwrap_or_default();
                         }
                     }
@@ -83,16 +68,12 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     }
                 }
                 "text_and_voice" => {
-                    // Hybrid action: Inject text AND read it (single-trip audio when present)
-                    println!("🗣️📝 Hybrid action - injecting and reading text");
+                    println!("🗣️📝 Hybrid action - injecting text and playing audio");
                     app_handle.emit("tts_speaking", ()).unwrap_or_default();
 
-                    // Inject text first
                     let injector = TextInjector::new();
                     match injector.inject_text(&action_response.value) {
-                        Ok(_) => {
-                            app_handle.emit("injection_success", ()).unwrap_or_default();
-                        }
+                        Ok(_) => app_handle.emit("injection_success", ()).unwrap_or_default(),
                         Err(e) => {
                             eprintln!("❌ Text injection failed: {}", e);
                             app_handle
@@ -101,21 +82,19 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                         }
                     }
 
-                    // Play audio from single-trip response if present, else TTS API
                     let tts_service = TtsService::new(app_handle.clone());
-                    let played = if let Some(ref b64) = action_response.audio_base64 {
-                        tts_service.play_audio_base64(b64)
-                    } else {
-                        tts_service.speak(&action_response.value, None).await
-                    };
-                    match played {
-                        Ok(_) => {
-                            app_handle.emit("tts_success", ()).unwrap_or_default();
-                        }
-                        Err(e) => {
-                            eprintln!("❌ TTS/playback failed: {}", e);
+                    match action_response.audio_base64.as_deref() {
+                        Some(b64) => match tts_service.play_audio_base64(b64) {
+                            Ok(_) => app_handle.emit("tts_success", ()).unwrap_or_default(),
+                            Err(e) => {
+                                eprintln!("❌ Playback failed: {}", e);
+                                app_handle.emit("tts_error", e.to_string()).unwrap_or_default();
+                            }
+                        },
+                        None => {
+                            eprintln!("❌ No audio in response");
                             app_handle
-                                .emit("tts_error", e.to_string())
+                                .emit("tts_error", "No audio in response")
                                 .unwrap_or_default();
                         }
                     }

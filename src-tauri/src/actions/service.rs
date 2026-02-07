@@ -23,12 +23,11 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
 /// Action response from the server.
-/// For voice/text_and_voice, server may include audio_base64 (MP3) so client does not need a second TTS call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionResponse {
     pub action_type: String,
     pub value: String,
-    /// Base64-encoded MP3 when action_type is voice or text_and_voice (single-trip response).
+    /// Base64-encoded MP3 when action_type is voice or text_and_voice.
     #[serde(default)]
     pub audio_base64: Option<String>,
 }
@@ -50,31 +49,7 @@ impl ActionService {
         }
     }
 
-    /// Performs an action based on the action command and returns the action response.
-    ///
-    /// This function:
-    /// 1. Gets the current app name from the provided cursor context
-    /// 2. Gets the selected text from the cursor context (if available)
-    /// 3. Sends the action command, app name, and selected text to the server
-    /// 4. Returns the action response with action_type and value
-    ///
-    /// # Arguments
-    /// * `action_command` - The action command extracted from the transcription
-    ///                      (e.g., "summarise this text", "do something")
-    /// * `app_handle` - Tauri AppHandle for accessing state and making API calls
-    /// * `cursor_context` - Optional cursor context (contains app name and selected text)
-    ///
-    /// # Returns
-    /// * `Option<ActionResponse>` - The action response with action_type and value, or None if the action failed
-    /// Performs an action based on the audio data and returns the action response.
-    ///
-    /// # Arguments
-    /// * `audio_data` - The recorded audio data
-    /// * `app_handle` - Tauri AppHandle for accessing state and making API calls
-    /// * `cursor_context` - Optional cursor context (contains app name and selected text)
-    ///
-    /// # Returns
-    /// * `Option<ActionResponse>` - The action response with action_type and value, or None if the action failed
+    /// Sends audio and context to server; returns action_type, value, and optional audio (base64).
     pub async fn perform_action(
         &self,
         audio_data: Option<Vec<u8>>,
@@ -87,9 +62,6 @@ impl ActionService {
             "🎯 Performing voice action (audio size: {} bytes)",
             audio_data.as_ref().map(|d| d.len()).unwrap_or(0)
         );
-
-        // Notify frontend that action processing has started
-        app_handle.emit("processing_start", ()).unwrap_or_default();
 
         // Get app name from cursor context
         let app_name = cursor_context
