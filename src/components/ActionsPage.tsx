@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Play, Pause } from "lucide-react";
 import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { formatDateTime } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
@@ -15,8 +16,36 @@ export const ActionsPage: React.FC = () => {
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [audioProgress, setAudioProgress] = useState<number>(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const pageSize = 20;
+
+  const handlePlayActionAudio = (actionId: string, audioUrl: string) => {
+    if (playingId === actionId && audioRef.current) {
+      audioRef.current.pause();
+      setPlayingId(null);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    audio.addEventListener("timeupdate", () => {
+      if (audio.duration) {
+        setAudioProgress((audio.currentTime / audio.duration) * 100);
+      }
+    });
+    audio.addEventListener("ended", () => {
+      setPlayingId(null);
+      setAudioProgress(0);
+    });
+    audio.play();
+    setPlayingId(actionId);
+    setAudioProgress(0);
+  };
 
   // Load action history
   const loadActionHistory = async () => {
@@ -538,49 +567,125 @@ export const ActionsPage: React.FC = () => {
                     </button>
                   </div>
 
+                  {/* Text action: show output value. Voice action: show output value + audio player (transcripts-style) */}
                   {(action.output_value || action.output_audio_file_url) && (
                     <div
                       style={{
                         marginTop: "0.75rem",
                         paddingTop: "0.75rem",
                         borderTop: "1px solid #f3f4f6",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "10px",
                       }}
                     >
+                      {action.output_audio_file_url && (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <button
+                            onClick={() =>
+                              handlePlayActionAudio(
+                                action.id,
+                                action.output_audio_file_url!
+                              )
+                            }
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "50%",
+                              border: "none",
+                              background:
+                                playingId === action.id ? "#1a1a1a" : "#f3f4f6",
+                              color:
+                                playingId === action.id ? "#fff" : "#6b7280",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              position: "relative",
+                              overflow: "hidden",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (playingId !== action.id) {
+                                e.currentTarget.style.background = "#e5e7eb";
+                                e.currentTarget.style.color = "#374151";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (playingId !== action.id) {
+                                e.currentTarget.style.background = "#f3f4f6";
+                                e.currentTarget.style.color = "#6b7280";
+                              }
+                            }}
+                            title={
+                              playingId === action.id ? "Pause" : "Play audio"
+                            }
+                          >
+                            {playingId === action.id && (
+                              <svg
+                                style={{
+                                  position: "absolute",
+                                  width: "28px",
+                                  height: "28px",
+                                  transform: "rotate(-90deg)",
+                                }}
+                              >
+                                <circle
+                                  cx="14"
+                                  cy="14"
+                                  r="12"
+                                  fill="none"
+                                  stroke="rgba(255,255,255,0.2)"
+                                  strokeWidth="2"
+                                />
+                                <circle
+                                  cx="14"
+                                  cy="14"
+                                  r="12"
+                                  fill="none"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  strokeDasharray={`${audioProgress * 0.754} 75.4`}
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            )}
+                            {playingId === action.id ? (
+                              <Pause size={12} fill="currentColor" />
+                            ) : (
+                              <Play
+                                size={12}
+                                fill="currentColor"
+                                style={{ marginLeft: "2px" }}
+                              />
+                            )}
+                          </button>
+                        </div>
+                      )}
                       {action.output_value && (
                         <div
                           style={{
+                            flex: 1,
+                            minWidth: 0,
                             fontSize: "0.8125rem",
                             color: "#4b5563",
                             lineHeight: 1.5,
-                            marginBottom: action.output_audio_file_url
-                              ? "0.5rem"
-                              : 0,
-                            maxHeight: "4.5em",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             display: "-webkit-box",
-                            WebkitLineClamp: 3,
+                            WebkitLineClamp: 4,
                             WebkitBoxOrient: "vertical" as const,
                           }}
                         >
-                          {action.output_value.length > 200
-                            ? `${action.output_value.slice(0, 200)}…`
-                            : action.output_value}
+                          {action.output_value}
                         </div>
-                      )}
-                      {action.output_audio_file_url && (
-                        <audio
-                          controls
-                          src={action.output_audio_file_url}
-                          style={{
-                            width: "100%",
-                            maxWidth: "320px",
-                            height: "32px",
-                            marginTop: "0.25rem",
-                          }}
-                        >
-                          Your browser does not support the audio element.
-                        </audio>
                       )}
                     </div>
                   )}
