@@ -289,7 +289,7 @@ export const ActionsPage: React.FC = () => {
         <p
           style={{ fontSize: "14px", color: "#6b7280", marginBottom: "1.5rem" }}
         >
-          Hold this hotkey (or any of these hotkeys) to record a voice command
+          Hold this hotkey combination to record a voice command
           for performing an action.
         </p>
 
