@@ -283,6 +283,10 @@ export interface ActionHistory {
   app_name: string | null;
   selected_text: string | null;
   action_type: string;
+  output_value: string | null;
+  output_audio_file_path: string | null;
+  output_audio_file_size: number | null;
+  output_audio_file_url: string | null;
   created_at: string;
   updated_at: string;
 }

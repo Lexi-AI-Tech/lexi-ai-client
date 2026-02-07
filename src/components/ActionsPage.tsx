@@ -538,6 +538,53 @@ export const ActionsPage: React.FC = () => {
                     </button>
                   </div>
 
+                  {(action.output_value || action.output_audio_file_url) && (
+                    <div
+                      style={{
+                        marginTop: "0.75rem",
+                        paddingTop: "0.75rem",
+                        borderTop: "1px solid #f3f4f6",
+                      }}
+                    >
+                      {action.output_value && (
+                        <div
+                          style={{
+                            fontSize: "0.8125rem",
+                            color: "#4b5563",
+                            lineHeight: 1.5,
+                            marginBottom: action.output_audio_file_url
+                              ? "0.5rem"
+                              : 0,
+                            maxHeight: "4.5em",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical" as const,
+                          }}
+                        >
+                          {action.output_value.length > 200
+                            ? `${action.output_value.slice(0, 200)}…`
+                            : action.output_value}
+                        </div>
+                      )}
+                      {action.output_audio_file_url && (
+                        <audio
+                          controls
+                          src={action.output_audio_file_url}
+                          style={{
+                            width: "100%",
+                            maxWidth: "320px",
+                            height: "32px",
+                            marginTop: "0.25rem",
+                          }}
+                        >
+                          Your browser does not support the audio element.
+                        </audio>
+                      )}
+                    </div>
+                  )}
+
                   <div
                     style={{
                       display: "flex",
@@ -546,6 +593,7 @@ export const ActionsPage: React.FC = () => {
                       color: "#9ca3af",
                       borderTop: "1px solid #f3f4f6",
                       paddingTop: "0.75rem",
+                      marginTop: "0.75rem",
                     }}
                   >
                     <span>{formatDateTime(action.created_at)}</span>
