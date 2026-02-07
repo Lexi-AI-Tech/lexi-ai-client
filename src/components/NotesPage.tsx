@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
+import "./home/home.css";
 
 type ViewMode = "list" | "grid";
 
@@ -21,6 +22,8 @@ export const NotesPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form state
   const [content, setContent] = useState("");
@@ -91,16 +94,26 @@ export const NotesPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (noteId: string) => {
-    if (!confirm("Are you sure you want to delete this note?")) {
-      return;
-    }
+  const openDeleteConfirm = (noteId: string) => {
+    setDeleteConfirmId(noteId);
+  };
 
+  const closeDeleteConfirm = () => {
+    if (!deletingId) setDeleteConfirmId(null);
+  };
+
+  const handleConfirmDeleteNote = async () => {
+    if (!deleteConfirmId) return;
+
+    setDeletingId(deleteConfirmId);
     try {
-      await invoke("delete_note", { noteId });
+      await invoke("delete_note", { noteId: deleteConfirmId });
+      setDeleteConfirmId(null);
       await fetchNotes();
     } catch (err) {
       alert(`Failed to delete note: ${err}`);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -542,24 +555,30 @@ export const NotesPage: React.FC = () => {
                     <Edit size={14} />
                   </button>
                   <button
-                    onClick={() => handleDelete(note.id)}
+                    onClick={() => openDeleteConfirm(note.id)}
+                    disabled={!!deletingId}
                     style={{
                       padding: "6px",
                       backgroundColor: "#fef2f2",
                       border: "none",
                       borderRadius: "4px",
-                      cursor: "pointer",
+                      cursor: deletingId ? "not-allowed" : "pointer",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       color: "#ef4444",
                       transition: "all 0.2s ease",
+                      opacity: deletingId ? 0.6 : 1,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#fee2e2";
+                      if (!deletingId) {
+                        e.currentTarget.style.backgroundColor = "#fee2e2";
+                      }
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "#fef2f2";
+                      if (!deletingId) {
+                        e.currentTarget.style.backgroundColor = "#fef2f2";
+                      }
                     }}
                   >
                     <Trash2 size={14} />
@@ -704,6 +723,42 @@ export const NotesPage: React.FC = () => {
                 }}
               >
                 {isCreating ? "Updating..." : "Update"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmId && (
+        <div
+          className="delete-modal-overlay"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Delete note?</h3>
+            <p>
+              This action cannot be undone. The note will be permanently
+              removed.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={closeDeleteConfirm}
+                disabled={!!deletingId}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleConfirmDeleteNote}
+                disabled={!!deletingId}
+              >
+                {deletingId ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
