@@ -22,11 +22,15 @@ use std::error::Error;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
-/// Action response from the server
+/// Action response from the server.
+/// For voice/text_and_voice, server may include audio_base64 (MP3) so client does not need a second TTS call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionResponse {
     pub action_type: String,
     pub value: String,
+    /// Base64-encoded MP3 when action_type is voice or text_and_voice (single-trip response).
+    #[serde(default)]
+    pub audio_base64: Option<String>,
 }
 
 /// Action Service client for performing actions using Lexi AI Server
