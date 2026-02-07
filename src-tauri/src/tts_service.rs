@@ -79,7 +79,7 @@ impl TtsService {
         if text.trim().is_empty() {
             return Ok(());
         }
-        let url = tts::stream_url();
+        let url = tts::speak_stream_url();
         let client = reqwest::Client::new();
         let res = client
             .post(&url)

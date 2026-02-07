@@ -106,15 +106,28 @@ pub mod action {
 pub mod tts {
     use super::*;
 
-    pub const STREAM: &str = "/tts/stream";
+    #[allow(dead_code)]
+    pub const SPEAK: &str = "/tts/speak";
+    pub const SPEAK_STREAM: &str = "/tts/speak/stream";
 
-    /// Build TTS stream endpoint URL (POST with JSON body { "text": "..." })
-    pub fn stream_url() -> String {
+    /// Build TTS speak endpoint URL (POST form: text)
+    #[allow(dead_code)]
+    pub fn speak_url() -> String {
         format!(
             "{}{}{}",
             config::api_base_url(),
             super::API_V1_PREFIX,
-            STREAM
+            SPEAK
+        )
+    }
+
+    /// Build TTS speak/stream endpoint URL (POST JSON body { "text": "..." })
+    pub fn speak_stream_url() -> String {
+        format!(
+            "{}{}{}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            SPEAK_STREAM
         )
     }
 }
