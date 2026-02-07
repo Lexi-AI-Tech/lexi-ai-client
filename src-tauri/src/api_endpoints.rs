@@ -102,32 +102,19 @@ pub mod action {
     }
 }
 
-/// TTS endpoints
+/// TTS endpoints (normal speak only: POST form, full audio response).
 pub mod tts {
     use super::*;
 
-    #[allow(dead_code)]
     pub const SPEAK: &str = "/tts/speak";
-    pub const SPEAK_STREAM: &str = "/tts/speak/stream";
 
-    /// Build TTS speak endpoint URL (POST form: text)
-    #[allow(dead_code)]
+    /// Build TTS speak endpoint URL (POST form: text).
     pub fn speak_url() -> String {
         format!(
             "{}{}{}",
             config::api_base_url(),
             super::API_V1_PREFIX,
             SPEAK
-        )
-    }
-
-    /// Build TTS speak/stream endpoint URL (POST JSON body { "text": "..." })
-    pub fn speak_stream_url() -> String {
-        format!(
-            "{}{}{}",
-            config::api_base_url(),
-            super::API_V1_PREFIX,
-            SPEAK_STREAM
         )
     }
 }

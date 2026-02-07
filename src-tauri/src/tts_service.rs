@@ -1,13 +1,13 @@
 //! TTS playback for actions.
 //!
-//! Supports playing base64-encoded audio or fetching and playing streamed TTS
-//! from the server (POST /api/v1/tts/stream).
+//! Calls POST /api/v1/tts/speak (form body), waits for full audio, then plays.
 
 use crate::api_endpoints::tts;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::error::Error;
 use std::fs;
 use std::process::Command;
+use std::time::Instant;
 use tauri::AppHandle;
 use tempfile::TempDir;
 
@@ -69,9 +69,8 @@ impl TtsService {
         Ok(())
     }
 
-    /// Fetches streamed TTS from the server for the given text and plays the audio.
-    /// Uses POST /api/v1/tts/stream; response is streamed and collected then played.
-    pub async fn play_tts_stream(
+    /// Fetches TTS from POST /tts/speak (form body), waits for complete audio, then plays.
+    pub async fn play_tts_speak(
         &self,
         text: &str,
         auth_token: &str,
@@ -79,21 +78,36 @@ impl TtsService {
         if text.trim().is_empty() {
             return Ok(());
         }
-        let url = tts::speak_stream_url();
+        let t0 = Instant::now();
+        let url = tts::speak_url();
         let client = reqwest::Client::new();
         let res = client
             .post(&url)
             .header("Authorization", format!("Bearer {}", auth_token))
-            .json(&serde_json::json!({ "text": text }))
+            .form(&[("text", text)])
             .send()
             .await?;
         if !res.status().is_success() {
             let status = res.status();
             let body = res.text().await.unwrap_or_default();
-            return Err(format!("TTS stream failed ({}): {}", status, body).into());
+            return Err(format!("TTS failed ({}): {}", status, body).into());
         }
         let bytes = res.bytes().await?;
+        let time_to_response_ms = t0.elapsed().as_millis();
+        let total_bytes = bytes.len();
         let slice: &[u8] = bytes.as_ref();
-        self.play_audio_bytes(slice)
+
+        let play_start = Instant::now();
+        self.play_audio_bytes(slice)?;
+        let playback_duration_ms = play_start.elapsed().as_millis();
+
+        println!(
+            "[TTS] time_to_response_ms={} total_bytes={} playback_duration_ms={} total_elapsed_ms={}",
+            time_to_response_ms,
+            total_bytes,
+            playback_duration_ms,
+            t0.elapsed().as_millis()
+        );
+        Ok(())
     }
 }

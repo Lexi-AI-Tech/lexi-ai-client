@@ -52,12 +52,12 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     match auth_token {
                         Some(token) => {
                             match tts_service
-                                .play_tts_stream(&action_response.value, &token)
+                                .play_tts_speak(&action_response.value, &token)
                                 .await
                             {
                                 Ok(_) => app_handle.emit("tts_success", ()).unwrap_or_default(),
                                 Err(e) => {
-                                    eprintln!("❌ TTS stream playback failed: {}", e);
+                                    eprintln!("❌ TTS playback failed: {}", e);
                                     app_handle
                                         .emit("tts_error", e.to_string())
                                         .unwrap_or_default();
@@ -65,7 +65,7 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                             }
                         }
                         None => {
-                            eprintln!("❌ No auth token for TTS stream");
+                            eprintln!("❌ No auth token for TTS");
                             app_handle
                                 .emit("tts_error", "Authentication required for TTS")
                                 .unwrap_or_default();
