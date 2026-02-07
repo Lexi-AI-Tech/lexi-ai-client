@@ -567,6 +567,43 @@ export const ActionsPage: React.FC = () => {
                     </button>
                   </div>
 
+                  {action.selected_text && (
+                    <div
+                      style={{
+                        marginTop: "0.5rem",
+                        paddingTop: "0.5rem",
+                        borderTop: "1px solid #f3f4f6",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "0.75rem",
+                          color: "#9ca3af",
+                          fontWeight: 500,
+                          marginBottom: "0.25rem",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.025em",
+                        }}
+                      >
+                        Input
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.8125rem",
+                          color: "#4b5563",
+                          lineHeight: 1.5,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: "vertical" as const,
+                        }}
+                      >
+                        {action.selected_text}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Text action: show output value. Voice action: show output value + audio player (transcripts-style) */}
                   {(action.output_value || action.output_audio_file_url) && (
                     <div
