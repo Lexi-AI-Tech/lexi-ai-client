@@ -97,7 +97,8 @@ use commands::hotkey::{
 };
 use commands::notes::{create_note, delete_note, get_note, get_notes, update_note};
 use commands::onboarding::{
-    complete_onboarding, get_onboarding_state, next_onboarding_step, previous_onboarding_step,
+    complete_onboarding, complete_server_onboarding, get_onboarding_state,
+    get_server_onboarding_status, next_onboarding_step, previous_onboarding_step,
     reset_onboarding, set_onboarding_step,
 };
 use commands::rooms::{
@@ -220,6 +221,8 @@ pub fn main() {
             start_oauth_websocket,
             stop_oauth_websocket,
             get_onboarding_state,
+            get_server_onboarding_status,
+            complete_server_onboarding,
             set_onboarding_step,
             next_onboarding_step,
             previous_onboarding_step,
