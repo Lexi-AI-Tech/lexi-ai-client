@@ -361,15 +361,16 @@ export const ShortcutsPage: React.FC = () => {
           >
             Value
           </div>
-          <input
-            type="text"
+          <textarea
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
             placeholder="e.g., 'Hello, this is Lexi'"
+            rows={4}
             style={{
               width: "100%",
               padding: "10px 12px",
               fontSize: "14px",
+              fontFamily: "inherit",
               backgroundColor: "#ffffff",
               border: "1px solid #e5e7eb",
               borderRadius: "8px",
@@ -377,6 +378,8 @@ export const ShortcutsPage: React.FC = () => {
               marginBottom: "16px",
               outline: "none",
               transition: "all 0.2s ease",
+              resize: "vertical",
+              minHeight: "80px",
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = "#d1d5db";
@@ -746,8 +749,7 @@ export const ShortcutsPage: React.FC = () => {
                         >
                           Value
                         </div>
-                        <input
-                          type="text"
+                        <textarea
                           value={editingShortcut.value}
                           onChange={(e) =>
                             setEditingShortcut({
@@ -755,16 +757,20 @@ export const ShortcutsPage: React.FC = () => {
                               value: e.target.value,
                             })
                           }
+                          rows={4}
                           style={{
                             width: "100%",
                             padding: "10px 12px",
                             fontSize: "14px",
+                            fontFamily: "inherit",
                             backgroundColor: "#ffffff",
                             border: "1px solid #e5e7eb",
                             borderRadius: "8px",
                             color: "#111827",
                             outline: "none",
                             transition: "all 0.2s ease",
+                            resize: "vertical",
+                            minHeight: "80px",
                           }}
                           onFocus={(e) => {
                             e.currentTarget.style.borderColor = "#d1d5db";
@@ -913,6 +919,8 @@ export const ShortcutsPage: React.FC = () => {
                           style={{
                             fontSize: "14px",
                             color: "#6b7280",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
                           }}
                         >
                           → {shortcut.value}
