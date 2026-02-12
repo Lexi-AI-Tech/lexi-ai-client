@@ -24,18 +24,36 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # 🔐 Import Apple Certificate Properly (FIXED VERSION)
       - name: Import Apple Certificate
         run: |
           echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+
+          # Create temporary keychain
           security create-keychain -p temp build.keychain
-          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security list-keychains -d user -s build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p temp build.keychain
+
+          # Import certificate
+          security import certificate.p12 \
+            -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+
+          # Allow codesign to access key without UI prompt (CRITICAL FIX)
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k temp build.keychain
+
+          # Make keychain available
+          security list-keychains -d user -s build.keychain
+
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
+      # 🚀 Build & Sign Tauri App
       - name: Build Tauri App
         run: npm run tauri build
         env:
