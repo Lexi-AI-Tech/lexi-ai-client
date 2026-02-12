@@ -89,3 +89,44 @@ To run the built app from the command line and see logs:
 ```
 
 This is useful for debugging issues in the production build, as all debug output will appear in the terminal.
+
+Notarizing the APP
+```bash
+export APPLE_ID="saivallampati6@gmail.com"
+export APPLE_PASSWORD="ylra-xsdw-debh-qavs"
+export APPLE_TEAM_ID="FWLCJN85BF"
+
+npm run tauri build
+```
+or 
+```bash
+xcrun notarytool submit \
+"/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg" \
+--apple-id "saivallampati6@gmail.com" \
+--password "ylra-xsdw-debh-qavs" \
+--team-id "FWLCJN85BF" \
+--wait
+```
+
+Staple the app
+```bash
+xcrun stapler staple \
+"/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/macos/Lexi AI.app"
+```
+
+Staple the dmg
+```bash
+xcrun stapler staple \
+"/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
+```
+
+Final Gatekeeper Test
+```bash
+spctl -a -vvv -t install \
+"/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
+```
+
+Staple Check
+```bash
+spctl -a -vvv -t install "/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
+```
