@@ -25,7 +25,7 @@
       "exceptionDomain": "",
       "frameworks": [],
       "providerShortName": null,
-      "signingIdentity": "Apple Development: ranjeetbaraik15@gmail.com (Q7WQTDB93C)",
+      "signingIdentity": "Developer ID Application: Satyasai Vallampati (FWLCJN85BF)",
       "infoPlist": "Info.plist"
     }
   },
@@ -52,12 +52,13 @@
         "visible": true
       }
     ],
-    "macOSPrivateApi": true,
     "withGlobalTauri": false
   },
   "plugins": {
     "deep-link": {
-      "schemes": ["lexi-ai"]
+      "schemes": [
+        "lexi-ai"
+      ]
     }
   }
 }
