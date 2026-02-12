@@ -1,9 +1,11 @@
 name: Build & Sign macOS App
 
+# Disabled: no automatic trigger. Uncomment below to run on tag push, or run manually from Actions tab.
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+#  push:
+#    tags:
+#      - "v*"
 
 jobs:
   build-macos:

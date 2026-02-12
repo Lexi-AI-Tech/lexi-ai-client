@@ -20,6 +20,8 @@ const REFRESH_TOKEN_KEY: &str = "refresh_token";
 const USER_DATA_KEY: &str = "user_data";
 const EXPIRES_AT_KEY: &str = "expires_at";
 const EXPIRES_IN_KEY: &str = "expires_in";
+
+#[cfg(debug_assertions)]
 const STORE_FILE: &str = ".auth.dat";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
