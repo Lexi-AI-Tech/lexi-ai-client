@@ -39,6 +39,8 @@ npm run dev
 npm run build
 ```
 
+For a **notarized DMG** to distribute (avoids "can't be opened" on install), use the release script: see [Building a distributable release](#building-a-distributable-release-notarized-dmg).
+
 ## Project Structure
 
 ```
@@ -90,7 +92,23 @@ To run the built app from the command line and see logs:
 
 This is useful for debugging issues in the production build, as all debug output will appear in the terminal.
 
-Notarizing the APP
+### Building a distributable release (notarized DMG)
+
+Without notarization and stapling, users installing from the DMG will see **"Lexi AI can't be opened"**. The DMG must contain the **stapled** app (not the one Tauri outputs), so use the release script or CI—do not distribute the raw DMG from `npm run build`.
+
+**Option A: Local build (recommended script)**
+
+**Build script:** `./build-release.sh` does the full flow (build → notarize & staple app → recreate DMG with stapled app → notarize & staple DMG) and writes the stapled DMG to `release/` (gitignored).
+
+```bash
+export APPLE_ID="saivallampati6@gmail.com"
+export APPLE_PASSWORD="ylra-xsdw-debh-qavs"
+export APPLE_TEAM_ID="FWLCJN85BF"
+./build-release.sh
+```
+
+From the project root, set Apple credentials and run the release script. The script builds, notarizes and staples the app, recreates the DMG with that app, then notarizes and staples the DMG, and copies the final file into `release/` (gitignored).
+
 ```bash
 export APPLE_ID="saivallampati6@gmail.com"
 export APPLE_PASSWORD="ylra-xsdw-debh-qavs"
@@ -129,4 +147,9 @@ spctl -a -vvv -t install \
 Staple Check
 ```bash
 spctl -a -vvv -t install "/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
+```
+
+Tauri Build
+```bash
+APPLE_ID="saivallampati6@gmail.com" APPLE_PASSWORD="ylra-xsdw-debh-qavs" APPLE_TEAM_ID="FWLCJN85BF" npm run tauri build
 ```

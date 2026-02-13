@@ -14,7 +14,7 @@ use tauri::AppHandle;
 use keyring::Entry;
 
 #[cfg(not(debug_assertions))]
-const SERVICE_NAME: &str = "com.speaklexi.client";
+const SERVICE_NAME: &str = "com.lexiai.client";
 const ACCESS_TOKEN_KEY: &str = "access_token";
 const REFRESH_TOKEN_KEY: &str = "refresh_token";
 const USER_DATA_KEY: &str = "user_data";
