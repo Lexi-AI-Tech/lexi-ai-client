@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Lexi AI",
   "version": "0.1.0",
-  "identifier": "com.lexi.ai",
+  "identifier": "com.lexiai.client",
   "build": {
     "beforeDevCommand": "npm run dev:frontend",
     "beforeBuildCommand": "npm run build:frontend",
@@ -25,8 +25,9 @@
       "exceptionDomain": "",
       "frameworks": [],
       "providerShortName": null,
-      "signingIdentity": "Apple Development: ranjeetbaraik15@gmail.com (Q7WQTDB93C)",
-      "infoPlist": "Info.plist"
+      "signingIdentity": "Developer ID Application: Satyasai Vallampati (FWLCJN85BF)",
+      "infoPlist": "Info.plist",
+      "hardenedRuntime": true
     }
   },
   "app": {
@@ -52,12 +53,13 @@
         "visible": true
       }
     ],
-    "macOSPrivateApi": true,
     "withGlobalTauri": false
   },
   "plugins": {
     "deep-link": {
-      "schemes": ["lexi-ai"]
+      "schemes": [
+        "lexi-ai"
+      ]
     }
   }
 }

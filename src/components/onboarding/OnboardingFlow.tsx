@@ -34,7 +34,7 @@ export const OnboardingFlow: React.FC = () => {
       <div className="onboarding-form-area">
         {/* Header */}
         <header className="onboarding-header">
-          <img src={Logo} alt="Speaklexi" className="onboarding-header-logo" />
+          <img src={Logo} alt="Lexi AI" className="onboarding-header-logo" />
           <div className="step-indicators">
             {STEPS.map((_, i) => (
               <div

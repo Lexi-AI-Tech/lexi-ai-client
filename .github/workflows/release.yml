@@ -1,0 +1,70 @@
+name: Build & Sign macOS App
+
+# Disabled: no automatic trigger. Uncomment below to run on tag push, or run manually from Actions tab.
+on:
+  workflow_dispatch:
+#  push:
+#    tags:
+#      - "v*"
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm install
+
+      # 🔐 Import Apple Certificate (keychain set so codesign can run non-interactively)
+      - name: Import Apple Certificate
+        run: |
+          set -e
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+
+          KEYCHAIN_PASSWORD="${KEYCHAIN_PASSWORD:-temp-build-keychain}"
+
+          # Create and unlock keychain (no lock timeout so it stays open during build)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+
+          # Import .p12; -T gives codesign access to the key
+          security import certificate.p12 \
+            -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          # Required: allow codesign to use the key without GUI (prevents hang at "replacing existing signature")
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+          # Ensure our keychain is in the search list
+          security list-keychains -d user -s build.keychain
+
+          echo "Imported identity:"
+          security find-identity -v -p codesigning build.keychain
+
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+
+      # 🚀 Build & Sign Tauri App (signingIdentity is in tauri.conf.json)
+      - name: Build Tauri App
+        run: npm run tauri build
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
