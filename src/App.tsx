@@ -98,6 +98,13 @@ function App() {
     prevCompletedRef.current = isCompleted;
   }, [isCompleted]);
 
+  // Start the global key listener when app loads with onboarding already complete
+  // (so Fn key works without restart after granting Input Monitoring)
+  useEffect(() => {
+    if (!isCompleted) return;
+    invoke("start_global_key_listener").catch(() => {});
+  }, [isCompleted]);
+
   const showLoading =
     !authStore.isInitialized ||
     (authStore.isAuthenticated && !onboardingSyncDone) ||

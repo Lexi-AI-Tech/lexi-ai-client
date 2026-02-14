@@ -79,7 +79,7 @@ use window::show_and_focus_main_window;
 
 use permissions::{
     check_accessibility_permission, check_input_monitoring_permission, check_microphone_permission,
-    request_accessibility_permission, request_input_monitoring_permission,
+    open_permission_pane, request_accessibility_permission, request_input_monitoring_permission,
     request_microphone_permission,
 };
 
@@ -118,6 +118,42 @@ pub enum RecordingCommand {
     Stop,        // Regular recording hotkey released
     ActionStart, // Action hotkey pressed
     ActionStop,  // Action hotkey released
+}
+
+/// State held so the global key listener can be started later (after permissions are granted).
+/// This fixes Fn key not working on first install until app restart.
+struct KeyListenerStartupState {
+    inner: std::sync::Mutex<Option<KeyListenerParams>>,
+}
+
+struct KeyListenerParams {
+    recording_tx: mpsc::Sender<RecordingCommand>,
+    config_rx: watch::Receiver<Vec<String>>,
+    action_hotkey_rx: watch::Receiver<Vec<String>>,
+    recording_state: Arc<Mutex<bool>>,
+}
+
+/// Start the global key listener if not already started. Called by the frontend when the user
+/// has completed the permissions step (or when app loads with onboarding already complete)
+/// so that the Fn key works without requiring an app restart after granting Input Monitoring.
+#[tauri::command]
+fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
+    let state = app.state::<KeyListenerStartupState>();
+    let mut guard = state
+        .inner
+        .lock()
+        .map_err(|e| format!("lock error: {}", e))?;
+    if let Some(params) = guard.take() {
+        start_listener(
+            app.clone(),
+            params.recording_tx,
+            params.config_rx,
+            params.action_hotkey_rx,
+            params.recording_state,
+        );
+        println!("✅ Global key listener started (Input Monitoring will now be used)");
+    }
+    Ok(())
 }
 
 /// Main entry point for the Tauri application
@@ -183,6 +219,7 @@ pub fn main() {
             request_microphone_permission,
             request_input_monitoring_permission,
             request_accessibility_permission,
+            open_permission_pane,
             check_microphone_permission,
             check_input_monitoring_permission,
             check_accessibility_permission,
@@ -240,6 +277,7 @@ pub fn main() {
             stop_room_recording_and_process,
             update_room,
             update_speaker,
+            start_global_key_listener,
         ])
         .setup(move |app| {
             // Create system tray first to avoid borrow checker issues
@@ -332,14 +370,18 @@ pub fn main() {
                 command_tx: Mutex::new(None),
             });
 
-            // Start listeners (rdev always running, manager thread handles Tauri shortcuts)
-            start_listener(
-                app_handle.clone(),
-                recording_tx.clone(),
-                config_rx,
-                action_hotkey_rx,
-                recording_state_arc,
-            );
+            // Defer starting the key listener until the frontend calls start_global_key_listener
+            // (after permissions step or when onboarding already complete). This ensures the
+            // Fn key works on first install without requiring an app restart after granting
+            // Input Monitoring.
+            app.manage(KeyListenerStartupState {
+                inner: std::sync::Mutex::new(Some(KeyListenerParams {
+                    recording_tx: recording_tx.clone(),
+                    config_rx,
+                    action_hotkey_rx,
+                    recording_state: recording_state_arc,
+                })),
+            });
 
             #[cfg(desktop)]
             {
