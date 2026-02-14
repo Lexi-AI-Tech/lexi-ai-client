@@ -40,6 +40,9 @@ fn key_to_string(key: &Key) -> String {
         Key::Alt => "Option".to_string(),
         Key::ShiftLeft | Key::ShiftRight => "Shift".to_string(),
         Key::Function => "Fn".to_string(),
+        // macOS sometimes reports Fn as Unknown(179) (e.g. Apple keyboards); treat as Fn
+        // so recording "Fn only" doesn't show Fn+Unknown(179)
+        Key::Unknown(179) => "Fn".to_string(),
         Key::Space => "Space".to_string(),
         Key::Return => "Enter".to_string(),
         Key::Escape => "Escape".to_string(),
