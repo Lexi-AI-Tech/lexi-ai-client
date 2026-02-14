@@ -93,7 +93,8 @@ use commands::auth::{
     store_auth_data,
 };
 use commands::hotkey::{
-    get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
+    get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_action_hotkey,
+    update_hotkey,
 };
 use commands::notes::{create_note, delete_note, get_note, get_notes, update_note};
 use commands::onboarding::{
@@ -277,6 +278,7 @@ pub fn main() {
             stop_room_recording_and_process,
             update_room,
             update_speaker,
+            update_action_hotkey,
             start_global_key_listener,
         ])
         .setup(move |app| {

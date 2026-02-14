@@ -5,7 +5,7 @@
 
 use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
 use crate::global_key_listener::validate_hotkey;
-use crate::state::{HotkeyRecordingState, HotkeyWatchState};
+use crate::state::{ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState};
 use serde::Deserialize;
 use serde_json;
 use tauri::{AppHandle, Emitter, State};
@@ -120,3 +120,75 @@ pub fn stop_hotkey_recording(state: State<HotkeyRecordingState>) {
         println!("🎹 Stopped hotkey recording mode");
     }
 }
+
+/// Update the action hotkey configuration dynamically
+///
+/// This command updates action hotkeys in app config and updates the runtime listener.
+/// Supports up to 3 action hotkeys.
+///
+/// # Arguments
+/// * `config_json` - JSON string with `hotkeys` array (e.g., `{"hotkeys": ["Fn+Control"]}`)
+///
+/// # Returns
+/// * `Ok(())` - Successfully updated the action hotkeys
+/// * `Err(String)` - An error message if parsing failed or update failed
+#[tauri::command]
+pub async fn update_action_hotkey(
+    config_json: String,
+    app: AppHandle,
+    state: State<'_, ActionHotkeyWatchState>,
+) -> Result<(), String> {
+    // Parse JSON - frontend sends {hotkeys: [...]}
+    #[derive(Deserialize)]
+    struct HotkeyConfigJson {
+        hotkeys: Vec<String>,
+    }
+    let config: HotkeyConfigJson = serde_json::from_str(&config_json)
+        .map_err(|e| format!("Failed to parse action hotkey config: {}", e))?;
+
+    let new_hotkeys = config.hotkeys;
+
+    // Validate: maximum 3 hotkeys
+    if new_hotkeys.len() > 3 {
+        return Err("Maximum of 3 action hotkeys allowed".to_string());
+    }
+
+    // Validate each hotkey
+    for hotkey in &new_hotkeys {
+        if let Err(e) = validate_hotkey(hotkey) {
+            return Err(e);
+        }
+    }
+
+    // Get current config to preserve other fields
+    let current_config = get_app_config(app.clone())
+        .await
+        .unwrap_or_else(|_| AppConfig::default());
+
+    let app_config_update = AppConfig {
+        hotkeys: current_config.hotkeys,
+        languages: current_config.languages,
+        enhance_transcription: current_config.enhance_transcription,
+        launch_on_system_startup: current_config.launch_on_system_startup,
+        vocabulary: current_config.vocabulary,
+        action_hotkeys: Some(new_hotkeys.clone()),
+        shortcuts: current_config.shortcuts,
+    };
+
+    update_app_config(app.clone(), app_config_update)
+        .await
+        .map_err(|e| format!("Failed to update action hotkeys: {}", e))?;
+
+    // Update watch state to notify listener thread
+    if state.0.send(new_hotkeys.clone()).is_err() {
+        return Err("Failed to update action hotkey watch state".to_string());
+    }
+
+    // Emit the config back as JSON for UI display
+    let response_json = serde_json::json!({ "hotkeys": new_hotkeys });
+    app.emit("action-hotkey-updated", response_json.to_string())
+        .unwrap_or_default();
+    println!("🎯 Action hotkeys updated to: {:?}", new_hotkeys);
+    Ok(())
+}
+

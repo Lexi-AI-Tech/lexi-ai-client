@@ -18,6 +18,7 @@ import {
 import type { TauriAppConfig, HotkeyConfig } from "../types";
 
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import { HotkeySelector } from "./HotkeySelector";
 import { useAuthStore } from "../store/authStore";
 
 // Supported languages for transcription
@@ -1023,7 +1024,33 @@ export const SettingsPage: React.FC = () => {
         {/* Hotkeys Section */}
         {activeSection === "hotkeys" && (
           <div>
-
+            <div
+              style={{
+                backgroundColor: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "24px",
+                marginBottom: "16px",
+              }}
+            >
+              {/* Transcription Hotkeys */}
+              <HotkeySelector
+                label="Transcription Hotkeys"
+                description="Hold to record audio for transcription"
+                value={currentHotkeys}
+                onChange={async (newConfig) => {
+                  setCurrentHotkeys(newConfig);
+                  try {
+                    await invoke("update_hotkey", {
+                      configJson: JSON.stringify(newConfig),
+                    });
+                  } catch (err) {
+                    console.error("Failed to update transcription hotkeys:", err);
+                  }
+                }}
+                maxHotkeys={3}
+              />
+            </div>
 
             <div
               style={{
@@ -1031,202 +1058,106 @@ export const SettingsPage: React.FC = () => {
                 border: "1px solid #e5e7eb",
                 borderRadius: "12px",
                 padding: "24px",
-                marginBottom: "24px",
+                marginBottom: "16px",
               }}
             >
-              {/* Transcription Hotkeys */}
+              {/* Action Hotkeys */}
+              <HotkeySelector
+                label="Action Hotkeys"
+                description="Hold to record a voice command for actions"
+                value={{ hotkeys: config?.action_hotkeys || [] }}
+                onChange={async (newConfig) => {
+                  // Update local config state
+                  setConfig((prev) =>
+                    prev ? { ...prev, action_hotkeys: newConfig.hotkeys } : prev,
+                  );
+                  try {
+                    await invoke("update_action_hotkey", {
+                      configJson: JSON.stringify(newConfig),
+                    });
+                  } catch (err) {
+                    console.error("Failed to update action hotkeys:", err);
+                  }
+                }}
+                maxHotkeys={3}
+              />
+            </div>
+
+            {/* Reset to Defaults */}
+            <div
+              style={{
+                backgroundColor: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "24px",
+              }}
+            >
               <div
                 style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#9ca3af",
-                  marginBottom: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
               >
-                Transcription Hotkeys
-              </div>
-
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginBottom: "24px" }}>
-                {currentHotkeys.hotkeys.length > 0 ? (
-                  currentHotkeys.hotkeys.map((hotkey, index) => {
-                    const keySymbols: Record<string, { symbol: string; label: string }> = {
-                      'fn': { symbol: 'fn', label: '🌐' },
-                      'control': { symbol: '^', label: 'control' },
-                      'ctrl': { symbol: '^', label: 'control' },
-                      'command': { symbol: '⌘', label: 'command' },
-                      'cmd': { symbol: '⌘', label: 'command' },
-                      'option': { symbol: '⌥', label: 'option' },
-                      'alt': { symbol: '⌥', label: 'option' },
-                      'shift': { symbol: '⇧', label: 'shift' },
-                    };
-                    return (
-                      <div
-                        style={{
-                          backgroundColor: "#1f2937",
-                          padding: "1.5rem",
-                          borderRadius: "0.75rem",
-                          maxWidth: "600px",
-                        }}
-                      >
-                        <div
-                          key={`transcription-${index}-${hotkey}`}
-                          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                        >
-                          {hotkey.split("+").map((key, keyIndex, arr) => {
-                            const keyName = key.trim().toLowerCase();
-                            const keyInfo = keySymbols[keyName];
-                            return (
-                              <React.Fragment key={`${index}-${keyIndex}-${key}`}>
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-start",
-                                    justifyContent: "space-between",
-                                    padding: "6px 8px",
-                                    minWidth: "54px",
-                                    minHeight: "48px",
-                                    background: "linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)",
-                                    color: "#fff",
-                                    borderRadius: "6px",
-                                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-                                    boxShadow: "0 1px 0 1px #1a1a1a, 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
-                                    border: "1px solid #4a4a4c",
-                                    position: "relative",
-                                  }}
-                                >
-                                  {keyInfo && (
-                                    <span style={{ fontSize: "13px", position: "absolute", top: "8px", right: "10px", color: "rgba(255,255,255,0.9)" }}>
-                                      {keyInfo.symbol}
-                                    </span>
-                                  )}
-                                  <span style={{ fontSize: "10px", fontWeight: 400, color: "rgba(255,255,255,0.85)", marginTop: "auto" }}>
-                                    {keyInfo ? keyInfo.label : key.trim()}
-                                  </span>
-                                </span>
-                                {keyIndex < arr.length - 1 && (
-                                  <span style={{ color: "#9ca3af", fontSize: "14px", fontWeight: 400 }}>+</span>
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
+                <div>
                   <div
                     style={{
-                      padding: "8px 12px",
-                      background: "#f3f4f6",
-                      borderRadius: "6px",
-                      fontSize: "13px",
-                      color: "#9ca3af",
-                      display: "inline-block",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      color: "#111827",
+                      marginBottom: "4px",
                     }}
                   >
-                    No hotkeys configured
+                    Reset Hotkeys
                   </div>
-                )}
-              </div>
-
-              {/* Action Hotkeys */}
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#9ca3af",
-                  marginBottom: "12px",
-                }}
-              >
-                Action Hotkeys
-              </div>
-
-              <div
-                style={{
-                  backgroundColor: "#1f2937",
-                  padding: "1.5rem",
-                  borderRadius: "0.75rem",
-                  maxWidth: "600px",
-                }}
-              >              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-                  {config?.action_hotkeys && config.action_hotkeys.length > 0 ? (
-                    config.action_hotkeys.map((hotkey, index) => {
-                      const keySymbols: Record<string, { symbol: string; label: string }> = {
-                        'fn': { symbol: 'fn', label: '🌐' },
-                        'control': { symbol: '^', label: 'control' },
-                        'ctrl': { symbol: '^', label: 'control' },
-                        'command': { symbol: '⌘', label: 'command' },
-                        'cmd': { symbol: '⌘', label: 'command' },
-                        'option': { symbol: '⌥', label: 'option' },
-                        'alt': { symbol: '⌥', label: 'option' },
-                        'shift': { symbol: '⇧', label: 'shift' },
-                      };
-                      return (
-                        <div
-                          key={`action-${index}-${hotkey}`}
-                          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                        >
-                          {hotkey.split("+").map((key, keyIndex, arr) => {
-                            const keyName = key.trim().toLowerCase();
-                            const keyInfo = keySymbols[keyName];
-                            return (
-                              <React.Fragment key={`${index}-${keyIndex}-${key}`}>
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-start",
-                                    justifyContent: "space-between",
-                                    padding: "6px 8px",
-                                    minWidth: "54px",
-                                    minHeight: "48px",
-                                    background: "linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)",
-                                    color: "#fff",
-                                    borderRadius: "6px",
-                                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-                                    boxShadow: "0 1px 0 1px #1a1a1a, 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
-                                    border: "1px solid #4a4a4c",
-                                    position: "relative",
-                                  }}
-                                >
-                                  {keyInfo && (
-                                    <span style={{ fontSize: "13px", position: "absolute", top: "8px", right: "10px", color: "rgba(255,255,255,0.9)" }}>
-                                      {keyInfo.symbol}
-                                    </span>
-                                  )}
-                                  <span style={{ fontSize: "10px", fontWeight: 400, color: "rgba(255,255,255,0.85)", marginTop: "auto" }}>
-                                    {keyInfo ? keyInfo.label : key.trim()}
-                                  </span>
-                                </span>
-                                {keyIndex < arr.length - 1 && (
-                                  <span style={{ color: "#9ca3af", fontSize: "14px", fontWeight: 400 }}>+</span>
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div
-                      style={{
-                        padding: "8px 12px",
-                        background: "#f3f4f6",
-                        borderRadius: "6px",
-                        fontSize: "13px",
-                        color: "#9ca3af",
-                        display: "inline-block",
-                      }}
-                    >
-                      No action hotkeys configured
-                    </div>
-                  )}
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                    }}
+                  >
+                    Restore default hotkeys (Fn for transcription, Fn+Control
+                    for actions)
+                  </div>
                 </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      // Reset transcription hotkeys to default
+                      const defaultTranscription = { hotkeys: ["Fn"] };
+                      await invoke("update_hotkey", {
+                        configJson: JSON.stringify(defaultTranscription),
+                      });
+                      setCurrentHotkeys(defaultTranscription);
+
+                      // Reset action hotkeys to default
+                      const defaultAction = { hotkeys: ["Fn+Control"] };
+                      await invoke("update_action_hotkey", {
+                        configJson: JSON.stringify(defaultAction),
+                      });
+                      setConfig((prev) =>
+                        prev
+                          ? { ...prev, action_hotkeys: defaultAction.hotkeys }
+                          : prev,
+                      );
+                    } catch (err) {
+                      console.error("Failed to reset hotkeys:", err);
+                    }
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    borderRadius: "8px",
+                    border: "1px solid #e5e7eb",
+                    background: "#ffffff",
+                    color: "#111827",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  Reset to Defaults
+                </button>
               </div>
             </div>
           </div>

@@ -12,6 +12,8 @@
 //! - **Dynamic Configuration**: Hotkey config can be changed at runtime.
 //! - **Hotkey Recording Mode**: Emits key events to frontend for interactive hotkey selection.
 //! - **System Shortcut Validation**: Prevents registration of known system-reserved shortcuts.
+//! - **Superset-Aware Grace Period**: When a hotkey is a subset of another configured hotkey,
+//!   triggering is delayed briefly to allow the user to complete the longer combo.
 //!
 //! ## Permissions Required
 //!
@@ -89,6 +91,22 @@ fn normalize_key_string(key: &str) -> String {
     }
 }
 
+/// Parse a hotkey config string into a normalized set of key strings
+fn parse_hotkey_parts(hotkey_config: &str) -> HashSet<String> {
+    hotkey_config
+        .split('+')
+        .map(|s| normalize_key_string(s))
+        .collect()
+}
+
+/// Check if hotkey_a is a strict subset of hotkey_b
+/// (all keys in a are in b, but b has additional keys)
+fn is_strict_subset(a: &str, b: &str) -> bool {
+    let parts_a = parse_hotkey_parts(a);
+    let parts_b = parse_hotkey_parts(b);
+    parts_a.len() < parts_b.len() && parts_a.is_subset(&parts_b)
+}
+
 /// Validates a hotkey string (basic check)
 pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
     if hotkey.trim().is_empty() {
@@ -105,11 +123,28 @@ pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
 /// Minimum time between Start and Stop events.
 const MIN_PRESS_RELEASE_INTERVAL: Duration = Duration::from_millis(500);
 
+/// Grace period for subset hotkeys — how long to wait for a superset combo
+/// before triggering the shorter hotkey.
+const SUBSET_GRACE_PERIOD: Duration = Duration::from_millis(150);
+
 /// Result of processing a hotkey event
 #[derive(Debug, Clone)]
 enum HotkeyCommandResult {
     SendNow(RecordingCommand),
     SendStopAfter(Duration),
+    Pending,
+}
+
+/// A hotkey activation that is pending (waiting for grace period to expire
+/// or for a superset hotkey to take over).
+#[derive(Debug, Clone)]
+struct PendingHotkey {
+    /// The hotkey config string that matched (e.g. "Fn")
+    hotkey_config: String,
+    /// The command to send if the grace period expires without a superset match
+    command: RecordingCommand,
+    /// When this pending activation was created
+    created_at: Instant,
 }
 
 /// Tracks which configured hotkeys are 'active' (pressed)
@@ -120,6 +155,8 @@ struct KeyStateTracker {
     last_press_at: Option<Instant>,
     /// Set of currently physically pressed keys (normalized strings)
     pressed_keys: HashSet<String>,
+    /// A hotkey activation waiting for the grace period to expire
+    pending_activation: Option<PendingHotkey>,
 }
 
 impl KeyStateTracker {
@@ -128,6 +165,7 @@ impl KeyStateTracker {
             active_hotkeys: HashSet::new(),
             last_press_at: None,
             pressed_keys: HashSet::new(),
+            pending_activation: None,
         }
     }
 
@@ -141,11 +179,8 @@ impl KeyStateTracker {
     }
 
     /// Check if a specific hotkey configuration matches the current physical state
-    fn matches_hotkey(&self, hotkey_config: &str, _trigger_key: &str) -> bool {
-        let parts: Vec<String> = hotkey_config
-            .split('+')
-            .map(|s| normalize_key_string(s))
-            .collect();
+    fn matches_hotkey(&self, hotkey_config: &str) -> bool {
+        let parts = parse_hotkey_parts(hotkey_config);
 
         if parts.is_empty() {
             return false;
@@ -155,26 +190,71 @@ impl KeyStateTracker {
         parts.iter().all(|k| self.pressed_keys.contains(k))
     }
 
-    /// Process an event against a specific hotkey configuration
+    /// Check if a hotkey has a superset sibling among all configured hotkeys
+    fn has_superset_sibling(
+        &self,
+        hotkey_config: &str,
+        all_recording_hotkeys: &[String],
+        all_action_hotkeys: &[String],
+    ) -> bool {
+        // Check across ALL configured hotkeys (both recording and action)
+        for other in all_recording_hotkeys
+            .iter()
+            .chain(all_action_hotkeys.iter())
+        {
+            if is_strict_subset(hotkey_config, other) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Process an event against a specific hotkey configuration.
+    /// Returns Some(command) if a hotkey should be triggered, None otherwise.
     fn process_event(
         &mut self,
         hotkey_config: &str,
         trigger_key: &str,
         is_press: bool,
-        is_action: bool, // true=ActionStart/Stop, false=Start/Stop
+        is_action: bool,
+        all_recording_hotkeys: &[String],
+        all_action_hotkeys: &[String],
     ) -> Option<HotkeyCommandResult> {
         let hotkey_normalized = hotkey_config.trim().to_string();
 
         if is_press {
             // Check if this hotkey is fully pressed
-            if self.matches_hotkey(&hotkey_normalized, trigger_key) {
+            if self.matches_hotkey(&hotkey_normalized) {
                 // Only trigger if not already active
-                if self.active_hotkeys.insert(hotkey_normalized.clone()) {
+                if !self.active_hotkeys.contains(&hotkey_normalized) {
                     let cmd = if is_action {
                         RecordingCommand::ActionStart
                     } else {
                         RecordingCommand::Start
                     };
+
+                    // Check if this hotkey has a superset sibling
+                    if self.has_superset_sibling(
+                        &hotkey_normalized,
+                        all_recording_hotkeys,
+                        all_action_hotkeys,
+                    ) {
+                        // Defer activation — store as pending
+                        println!(
+                            "⏳ Hotkey {} matched but has superset sibling, deferring for {}ms",
+                            hotkey_normalized,
+                            SUBSET_GRACE_PERIOD.as_millis()
+                        );
+                        self.pending_activation = Some(PendingHotkey {
+                            hotkey_config: hotkey_normalized,
+                            command: cmd,
+                            created_at: Instant::now(),
+                        });
+                        return Some(HotkeyCommandResult::Pending);
+                    }
+
+                    // No superset sibling — activate immediately
+                    self.active_hotkeys.insert(hotkey_normalized.clone());
                     println!("🔑 Hotkey Activated: {}", hotkey_normalized);
                     self.last_press_at = Some(Instant::now());
                     return Some(HotkeyCommandResult::SendNow(cmd));
@@ -185,7 +265,7 @@ impl KeyStateTracker {
             // A hotkey is "released" if ANY of its constituent keys are released.
             // If the key being released is part of an active hotkey, we deactivate it.
 
-            // Check if this active active hotkey should be released
+            // Check if this active hotkey should be released
             if self.active_hotkeys.contains(&hotkey_normalized) {
                 // Normalize config parts
                 let parts: Vec<String> = hotkey_normalized
@@ -223,6 +303,60 @@ impl KeyStateTracker {
             }
         }
 
+        None
+    }
+
+    /// Check if the pending activation's grace period has expired.
+    /// If so, activate the pending hotkey and return the command.
+    fn check_pending_timeout(&mut self) -> Option<HotkeyCommandResult> {
+        if let Some(ref pending) = self.pending_activation {
+            if pending.created_at.elapsed() >= SUBSET_GRACE_PERIOD {
+                let pending = self.pending_activation.take().unwrap();
+                println!(
+                    "⏳→🔑 Grace period expired, activating pending hotkey: {}",
+                    pending.hotkey_config
+                );
+                self.active_hotkeys.insert(pending.hotkey_config);
+                self.last_press_at = Some(Instant::now());
+                return Some(HotkeyCommandResult::SendNow(pending.command));
+            }
+        }
+        None
+    }
+
+    /// Cancel the pending activation if a superset hotkey was activated.
+    /// Returns true if a pending was cancelled.
+    fn cancel_pending_if_superset(&mut self, superset_config: &str) -> bool {
+        if let Some(ref pending) = self.pending_activation {
+            if is_strict_subset(&pending.hotkey_config, superset_config) {
+                println!(
+                    "⏳→❌ Cancelling pending hotkey '{}' — superset '{}' matched",
+                    pending.hotkey_config, superset_config
+                );
+                self.pending_activation = None;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// If the user releases a key that is part of the pending hotkey
+    /// before the grace period expires, immediately activate the pending hotkey.
+    fn flush_pending_on_release(&mut self, released_key: &str) -> Option<HotkeyCommandResult> {
+        if let Some(ref pending) = self.pending_activation {
+            let parts = parse_hotkey_parts(&pending.hotkey_config);
+            if parts.contains(&released_key.to_string()) {
+                let pending = self.pending_activation.take().unwrap();
+                println!(
+                    "⏳→🔑 Key released during grace period, flushing pending hotkey: {}",
+                    pending.hotkey_config
+                );
+                self.active_hotkeys.insert(pending.hotkey_config.clone());
+                self.last_press_at = Some(Instant::now());
+                // Return the start command, then immediately process the release
+                return Some(HotkeyCommandResult::SendNow(pending.command));
+            }
+        }
         None
     }
 }
@@ -297,62 +431,83 @@ pub fn start_listener(
             };
             tracker.update_key_state(&key_str, is_press);
 
-            // 3. Check Hotkeys
+            // 3. Get current hotkey configs
             let recording_hotkeys = config_rx_for_rdev.borrow().clone();
             let action_hotkeys = action_hotkey_rx_for_rdev.borrow().clone();
 
-            // Check Action Hotkeys first
+            // 4. Check for pending timeout (grace period expiry)
+            if let Some(result) = tracker.check_pending_timeout() {
+                dispatch_command(
+                    &result,
+                    &recording_tx_for_rdev,
+                    true,
+                    &key_state_tracker_local,
+                );
+            }
+
+            // 5. If releasing a key, check if we need to flush a pending hotkey
+            if !is_press {
+                if let Some(start_result) = tracker.flush_pending_on_release(&key_str) {
+                    // The pending hotkey was flushed (started), now process the release
+                    dispatch_command(
+                        &start_result,
+                        &recording_tx_for_rdev,
+                        false,
+                        &key_state_tracker_local,
+                    );
+                    // Fall through to process the release against active hotkeys
+                }
+            }
+
+            // 6. Check Action Hotkeys first (higher priority)
             let mut triggered_action_cmd = None;
             for hotkey in &action_hotkeys {
-                if let Some(cmd) = tracker.process_event(hotkey, &key_str, is_press, true) {
+                if let Some(cmd) = tracker.process_event(
+                    hotkey,
+                    &key_str,
+                    is_press,
+                    true,
+                    &recording_hotkeys,
+                    &action_hotkeys,
+                ) {
+                    // If this is a superset of a pending hotkey, cancel the pending
+                    tracker.cancel_pending_if_superset(hotkey);
                     triggered_action_cmd = Some(cmd);
                     break;
                 }
             }
 
-            // Check Recording Hotkeys
+            // 7. Check Recording Hotkeys
             let mut triggered_rec_cmd = None;
             if triggered_action_cmd.is_none() {
                 for hotkey in &recording_hotkeys {
-                    if let Some(cmd) = tracker.process_event(hotkey, &key_str, is_press, false) {
+                    if let Some(cmd) = tracker.process_event(
+                        hotkey,
+                        &key_str,
+                        is_press,
+                        false,
+                        &recording_hotkeys,
+                        &action_hotkeys,
+                    ) {
+                        // If this is a superset of a pending hotkey, cancel the pending
+                        tracker.cancel_pending_if_superset(hotkey);
                         triggered_rec_cmd = Some(cmd);
                         break;
                     }
                 }
             }
 
-            // 4. Dispatch Commands
-            // Clone triggered_action_cmd so it can be used in both .or() and is_some() check if needed logic was complex,
-            // but actually we just need 'cmd_to_send'. The delayed stop logic needs to know WHICH command type.
+            // 8. Dispatch Commands
             let cmd_to_send = triggered_action_cmd.clone().or(triggered_rec_cmd);
-
-            // We determine command type for delayed stop based on what was triggered
             let is_action_triggered = triggered_action_cmd.is_some();
 
             if let Some(result) = cmd_to_send {
-                match result {
-                    HotkeyCommandResult::SendNow(cmd) => {
-                        if let Err(e) = recording_tx_for_rdev.send(cmd) {
-                            eprintln!("Failed to send command: {:?}", e);
-                        }
-                    }
-                    HotkeyCommandResult::SendStopAfter(delay) => {
-                        let tx = recording_tx_for_rdev.clone();
-                        // Determine correct stop command
-                        let stop_cmd = if is_action_triggered {
-                            RecordingCommand::ActionStop
-                        } else {
-                            RecordingCommand::Stop
-                        };
-
-                        std::thread::spawn(move || {
-                            std::thread::sleep(delay);
-                            if let Err(e) = tx.send(stop_cmd) {
-                                eprintln!("Failed to send delayed stop: {:?}", e);
-                            }
-                        });
-                    }
-                }
+                dispatch_command(
+                    &result,
+                    &recording_tx_for_rdev,
+                    is_action_triggered,
+                    &key_state_tracker_local,
+                );
             }
 
             // Emit debug event
@@ -367,4 +522,52 @@ pub fn start_listener(
     });
 
     println!("✅ rdev listener started (Unified Mode)");
+}
+
+/// Helper to dispatch a HotkeyCommandResult to the recording channel
+fn dispatch_command(
+    result: &HotkeyCommandResult,
+    tx: &mpsc::Sender<RecordingCommand>,
+    is_action: bool,
+    tracker_arc: &Arc<Mutex<KeyStateTracker>>,
+) {
+    match result {
+        HotkeyCommandResult::SendNow(cmd) => {
+            if let Err(e) = tx.send(*cmd) {
+                eprintln!("Failed to send command: {:?}", e);
+            }
+        }
+        HotkeyCommandResult::SendStopAfter(delay) => {
+            let tx = tx.clone();
+            let delay = *delay;
+            let stop_cmd = if is_action {
+                RecordingCommand::ActionStop
+            } else {
+                RecordingCommand::Stop
+            };
+
+            std::thread::spawn(move || {
+                std::thread::sleep(delay);
+                if let Err(e) = tx.send(stop_cmd) {
+                    eprintln!("Failed to send delayed stop: {:?}", e);
+                }
+            });
+        }
+        HotkeyCommandResult::Pending => {
+            let tx = tx.clone();
+            let tracker = tracker_arc.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(SUBSET_GRACE_PERIOD);
+                // After sleep, check if pending is still valid and timed out
+                let mut t = tracker.lock().unwrap();
+                if let Some(res) = t.check_pending_timeout() {
+                    if let HotkeyCommandResult::SendNow(cmd) = res {
+                        if let Err(e) = tx.send(cmd) {
+                            eprintln!("Failed to send pending command: {:?}", e);
+                        }
+                    }
+                }
+            });
+        }
+    }
 }
