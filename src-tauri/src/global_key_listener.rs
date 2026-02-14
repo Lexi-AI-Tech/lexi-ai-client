@@ -99,6 +99,148 @@ fn parse_hotkey_parts(hotkey_config: &str) -> HashSet<String> {
         .collect()
 }
 
+/// Canonical modifier order for storage and comparison (matches backend/DB).
+/// Format: Control+Option+Command+Shift+Key (modifiers in this order, then the key).
+/// Fn, when present, is placed first.
+const MODIFIER_ORDER: [&str; 5] = ["Fn", "Control", "Option", "Command", "Shift"];
+
+/// Normalize a hotkey string to canonical form for storage and comparison.
+/// Order: Fn (if present), Control, Option, Command, Shift, then the key.
+pub fn hotkey_to_canonical(hotkey: &str) -> String {
+    let parts: Vec<String> = hotkey
+        .split('+')
+        .map(|s| normalize_key_string(s))
+        .filter(|s| !s.is_empty())
+        .collect();
+    let mut modifiers: Vec<String> = Vec::new();
+    let mut keys: Vec<String> = Vec::new();
+    for p in &parts {
+        if MODIFIER_ORDER.contains(&p.as_str()) {
+            if !modifiers.contains(p) {
+                modifiers.push(p.clone());
+            }
+        } else {
+            keys.push(p.clone());
+        }
+    }
+    modifiers.sort_by_key(|m| MODIFIER_ORDER.iter().position(|&x| x == m).unwrap_or(99));
+    let mut out: Vec<String> = modifiers;
+    out.extend(keys);
+    out.join("+")
+}
+
+/// macOS system-reserved keyboard shortcuts (Apple Support). Stored in canonical form:
+/// Control+Option+Command+Shift+Key. These must not be allowed as user-defined hotkeys.
+const RESERVED_MACOS_SHORTCUTS: &[&str] = &[
+    "Command+A",
+    "Command+B",
+    "Command+C",
+    "Command+D",
+    "Command+E",
+    "Command+F",
+    "Command+G",
+    "Command+H",
+    "Command+I",
+    "Command+J",
+    "Command+K",
+    "Command+L",
+    "Command+M",
+    "Command+N",
+    "Command+O",
+    "Command+P",
+    "Command+Q",
+    "Command+R",
+    "Command+S",
+    "Command+T",
+    "Command+U",
+    "Command+V",
+    "Command+W",
+    "Command+X",
+    "Command+Y",
+    "Command+Z",
+    "Command+1",
+    "Command+2",
+    "Command+3",
+    "Command+4",
+    "Command+,",
+    "Command+;",
+    "Command+?",
+    "Command+Space",
+    "Command+Tab",
+    "Command+`",
+    "Command+Shift+Z",
+    "Command+Shift+C",
+    "Command+Shift+D",
+    "Command+Shift+F",
+    "Command+Shift+G",
+    "Command+Shift+H",
+    "Command+Shift+I",
+    "Command+Shift+K",
+    "Command+Shift+N",
+    "Command+Shift+O",
+    "Command+Shift+P",
+    "Command+Shift+Q",
+    "Command+Shift+R",
+    "Command+Shift+S",
+    "Command+Shift+T",
+    "Command+Shift+;",
+    "Command+Shift+3",
+    "Command+Shift+4",
+    "Command+Shift+5",
+    "Command+Shift+6",
+    "Command+Shift+Delete",
+    "Command+Option+D",
+    "Command+Option+F",
+    "Command+Option+H",
+    "Command+Option+I",
+    "Command+Option+L",
+    "Command+Option+M",
+    "Command+Option+P",
+    "Command+Option+T",
+    "Command+Option+V",
+    "Command+Option+W",
+    "Command+Option+Y",
+    "Command+Option+8",
+    "Command+Option+=",
+    "Command+Option+-",
+    "Command+Option+Escape",
+    "Command+Option+F5",
+    "Command+Option+Power",
+    "Command+Option+Shift+V",
+    "Command+Option+Power",
+    "Option+Delete",
+    "Command+Option+Shift+Q",
+    "Command+Option+Shift+Delete",
+    "Control+A",
+    "Control+B",
+    "Control+Command+F",
+    "Control+Command+Q",
+    "Control+Command+Space",
+    "Control+Command+Power",
+    "Control+D",
+    "Control+E",
+    "Control+F",
+    "Control+H",
+    "Control+K",
+    "Control+N",
+    "Control+O",
+    "Control+Option+Command+,",
+    "Control+Option+Command+.",
+    "Control+Option+Command+8",
+    "Control+Option+Command+Power",
+    "Control+P",
+    "Control+Power",
+    "Control+Shift+Power",
+    "Command+F5",
+];
+
+fn is_reserved_macos_shortcut(hotkey: &str) -> bool {
+    let canonical = hotkey_to_canonical(hotkey);
+    RESERVED_MACOS_SHORTCUTS
+        .iter()
+        .any(|&reserved| hotkey_to_canonical(reserved) == canonical)
+}
+
 /// Check if hotkey_a is a strict subset of hotkey_b
 /// (all keys in a are in b, but b has additional keys)
 fn is_strict_subset(a: &str, b: &str) -> bool {
@@ -107,12 +249,14 @@ fn is_strict_subset(a: &str, b: &str) -> bool {
     parts_a.len() < parts_b.len() && parts_a.is_subset(&parts_b)
 }
 
-/// Validates a hotkey string (basic check)
+/// Validates a hotkey string (non-empty, not reserved by macOS).
 pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
     if hotkey.trim().is_empty() {
         return Err("Hotkey cannot be empty".to_string());
     }
-    // We could check for reserved keys here if needed, but rdev captures almost everything.
+    if is_reserved_macos_shortcut(hotkey) {
+        return Err("This shortcut is reserved by macOS and cannot be used".to_string());
+    }
     Ok(())
 }
 

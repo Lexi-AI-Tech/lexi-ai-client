@@ -47,6 +47,7 @@ export const SettingsPage: React.FC = () => {
   const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
     hotkeys: [],
   });
+  const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<
     "account" | "transcription" | "general" | "hotkeys"
   >("account");
@@ -1024,6 +1025,21 @@ export const SettingsPage: React.FC = () => {
         {/* Hotkeys Section */}
         {activeSection === "hotkeys" && (
           <div>
+            {hotkeyError && (
+              <div
+                style={{
+                  backgroundColor: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  marginBottom: "16px",
+                  color: "#b91c1c",
+                  fontSize: "14px",
+                }}
+              >
+                {hotkeyError}
+              </div>
+            )}
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -1039,6 +1055,7 @@ export const SettingsPage: React.FC = () => {
                 description="Hold to record audio for transcription"
                 value={currentHotkeys}
                 onChange={async (newConfig) => {
+                  setHotkeyError(null);
                   setCurrentHotkeys(newConfig);
                   try {
                     await invoke("update_hotkey", {
@@ -1048,6 +1065,7 @@ export const SettingsPage: React.FC = () => {
                     console.error("Failed to update transcription hotkeys:", err);
                   }
                 }}
+                onValidationError={setHotkeyError}
                 maxHotkeys={3}
               />
             </div>
@@ -1067,7 +1085,7 @@ export const SettingsPage: React.FC = () => {
                 description="Hold to record a voice command for actions"
                 value={{ hotkeys: config?.action_hotkeys || [] }}
                 onChange={async (newConfig) => {
-                  // Update local config state
+                  setHotkeyError(null);
                   setConfig((prev) =>
                     prev ? { ...prev, action_hotkeys: newConfig.hotkeys } : prev,
                   );
@@ -1079,6 +1097,7 @@ export const SettingsPage: React.FC = () => {
                     console.error("Failed to update action hotkeys:", err);
                   }
                 }}
+                onValidationError={setHotkeyError}
                 maxHotkeys={3}
               />
             </div>

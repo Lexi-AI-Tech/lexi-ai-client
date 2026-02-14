@@ -4,7 +4,7 @@
 //! Hotkeys are managed via app config (server-synced) and runtime listeners.
 
 use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
-use crate::global_key_listener::validate_hotkey;
+use crate::global_key_listener::{hotkey_to_canonical, validate_hotkey};
 use crate::state::{ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState};
 use serde::Deserialize;
 use serde_json;
@@ -42,12 +42,11 @@ pub async fn update_hotkey(
         return Err("Maximum of 3 hotkeys allowed".to_string());
     }
 
-    // Validate each hotkey
-    for hotkey in &new_hotkeys {
-        if let Err(e) = validate_hotkey(hotkey) {
-            return Err(e);
-        }
-    }
+    // Validate and normalize each hotkey to canonical form (Control+Option+Command+Shift+Key)
+    let new_hotkeys: Vec<String> = new_hotkeys
+        .iter()
+        .map(|h| validate_hotkey(h).map(|()| hotkey_to_canonical(h)))
+        .collect::<Result<Vec<_>, String>>()?;
 
     // Get current config to preserve other fields
     let current_config = get_app_config(app.clone())
@@ -121,6 +120,13 @@ pub fn stop_hotkey_recording(state: State<HotkeyRecordingState>) {
     }
 }
 
+/// Validate a hotkey string (non-empty, not reserved by macOS).
+/// Returns the canonical form on success (Control+Option+Command+Shift+Key format for storage).
+#[tauri::command]
+pub fn validate_hotkey_for_ui(hotkey: String) -> Result<String, String> {
+    validate_hotkey(&hotkey).map(|()| hotkey_to_canonical(&hotkey))
+}
+
 /// Update the action hotkey configuration dynamically
 ///
 /// This command updates action hotkeys in app config and updates the runtime listener.
@@ -153,12 +159,11 @@ pub async fn update_action_hotkey(
         return Err("Maximum of 3 action hotkeys allowed".to_string());
     }
 
-    // Validate each hotkey
-    for hotkey in &new_hotkeys {
-        if let Err(e) = validate_hotkey(hotkey) {
-            return Err(e);
-        }
-    }
+    // Validate and normalize each hotkey to canonical form (Control+Option+Command+Shift+Key)
+    let new_hotkeys: Vec<String> = new_hotkeys
+        .iter()
+        .map(|h| validate_hotkey(h).map(|()| hotkey_to_canonical(h)))
+        .collect::<Result<Vec<_>, String>>()?;
 
     // Get current config to preserve other fields
     let current_config = get_app_config(app.clone())

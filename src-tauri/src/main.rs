@@ -94,7 +94,7 @@ use commands::auth::{
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_action_hotkey,
-    update_hotkey,
+    update_hotkey, validate_hotkey_for_ui,
 };
 use commands::notes::{create_note, delete_note, get_note, get_notes, update_note};
 use commands::onboarding::{
@@ -230,6 +230,7 @@ pub fn main() {
             get_pkce_verifier,
             update_hotkey,
             get_current_hotkey,
+            validate_hotkey_for_ui,
             start_hotkey_recording,
             stop_hotkey_recording,
             store_auth_data,

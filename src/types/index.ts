@@ -207,8 +207,13 @@ export interface PaginatedNotesResponse {
 // UI Component Types
 // ============================================================================
 
+/**
+ * Hotkey configuration. Each combination is stored in canonical form:
+ * Control+Option+Command+Shift+Key (modifiers in that order, Fn first if present).
+ * Example: ["Fn", "Control+Option+Command+Shift+Q"]. Reserved macOS shortcuts are rejected.
+ */
 export interface HotkeyConfig {
-  hotkeys: string[]; // Array of up to 3 hotkeys (e.g., ["Fn", "Cmd+Shift+R", "Ctrl+Alt+T"])
+  hotkeys: string[];
 }
 
 export interface NetworkStatus {

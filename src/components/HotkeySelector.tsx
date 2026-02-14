@@ -10,6 +10,8 @@ interface HotkeySelectorProps {
   disabled?: boolean;
   label?: string;
   description?: string;
+  /** Called when the user records a shortcut that is reserved by macOS */
+  onValidationError?: (message: string) => void;
 }
 
 // Mac key symbols for display
@@ -26,6 +28,9 @@ const KEY_SYMBOLS: Record<string, { symbol: string; label: string }> = {
 
 
 
+/** Canonical modifier order for storage (Control+Option+Command+Shift+Key, Fn first when present) */
+const MODIFIER_ORDER = ["Fn", "Control", "Option", "Command", "Shift"];
+
 export function HotkeySelector({
   value = { hotkeys: [] },
   onChange,
@@ -33,6 +38,7 @@ export function HotkeySelector({
   disabled = false,
   label = "Hotkeys",
   description = "Press keys to record a hotkey combination",
+  onValidationError,
 }: HotkeySelectorProps) {
   const [hotkeys, setHotkeys] = useState<string[]>(value.hotkeys);
   const [isRecording, setIsRecording] = useState(false);
@@ -65,23 +71,15 @@ export function HotkeySelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hotkeys]);
 
-  // Finalize current keys into a hotkey string
+  // Finalize current keys into a hotkey string (canonical: Control+Option+Command+Shift+Key)
   const finalizeRecording = useCallback(
-    (keys: Set<string>) => {
+    async (keys: Set<string>) => {
       if (keys.size === 0) return;
       const keysArray = Array.from(keys);
 
-      // Sort: modifiers first, then regular keys
-      const modifierOrder = [
-        "Fn",
-        "Control",
-        "Shift",
-        "Option",
-        "Command",
-      ];
       keysArray.sort((a, b) => {
-        const aIdx = modifierOrder.indexOf(a);
-        const bIdx = modifierOrder.indexOf(b);
+        const aIdx = MODIFIER_ORDER.indexOf(a);
+        const bIdx = MODIFIER_ORDER.indexOf(b);
         if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
         if (aIdx !== -1) return -1;
         if (bIdx !== -1) return 1;
@@ -90,15 +88,23 @@ export function HotkeySelector({
 
       const display = keysArray.join("+");
 
-      // Don't add duplicates
-      if (!hotkeys.includes(display) && hotkeys.length < maxHotkeys) {
-        setHotkeys((prev) => [...prev, display]);
+      try {
+        const canonical = await invoke<string>("validate_hotkey_for_ui", {
+          hotkey: display,
+        });
+        if (!hotkeys.includes(canonical) && hotkeys.length < maxHotkeys) {
+          setHotkeys((prev) => [...prev, canonical]);
+        }
+      } catch (err) {
+        const message =
+          typeof err === "string" ? err : (err as Error)?.message || "Invalid shortcut";
+        onValidationError?.(message);
       }
 
       setCurrentKeys(new Set());
       stopRecording();
     },
-    [hotkeys, maxHotkeys],
+    [hotkeys, maxHotkeys, onValidationError],
   );
 
   // Start recording mode — tells the rdev listener to emit key events
