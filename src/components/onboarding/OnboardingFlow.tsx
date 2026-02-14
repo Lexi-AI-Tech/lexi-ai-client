@@ -1,5 +1,6 @@
 import React from "react";
 import { AnimatePresence } from "framer-motion";
+import { invoke } from "@tauri-apps/api/core";
 import { useOnboardingStore } from "../../store/onboardingStore";
 import {
   WelcomeStep,
@@ -60,7 +61,10 @@ export const OnboardingFlow: React.FC = () => {
               {currentStepIndex === 1 && (
                 <PermissionsStep
                   key="permissions"
-                  onNext={nextStep}
+                  onNext={async () => {
+                    await invoke("start_global_key_listener").catch(() => {});
+                    await nextStep();
+                  }}
                   onBack={previousStep}
                   onSkip={completeOnboarding}
                   showBack={showBack}

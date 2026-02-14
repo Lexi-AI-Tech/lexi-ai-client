@@ -4,9 +4,12 @@
  * Main app with home dashboard, transcripts, and settings.
  * When Rust detects auth errors (e.g. token refresh fails), it clears auth and resets
  * onboarding, then emits auth_expired; the frontend syncs state and shows onboarding.
+ * After login, onboarding status is synced from server by system type and version;
+ * if not complete, onboarding flow is shown from start; otherwise go to homepage.
  */
 
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { HomePage } from "./components/home/HomePage";
@@ -18,6 +21,9 @@ import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { NotesPage } from "./components/NotesPage";
 import { useOnboardingStore } from "./store/onboardingStore";
+import { useAuthStore } from "./store/authStore";
+
+const ONBOARDING_VERSION = 1;
 
 type Page =
   | "home"
@@ -29,9 +35,60 @@ type Page =
   | "notes"
 
 function App() {
-  const { isCompleted, isInitialized } = useOnboardingStore();
+  const authStore = useAuthStore();
+  const { isCompleted, isInitialized, refreshState } = useOnboardingStore();
   const [currentPage, setCurrentPage] = useState<Page>("home");
+  const [onboardingSyncDone, setOnboardingSyncDone] = useState(false);
   const prevCompletedRef = useRef(isCompleted);
+
+  // When not authenticated, reset sync flag so we sync again after next login
+  useEffect(() => {
+    if (!authStore.isAuthenticated) {
+      setOnboardingSyncDone(false);
+    }
+  }, [authStore.isAuthenticated]);
+
+  // After login: fetch onboarding status from server and sync local state (complete or reset)
+  useEffect(() => {
+    if (
+      !authStore.isInitialized ||
+      !authStore.isAuthenticated ||
+      onboardingSyncDone
+    ) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await invoke<{ is_complete: boolean; version: number }>(
+          "get_server_onboarding_status",
+          { version: ONBOARDING_VERSION }
+        );
+        if (cancelled) return;
+        if (status.is_complete) {
+          await invoke("complete_onboarding");
+        } else {
+          await invoke("reset_onboarding");
+        }
+        if (cancelled) return;
+        await refreshState();
+        if (!cancelled) setOnboardingSyncDone(true);
+      } catch (e) {
+        if (!cancelled) {
+          console.error("Failed to sync onboarding from server:", e);
+          setOnboardingSyncDone(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authStore.isInitialized,
+    authStore.isAuthenticated,
+    onboardingSyncDone,
+    refreshState,
+  ]);
 
   // Whenever we land in the main app (complete/skip onboarding or load with onboarding done), show home
   useEffect(() => {
@@ -41,8 +98,19 @@ function App() {
     prevCompletedRef.current = isCompleted;
   }, [isCompleted]);
 
-  // Wait for onboarding state to initialize before deciding what to show
-  if (!isInitialized) {
+  // Start the global key listener when app loads with onboarding already complete
+  // (so Fn key works without restart after granting Input Monitoring)
+  useEffect(() => {
+    if (!isCompleted) return;
+    invoke("start_global_key_listener").catch(() => {});
+  }, [isCompleted]);
+
+  const showLoading =
+    !authStore.isInitialized ||
+    (authStore.isAuthenticated && !onboardingSyncDone) ||
+    !isInitialized;
+
+  if (showLoading) {
     return (
       <div className="app">
         <div

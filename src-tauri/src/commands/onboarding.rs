@@ -2,15 +2,20 @@
 //!
 //! This module provides Tauri commands for managing the onboarding flow state.
 //! Onboarding state is stored in Tauri Store (persistent storage) instead of localStorage.
+//! Server-side onboarding status is used after login to decide whether to show onboarding.
 //!
 //! ## Commands
-//! - `get_onboarding_state` - Get current onboarding step and completion status
+//! - `get_onboarding_state` - Get current onboarding step and completion status (local)
 //! - `set_onboarding_step` - Set the current onboarding step
 //! - `next_onboarding_step` - Move to the next step
 //! - `previous_onboarding_step` - Move to the previous step
-//! - `complete_onboarding` - Mark onboarding as completed
+//! - `complete_onboarding` - Mark onboarding as completed (local)
 //! - `reset_onboarding` - Reset onboarding to initial state
+//! - `get_server_onboarding_status` - Fetch onboarding status from server (by system_type and version)
+//! - `complete_server_onboarding` - Mark onboarding complete on server
 
+use crate::commands::auth::get_auth_token_async;
+use crate::utils;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
@@ -191,6 +196,108 @@ pub fn reset_onboarding(app: AppHandle) -> Result<OnboardingState, String> {
     let state = OnboardingState::default();
     save_onboarding_state(&app, &state)?;
     Ok(state)
+}
+
+/// Server onboarding status response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerOnboardingStatus {
+    pub is_complete: bool,
+    pub version: i32,
+}
+
+/// Get onboarding status from server for current user and system type.
+/// Call after login to decide whether to show onboarding or go to homepage.
+#[tauri::command]
+pub async fn get_server_onboarding_status(
+    app: AppHandle,
+    version: Option<i32>,
+) -> Result<ServerOnboardingStatus, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .ok_or_else(|| "Authentication required".to_string())?;
+
+    let system_type = utils::get_system_type();
+    let version_param = version.unwrap_or(1);
+    let url = format!(
+        "{}/api/v1/auth/onboarding-status?system_type={}&version={}",
+        crate::config::api_base_url(),
+        urlencoding::encode(system_type),
+        version_param
+    );
+
+    utils::log_api_request("Get server onboarding status", "GET", &url);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let status_code = response.status();
+    if !status_code.is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Server error ({}): {}", status_code, error_text));
+    }
+
+    response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+/// Mark onboarding as complete on the server for current user and system type.
+/// Call when user finishes or skips the onboarding flow.
+#[tauri::command]
+pub async fn complete_server_onboarding(
+    app: AppHandle,
+    version: Option<i32>,
+) -> Result<ServerOnboardingStatus, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .ok_or_else(|| "Authentication required".to_string())?;
+
+    let system_type = utils::get_system_type();
+    let version_param = version.unwrap_or(1);
+    let url = format!(
+        "{}/api/v1/auth/onboarding-status/complete",
+        crate::config::api_base_url()
+    );
+
+    utils::log_api_request("Complete server onboarding", "POST", &url);
+
+    let body = serde_json::json!({
+        "system_type": system_type,
+        "version": version_param
+    });
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let status_code = response.status();
+    if !status_code.is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Server error ({}): {}", status_code, error_text));
+    }
+
+    response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
 }
 
 /// Save onboarding state to Tauri Store

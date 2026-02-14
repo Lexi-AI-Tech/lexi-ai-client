@@ -27,31 +27,37 @@
 //!
 //! ## Implementation Notes
 //!
-//! Permission checks are simplified and may not be 100% accurate. In production, you might
-//! want to use platform-specific APIs (e.g., AVFoundation for microphone on macOS) for
-//! more reliable permission status checking.
+//! Microphone on macOS uses AVFoundation's AVCaptureDevice.authorizationStatus(for: .audio)
+//! so the UI reflects the actual System Settings toggle. Accessibility uses AXIsProcessTrusted;
+//! Input Monitoring uses IOHIDCheckAccess.
+
+#![allow(unexpected_cfgs)]
 
 use tauri::AppHandle;
 
+#[cfg(target_os = "macos")]
+use objc::runtime::Class;
 use crate::audio::recorder::AudioRecorder;
+#[cfg(target_os = "macos")]
+use objc::{msg_send, sel, sel_impl};
+#[cfg(target_os = "macos")]
+use std::ffi::CString;
 
-/// Check microphone permission on macOS
+/// Check microphone permission on macOS using AVFoundation (matches System Settings).
+/// cpal can succeed even when the mic toggle is off; this uses the real authorization status.
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn check_microphone_permission() -> Result<bool, String> {
-    // On macOS, we can check microphone permission by trying to access it
-    // This is a simplified check - in production you might want to use
-    // AVFoundation APIs for a more accurate check
+    // AVAuthorizationStatusAuthorized = 3
+    const AV_AUTHORIZATION_STATUS_AUTHORIZED: i64 = 3;
 
-    // Try to check using system_profiler or just return true if we can create a recorder
-    // For now, we'll attempt to create a recorder as a check
-    match std::panic::catch_unwind(|| {
-        let _recorder = AudioRecorder::new();
-        true
-    }) {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
+    let av_class = Class::get("AVCaptureDevice").ok_or_else(|| "AVCaptureDevice unavailable".to_string())?;
+    let ns_string_class = Class::get("NSString").ok_or_else(|| "NSString unavailable".to_string())?;
+    let c_str = CString::new("soun").map_err(|e| e.to_string())?;
+    let media_type: *mut objc::runtime::Object = unsafe { msg_send![ns_string_class, stringWithUTF8String: c_str.as_ptr()] };
+    let status: i64 = unsafe { msg_send![av_class, authorizationStatusForMediaType: media_type] };
+
+    Ok(status == AV_AUTHORIZATION_STATUS_AUTHORIZED)
 }
 
 /// Check microphone permission (non-macOS platforms)
@@ -61,15 +67,21 @@ pub fn check_microphone_permission() -> Result<bool, String> {
     Ok(true)
 }
 
-/// Check Input Monitoring permission on macOS
+// IOHIDCheckAccess: macOS 10.15+ API to check Input Monitoring permission.
+// kIOHIDRequestTypeListenEvent = 1, kIOHIDAccessTypeGranted = 0.
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn IOHIDCheckAccess(request_type: u32) -> u32;
+}
+
+/// Check Input Monitoring permission on macOS via IOHIDCheckAccess.
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn check_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> {
-    // Input Monitoring permission is tricky to check directly
-    // We'll try to start a test listener and see if it works
-    // In practice, if the permission is granted, rdev::listen will work
-    // This is a simplified check
-    Ok(true) // For now, assume it's granted if the app is running
+    const K_IOHID_REQUEST_TYPE_LISTEN_EVENT: u32 = 1;
+    const K_IOHID_ACCESS_TYPE_GRANTED: u32 = 0;
+    let access = unsafe { IOHIDCheckAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT) };
+    Ok(access == K_IOHID_ACCESS_TYPE_GRANTED)
 }
 
 /// Check Input Monitoring permission (non-macOS platforms)
@@ -79,32 +91,15 @@ pub fn check_input_monitoring_permission(_app: AppHandle) -> Result<bool, String
     Ok(true)
 }
 
-/// Check Accessibility permission on macOS
+/// Check Accessibility permission on macOS using the system API for this process.
+/// AppleScript checks the osascript process, not Lexi, so we use AXIsProcessTrusted instead.
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
-    use std::process::Command;
-
-    // Check if we can access System Events (which requires Accessibility permission)
-    let script = r#"
-        tell application "System Events"
-            try
-                get name of every process
-                return true
-            on error
-                return false
-            end try
-        end tell
-    "#;
-
-    match Command::new("osascript").arg("-e").arg(script).output() {
-        Ok(output) => {
-            let result = String::from_utf8_lossy(&output.stdout);
-            let trimmed = result.trim();
-            Ok(trimmed == "true")
-        }
-        Err(_) => Ok(false),
-    }
+    use macos_accessibility_client::raw::AXIsProcessTrusted;
+    // AXIsProcessTrusted returns non-zero (true) only if this process has accessibility permission.
+    let granted = unsafe { AXIsProcessTrusted() != 0 };
+    Ok(granted)
 }
 
 /// Check Accessibility permission (non-macOS platforms)
@@ -114,28 +109,55 @@ pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Internal helper: open macOS System Settings to a specific privacy pane.
+#[cfg(target_os = "macos")]
+fn open_permission_pane_impl(pane: &str) -> Result<(), String> {
+    use std::process::Command;
+    let url = match pane {
+        "microphone" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+        "accessibility" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+        "input_monitoring" => "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
+        _ => return Err(format!("Unknown pane: {}", pane)),
+    };
+    Command::new("open")
+        .arg(url)
+        .output()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Open macOS System Settings to a specific privacy pane (so user can grant permission if modal didn't show)
+#[tauri::command]
+#[cfg(target_os = "macos")]
+pub fn open_permission_pane(pane: String) -> Result<(), String> {
+    open_permission_pane_impl(&pane)
+}
+
+#[tauri::command]
+#[cfg(not(target_os = "macos"))]
+pub fn open_permission_pane(_pane: String) -> Result<(), String> {
+    Ok(())
+}
+
 /// Request microphone permission on macOS
 /// This will trigger the system permission dialog by attempting to access the microphone
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_microphone_permission() -> Result<bool, String> {
     use std::thread;
-    use std::time::Duration;
+
+    // Open System Settings pane so user can enable if the modal doesn't show
+    let _ = open_permission_pane_impl("microphone");
 
     // Spawn a thread to attempt microphone access, which triggers the permission dialog
     thread::spawn(move || {
-        thread::sleep(Duration::from_millis(100));
-
         // Try to create an audio recorder, which will trigger the permission dialog
-        // We do this in a separate thread to avoid blocking
-        // If permission is denied, this will fail, but that's okay - we just want to trigger the dialog
         let _ = std::panic::catch_unwind(|| {
             let _recorder = AudioRecorder::new();
             println!("Microphone permission dialog should have appeared");
         });
     });
 
-    // Return immediately - the permission dialog will appear asynchronously
     Ok(true)
 }
 
@@ -153,14 +175,12 @@ pub fn request_microphone_permission() -> Result<bool, String> {
 pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> {
     use rdev::{listen, Event};
     use std::thread;
-    use std::time::Duration;
+
+    // Open System Settings pane so user can enable if the modal doesn't show
+    let _ = open_permission_pane_impl("input_monitoring");
 
     // Spawn a thread to attempt starting a test listener, which triggers the permission dialog
     thread::spawn(move || {
-        thread::sleep(Duration::from_millis(100));
-
-        // Try to start a test listener, which will trigger Input Monitoring permission dialog
-        // We do this in a separate thread to avoid blocking
         let _ = std::panic::catch_unwind(|| {
             let _ = listen(move |_event: Event| {
                 // Empty callback - we just want to trigger the permission dialog
@@ -169,7 +189,6 @@ pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, Stri
         });
     });
 
-    // Return immediately - the permission dialog will appear asynchronously
     Ok(true)
 }
 
@@ -187,29 +206,23 @@ pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, Stri
 pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
     use std::process::Command;
     use std::thread;
-    use std::time::Duration;
+
+    // Open System Settings pane so user can enable if the modal doesn't show
+    let _ = open_permission_pane_impl("accessibility");
 
     // Spawn a thread to attempt using System Events, which triggers the permission dialog
     thread::spawn(move || {
-        thread::sleep(Duration::from_millis(100));
-
-        // Try to run a simple AppleScript that uses System Events
-        // This will trigger the Accessibility permission dialog
-        // We use a harmless command that just checks if we can access System Events
         let script = r#"
             tell application "System Events"
-                -- Just check if we can access System Events (triggers permission dialog)
                 get name of every process
             end tell
         "#;
-
         let _ = std::panic::catch_unwind(|| {
             let _ = Command::new("osascript").arg("-e").arg(script).output();
             println!("Accessibility permission dialog should have appeared");
         });
     });
 
-    // Return immediately - the permission dialog will appear asynchronously
     Ok(true)
 }
 

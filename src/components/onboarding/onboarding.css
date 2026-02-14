@@ -359,6 +359,26 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
+.permission-card--clickable {
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.permission-card--clickable:hover:not([aria-disabled="true"]) {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+.permission-card--clickable:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
+}
+
+.permission-allow-hint {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
 .permission-info {
   display: flex;
   align-items: center;

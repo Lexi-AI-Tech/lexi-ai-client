@@ -230,7 +230,24 @@ export function PermissionsStep({
 
       <div className="permissions-list">
         {permissions.map((item, i) => (
-          <div key={i} className="permission-card">
+          <div
+            key={i}
+            className={`permission-card ${!item.state.granted ? "permission-card--clickable" : ""}`}
+            role={!item.state.granted ? "button" : undefined}
+            tabIndex={!item.state.granted ? 0 : undefined}
+            onClick={!item.state.granted ? item.request : undefined}
+            onKeyDown={
+              !item.state.granted
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      item.request();
+                    }
+                  }
+                : undefined
+            }
+            aria-disabled={!item.state.granted && item.state.checking}
+          >
             <div className="permission-info">
               <div className="permission-icon-wrapper">
                 <item.icon className="permission-icon" />
@@ -245,13 +262,9 @@ export function PermissionsStep({
                 <Check className="check-icon" /> Allowed
               </div>
             ) : (
-              <button
-                onClick={item.request}
-                disabled={item.state.checking}
-                className="btn btn-outline btn-sm"
-              >
-                {item.state.checking ? "..." : "Allow"}
-              </button>
+              <span className="permission-allow-hint">
+                {item.state.checking ? "..." : "Click to open system permission"}
+              </span>
             )}
           </div>
         ))}
