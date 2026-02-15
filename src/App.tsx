@@ -98,11 +98,20 @@ function App() {
     prevCompletedRef.current = isCompleted;
   }, [isCompleted]);
 
-  // Start the global key listener when app loads with onboarding already complete
-  // (so Fn key works without restart after granting Input Monitoring)
+  // Start the global key listener only when onboarding is complete AND input monitoring
+  // is already granted. This avoids triggering the macOS Input Monitoring popup before
+  // the user has reached the permissions page (e.g. when server says onboarding complete
+  // from another device). After the user grants the permission and restarts, this will
+  // start the listener on next launch.
   useEffect(() => {
     if (!isCompleted) return;
-    invoke("start_global_key_listener").catch(() => {});
+    invoke<boolean>("check_input_monitoring_permission")
+      .then((granted) => {
+        if (granted) {
+          invoke("start_global_key_listener").catch(() => {});
+        }
+      })
+      .catch(() => {});
   }, [isCompleted]);
 
   const showLoading =
