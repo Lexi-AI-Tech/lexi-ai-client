@@ -14,69 +14,34 @@ import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import "../styles/pages/shared.css";
 
+const PAGE_SIZE = 10;
+
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const [nextPage, setNextPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [originalTooltipId, setOriginalTooltipId] = useState<string | null>(null);
-  
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+
   // Audio playback state
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioProgress, setAudioProgress] = useState<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Clear error on mount to prevent stale error messages
-  useEffect(() => {
-    setError(null);
-  }, []);
-
-  // Fetch transcripts function
-  const fetchTranscripts = useCallback(async () => {
-    // This function should only be called when we're ready to fetch
-    // (initialized, authenticated, and tokens loaded)
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      // Should not happen if called correctly, but handle gracefully
-      setTranscripts([]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await invoke<{
-        transcripts: Transcript[];
-        total: number;
-        page: number;
-        page_size: number;
-        total_pages: number;
-      }>("get_transcripts", {
-        page,
-        pageSize: 10,
-      });
-      setTranscripts(response.transcripts);
-      setTotalPages(response.total_pages);
-      setTotal(response.total);
-    } catch (err: any) {
-      console.error("Failed to fetch transcripts:", err);
-
-      // Check error type
+  const handleFetchError = useCallback(
+    (err: any) => {
       const errorMessage = err.message || "Failed to load transcripts";
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
         errorMessage.includes("Unauthorized");
-
-      // Check for network errors (server unreachable, no internet, etc.)
       const isNetworkError =
         err.name === "TypeError" ||
         err.name === "NetworkError" ||
@@ -86,81 +51,120 @@ export const TranscriptsList: React.FC = () => {
         errorMessage.includes("ECONNREFUSED");
 
       if (isAuthError) {
-        // Auth error - Rust backend already tried to refresh token via get_auth_token_async()
-        // If we still got 401, the refresh failed or tokens are invalid
-        // The backend will emit auth_expired event, which authStore will handle
-        // Don't show error - just let the UI transition to login state
-        console.log(
-          "🔴 Auth error after Rust-side refresh attempt, clearing auth",
-        );
         authStore.clearAuth();
         setTranscripts([]);
-        setError(null); // No error message - silent logout
+        setError(null);
       } else if (isNetworkError) {
-        // Network error - don't show error on initial load, just log it
-        // User can retry manually if needed
-        console.warn("Network error while fetching transcripts:", err);
         setTranscripts([]);
-        setError(null); // Don't show network errors as they're often temporary
+        setError(null);
       } else {
-        // Other API errors - show error message
         setError(errorMessage);
       }
+    },
+    [authStore],
+  );
+
+  const loadInitial = useCallback(async () => {
+    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await invoke<{
+        transcripts: Transcript[];
+        total: number;
+        page: number;
+        page_size: number;
+        total_pages: number;
+      }>("get_transcripts", { page: 1, pageSize: PAGE_SIZE });
+      setTranscripts(response.transcripts);
+      setTotalPages(response.total_pages);
+      setTotal(response.total);
+      setNextPage(2);
+    } catch (err: any) {
+      console.error("Failed to fetch transcripts:", err);
+      handleFetchError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [authStore.isAuthenticated, authStore.tokens?.access_token, handleFetchError]);
+
+  const loadMore = useCallback(async () => {
+    if (
+      !authStore.isAuthenticated ||
+      !authStore.tokens?.access_token ||
+      loading ||
+      nextPage > totalPages
+    )
+      return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await invoke<{
+        transcripts: Transcript[];
+        total: number;
+        page: number;
+        page_size: number;
+        total_pages: number;
+      }>("get_transcripts", { page: nextPage, pageSize: PAGE_SIZE });
+      setTranscripts((prev) => [...prev, ...response.transcripts]);
+      setTotal(response.total);
+      setTotalPages(response.total_pages);
+      setNextPage((p) => p + 1);
+    } catch (err: any) {
+      console.error("Failed to load more transcripts:", err);
+      handleFetchError(err);
     } finally {
       setLoading(false);
     }
   }, [
     authStore.isAuthenticated,
-    authStore.isInitialized,
     authStore.tokens?.access_token,
-    page,
+    loading,
+    nextPage,
+    totalPages,
+    handleFetchError,
   ]);
 
-  // Fetch transcripts when authenticated and page changes (same pattern as HomePage: single effect, no callback in deps to avoid double fetch)
+  // Initial load when authenticated and list is empty
   useEffect(() => {
     if (!authStore.isInitialized) return;
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
       setTranscripts([]);
       setError(null);
+      setNextPage(1);
       setLoading(false);
       return;
     }
-
-    setLoading(true);
-    setError(null);
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const response = await invoke<{
-          transcripts: Transcript[];
-          total: number;
-          page: number;
-          page_size: number;
-          total_pages: number;
-        }>("get_transcripts", { page, pageSize: 10 });
-
-        if (cancelled) return;
-        setTranscripts(response.transcripts);
-        setTotalPages(response.total_pages);
-        setTotal(response.total);
-      } catch (err: any) {
-        if (cancelled) return;
-        console.error("Failed to fetch transcripts:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    if (transcripts.length === 0 && nextPage === 1 && !loading) {
+      loadInitial();
+    }
   }, [
     authStore.isInitialized,
     authStore.isAuthenticated,
     authStore.tokens?.access_token,
-    page,
+    transcripts.length,
+    nextPage,
+    loading,
+    loadInitial,
   ]);
+
+  // Infinite scroll: load more when sentinel is visible
+  useEffect(() => {
+    if (!loadMoreSentinelRef.current || nextPage > totalPages || loading)
+      return;
+    const sentinel = loadMoreSentinelRef.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [e] = entries;
+        if (e?.isIntersecting && nextPage <= totalPages && !loading) {
+          loadMore();
+        }
+      },
+      { root: null, rootMargin: "200px", threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [nextPage, totalPages, loading, loadMore]);
 
   const openDeleteConfirm = (transcriptId: string) => {
     setDeleteConfirmId(transcriptId);
@@ -177,7 +181,9 @@ export const TranscriptsList: React.FC = () => {
     try {
       await invoke("delete_transcript", { transcriptId: deleteConfirmId });
       setDeleteConfirmId(null);
-      await fetchTranscripts();
+      setTranscripts([]);
+      setNextPage(1);
+      // Effect will run and call loadInitial() when transcripts.length becomes 0
     } catch (err: any) {
       console.error("Failed to delete transcript:", err);
       alert(err.message || "Failed to delete transcript");
@@ -276,31 +282,6 @@ export const TranscriptsList: React.FC = () => {
             </span>
           )}
         </h3>
-        {totalPages > 1 && (
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <button
-              className="transcript-btn"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1 || loading}
-              style={{ fontSize: "11px", padding: "4px 8px" }}
-            >
-              ← Prev
-            </button>
-            <span
-              style={{ fontSize: "11px", color: "rgba(255, 255, 255, 0.6)" }}
-            >
-              {page} / {totalPages}
-            </span>
-            <button
-              className="transcript-btn"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages || loading}
-              style={{ fontSize: "11px", padding: "4px 8px" }}
-            >
-              Next →
-            </button>
-          </div>
-        )}
       </div>
 
       {!showContent && (
@@ -372,22 +353,6 @@ export const TranscriptsList: React.FC = () => {
 
       {showContent && !showLogin && transcripts.length > 0 && (
         <div className="transcripts-list transcripts-table" style={{ position: "relative" }}>
-          {loading && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "rgba(255, 255, 255, 0.7)",
-                borderRadius: "8px",
-                zIndex: 10,
-              }}
-            >
-              <div className="loading-spinner" />
-            </div>
-          )}
           <div className="transcripts-table-header">
             <span>Date</span>
             <span>Transcript</span>
@@ -699,6 +664,20 @@ export const TranscriptsList: React.FC = () => {
               </div>
             </div>
           ))}
+          {/* Sentinel for infinite scroll */}
+          {nextPage <= totalPages && (
+            <div
+              ref={loadMoreSentinelRef}
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                padding: "16px",
+                minHeight: "40px",
+              }}
+            >
+              {loading && <div className="loading-spinner" />}
+            </div>
+          )}
         </div>
       )}
 
