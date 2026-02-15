@@ -306,14 +306,16 @@ export const ActionsPage: React.FC = () => {
 
         <div
           style={{
-            backgroundColor: "#1f2937",
+            backgroundColor: "#f9fafb",
             padding: "1.5rem",
             borderRadius: "0.75rem",
             maxWidth: "600px",
+            border: "1px solid #e5e7eb",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
           }}
         >
           {isLoadingConfig ? (
-            <div style={{ color: "#9ca3af", fontSize: "14px" }}>
+            <div style={{ color: "#6b7280", fontSize: "14px" }}>
               Loading hotkey...
             </div>
           ) : (
@@ -420,11 +422,12 @@ export const ActionsPage: React.FC = () => {
                 <div
                   style={{
                     padding: "8px 12px",
-                    background: "rgba(255, 255, 255, 0.05)",
+                    background: "#f3f4f6",
                     borderRadius: "6px",
                     fontSize: "13px",
-                    color: "#9ca3af",
+                    color: "#6b7280",
                     display: "inline-block",
+                    border: "1px solid #e5e7eb",
                   }}
                 >
                   No action hotkeys configured

@@ -291,12 +291,14 @@ export function HotkeySelector({
             >
               <div
                 style={{
-                  backgroundColor: "#1f2937",
+                  backgroundColor: "#f9fafb",
                   padding: "12px 16px",
                   borderRadius: "10px",
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
                 }}
               >
                 {keys.map((key, keyIndex) =>
@@ -336,13 +338,14 @@ export function HotkeySelector({
         {isRecording && (
           <div
             style={{
-              backgroundColor: "#1f2937",
+              backgroundColor: "#eff6ff",
               padding: "12px 16px",
               borderRadius: "10px",
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              border: "2px solid rgba(59, 130, 246, 0.5)",
+              border: "2px solid rgba(59, 130, 246, 0.35)",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
             }}
           >
             {currentKeys.size > 0 ? (
