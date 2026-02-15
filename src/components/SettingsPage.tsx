@@ -60,6 +60,16 @@ export const SettingsPage: React.FC = () => {
   const enhanceTranscription = config?.enhance_transcription;
 
   const configHotkeys = config?.hotkeys || [];
+  const configActionHotkeys = config?.action_hotkeys || [];
+
+  const overlapError =
+    "Same key combination cannot be used for both hotkeys and action hotkeys";
+
+  const hasHotkeyOverlap = (
+    listA: string[],
+    listB: string[],
+  ): boolean =>
+    listA.some((h) => listB.includes(h));
 
   // Load app config on mount
   useEffect(() => {
@@ -1049,20 +1059,30 @@ export const SettingsPage: React.FC = () => {
                 marginBottom: "16px",
               }}
             >
-              {/* Transcription Hotkeys */}
+              {/* Hotkeys */}
               <HotkeySelector
                 label="Transcription Hotkeys"
                 description="Hold to record audio for transcription"
                 value={currentHotkeys}
                 onChange={async (newConfig) => {
                   setHotkeyError(null);
+                  if (hasHotkeyOverlap(newConfig.hotkeys, configActionHotkeys)) {
+                    setHotkeyError(overlapError);
+                    return;
+                  }
                   setCurrentHotkeys(newConfig);
                   try {
                     await invoke("update_hotkey", {
                       configJson: JSON.stringify(newConfig),
                     });
-                  } catch (err) {
+                  } catch (err: unknown) {
                     console.error("Failed to update transcription hotkeys:", err);
+                    const message =
+                      typeof err === "string"
+                        ? err
+                        : (err as Error)?.message ||
+                          "Failed to update transcription hotkeys";
+                    setHotkeyError(message);
                   }
                 }}
                 onValidationError={setHotkeyError}
@@ -1086,6 +1106,10 @@ export const SettingsPage: React.FC = () => {
                 value={{ hotkeys: config?.action_hotkeys || [] }}
                 onChange={async (newConfig) => {
                   setHotkeyError(null);
+                  if (hasHotkeyOverlap(newConfig.hotkeys, configHotkeys)) {
+                    setHotkeyError(overlapError);
+                    return;
+                  }
                   setConfig((prev) =>
                     prev ? { ...prev, action_hotkeys: newConfig.hotkeys } : prev,
                   );
@@ -1093,8 +1117,14 @@ export const SettingsPage: React.FC = () => {
                     await invoke("update_action_hotkey", {
                       configJson: JSON.stringify(newConfig),
                     });
-                  } catch (err) {
+                  } catch (err: unknown) {
                     console.error("Failed to update action hotkeys:", err);
+                    const message =
+                      typeof err === "string"
+                        ? err
+                        : (err as Error)?.message ||
+                          "Failed to update action hotkeys";
+                    setHotkeyError(message);
                   }
                 }}
                 onValidationError={setHotkeyError}
@@ -1142,12 +1172,12 @@ export const SettingsPage: React.FC = () => {
                 <button
                   onClick={async () => {
                     try {
-                      // Reset transcription hotkeys to default
-                      const defaultTranscription = { hotkeys: ["Fn"] };
+                      // Reset hotkeys to default
+                      const defaultHotkeys = { hotkeys: ["Fn"] };
                       await invoke("update_hotkey", {
-                        configJson: JSON.stringify(defaultTranscription),
+                        configJson: JSON.stringify(defaultHotkeys),
                       });
-                      setCurrentHotkeys(defaultTranscription);
+                      setCurrentHotkeys(defaultHotkeys);
 
                       // Reset action hotkeys to default
                       const defaultAction = { hotkeys: ["Fn+Control"] };

@@ -2,56 +2,65 @@
 //!
 //! This module provides Tauri commands for managing hotkey configuration.
 //! Hotkeys are managed via app config (server-synced) and runtime listeners.
+//! - **Hotkeys**: trigger recording for transcription.
+//! - **Action hotkeys**: trigger recording for voice actions.
 
 use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
-use crate::global_key_listener::{hotkey_to_canonical, validate_hotkey};
+use crate::global_key_listener::{
+    hotkey_to_canonical,
+    validate_assistant_action_hotkeys_no_overlap,
+    validate_hotkey,
+};
 use crate::state::{ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState};
 use serde::Deserialize;
-use serde_json;
 use tauri::{AppHandle, Emitter, State};
+
+const MAX_HOTKEYS: usize = 3;
+
+/// JSON payload from frontend: `{ "hotkeys": ["Fn", "Cmd+Shift+R"] }`
+#[derive(Deserialize)]
+struct HotkeyConfigJson {
+    hotkeys: Vec<String>,
+}
+
+/// Parse JSON and validate/normalize hotkey list. Returns canonical hotkeys or error.
+fn parse_and_validate_hotkeys(
+    config_json: &str,
+    max_allowed: usize,
+    kind: &str,
+) -> Result<Vec<String>, String> {
+    let config: HotkeyConfigJson = serde_json::from_str(config_json)
+        .map_err(|e| format!("Failed to parse {} config: {}", kind, e))?;
+
+    let raw = config.hotkeys;
+    if raw.len() > max_allowed {
+        return Err(format!("Maximum of {} {} allowed", max_allowed, kind));
+    }
+
+    raw.iter()
+        .map(|h| validate_hotkey(h).map(|()| hotkey_to_canonical(h)))
+        .collect::<Result<Vec<_>, _>>()
+}
 
 /// Update the hotkey configuration dynamically
 ///
-/// This command updates hotkeys in app config and updates the runtime listener.
 /// Supports up to 3 hotkeys. Fn key is handled via rdev, others via Tauri global shortcuts.
-///
-/// # Arguments
-/// * `config_json` - JSON string with `hotkeys` array (e.g., `{"hotkeys": ["Fn", "Cmd+Shift+R"]}`)
-///
-/// # Returns
-/// * `Ok(())` - Successfully updated the hotkeys
-/// * `Err(String)` - An error message if parsing failed or update failed
 #[tauri::command]
 pub async fn update_hotkey(
     config_json: String,
     app: AppHandle,
     state: State<'_, HotkeyWatchState>,
 ) -> Result<(), String> {
-    // Parse JSON - frontend sends {hotkeys: [...]}
-    #[derive(Deserialize)]
-    struct HotkeyConfigJson {
-        hotkeys: Vec<String>,
-    }
-    let config: HotkeyConfigJson = serde_json::from_str(&config_json)
-        .map_err(|e| format!("Failed to parse hotkey config: {}", e))?;
+    let new_hotkeys = parse_and_validate_hotkeys(&config_json, MAX_HOTKEYS, "hotkey")?;
 
-    let new_hotkeys = config.hotkeys;
-
-    // Validate: maximum 3 hotkeys
-    if new_hotkeys.len() > 3 {
-        return Err("Maximum of 3 hotkeys allowed".to_string());
-    }
-
-    // Validate and normalize each hotkey to canonical form (Control+Option+Command+Shift+Key)
-    let new_hotkeys: Vec<String> = new_hotkeys
-        .iter()
-        .map(|h| validate_hotkey(h).map(|()| hotkey_to_canonical(h)))
-        .collect::<Result<Vec<_>, String>>()?;
-
-    // Get current config to preserve other fields
     let current_config = get_app_config(app.clone())
         .await
         .unwrap_or_else(|_| AppConfig::default());
+
+    validate_assistant_action_hotkeys_no_overlap(
+        &new_hotkeys,
+        current_config.action_hotkeys.as_deref().unwrap_or(&[]),
+    )?;
 
     let app_config_update = AppConfig {
         hotkeys: Some(new_hotkeys.clone()),
@@ -67,14 +76,10 @@ pub async fn update_hotkey(
         .await
         .map_err(|e| format!("Failed to update hotkeys: {}", e))?;
 
-    // Update watch state to notify listener thread (single source of truth)
     if state.0.send(new_hotkeys.clone()).is_err() {
         return Err("Failed to update hotkey watch state".to_string());
     }
 
-    // Note: rdev hotkeys are automatically handled by the rdev listener when config changes
-
-    // Emit the config back as JSON for UI display (frontend expects {hotkeys: [...]})
     let response_json = serde_json::json!({ "hotkeys": new_hotkeys });
     app.emit("hotkey-updated", response_json.to_string())
         .unwrap_or_default();
@@ -83,12 +88,6 @@ pub async fn update_hotkey(
 }
 
 /// Get the current hotkey configuration
-///
-/// Returns hotkeys from app config.
-///
-/// # Returns
-/// * `String` - JSON string with `hotkeys` array (e.g., `{"hotkeys": ["Fn", "Cmd+Shift+R"]}`)
-
 #[tauri::command]
 pub async fn get_current_hotkey(app: AppHandle) -> Result<String, String> {
     let config = get_app_config(app).await?;
@@ -96,7 +95,6 @@ pub async fn get_current_hotkey(app: AppHandle) -> Result<String, String> {
         .hotkeys
         .ok_or_else(|| "Server did not provide hotkeys".to_string())?;
 
-    // Frontend expects {hotkeys: [...]} format
     let response = serde_json::json!({ "hotkeys": hotkeys });
     serde_json::to_string(&response)
         .map_err(|e| format!("Failed to serialize hotkey config: {}", e))
@@ -121,7 +119,7 @@ pub fn stop_hotkey_recording(state: State<HotkeyRecordingState>) {
 }
 
 /// Validate a hotkey string (non-empty, not reserved by macOS).
-/// Returns the canonical form on success (Control+Option+Command+Shift+Key format for storage).
+/// Returns the canonical form on success.
 #[tauri::command]
 pub fn validate_hotkey_for_ui(hotkey: String) -> Result<String, String> {
     validate_hotkey(&hotkey).map(|()| hotkey_to_canonical(&hotkey))
@@ -129,46 +127,24 @@ pub fn validate_hotkey_for_ui(hotkey: String) -> Result<String, String> {
 
 /// Update the action hotkey configuration dynamically
 ///
-/// This command updates action hotkeys in app config and updates the runtime listener.
 /// Supports up to 3 action hotkeys.
-///
-/// # Arguments
-/// * `config_json` - JSON string with `hotkeys` array (e.g., `{"hotkeys": ["Fn+Control"]}`)
-///
-/// # Returns
-/// * `Ok(())` - Successfully updated the action hotkeys
-/// * `Err(String)` - An error message if parsing failed or update failed
 #[tauri::command]
 pub async fn update_action_hotkey(
     config_json: String,
     app: AppHandle,
     state: State<'_, ActionHotkeyWatchState>,
 ) -> Result<(), String> {
-    // Parse JSON - frontend sends {hotkeys: [...]}
-    #[derive(Deserialize)]
-    struct HotkeyConfigJson {
-        hotkeys: Vec<String>,
-    }
-    let config: HotkeyConfigJson = serde_json::from_str(&config_json)
-        .map_err(|e| format!("Failed to parse action hotkey config: {}", e))?;
+    let new_hotkeys =
+        parse_and_validate_hotkeys(&config_json, MAX_HOTKEYS, "action hotkey")?;
 
-    let new_hotkeys = config.hotkeys;
-
-    // Validate: maximum 3 hotkeys
-    if new_hotkeys.len() > 3 {
-        return Err("Maximum of 3 action hotkeys allowed".to_string());
-    }
-
-    // Validate and normalize each hotkey to canonical form (Control+Option+Command+Shift+Key)
-    let new_hotkeys: Vec<String> = new_hotkeys
-        .iter()
-        .map(|h| validate_hotkey(h).map(|()| hotkey_to_canonical(h)))
-        .collect::<Result<Vec<_>, String>>()?;
-
-    // Get current config to preserve other fields
     let current_config = get_app_config(app.clone())
         .await
         .unwrap_or_else(|_| AppConfig::default());
+
+    validate_assistant_action_hotkeys_no_overlap(
+        current_config.hotkeys.as_deref().unwrap_or(&[]),
+        &new_hotkeys,
+    )?;
 
     let app_config_update = AppConfig {
         hotkeys: current_config.hotkeys,
@@ -184,16 +160,13 @@ pub async fn update_action_hotkey(
         .await
         .map_err(|e| format!("Failed to update action hotkeys: {}", e))?;
 
-    // Update watch state to notify listener thread
     if state.0.send(new_hotkeys.clone()).is_err() {
         return Err("Failed to update action hotkey watch state".to_string());
     }
 
-    // Emit the config back as JSON for UI display
     let response_json = serde_json::json!({ "hotkeys": new_hotkeys });
     app.emit("action-hotkey-updated", response_json.to_string())
         .unwrap_or_default();
     println!("🎯 Action hotkeys updated to: {:?}", new_hotkeys);
     Ok(())
 }
-

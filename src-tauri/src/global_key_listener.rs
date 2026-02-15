@@ -237,13 +237,6 @@ const RESERVED_MACOS_SHORTCUTS: &[&str] = &[
     "Command+F5",
 ];
 
-fn is_reserved_macos_shortcut(hotkey: &str) -> bool {
-    let canonical = hotkey_to_canonical(hotkey);
-    RESERVED_MACOS_SHORTCUTS
-        .iter()
-        .any(|&reserved| hotkey_to_canonical(reserved) == canonical)
-}
-
 /// Check if hotkey_a is a strict subset of hotkey_b
 /// (all keys in a are in b, but b has additional keys)
 fn is_strict_subset(a: &str, b: &str) -> bool {
@@ -252,13 +245,50 @@ fn is_strict_subset(a: &str, b: &str) -> bool {
     parts_a.len() < parts_b.len() && parts_a.is_subset(&parts_b)
 }
 
-/// Validates a hotkey string (non-empty, not reserved by macOS).
+/// Single-letter keys (A–Z) used alone are reserved; Fn and other single keys (e.g. F6, Escape) are allowed.
+fn is_reserved_single_letter(canonical: &str) -> bool {
+    if canonical.contains('+') {
+        return false;
+    }
+    canonical.len() == 1 && canonical.chars().next().map_or(false, |c| c.is_ascii_alphabetic())
+}
+
+fn is_reserved_macos_shortcut(hotkey: &str) -> bool {
+    let canonical = hotkey_to_canonical(hotkey);
+    if is_reserved_single_letter(&canonical) {
+        return true;
+    }
+    RESERVED_MACOS_SHORTCUTS
+        .iter()
+        .any(|&reserved| hotkey_to_canonical(reserved) == canonical)
+}
+
+/// Validates a hotkey string (non-empty, not reserved by macOS, no single letter A–Z alone).
 pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
     if hotkey.trim().is_empty() {
         return Err("Hotkey cannot be empty".to_string());
     }
     if is_reserved_macos_shortcut(hotkey) {
         return Err("This shortcut is reserved by macOS and cannot be used".to_string());
+    }
+    Ok(())
+}
+
+/// Error message when hotkeys and action hotkeys overlap.
+pub const ASSISTANT_ACTION_HOTKEY_OVERLAP_MSG: &str =
+    "Same key combination cannot be used for both hotkeys and action hotkeys";
+
+/// Returns an error if any hotkey appears in both hotkey and action hotkey lists (canonical comparison).
+pub fn validate_assistant_action_hotkeys_no_overlap(
+    assistant_hotkeys: &[String],
+    action_hotkeys: &[String],
+) -> Result<(), String> {
+    let action_set: std::collections::HashSet<_> =
+        action_hotkeys.iter().map(|h| hotkey_to_canonical(h)).collect();
+    for h in assistant_hotkeys {
+        if action_set.contains(&hotkey_to_canonical(h)) {
+            return Err(ASSISTANT_ACTION_HOTKEY_OVERLAP_MSG.to_string());
+        }
     }
     Ok(())
 }

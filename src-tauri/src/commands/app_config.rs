@@ -14,6 +14,7 @@ use tauri_plugin_autostart::ManagerExt;
 use crate::api_endpoints::app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::commands::shortcuts::Shortcut;
+use crate::global_key_listener::validate_assistant_action_hotkeys_no_overlap;
 use crate::state::{ActionHotkeyWatchState, HotkeyWatchState};
 use crate::utils;
 
@@ -25,7 +26,7 @@ use crate::utils;
 pub struct AppConfig {
     /// Transcription language preferences (e.g., ["en"], ["es"], ["auto"])
     pub languages: Option<Vec<String>>,
-    /// Global hotkeys for triggering recording (e.g., ["Fn"], ["Cmd+Shift+R"])
+    /// Hotkeys for triggering recording (e.g., ["Fn"], ["Cmd+Shift+R"])
     pub hotkeys: Option<Vec<String>>,
     /// Whether to enhance transcriptions with LLM processing
     pub enhance_transcription: Option<bool>,
@@ -144,6 +145,12 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
 
     // Merge provided config with current config
     merge_config(&mut current_config, config);
+
+    // Validate hotkeys and action hotkeys do not overlap before syncing to server
+    validate_assistant_action_hotkeys_no_overlap(
+        current_config.hotkeys.as_deref().unwrap_or(&[]),
+        current_config.action_hotkeys.as_deref().unwrap_or(&[]),
+    )?;
 
     println!("✅ App config updated in memory");
 
