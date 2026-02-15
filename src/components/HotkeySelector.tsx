@@ -43,7 +43,7 @@ export function HotkeySelector({
   const [hotkeys, setHotkeys] = useState<string[]>(value.hotkeys);
   const [isRecording, setIsRecording] = useState(false);
   const [currentKeys, setCurrentKeys] = useState<Set<string>>(new Set());
-  const [isHoveredRemove, setIsHoveredRemove] = useState<string | null>(null);
+  const [hoveredRemoveIndex, setHoveredRemoveIndex] = useState<number | null>(null);
   const lastPropValue = useRef<string>(JSON.stringify(value.hotkeys));
   const lastNotified = useRef<string>(JSON.stringify(value.hotkeys));
   const recordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -276,23 +276,32 @@ export function HotkeySelector({
         </p>
       </div>
 
-      {/* Hotkey chips */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      {/* Hotkey chips - inline */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: "12px",
+          alignItems: "center",
+        }}
+      >
         {hotkeys.map((hotkey, index) => {
           const keys = hotkey.split("+");
           return (
             <div
               key={`hotkey-${index}-${hotkey}`}
               style={{
-                display: "flex",
+                position: "relative",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "12px",
               }}
             >
               <div
                 style={{
                   backgroundColor: "#f9fafb",
                   padding: "12px 16px",
+                  paddingRight: disabled ? "16px" : "36px",
                   borderRadius: "10px",
                   display: "flex",
                   alignItems: "center",
@@ -307,27 +316,35 @@ export function HotkeySelector({
               </div>
               {!disabled && (
                 <button
-                  onClick={() => removeHotkey(index)}
-                  onMouseEnter={() => setIsHoveredRemove(`${index}`)}
-                  onMouseLeave={() => setIsHoveredRemove(null)}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    removeHotkey(index);
+                  }}
+                  onMouseEnter={() => setHoveredRemoveIndex(index)}
+                  onMouseLeave={() => setHoveredRemoveIndex(null)}
+                  aria-label="Remove hotkey"
                   style={{
-                    background: "transparent",
-                    border: "1px solid",
-                    borderColor:
-                      isHoveredRemove === `${index}`
-                        ? "rgba(239, 68, 68, 0.5)"
-                        : "#e5e7eb",
-                    color:
-                      isHoveredRemove === `${index}` ? "#ef4444" : "#9ca3af",
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    width: "20px",
+                    height: "20px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: hoveredRemoveIndex === index ? "#fef2f2" : "transparent",
+                    border: "none",
+                    borderRadius: "4px",
+                    color: hoveredRemoveIndex === index ? "#ef4444" : "#9ca3af",
                     cursor: "pointer",
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    fontWeight: 500,
+                    fontSize: "14px",
+                    lineHeight: 1,
+                    fontWeight: 600,
                     transition: "all 0.2s ease",
                   }}
                 >
-                  Remove
+                  ×
                 </button>
               )}
             </div>
