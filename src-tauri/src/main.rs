@@ -54,6 +54,7 @@ mod cursor_context; // Cursor context retrieval using macOS Accessibility API (A
 mod global_key_listener; // Unified hotkey management (rdev for Fn key, Tauri shortcuts for others)
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
+mod os_event_consumers; // OS-level event consumers (e.g. suppress Fn → emoji picker on macOS)
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
@@ -288,24 +289,7 @@ pub fn main() {
             // Create system tray first to avoid borrow checker issues
             tray::init_system_tray(app)?;
 
-            // Suppress emoji picker on Fn key press (when "Press Fn to show Emoji & Symbols" is set in System Settings)
-            #[cfg(target_os = "macos")]
-            {
-                use tauri_plugin_macos_input_monitor::{Hotkey, MacOSInputMonitorExt, Modifiers};
-                let hotkey = Hotkey {
-                    keycodes: vec![179], // Fn key (kVK_Function / Globe key)
-                    modifiers: Modifiers::empty(),
-                    consume: true,
-                    event_name: "fn-key-consumed".to_string(),
-                };
-                let monitor = app.macos_input_monitor();
-                let manager = monitor.manager.lock().unwrap();
-                if let Ok(id) = manager.register(hotkey) {
-                    println!("🔇 Fn key (emoji picker) suppressed via macos-input-monitor: id {:?}", id);
-                } else {
-                    eprintln!("⚠️  Failed to register Fn-key suppression hotkey");
-                }
-            }
+            os_event_consumers::register(app);
 
             let app_handle = app.handle();
 
