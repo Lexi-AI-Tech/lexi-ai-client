@@ -53,9 +53,9 @@ pub async fn update_hotkey(
 ) -> Result<(), String> {
     let new_hotkeys = parse_and_validate_hotkeys(&config_json, MAX_HOTKEYS, "hotkey")?;
 
-    let current_config = get_app_config(app.clone())
-        .await
-        .unwrap_or_else(|_| AppConfig::default());
+    let current_config = get_app_config(app.clone()).await.map_err(|e| {
+        format!("Could not load config to validate hotkeys: {}", e)
+    })?;
 
     validate_assistant_action_hotkeys_no_overlap(
         &new_hotkeys,
@@ -137,9 +137,9 @@ pub async fn update_action_hotkey(
     let new_hotkeys =
         parse_and_validate_hotkeys(&config_json, MAX_HOTKEYS, "action hotkey")?;
 
-    let current_config = get_app_config(app.clone())
-        .await
-        .unwrap_or_else(|_| AppConfig::default());
+    let current_config = get_app_config(app.clone()).await.map_err(|e| {
+        format!("Could not load config to validate hotkeys: {}", e)
+    })?;
 
     validate_assistant_action_hotkeys_no_overlap(
         current_config.hotkeys.as_deref().unwrap_or(&[]),

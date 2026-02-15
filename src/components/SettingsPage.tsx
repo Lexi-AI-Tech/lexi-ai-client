@@ -48,6 +48,7 @@ export const SettingsPage: React.FC = () => {
     hotkeys: [],
   });
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
+  const [hotkeySectionKey, setHotkeySectionKey] = useState(0);
   const [activeSection, setActiveSection] = useState<
     "account" | "transcription" | "general" | "hotkeys"
   >("account");
@@ -1061,6 +1062,7 @@ export const SettingsPage: React.FC = () => {
             >
               {/* Hotkeys */}
               <HotkeySelector
+                key={`hotkeys-${hotkeySectionKey}`}
                 label="Transcription Hotkeys"
                 description="Hold to record audio for transcription"
                 value={currentHotkeys}
@@ -1070,11 +1072,11 @@ export const SettingsPage: React.FC = () => {
                     setHotkeyError(overlapError);
                     return;
                   }
-                  setCurrentHotkeys(newConfig);
                   try {
                     await invoke("update_hotkey", {
                       configJson: JSON.stringify(newConfig),
                     });
+                    setCurrentHotkeys(newConfig);
                   } catch (err: unknown) {
                     console.error("Failed to update transcription hotkeys:", err);
                     const message =
@@ -1083,6 +1085,14 @@ export const SettingsPage: React.FC = () => {
                         : (err as Error)?.message ||
                           "Failed to update transcription hotkeys";
                     setHotkeyError(message);
+                    try {
+                      const fresh = await invoke<TauriAppConfig>("get_app_config");
+                      setConfig(fresh);
+                      if (fresh.hotkeys) setCurrentHotkeys({ hotkeys: fresh.hotkeys });
+                      setHotkeySectionKey((k) => k + 1);
+                    } catch (_) {
+                      // ignore refetch failure
+                    }
                   }
                 }}
                 onValidationError={setHotkeyError}
@@ -1101,22 +1111,24 @@ export const SettingsPage: React.FC = () => {
             >
               {/* Action Hotkeys */}
               <HotkeySelector
+                key={`action-hotkeys-${hotkeySectionKey}`}
                 label="Action Hotkeys"
                 description="Hold to record a voice command for actions"
                 value={{ hotkeys: config?.action_hotkeys || [] }}
                 onChange={async (newConfig) => {
                   setHotkeyError(null);
-                  if (hasHotkeyOverlap(newConfig.hotkeys, configHotkeys)) {
+                  const normalHotkeys = currentHotkeys.hotkeys.length > 0 ? currentHotkeys.hotkeys : (config?.hotkeys || []);
+                  if (hasHotkeyOverlap(newConfig.hotkeys, normalHotkeys)) {
                     setHotkeyError(overlapError);
                     return;
                   }
-                  setConfig((prev) =>
-                    prev ? { ...prev, action_hotkeys: newConfig.hotkeys } : prev,
-                  );
                   try {
                     await invoke("update_action_hotkey", {
                       configJson: JSON.stringify(newConfig),
                     });
+                    setConfig((prev) =>
+                      prev ? { ...prev, action_hotkeys: newConfig.hotkeys } : prev,
+                    );
                   } catch (err: unknown) {
                     console.error("Failed to update action hotkeys:", err);
                     const message =
@@ -1125,6 +1137,13 @@ export const SettingsPage: React.FC = () => {
                         : (err as Error)?.message ||
                           "Failed to update action hotkeys";
                     setHotkeyError(message);
+                    try {
+                      const fresh = await invoke<TauriAppConfig>("get_app_config");
+                      setConfig(fresh);
+                      setHotkeySectionKey((k) => k + 1);
+                    } catch (_) {
+                      // ignore refetch failure
+                    }
                   }
                 }}
                 onValidationError={setHotkeyError}
