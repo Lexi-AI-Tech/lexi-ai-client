@@ -818,7 +818,7 @@ export const ShortcutsPage: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      {/* Action buttons - shown on hover */}
+                      {/* Action buttons - always visible */}
                       <div
                         style={{
                           position: "absolute",
@@ -826,11 +826,10 @@ export const ShortcutsPage: React.FC = () => {
                           right: "12px",
                           display: "flex",
                           gap: "6px",
-                          opacity: hoveredShortcutId === shortcut.id ? 1 : 0,
-                          transition: "opacity 0.2s ease",
                         }}
                       >
                         <button
+                          type="button"
                           onClick={() => handleUpdateShortcut(shortcut)}
                           style={{
                             padding: "6px",
@@ -843,6 +842,8 @@ export const ShortcutsPage: React.FC = () => {
                             justifyContent: "center",
                             color: "#6b7280",
                             transition: "all 0.2s ease",
+                            width: "32px",
+                            height: "32px",
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = "#e5e7eb";
@@ -852,37 +853,18 @@ export const ShortcutsPage: React.FC = () => {
                             e.currentTarget.style.backgroundColor = "#f3f4f6";
                             e.currentTarget.style.color = "#6b7280";
                           }}
+                          title="Edit shortcut"
                         >
                           <Edit size={14} />
                         </button>
                         <button
+                          type="button"
+                          className="delete-btn-icon"
                           onClick={() => openDeleteConfirm(shortcut.id)}
                           disabled={!!deletingId}
-                          style={{
-                            padding: "6px",
-                            backgroundColor: "#fef2f2",
-                            border: "none",
-                            borderRadius: "4px",
-                            cursor: deletingId ? "not-allowed" : "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#ef4444",
-                            transition: "all 0.2s ease",
-                            opacity: deletingId ? 0.6 : 1,
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!deletingId) {
-                              e.currentTarget.style.backgroundColor = "#fee2e2";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!deletingId) {
-                              e.currentTarget.style.backgroundColor = "#fef2f2";
-                            }
-                          }}
+                          title="Delete shortcut"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                       <div style={{ paddingRight: "60px" }}>

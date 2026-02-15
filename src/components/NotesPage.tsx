@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  Mic,
   Search,
   LayoutGrid,
   RefreshCw,
@@ -186,35 +185,6 @@ export const NotesPage: React.FC = () => {
             minHeight: "200px",
           }}
         >
-          {/* Microphone Icon */}
-          <div
-            style={{
-              position: "absolute",
-              top: "16px",
-              right: "16px",
-              cursor: "pointer",
-              color: "#6b7280",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "32px",
-              height: "32px",
-              borderRadius: "6px",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f3f4f6";
-              e.currentTarget.style.color = "#111827";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-              e.currentTarget.style.color = "#6b7280";
-            }}
-          >
-            <Mic size={18} />
-          </div>
-
-          {/* Textarea */}
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -229,7 +199,6 @@ export const NotesPage: React.FC = () => {
               color: "#111827",
               resize: "none",
               minHeight: "150px",
-              paddingRight: "40px",
               lineHeight: 1.6,
               background: "transparent",
             }}
