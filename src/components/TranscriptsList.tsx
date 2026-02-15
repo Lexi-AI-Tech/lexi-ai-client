@@ -12,7 +12,7 @@ import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
-import "./home/home.css";
+import "../styles/pages/shared.css";
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();

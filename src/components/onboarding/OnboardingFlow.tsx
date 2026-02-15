@@ -9,7 +9,7 @@ import {
   TryItStep,
   VisualSide,
 } from "./onboarding-steps";
-import "./onboarding.css";
+import "../../styles/components/onboarding.css";
 import Logo from "../../assets/light_mode_without_text.png";
 
 const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];

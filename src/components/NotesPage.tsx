@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
-import "./home/home.css";
+import "../styles/pages/shared.css";
 
 type ViewMode = "list" | "grid";
 

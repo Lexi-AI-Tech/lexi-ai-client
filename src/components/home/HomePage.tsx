@@ -18,7 +18,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 import type { Transcript } from "../../types";
-import "./home.css";
+import "../../styles/pages/shared.css";
 
 // Analytics interfaces
 interface AnalyticsStats {

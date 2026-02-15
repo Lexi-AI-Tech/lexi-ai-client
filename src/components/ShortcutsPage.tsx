@@ -4,7 +4,7 @@ import { Search, RefreshCw, Plus, X, Edit, Trash2 } from "lucide-react";
 import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
-import "./home/home.css";
+import "../styles/pages/shared.css";
 
 export const ShortcutsPage: React.FC = () => {
   const authStore = useAuthStore();

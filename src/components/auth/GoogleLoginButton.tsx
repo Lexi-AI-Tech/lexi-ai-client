@@ -5,7 +5,7 @@ import { useAuthStore, authStore } from "../../store/authStore";
 import { onboardingStore } from "../../store/onboardingStore";
 import type { GoogleLoginButtonProps } from "../../types";
 
-import "./auth.css";
+import "../../styles/components/auth.css";
 
 export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onSuccess,

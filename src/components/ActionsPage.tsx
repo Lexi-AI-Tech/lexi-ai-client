@@ -5,7 +5,7 @@ import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { formatDateTime } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
-import "./home/home.css";
+import "../styles/pages/shared.css";
 
 
 export const ActionsPage: React.FC = () => {

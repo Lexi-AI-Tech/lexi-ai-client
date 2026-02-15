@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Search, RefreshCw, Plus, X, Trash2 } from "lucide-react";
 import type { TauriAppConfig } from "../types";
-import "./home/home.css";
+import "../styles/pages/shared.css";
 
 export const VocabularyPage: React.FC = () => {
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
