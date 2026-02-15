@@ -21,6 +21,7 @@ import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { HotkeySelector } from "./HotkeySelector";
 import { useAuthStore } from "../store/authStore";
 import "../styles/pages/shared.css";
+import "../styles/components/hotkey-selector.css";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -57,7 +58,6 @@ export const SettingsPage: React.FC = () => {
   const languageDropdownRef = useRef<HTMLDivElement>(null);
 
   // Derived values from config - no defaults, rely entirely on backend
-  const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
   const autostartEnabled = config?.launch_on_system_startup;
   const enhanceTranscription = config?.enhance_transcription;
 
@@ -201,109 +201,60 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSaveSettings = async () => {
-    // Check if anything changed using the same logic as hasChanges
-    const languageChanged =
-      selectedLanguage !== null &&
-      selectedLanguage !== undefined &&
-      selectedLanguage !== currentLanguage;
-
-    const currentAutostart = autostartEnabled ?? false;
-    const autostartChanged =
-      selectedAutostart !== null &&
-      selectedAutostart !== undefined &&
-      selectedAutostart !== currentAutostart;
-
-    const currentEnhance = enhanceTranscription ?? false;
-    const enhanceChanged =
-      selectedEnhanceTranscription !== null &&
-      selectedEnhanceTranscription !== undefined &&
-      selectedEnhanceTranscription !== currentEnhance;
-
-    if (!languageChanged && !autostartChanged && !enhanceChanged) {
-      return; // No changes needed
-    }
-
+  const handleToggleAutostart = async () => {
+    const currentValue = selectedAutostart ?? autostartEnabled ?? false;
+    const newValue = !currentValue;
+    setSelectedAutostart(newValue);
     setIsUpdating(true);
     setError(null);
     setSuccess(false);
-
     try {
-      const updates: Partial<TauriAppConfig> = {};
-
-      if (languageChanged && selectedLanguage !== null) {
-        updates.languages = [selectedLanguage];
-      }
-      if (autostartChanged && selectedAutostart !== null) {
-        updates.launch_on_system_startup = selectedAutostart;
-      }
-      if (enhanceChanged && selectedEnhanceTranscription !== null) {
-        updates.enhance_transcription = selectedEnhanceTranscription;
-      }
-      const updatedConfig = await updateConfig(updates);
-
-      // Update selected values to match the saved config
-      if (
-        languageChanged &&
-        updatedConfig.languages &&
-        updatedConfig.languages.length > 0
-      ) {
-        setSelectedLanguage(updatedConfig.languages[0] as LanguageCode);
-      }
-      if (
-        autostartChanged &&
-        updatedConfig.launch_on_system_startup !== undefined
-      ) {
-        setSelectedAutostart(updatedConfig.launch_on_system_startup);
-      }
-      if (enhanceChanged && updatedConfig.enhance_transcription !== undefined) {
-        setSelectedEnhanceTranscription(updatedConfig.enhance_transcription);
-      }
-
+      await updateConfig({ launch_on_system_startup: newValue });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-    } catch (err: any) {
-      // Error already set by updateConfig
+    } catch {
+      setSelectedAutostart(currentValue);
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const hasChanges = () => {
-    // Compare language
-    const languageChanged =
-      selectedLanguage !== null &&
-      selectedLanguage !== undefined &&
-      selectedLanguage !== currentLanguage;
-
-    // Compare autostart (handle null/undefined properly)
-    // If selectedAutostart is null, it means unchanged, so no change
-    // If selectedAutostart is a boolean, compare it to current value
-    const currentAutostart = autostartEnabled ?? false;
-    const autostartChanged =
-      selectedAutostart !== null &&
-      selectedAutostart !== undefined &&
-      selectedAutostart !== currentAutostart;
-
-    // Compare enhance transcription
-    const currentEnhance = enhanceTranscription ?? false;
-    const enhanceChanged =
-      selectedEnhanceTranscription !== null &&
-      selectedEnhanceTranscription !== undefined &&
-      selectedEnhanceTranscription !== currentEnhance;
-
-    return languageChanged || autostartChanged || enhanceChanged;
-  };
-
-  const handleToggleAutostart = () => {
-    const currentValue = selectedAutostart ?? autostartEnabled ?? false;
-    setSelectedAutostart(!currentValue);
-  };
-
-  const handleToggleEnhanceTranscription = () => {
+  const handleToggleEnhanceTranscription = async () => {
     const currentValue =
       selectedEnhanceTranscription ?? enhanceTranscription ?? false;
-    setSelectedEnhanceTranscription(!currentValue);
+    const newValue = !currentValue;
+    setSelectedEnhanceTranscription(newValue);
+    setIsUpdating(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      await updateConfig({ enhance_transcription: newValue });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+    } catch {
+      setSelectedEnhanceTranscription(currentValue);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleLanguageSelect = async (newLanguage: LanguageCode | null) => {
+    const valueToSave = newLanguage ?? LanguageCode.AUTO;
+    const previousLanguage = selectedLanguage;
+    setSelectedLanguage(newLanguage);
+    setIsLanguageDropdownOpen(false);
+    setIsUpdating(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      await updateConfig({ languages: [valueToSave] });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+    } catch {
+      setSelectedLanguage(previousLanguage);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const ToggleSwitch: React.FC<{
@@ -653,10 +604,7 @@ export const SettingsPage: React.FC = () => {
                     >
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedLanguage(null);
-                          setIsLanguageDropdownOpen(false);
-                        }}
+                        onClick={() => handleLanguageSelect(null)}
                         style={{
                           width: "100%",
                           padding: "10px 16px",
@@ -692,10 +640,9 @@ export const SettingsPage: React.FC = () => {
                         <button
                           key={lang.value}
                           type="button"
-                          onClick={() => {
-                            setSelectedLanguage(lang.value as LanguageCode);
-                            setIsLanguageDropdownOpen(false);
-                          }}
+                          onClick={() =>
+                            handleLanguageSelect(lang.value as LanguageCode)
+                          }
                           style={{
                             width: "100%",
                             padding: "10px 16px",
@@ -793,52 +740,6 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                justifyContent: "flex-end",
-              }}
-            >
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    handleSaveSettings();
-                  }
-                }}
-                disabled={isUpdating || !hasChanges() || isLoading}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  background: "#111827",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "6px",
-                  opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
-                  cursor:
-                    isUpdating || !hasChanges() || isLoading
-                      ? "not-allowed"
-                      : "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#374151";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#111827";
-                  }
-                }}
-              >
-                {isUpdating ? "Saving..." : "Save Settings"}
-              </button>
-            </div>
-
             {error && (
               <div
                 style={{
@@ -920,52 +821,6 @@ export const SettingsPage: React.FC = () => {
                   disabled={isLoading || isUpdating}
                 />
               </div>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                justifyContent: "flex-end",
-              }}
-            >
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    handleSaveSettings();
-                  }
-                }}
-                disabled={isUpdating || !hasChanges() || isLoading}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  background: "#111827",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "6px",
-                  opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
-                  cursor:
-                    isUpdating || !hasChanges() || isLoading
-                      ? "not-allowed"
-                      : "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#374151";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#111827";
-                  }
-                }}
-              >
-                {isUpdating ? "Saving..." : "Save Settings"}
-              </button>
             </div>
 
             {error && (
@@ -1158,6 +1013,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={async () => {
                     try {
                       // Reset hotkeys to default
@@ -1181,17 +1037,7 @@ export const SettingsPage: React.FC = () => {
                       console.error("Failed to reset hotkeys:", err);
                     }
                   }}
-                  style={{
-                    padding: "8px 16px",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    borderRadius: "8px",
-                    border: "1px solid #e5e7eb",
-                    background: "#ffffff",
-                    color: "#111827",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                  }}
+                  className="hotkey-selector__btn hotkey-selector__btn--primary"
                 >
                   Reset to Defaults
                 </button>
