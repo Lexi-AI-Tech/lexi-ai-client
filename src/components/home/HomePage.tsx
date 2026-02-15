@@ -113,7 +113,7 @@ const PeriodButton: React.FC<PeriodButtonProps> = ({
   </button>
 );
 
-/** Format hotkey for display (e.g. "Fn" or "Fn + Control") */
+/** Format a single hotkey for display (e.g. "Fn" or "Fn + Control") */
 function formatHotkeyDisplay(hotkey: string): string {
   if (!hotkey || !hotkey.trim()) return "Fn";
   return hotkey
@@ -123,12 +123,32 @@ function formatHotkeyDisplay(hotkey: string): string {
     .join(" + ");
 }
 
+/** Format hotkeys for copy: "A", "A or B", or "A, B, or C" */
+function formatHotkeysCopy(hotkeys: string[]): React.ReactNode {
+  const list = hotkeys.length > 0 ? hotkeys : ["Fn"];
+  const formatted = list.map((h) => formatHotkeyDisplay(h));
+  if (formatted.length === 1) {
+    return <kbd className="hotkey-badge">{formatted[0]}</kbd>;
+  }
+  return (
+    <>
+      {formatted.slice(0, -1).map((label, i) => (
+        <React.Fragment key={i}>
+          <kbd className="hotkey-badge">{label}</kbd>
+          {i < formatted.length - 2 ? ", " : " or "}
+        </React.Fragment>
+      ))}
+      <kbd className="hotkey-badge">{formatted[formatted.length - 1]}</kbd>
+    </>
+  );
+}
+
 export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
   const { user, isAuthenticated, tokens } = useAuthStore();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
   const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
-  const [transcriptionHotkey, setTranscriptionHotkey] = useState<string>("Fn");
+  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(["Fn"]);
 
   const [stats, setStats] = useState<AnalyticsStats>({
     words_typed_this_week: 0,
@@ -142,16 +162,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
     total_transcriptions: 0,
   });
 
-  // Fetch app config for transcription hotkey (for dynamic copy)
+  // Fetch app config for transcription hotkeys (for dynamic copy)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const config = await invoke<TauriAppConfig>("get_app_config");
-        const first = config?.hotkeys?.[0];
-        if (!cancelled && first) setTranscriptionHotkey(first);
+        const keys = config?.hotkeys?.filter((h) => h && String(h).trim()) ?? [];
+        if (!cancelled) setTranscriptionHotkeys(keys.length > 0 ? keys : ["Fn"]);
       } catch {
-        /* use default "Fn" */
+        /* use default ["Fn"] */
       }
     })();
     return () => {
@@ -254,7 +274,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
         <div className="tip-content">
           <span className="tip-label">Quick tip</span>
           <p className="tip-text">
-            Hold <kbd className="hotkey-badge">{formatHotkeyDisplay(transcriptionHotkey)}</kbd> and speak naturally
+            Hold {formatHotkeysCopy(transcriptionHotkeys)} and speak naturally
             — Lexi will transcribe in real-time
           </p>
         </div>
@@ -319,7 +339,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
                 </div>
                 <p className="empty-title">No transcriptions yet</p>
                 <p className="empty-sub">
-                  Hold <kbd className="hotkey-badge">{formatHotkeyDisplay(transcriptionHotkey)}</kbd> and speak to create your first transcription
+                  Hold {formatHotkeysCopy(transcriptionHotkeys)} and speak to create your first transcription
                 </p>
               </div>
             ) : (
