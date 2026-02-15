@@ -6,6 +6,7 @@ import { onboardingStore } from "../../store/onboardingStore";
 import type { GoogleLoginButtonProps } from "../../types";
 
 import "../../styles/components/auth.css";
+import "../../styles/components/hotkey-selector.css";
 
 export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onSuccess,
@@ -184,9 +185,10 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         </div>
         <div className="auth-actions">
           <button
+            type="button"
             onClick={handleLogout}
             disabled={loading}
-            className="auth-button secondary"
+            className="hotkey-selector__btn hotkey-selector__btn--primary"
           >
             {loading ? (
               <>
