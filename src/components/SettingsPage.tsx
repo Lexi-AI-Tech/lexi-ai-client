@@ -20,6 +20,7 @@ import type { TauriAppConfig, HotkeyConfig } from "../types";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { HotkeySelector } from "./HotkeySelector";
 import { useAuthStore } from "../store/authStore";
+import "../styles/pages/shared.css";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -381,8 +382,9 @@ export const SettingsPage: React.FC = () => {
   // Don't render settings content until config is loaded to prevent flash of defaults
   if (isLoading) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
-        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
+      <div className="page-layout">
+        <h2 className="page-layout__title">Settings</h2>
+        <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
           Loading settings...
         </div>
       </div>
@@ -393,18 +395,8 @@ export const SettingsPage: React.FC = () => {
   // This prevents showing cached config when user is logged out
   if (!authStore.isAuthenticated) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2
-          style={{
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#111827",
-            marginBottom: "16px",
-            marginTop: 0,
-          }}
-        >
-          Settings
-        </h2>
+      <div className="page-layout">
+        <h2 className="page-layout__title">Settings</h2>
         <div
           style={{
             backgroundColor: "#ffffff",
@@ -439,28 +431,15 @@ export const SettingsPage: React.FC = () => {
   // Show error state if config failed to load
   if (config === null) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2
-          style={{
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#111827",
-            marginBottom: "16px",
-            marginTop: 0,
-          }}
-        >
-          Settings
-        </h2>
+      <div className="page-layout">
+        <h2 className="page-layout__title">Settings</h2>
         {error && (
           <div
+            className="permission-message"
             style={{
               background: "#fef2f2",
-              border: "1px solid #fecaca",
+              borderColor: "#fecaca",
               color: "#b91c1c",
-              fontSize: "13px",
-              padding: "12px 16px",
-              marginBottom: "24px",
-              borderRadius: "8px",
             }}
           >
             {error}
@@ -471,18 +450,8 @@ export const SettingsPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
-      <h2
-        style={{
-          fontSize: "18px",
-          fontWeight: 500,
-          color: "#111827",
-          marginBottom: "24px",
-          marginTop: 0,
-        }}
-      >
-        Settings
-      </h2>
+    <div className="page-layout">
+      <h2 className="page-layout__title">Settings</h2>
 
       {/* Section Navigation */}
       <div
