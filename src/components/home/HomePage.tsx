@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import type { Transcript } from "../../types";
+import type { Transcript, TauriAppConfig } from "../../types";
 import "../../styles/pages/shared.css";
 
 // Analytics interfaces
@@ -113,11 +113,22 @@ const PeriodButton: React.FC<PeriodButtonProps> = ({
   </button>
 );
 
+/** Format hotkey for display (e.g. "Fn" or "Fn + Control") */
+function formatHotkeyDisplay(hotkey: string): string {
+  if (!hotkey || !hotkey.trim()) return "Fn";
+  return hotkey
+    .split("+")
+    .map((k) => k.trim())
+    .filter(Boolean)
+    .join(" + ");
+}
+
 export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
   const { user, isAuthenticated, tokens } = useAuthStore();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
   const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
+  const [transcriptionHotkey, setTranscriptionHotkey] = useState<string>("Fn");
 
   const [stats, setStats] = useState<AnalyticsStats>({
     words_typed_this_week: 0,
@@ -130,6 +141,23 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
     data: [],
     total_transcriptions: 0,
   });
+
+  // Fetch app config for transcription hotkey (for dynamic copy)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const config = await invoke<TauriAppConfig>("get_app_config");
+        const first = config?.hotkeys?.[0];
+        if (!cancelled && first) setTranscriptionHotkey(first);
+      } catch {
+        /* use default "Fn" */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Fetch transcripts
   const fetchTranscripts = useCallback(async () => {
@@ -226,7 +254,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
         <div className="tip-content">
           <span className="tip-label">Quick tip</span>
           <p className="tip-text">
-            Hold <kbd className="hotkey-badge">fn</kbd> key and speak naturally
+            Hold <kbd className="hotkey-badge">{formatHotkeyDisplay(transcriptionHotkey)}</kbd> and speak naturally
             — Lexi will transcribe in real-time
           </p>
         </div>
@@ -291,7 +319,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
                 </div>
                 <p className="empty-title">No transcriptions yet</p>
                 <p className="empty-sub">
-                  Hold fn and speak to create your first transcription
+                  Hold <kbd className="hotkey-badge">{formatHotkeyDisplay(transcriptionHotkey)}</kbd> and speak to create your first transcription
                 </p>
               </div>
             ) : (
