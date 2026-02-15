@@ -558,33 +558,13 @@ export const NotesPage: React.FC = () => {
                     <Edit size={14} />
                   </button>
                   <button
+                    type="button"
+                    className="delete-btn-icon"
                     onClick={() => openDeleteConfirm(note.id)}
                     disabled={!!deletingId}
-                    style={{
-                      padding: "6px",
-                      backgroundColor: "#fef2f2",
-                      border: "none",
-                      borderRadius: "4px",
-                      cursor: deletingId ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#ef4444",
-                      transition: "all 0.2s ease",
-                      opacity: deletingId ? 0.6 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!deletingId) {
-                        e.currentTarget.style.backgroundColor = "#fee2e2";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!deletingId) {
-                        e.currentTarget.style.backgroundColor = "#fef2f2";
-                      }
-                    }}
+                    title="Delete note"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
 

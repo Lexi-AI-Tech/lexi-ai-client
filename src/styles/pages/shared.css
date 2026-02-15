@@ -45,6 +45,32 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
+/* Shared delete icon button (Actions, Transcripts, Vocabulary, Notes) — red, always visible */
+.delete-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  color: #b91c1c;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.delete-btn-icon:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+.delete-btn-icon:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Container */
 .home-container {
   width: 100%;

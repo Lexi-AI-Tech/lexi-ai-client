@@ -529,39 +529,16 @@ export const VocabularyPage: React.FC = () => {
                     position: "absolute",
                     top: "12px",
                     right: "12px",
-                    opacity: hoveredVocabularyValue === item ? 1 : 0,
-                    transition: "opacity 0.2s ease",
                   }}
                 >
                   <button
+                    type="button"
+                    className="delete-btn-icon"
                     onClick={() => openDeleteConfirm(item)}
                     disabled={isUpdating || !!deletingValue}
-                    style={{
-                      padding: "6px",
-                      backgroundColor: "#fef2f2",
-                      border: "none",
-                      borderRadius: "4px",
-                      cursor:
-                        isUpdating || deletingValue ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#ef4444",
-                      transition: "all 0.2s ease",
-                      opacity: isUpdating || deletingValue ? 0.5 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isUpdating && !deletingValue) {
-                        e.currentTarget.style.backgroundColor = "#fee2e2";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isUpdating && !deletingValue) {
-                        e.currentTarget.style.backgroundColor = "#fef2f2";
-                      }
-                    }}
+                    title="Remove from vocabulary"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
                 <div style={{ paddingRight: "50px" }}>

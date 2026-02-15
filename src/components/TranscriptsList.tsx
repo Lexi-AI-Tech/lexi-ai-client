@@ -615,37 +615,10 @@ export const TranscriptsList: React.FC = () => {
                     <RefreshCw size={16} />
                   </button> */}
                   <button
+                    type="button"
+                    className="delete-btn-icon"
                     onClick={() => openDeleteConfirm(transcript.id)}
                     disabled={!!deletingId}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: "32px",
-                      height: "32px",
-                      padding: 0,
-                      background: "#ffffff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "0.5rem",
-                      cursor: deletingId ? "not-allowed" : "pointer",
-                      transition: "all 0.2s ease",
-                      color: "#6b7280",
-                      opacity: deletingId ? 0.6 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!deletingId) {
-                        e.currentTarget.style.background = "#fef2f2";
-                        e.currentTarget.style.borderColor = "#fecaca";
-                        e.currentTarget.style.color = "#dc2626";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!deletingId) {
-                        e.currentTarget.style.background = "#ffffff";
-                        e.currentTarget.style.borderColor = "#e5e7eb";
-                        e.currentTarget.style.color = "#6b7280";
-                      }
-                    }}
                     title="Delete transcript"
                   >
                     <Trash2 size={16} />
