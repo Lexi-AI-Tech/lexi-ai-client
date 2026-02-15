@@ -3,6 +3,29 @@
    Matching onboarding aesthetics
    ============================================ */
 
+/* Shared page layout (Transcripts, Shortcuts, Notes, Vocabulary, Actions) */
+.page-layout {
+  padding: 2rem 2.5rem;
+  background: #ffffff;
+  min-height: 100vh;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  color: #111827;
+}
+
+.page-layout__title {
+  margin: 0 0 2rem 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+  letter-spacing: -0.025em;
+}
+
 /* Action hotkeys list (Actions page): multiple combos as separate chips */
 .action-hotkeys-list {
   display: flex;

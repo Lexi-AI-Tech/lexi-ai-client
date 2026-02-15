@@ -218,8 +218,9 @@ export const ShortcutsPage: React.FC = () => {
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
-        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
+      <div className="page-layout">
+        <h2 className="page-layout__title">Shortcuts</h2>
+        <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
           Loading...
         </div>
       </div>
@@ -229,18 +230,8 @@ export const ShortcutsPage: React.FC = () => {
   // Show login prompt if not authenticated
   if (!authStore.isAuthenticated) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2
-          style={{
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#111827",
-            marginBottom: "16px",
-            marginTop: 0,
-          }}
-        >
-          Shortcuts
-        </h2>
+      <div className="page-layout">
+        <h2 className="page-layout__title">Shortcuts</h2>
         <div
           style={{
             backgroundColor: "#ffffff",
@@ -273,18 +264,8 @@ export const ShortcutsPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
-      <h2
-        style={{
-          fontSize: "18px",
-          fontWeight: 500,
-          color: "#111827",
-          marginBottom: "16px",
-          marginTop: 0,
-        }}
-      >
-        Shortcuts
-      </h2>
+    <div className="page-layout">
+      <h2 className="page-layout__title">Shortcuts</h2>
 
       {error && (
         <div

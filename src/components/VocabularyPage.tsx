@@ -131,8 +131,9 @@ export const VocabularyPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
-        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
+      <div className="page-layout">
+        <h2 className="page-layout__title">Vocabulary</h2>
+        <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
           Loading vocabulary...
         </div>
       </div>
@@ -140,18 +141,8 @@ export const VocabularyPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
-      <h2
-        style={{
-          fontSize: "18px",
-          fontWeight: 500,
-          color: "#111827",
-          marginBottom: "16px",
-          marginTop: 0,
-        }}
-      >
-        Vocabulary
-      </h2>
+    <div className="page-layout">
+      <h2 className="page-layout__title">Vocabulary</h2>
 
       {error && (
         <div

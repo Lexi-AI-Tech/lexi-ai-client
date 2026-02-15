@@ -160,27 +160,8 @@ export const ActionsPage: React.FC = () => {
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Actions
-        </h2>
+      <div className="page-layout">
+        <h2 className="page-layout__title">Actions</h2>
         <div
           style={{
             display: "flex",
@@ -200,27 +181,8 @@ export const ActionsPage: React.FC = () => {
   // Show login prompt if not authenticated
   if (!authStore.isAuthenticated) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Actions
-        </h2>
+      <div className="page-layout">
+        <h2 className="page-layout__title">Actions</h2>
         <div style={{ textAlign: "center", padding: "16px 0" }}>
           <p
             style={{
@@ -245,27 +207,8 @@ export const ActionsPage: React.FC = () => {
   }
 
   return (
-    <div
-      style={{
-        padding: "2rem 2.5rem",
-        background: "#ffffff",
-        minHeight: "100vh",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      <h2
-        style={{
-          margin: 0,
-          marginBottom: "2rem",
-          fontSize: "24px",
-          fontWeight: 600,
-          color: "#111827",
-          letterSpacing: "-0.025em",
-        }}
-      >
-        Actions
-      </h2>
+    <div className="page-layout">
+      <h2 className="page-layout__title">Actions</h2>
 
       {error && (
         <div

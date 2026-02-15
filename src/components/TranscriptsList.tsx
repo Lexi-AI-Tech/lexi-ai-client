@@ -255,34 +255,24 @@ export const TranscriptsList: React.FC = () => {
 
   return (
     <div
-      className="settings"
+      className="page-layout"
       style={{
         display: "flex",
         flexDirection: "column",
         flex: 1,
         minHeight: 0,
-        padding: "32px",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "12px",
-        }}
-      >
-        <h3>
-          Transcripts{" "}
-          {total > 0 && (
-            <span
-              style={{ fontSize: "12px", fontWeight: "normal", opacity: 0.6 }}
-            >
-              ({total})
-            </span>
-          )}
-        </h3>
-      </div>
+      <h2 className="page-layout__title">
+        Transcripts
+        {total > 0 && (
+          <span
+            style={{ fontSize: "14px", fontWeight: "normal", opacity: 0.6 }}
+          >
+            {" "}({total})
+          </span>
+        )}
+      </h2>
 
       {!showContent && (
         <div

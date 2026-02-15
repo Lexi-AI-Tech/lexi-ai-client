@@ -152,27 +152,30 @@ export const NotesPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
-        Loading notes...
+      <div className="page-layout">
+        <h2 className="page-layout__title">Notes</h2>
+        <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+          Loading notes...
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+    <div className="page-layout">
+      <h2 className="page-layout__title">Notes</h2>
       {/* Quick Thoughts Section */}
-      <div style={{ marginBottom: "48px" }}>
-        <h2
+      <div style={{ marginBottom: "3rem" }}>
+        <p
           style={{
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#111827",
-            marginBottom: "16px",
+            fontSize: "14px",
+            color: "#6b7280",
+            marginBottom: "1.5rem",
             marginTop: 0,
           }}
         >
           For quick thoughts you want to come back to.
-        </h2>
+        </p>
         <div
           style={{
             position: "relative",
