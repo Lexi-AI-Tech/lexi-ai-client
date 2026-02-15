@@ -12,8 +12,10 @@
 //! - **Dynamic Configuration**: Hotkey config can be changed at runtime.
 //! - **Hotkey Recording Mode**: Emits key events to frontend for interactive hotkey selection.
 //! - **System Shortcut Validation**: Prevents registration of known system-reserved shortcuts.
-//! - **Superset-Aware Grace Period**: When a hotkey is a subset of another configured hotkey,
-//!   triggering is delayed briefly to allow the user to complete the longer combo.
+//! - **Superset-Aware Grace Period**: When a hotkey is a subset of another configured hotkey
+//!   (in either list — recording or action), triggering is delayed briefly (~500ms) so the user
+//!   can complete the longer combo (e.g. Fn then Control for Fn+Control). Pending timeout is
+//!   checked after the current key is processed so the superset match wins.
 //!
 //! ## Permissions Required
 //!
@@ -301,8 +303,10 @@ pub fn validate_assistant_action_hotkeys_no_overlap(
 const MIN_PRESS_RELEASE_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Grace period for subset hotkeys — how long to wait for a superset combo
-/// before triggering the shorter hotkey.
-const SUBSET_GRACE_PERIOD: Duration = Duration::from_millis(150);
+/// (including cross-list: recording subset of action, or vice versa) before
+/// triggering the shorter hotkey. 200ms accounts for typical user latency
+/// when rolling from one key to the next (e.g. Fn then Control).
+const SUBSET_GRACE_PERIOD: Duration = Duration::from_millis(200);
 
 /// Result of processing a hotkey event
 #[derive(Debug, Clone)]
@@ -612,31 +616,25 @@ pub fn start_listener(
             let recording_hotkeys = config_rx_for_rdev.borrow().clone();
             let action_hotkeys = action_hotkey_rx_for_rdev.borrow().clone();
 
-            // 4. Check for pending timeout (grace period expiry)
-            if let Some(result) = tracker.check_pending_timeout() {
-                dispatch_command(
-                    &result,
-                    &recording_tx_for_rdev,
-                    true,
-                    &key_state_tracker_local,
-                );
-            }
-
-            // 5. If releasing a key, check if we need to flush a pending hotkey
+            // 4. If releasing a key, check if we need to flush a pending hotkey
             if !is_press {
                 if let Some(start_result) = tracker.flush_pending_on_release(&key_str) {
                     // The pending hotkey was flushed (started), now process the release
+                    let is_action = matches!(
+                        start_result,
+                        HotkeyCommandResult::SendNow(RecordingCommand::ActionStart)
+                    );
                     dispatch_command(
                         &start_result,
                         &recording_tx_for_rdev,
-                        false,
+                        is_action,
                         &key_state_tracker_local,
                     );
                     // Fall through to process the release against active hotkeys
                 }
             }
 
-            // 6. Check Action Hotkeys first (higher priority)
+            // 5. Check Action Hotkeys first (higher priority)
             let mut triggered_action_cmd = None;
             for hotkey in &action_hotkeys {
                 if let Some(cmd) = tracker.process_event(
@@ -654,7 +652,7 @@ pub fn start_listener(
                 }
             }
 
-            // 7. Check Recording Hotkeys
+            // 6. Check Recording Hotkeys
             let mut triggered_rec_cmd = None;
             if triggered_action_cmd.is_none() {
                 for hotkey in &recording_hotkeys {
@@ -674,9 +672,25 @@ pub fn start_listener(
                 }
             }
 
-            // 8. Dispatch Commands
-            let cmd_to_send = triggered_action_cmd.clone().or(triggered_rec_cmd);
-            let is_action_triggered = triggered_action_cmd.is_some();
+            // 7. If no hotkey matched this event, check pending timeout (grace period expiry).
+            // This runs after 5–6 so that when the user completes a superset (e.g. Fn then
+            // Control), we match the superset and cancel the pending before it can fire.
+            let mut cmd_to_send = triggered_action_cmd.clone().or(triggered_rec_cmd);
+            if cmd_to_send.is_none() {
+                if let Some(pending_result) = tracker.check_pending_timeout() {
+                    cmd_to_send = Some(pending_result);
+                }
+            }
+
+            // 8. Dispatch Commands. is_action: from action hotkey match, or from pending
+            // (SendNow(ActionStart)); ensures SendStopAfter uses the correct Stop vs ActionStop.
+            let is_action_triggered = triggered_action_cmd.is_some()
+                || cmd_to_send.as_ref().map_or(false, |r| {
+                    matches!(
+                        r,
+                        HotkeyCommandResult::SendNow(RecordingCommand::ActionStart)
+                    )
+                });
 
             if let Some(result) = cmd_to_send {
                 dispatch_command(
