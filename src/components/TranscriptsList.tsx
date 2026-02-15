@@ -623,7 +623,7 @@ export const TranscriptsList: React.FC = () => {
                     </button>
                     ) : null;
                   })()}
-                  <button
+                  {/* <button
                     onClick={() => {
                       // Regenerate action - placeholder for now
                       console.log(
@@ -658,7 +658,7 @@ export const TranscriptsList: React.FC = () => {
                     title="Regenerate transcript"
                   >
                     <RefreshCw size={16} />
-                  </button>
+                  </button> */}
                   <button
                     onClick={() => openDeleteConfirm(transcript.id)}
                     disabled={!!deletingId}
