@@ -183,7 +183,9 @@ pub fn main() {
     // Add tauri-nspanel plugin on macOS for advanced NSPanel features
     #[cfg(target_os = "macos")]
     {
-        builder = builder.plugin(tauri_nspanel::init());
+        builder = builder
+            .plugin(tauri_nspanel::init())
+            .plugin(tauri_plugin_macos_input_monitor::init());
     }
 
     let builder = builder
@@ -285,6 +287,25 @@ pub fn main() {
         .setup(move |app| {
             // Create system tray first to avoid borrow checker issues
             tray::init_system_tray(app)?;
+
+            // Suppress emoji picker on Fn key press (when "Press Fn to show Emoji & Symbols" is set in System Settings)
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_plugin_macos_input_monitor::{Hotkey, MacOSInputMonitorExt, Modifiers};
+                let hotkey = Hotkey {
+                    keycodes: vec![179], // Fn key (kVK_Function / Globe key)
+                    modifiers: Modifiers::empty(),
+                    consume: true,
+                    event_name: "fn-key-consumed".to_string(),
+                };
+                let monitor = app.macos_input_monitor();
+                let manager = monitor.manager.lock().unwrap();
+                if let Ok(id) = manager.register(hotkey) {
+                    println!("🔇 Fn key (emoji picker) suppressed via macos-input-monitor: id {:?}", id);
+                } else {
+                    eprintln!("⚠️  Failed to register Fn-key suppression hotkey");
+                }
+            }
 
             let app_handle = app.handle();
 

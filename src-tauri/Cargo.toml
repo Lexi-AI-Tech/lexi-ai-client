@@ -53,4 +53,5 @@ futures-util = "0.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel" }  # macOS NSPanel for advanced window behaviors
+tauri-plugin-macos-input-monitor = "0.1"  # CGEventTap: suppress system shortcuts (e.g. Fn → emoji picker)
 macos-accessibility-client = "0.0"
