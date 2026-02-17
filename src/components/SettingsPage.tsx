@@ -62,16 +62,6 @@ export const SettingsPage: React.FC = () => {
   const enhanceTranscription = config?.enhance_transcription;
 
   const configHotkeys = config?.hotkeys || [];
-  const configActionHotkeys = config?.action_hotkeys || [];
-
-  const overlapError =
-    "Same key combination cannot be used for both hotkeys and action hotkeys";
-
-  const hasHotkeyOverlap = (
-    listA: string[],
-    listB: string[],
-  ): boolean =>
-    listA.some((h) => listB.includes(h));
 
   // Load app config on mount
   useEffect(() => {
@@ -892,10 +882,6 @@ export const SettingsPage: React.FC = () => {
                 value={currentHotkeys}
                 onChange={async (newConfig) => {
                   setHotkeyError(null);
-                  if (hasHotkeyOverlap(newConfig.hotkeys, configActionHotkeys)) {
-                    setHotkeyError(overlapError);
-                    return;
-                  }
                   try {
                     await invoke("update_hotkey", {
                       configJson: JSON.stringify(newConfig),
@@ -907,7 +893,7 @@ export const SettingsPage: React.FC = () => {
                       typeof err === "string"
                         ? err
                         : (err as Error)?.message ||
-                          "Failed to update transcription hotkeys";
+                        "Failed to update transcription hotkeys";
                     setHotkeyError(message);
                     try {
                       const fresh = await invoke<TauriAppConfig>("get_app_config");
@@ -941,11 +927,6 @@ export const SettingsPage: React.FC = () => {
                 value={{ hotkeys: config?.action_hotkeys || [] }}
                 onChange={async (newConfig) => {
                   setHotkeyError(null);
-                  const normalHotkeys = currentHotkeys.hotkeys.length > 0 ? currentHotkeys.hotkeys : (config?.hotkeys || []);
-                  if (hasHotkeyOverlap(newConfig.hotkeys, normalHotkeys)) {
-                    setHotkeyError(overlapError);
-                    return;
-                  }
                   try {
                     await invoke("update_action_hotkey", {
                       configJson: JSON.stringify(newConfig),
@@ -959,7 +940,7 @@ export const SettingsPage: React.FC = () => {
                       typeof err === "string"
                         ? err
                         : (err as Error)?.message ||
-                          "Failed to update action hotkeys";
+                        "Failed to update action hotkeys";
                     setHotkeyError(message);
                     try {
                       const fresh = await invoke<TauriAppConfig>("get_app_config");

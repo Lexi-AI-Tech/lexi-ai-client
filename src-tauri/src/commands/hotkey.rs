@@ -8,7 +8,6 @@
 use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
 use crate::global_key_listener::{
     hotkey_to_canonical,
-    validate_assistant_action_hotkeys_no_overlap,
     validate_hotkey,
 };
 use crate::state::{ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState};
@@ -53,28 +52,14 @@ pub async fn update_hotkey(
 ) -> Result<(), String> {
     let new_hotkeys = parse_and_validate_hotkeys(&config_json, MAX_HOTKEYS, "hotkey")?;
 
-    let current_config = get_app_config(app.clone()).await.map_err(|e| {
-        format!("Could not load config to validate hotkeys: {}", e)
-    })?;
-
-    validate_assistant_action_hotkeys_no_overlap(
-        &new_hotkeys,
-        current_config.action_hotkeys.as_deref().unwrap_or(&[]),
-    )?;
-
     let app_config_update = AppConfig {
         hotkeys: Some(new_hotkeys.clone()),
-        languages: current_config.languages,
-        enhance_transcription: current_config.enhance_transcription,
-        launch_on_system_startup: current_config.launch_on_system_startup,
-        vocabulary: current_config.vocabulary,
-        action_hotkeys: current_config.action_hotkeys,
-        shortcuts: current_config.shortcuts,
+        ..Default::default()
     };
 
     update_app_config(app.clone(), app_config_update)
         .await
-        .map_err(|e| format!("Failed to update hotkeys: {}", e))?;
+        .map_err(|e| e.to_string())?;
 
     if state.0.send(new_hotkeys.clone()).is_err() {
         return Err("Failed to update hotkey watch state".to_string());
@@ -137,28 +122,14 @@ pub async fn update_action_hotkey(
     let new_hotkeys =
         parse_and_validate_hotkeys(&config_json, MAX_HOTKEYS, "action hotkey")?;
 
-    let current_config = get_app_config(app.clone()).await.map_err(|e| {
-        format!("Could not load config to validate hotkeys: {}", e)
-    })?;
-
-    validate_assistant_action_hotkeys_no_overlap(
-        current_config.hotkeys.as_deref().unwrap_or(&[]),
-        &new_hotkeys,
-    )?;
-
     let app_config_update = AppConfig {
-        hotkeys: current_config.hotkeys,
-        languages: current_config.languages,
-        enhance_transcription: current_config.enhance_transcription,
-        launch_on_system_startup: current_config.launch_on_system_startup,
-        vocabulary: current_config.vocabulary,
         action_hotkeys: Some(new_hotkeys.clone()),
-        shortcuts: current_config.shortcuts,
+        ..Default::default()
     };
 
     update_app_config(app.clone(), app_config_update)
         .await
-        .map_err(|e| format!("Failed to update action hotkeys: {}", e))?;
+        .map_err(|e| e.to_string())?;
 
     if state.0.send(new_hotkeys.clone()).is_err() {
         return Err("Failed to update action hotkey watch state".to_string());

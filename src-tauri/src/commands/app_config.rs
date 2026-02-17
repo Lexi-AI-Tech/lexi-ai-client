@@ -14,7 +14,6 @@ use tauri_plugin_autostart::ManagerExt;
 use crate::api_endpoints::app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::commands::shortcuts::Shortcut;
-use crate::global_key_listener::validate_assistant_action_hotkeys_no_overlap;
 use crate::state::{ActionHotkeyWatchState, HotkeyWatchState};
 use crate::utils;
 
@@ -146,16 +145,10 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
     // Merge provided config with current config
     merge_config(&mut current_config, config);
 
-    // Validate hotkeys and action hotkeys do not overlap before syncing to server
-    validate_assistant_action_hotkeys_no_overlap(
-        current_config.hotkeys.as_deref().unwrap_or(&[]),
-        current_config.action_hotkeys.as_deref().unwrap_or(&[]),
-    )?;
-
     println!("✅ App config updated in memory");
 
-    // Sync to cloud first
-    sync_config_to_cloud(&app, &current_config).await;
+    // Sync to cloud — server validates (e.g. hotkey overlap) and may reject
+    sync_config_to_cloud(&app, &current_config).await?;
 
     // Re-fetch from server to get the updated config (source of truth), then sync status from it
     let mut updated_config = fetch_config_from_server(&app).await?;
@@ -328,13 +321,13 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
     body
 }
 
-/// Sync app configuration to cloud API (best-effort, failures are logged)
-async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
+/// Sync app configuration to cloud API
+/// Returns an error if the server rejects the update (e.g. hotkey overlap).
+async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     let auth_token = match get_auth_token_async(app).await {
         Some(token) => token,
         None => {
-            println!("⚠️  No auth token available, skipping cloud sync");
-            return;
+            return Err("No auth token available, cannot sync to cloud".to_string());
         }
     };
 
@@ -344,31 +337,25 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
 
     utils::log_api_request("Sync app configuration to cloud", "PUT", &url);
 
-    match client
+    let response = client
         .put(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
         .header("Content-Type", "application/json")
         .json(&request_body)
         .send()
         .await
-    {
-        Ok(response) => {
-            let status = response.status();
-            if status.is_success() {
-                println!("✅ App config synced to cloud successfully");
-            } else {
-                let error_text = response
-                    .text()
-                    .await
-                    .unwrap_or_else(|_| "Unknown error".to_string());
-                eprintln!(
-                    "⚠️  Failed to sync app config to cloud ({}): {}",
-                    status, error_text
-                );
-            }
-        }
-        Err(e) => {
-            eprintln!("⚠️  Failed to sync app config to cloud: {}", e);
-        }
+        .map_err(|e| format!("Failed to connect to server: {}", e))?;
+
+    let status = response.status();
+    if status.is_success() {
+        println!("✅ App config synced to cloud successfully");
+        Ok(())
+    } else {
+        let json_value: serde_json::Value = response
+            .json()
+            .await
+            .unwrap_or_else(|_| serde_json::json!({}));
+        let error_msg = extract_error_message(&json_value, status);
+        Err(error_msg)
     }
 }

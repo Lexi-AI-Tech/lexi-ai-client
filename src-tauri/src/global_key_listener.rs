@@ -280,27 +280,6 @@ pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Error message when hotkeys and action hotkeys overlap.
-pub const ASSISTANT_ACTION_HOTKEY_OVERLAP_MSG: &str =
-    "Same key combination cannot be used for both hotkeys and action hotkeys";
-
-/// Returns an error if any hotkey appears in both hotkey and action hotkey lists (canonical comparison).
-pub fn validate_assistant_action_hotkeys_no_overlap(
-    assistant_hotkeys: &[String],
-    action_hotkeys: &[String],
-) -> Result<(), String> {
-    let action_set: std::collections::HashSet<_> = action_hotkeys
-        .iter()
-        .map(|h| hotkey_to_canonical(h))
-        .collect();
-    for h in assistant_hotkeys {
-        if action_set.contains(&hotkey_to_canonical(h)) {
-            return Err(ASSISTANT_ACTION_HOTKEY_OVERLAP_MSG.to_string());
-        }
-    }
-    Ok(())
-}
-
 // ============================================================================
 // rdev Listener (configurable hotkeys)
 // ============================================================================
