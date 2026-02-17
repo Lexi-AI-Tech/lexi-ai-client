@@ -52,11 +52,32 @@ impl AudioRecorder {
         // Get the default audio host for the current platform
         let host = cpal::default_host();
 
-        // Get the default input device (microphone)
-        // Panics if no input device is available (shouldn't happen on most systems)
-        let device = host
-            .default_input_device()
-            .expect("Failed to get default input device");
+        // Prefer the built-in laptop mic over external devices (e.g. AirPods).
+        // Enumerate all input devices and pick the first one whose name contains
+        // "MacBook" or "Built-in"; fall back to the system default otherwise.
+        let builtin_device = host.input_devices().ok().and_then(|devices| {
+            devices
+                .filter_map(|d| {
+                    let name = d.name().ok()?;
+                    if name.contains("MacBook") || name.contains("Built-in") {
+                        Some(d)
+                    } else {
+                        None
+                    }
+                })
+                .next()
+        });
+
+        let device = builtin_device.unwrap_or_else(|| {
+            host.default_input_device()
+                .expect("Failed to get default input device")
+        });
+
+        // Log the audio input source
+        println!(
+            "🎙️ Audio input device: {}",
+            device.name().unwrap_or_else(|_| "Unknown".to_string())
+        );
 
         // Get the default configuration for the device
         // This includes sample rate, number of channels, and sample format
