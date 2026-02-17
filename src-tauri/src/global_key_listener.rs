@@ -112,6 +112,10 @@ enum HotkeyCommandResult {
     SendStopAfter(Duration),
 }
 
+/// Minimum cooldown after deactivation before the same hotkey can re-activate.
+/// Prevents the macOS Fn key phantom re-press (KeyRelease immediately followed by KeyPress).
+const REACTIVATION_COOLDOWN: Duration = Duration::from_millis(200);
+
 /// Tracks which configured hotkeys are 'active' (pressed)
 struct KeyStateTracker {
     /// Hotkey strings that are currently considered active
@@ -120,6 +124,8 @@ struct KeyStateTracker {
     last_press_at: Option<Instant>,
     /// Set of currently physically pressed keys (normalized strings)
     pressed_keys: HashSet<String>,
+    /// When each hotkey was last deactivated (for cooldown)
+    last_deactivated_at: std::collections::HashMap<String, Instant>,
 }
 
 impl KeyStateTracker {
@@ -128,6 +134,7 @@ impl KeyStateTracker {
             active_hotkeys: HashSet::new(),
             last_press_at: None,
             pressed_keys: HashSet::new(),
+            last_deactivated_at: std::collections::HashMap::new(),
         }
     }
 
@@ -168,6 +175,13 @@ impl KeyStateTracker {
         if is_press {
             // Check if this hotkey is fully pressed
             if self.matches_hotkey(&hotkey_normalized, trigger_key) {
+                // Reject phantom re-press: if this hotkey was deactivated very recently, ignore
+                if let Some(deactivated_at) = self.last_deactivated_at.get(&hotkey_normalized) {
+                    if deactivated_at.elapsed() < REACTIVATION_COOLDOWN {
+                        return None; // Phantom re-press, ignore
+                    }
+                }
+
                 // Only trigger if not already active
                 if self.active_hotkeys.insert(hotkey_normalized.clone()) {
                     let cmd = if is_action {
@@ -196,6 +210,8 @@ impl KeyStateTracker {
                 // If the released key is one of the parts, deactivate
                 if parts.contains(&trigger_key.to_string()) {
                     self.active_hotkeys.remove(&hotkey_normalized);
+                    self.last_deactivated_at
+                        .insert(hotkey_normalized.clone(), Instant::now());
 
                     println!("🔑 Hotkey Deactivated: {}", hotkey_normalized);
 

@@ -8,14 +8,6 @@
 use std::sync::{Arc, Mutex};
 use tokio::sync::watch;
 
-/// Transcription task state for managing abort handles
-///
-/// This allows canceling ongoing transcriptions when a new one starts.
-pub struct TranscriptionTaskState {
-    /// Handle to the current transcription task, if one is running
-    pub task_handle: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
-}
-
 /// State for watch sender (to broadcast config changes)
 ///
 /// This state manages a watch channel that broadcasts hotkey configuration changes
