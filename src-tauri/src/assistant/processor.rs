@@ -12,10 +12,10 @@ use super::service::AssistantService;
 
 use crate::commands::auth::get_auth_token_async;
 use crate::shortcuts::check_command;
-use crate::state::TranscriptionTaskState;
+
 use crate::text_injector::TextInjector;
 use std::time::Instant;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 /// Processes recorded audio data by transcribing it and injecting the result.
 ///
@@ -26,18 +26,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// * `audio_data` - The WAV audio data to transcribe
 /// * `app_handle` - The Tauri AppHandle for emitting events and accessing state
 pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
-    // Clone app_handle for use in the task and for storing abort handle
     let app_handle_for_task = app_handle.clone();
-
-    // Abort any ongoing transcription task
-    if let Some(state) = app_handle.try_state::<TranscriptionTaskState>() {
-        if let Ok(mut handle_guard) = state.task_handle.lock() {
-            if let Some(handle) = handle_guard.take() {
-                println!("🛑 Aborting previous transcription task");
-                handle.abort();
-            }
-        }
-    }
 
     // Spawn a new transcription task using Tauri's async runtime
     // This returns a JoinHandle that we can use to abort the task
@@ -128,17 +117,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 }
             }
             Err(e) => {
-                // Check if this is a cancellation error
                 let error_msg = e.to_string();
-                if error_msg.contains("cancelled") || error_msg.contains("aborted") {
-                    println!(
-                        "🛑 Transcription was cancelled after {:.2}s",
-                        transcription_duration.as_secs_f64()
-                    );
-                    // Don't emit error event for cancellation - it's expected
-                    return;
-                }
-
                 eprintln!(
                     "❌ Transcription failed after {:.2}s: {}",
                     transcription_duration.as_secs_f64(),
@@ -151,11 +130,4 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             }
         }
     });
-
-    // Store the task handle in state for future cancellation
-    if let Some(state) = app_handle.try_state::<TranscriptionTaskState>() {
-        if let Ok(mut handle_guard) = state.task_handle.lock() {
-            *handle_guard = Some(task);
-        }
-    }
 }

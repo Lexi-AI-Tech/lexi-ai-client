@@ -75,7 +75,6 @@ use google_oauth::OAuthState;
 
 use state::{
     ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState,
-    TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
 
@@ -221,9 +220,6 @@ pub fn main() {
 
     builder
         .manage(OAuthState::default())
-        .manage(TranscriptionTaskState {
-            task_handle: Mutex::new(None),
-        })
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
             request_input_monitoring_permission,
