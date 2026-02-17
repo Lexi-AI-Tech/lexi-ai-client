@@ -21,6 +21,7 @@ import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { HotkeySelector } from "./HotkeySelector";
 import { useAuthStore } from "../store/authStore";
 import "../styles/pages/shared.css";
+import "../styles/pages/settings.css";
 import "../styles/components/hotkey-selector.css";
 
 // Supported languages for transcription
@@ -255,67 +256,10 @@ export const SettingsPage: React.FC = () => {
     <button
       onClick={onToggle}
       disabled={disabled}
-      style={{
-        width: "48px",
-        height: "28px",
-        borderRadius: "14px",
-        border: "none",
-        background: enabled
-          ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-          : "#e5e7eb",
-        cursor: disabled ? "not-allowed" : "pointer",
-        position: "relative",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        opacity: disabled ? 0.5 : 1,
-        boxShadow: enabled
-          ? "0 2px 8px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
-          : "inset 0 2px 4px rgba(0, 0, 0, 0.06)",
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled && enabled) {
-          e.currentTarget.style.boxShadow =
-            "0 4px 12px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
-        } else if (!disabled && !enabled) {
-          e.currentTarget.style.background = "#d1d5db";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!disabled && enabled) {
-          e.currentTarget.style.boxShadow =
-            "0 2px 8px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
-        } else if (!disabled && !enabled) {
-          e.currentTarget.style.background = "#e5e7eb";
-        }
-      }}
+      className={`toggle-switch${enabled ? " toggle-switch--on" : ""}`}
     >
-      <div
-        style={{
-          width: "22px",
-          height: "22px",
-          borderRadius: "50%",
-          background: "#ffffff",
-          position: "absolute",
-          top: "3px",
-          left: enabled ? "23px" : "3px",
-          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          boxShadow: enabled
-            ? "0 2px 6px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1)"
-            : "0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.1)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {enabled && (
-          <div
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-            }}
-          />
-        )}
+      <div className="toggle-switch__knob">
+        {enabled && <div className="toggle-switch__dot" />}
       </div>
     </button>
   );
@@ -325,9 +269,7 @@ export const SettingsPage: React.FC = () => {
     return (
       <div className="page-layout">
         <h2 className="page-layout__title">Settings</h2>
-        <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-          Loading settings...
-        </div>
+        <div className="settings-loading">Loading settings...</div>
       </div>
     );
   }
@@ -338,22 +280,8 @@ export const SettingsPage: React.FC = () => {
     return (
       <div className="page-layout">
         <h2 className="page-layout__title">Settings</h2>
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "12px",
-            padding: "40px",
-            textAlign: "center",
-          }}
-        >
-          <p
-            style={{
-              fontSize: "14px",
-              color: "#6b7280",
-              marginBottom: "20px",
-            }}
-          >
+        <div className="settings-auth-prompt">
+          <p className="settings-auth-prompt__text">
             Sign in to access your settings
           </p>
           <GoogleLoginButton
@@ -375,16 +303,7 @@ export const SettingsPage: React.FC = () => {
       <div className="page-layout">
         <h2 className="page-layout__title">Settings</h2>
         {error && (
-          <div
-            className="permission-message"
-            style={{
-              background: "#fef2f2",
-              borderColor: "#fecaca",
-              color: "#b91c1c",
-            }}
-          >
-            {error}
-          </div>
+          <div className="settings-msg settings-msg--error">{error}</div>
         )}
       </div>
     );
@@ -395,14 +314,7 @@ export const SettingsPage: React.FC = () => {
       <h2 className="page-layout__title">Settings</h2>
 
       {/* Section Navigation */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          marginBottom: "32px",
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="settings-nav">
         {[
           { id: "account" as const, label: "Account", icon: Monitor },
           { id: "transcription" as const, label: "Transcription", icon: Mic },
@@ -416,32 +328,7 @@ export const SettingsPage: React.FC = () => {
           <button
             key={id}
             onClick={() => setActiveSection(id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 16px",
-              borderRadius: "8px",
-              border: "none",
-              background: activeSection === id ? "#111827" : "#f3f4f6",
-              color: activeSection === id ? "#ffffff" : "#6b7280",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              fontSize: "14px",
-              fontWeight: activeSection === id ? 500 : 400,
-            }}
-            onMouseEnter={(e) => {
-              if (activeSection !== id) {
-                e.currentTarget.style.background = "#e5e7eb";
-                e.currentTarget.style.color = "#111827";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeSection !== id) {
-                e.currentTarget.style.background = "#f3f4f6";
-                e.currentTarget.style.color = "#6b7280";
-              }
-            }}
+            className={`settings-nav__btn${activeSection === id ? " settings-nav__btn--active" : ""}`}
           >
             <Icon size={16} />
             <span>{label}</span>
@@ -454,26 +341,8 @@ export const SettingsPage: React.FC = () => {
         {/* Account Section */}
         {activeSection === "account" && (
           <div>
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#9ca3af",
-                  marginBottom: "16px",
-                }}
-              >
-                Account
-              </div>
+            <div className="settings-card">
+              <div className="settings-label">Account</div>
               <GoogleLoginButton />
             </div>
           </div>
@@ -482,31 +351,9 @@ export const SettingsPage: React.FC = () => {
         {/* Transcription Section */}
         {activeSection === "transcription" && (
           <div>
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#9ca3af",
-                  marginBottom: "12px",
-                }}
-              >
-                Language
-              </div>
-              <div
-                ref={languageDropdownRef}
-                style={{ position: "relative", marginBottom: "12px" }}
-              >
+            <div className="settings-card settings-card--mb">
+              <div className="settings-label settings-label--sm">Language</div>
+              <div ref={languageDropdownRef} className="lang-dropdown">
                 <button
                   type="button"
                   onClick={() => {
@@ -515,40 +362,7 @@ export const SettingsPage: React.FC = () => {
                     }
                   }}
                   disabled={isUpdating || isLoading}
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    fontSize: "14px",
-                    fontFamily: "inherit",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    color: "#111827",
-                    cursor: isUpdating || isLoading ? "not-allowed" : "pointer",
-                    opacity: isUpdating || isLoading ? 0.5 : 1,
-                    transition: "all 0.2s ease",
-                    outline: "none",
-                    fontWeight: 500,
-                    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-                    textAlign: "left",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isUpdating && !isLoading) {
-                      e.currentTarget.style.borderColor = "#d1d5db";
-                      e.currentTarget.style.boxShadow =
-                        "0 2px 4px rgba(0, 0, 0, 0.08)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isLanguageDropdownOpen) {
-                      e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.boxShadow =
-                        "0 1px 2px rgba(0, 0, 0, 0.05)";
-                    }
-                  }}
+                  className="lang-dropdown__trigger"
                 >
                   <span>
                     {selectedLanguage
@@ -559,69 +373,21 @@ export const SettingsPage: React.FC = () => {
                   </span>
                   <ChevronDown
                     size={18}
-                    style={{
-                      color: "#6b7280",
-                      transform: isLanguageDropdownOpen
-                        ? "rotate(180deg)"
-                        : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                    }}
+                    className={`lang-dropdown__chevron${isLanguageDropdownOpen ? " lang-dropdown__chevron--open" : ""}`}
                   />
                 </button>
 
                 {isLanguageDropdownOpen && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      marginTop: "4px",
-                      backgroundColor: "#ffffff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                      zIndex: 1000,
-                      maxHeight: "300px",
-                      overflowY: "auto",
-                      overflowX: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "8px 0",
-                      }}
-                    >
+                  <div className="lang-dropdown__menu">
+                    <div className="lang-dropdown__list">
                       <button
                         type="button"
                         onClick={() => handleLanguageSelect(null)}
-                        style={{
-                          width: "100%",
-                          padding: "10px 16px",
-                          backgroundColor: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          fontSize: "14px",
-                          color: "#111827",
-                          transition: "background-color 0.15s ease",
-                          textAlign: "left",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#f3f4f6";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }}
+                        className="lang-dropdown__option"
                       >
                         <span>Auto Detect Language</span>
                         {!selectedLanguage && (
-                          <Check
-                            size={16}
-                            style={{ color: "#111827", flexShrink: 0 }}
-                          />
+                          <Check size={16} className="lang-dropdown__check" />
                         )}
                       </button>
                       {SUPPORTED_LANGUAGES.filter(
@@ -633,34 +399,11 @@ export const SettingsPage: React.FC = () => {
                           onClick={() =>
                             handleLanguageSelect(lang.value as LanguageCode)
                           }
-                          style={{
-                            width: "100%",
-                            padding: "10px 16px",
-                            backgroundColor: "transparent",
-                            border: "none",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            fontSize: "14px",
-                            color: "#111827",
-                            transition: "background-color 0.15s ease",
-                            textAlign: "left",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "#f3f4f6";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "transparent";
-                          }}
+                          className="lang-dropdown__option"
                         >
                           <span>{lang.label}</span>
                           {selectedLanguage === lang.value && (
-                            <Check
-                              size={16}
-                              style={{ color: "#111827", flexShrink: 0 }}
-                            />
+                            <Check size={16} className="lang-dropdown__check" />
                           )}
                         </button>
                       ))}
@@ -668,12 +411,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 )}
               </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "#9ca3af",
-                }}
-              >
+              <div className="settings-row__hint">
                 {selectedLanguage === "auto"
                   ? "Automatically detected from your audio input."
                   : selectedLanguage
@@ -682,39 +420,13 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "24px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#111827",
-                      marginBottom: "4px",
-                      fontWeight: 500,
-                    }}
-                  >
+            <div className="settings-card settings-card--mb-lg">
+              <div className="settings-row">
+                <div className="settings-row__text">
+                  <div className="settings-row__title">
                     Enhance Transcription
                   </div>
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      color: "#6b7280",
-                    }}
-                  >
+                  <div className="settings-row__desc">
                     Use AI to improve accuracy and formatting.
                   </div>
                 </div>
@@ -731,33 +443,11 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             {error && (
-              <div
-                style={{
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#b91c1c",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
-                {error}
-              </div>
+              <div className="settings-msg settings-msg--error">{error}</div>
             )}
 
             {success && (
-              <div
-                style={{
-                  background: "#ecfdf5",
-                  border: "1px solid #a7f3d0",
-                  color: "#047857",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
+              <div className="settings-msg settings-msg--success">
                 Settings saved successfully!
               </div>
             )}
@@ -767,39 +457,13 @@ export const SettingsPage: React.FC = () => {
         {/* General Section */}
         {activeSection === "general" && (
           <div>
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "24px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#111827",
-                      marginBottom: "4px",
-                      fontWeight: 500,
-                    }}
-                  >
+            <div className="settings-card settings-card--mb-lg">
+              <div className="settings-row">
+                <div className="settings-row__text">
+                  <div className="settings-row__title">
                     Start on System Startup
                   </div>
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      color: "#6b7280",
-                    }}
-                  >
+                  <div className="settings-row__desc">
                     Automatically launch when your computer starts.
                   </div>
                 </div>
@@ -814,33 +478,11 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             {error && (
-              <div
-                style={{
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#b91c1c",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
-                {error}
-              </div>
+              <div className="settings-msg settings-msg--error">{error}</div>
             )}
 
             {success && (
-              <div
-                style={{
-                  background: "#ecfdf5",
-                  border: "1px solid #a7f3d0",
-                  color: "#047857",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
+              <div className="settings-msg settings-msg--success">
                 Settings saved successfully!
               </div>
             )}
@@ -851,29 +493,9 @@ export const SettingsPage: React.FC = () => {
         {activeSection === "hotkeys" && (
           <div>
             {hotkeyError && (
-              <div
-                style={{
-                  backgroundColor: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  borderRadius: "8px",
-                  padding: "12px 16px",
-                  marginBottom: "16px",
-                  color: "#b91c1c",
-                  fontSize: "14px",
-                }}
-              >
-                {hotkeyError}
-              </div>
+              <div className="settings-msg--error-block">{hotkeyError}</div>
             )}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "16px",
-              }}
-            >
+            <div className="settings-card settings-card--mb">
               {/* Hotkeys */}
               <HotkeySelector
                 key={`hotkeys-${hotkeySectionKey}`}
@@ -910,15 +532,7 @@ export const SettingsPage: React.FC = () => {
               />
             </div>
 
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "16px",
-              }}
-            >
+            <div className="settings-card settings-card--mb">
               {/* Action Hotkeys */}
               <HotkeySelector
                 key={`action-hotkeys-${hotkeySectionKey}`}
@@ -957,38 +571,11 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             {/* Reset to Defaults */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+            <div className="settings-card">
+              <div className="settings-row">
                 <div>
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 500,
-                      color: "#111827",
-                      marginBottom: "4px",
-                    }}
-                  >
-                    Reset Hotkeys
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "#6b7280",
-                    }}
-                  >
+                  <div className="settings-reset__title">Reset Hotkeys</div>
+                  <div className="settings-reset__desc">
                     Restore default hotkeys (Fn for transcription, Fn+Control
                     for actions)
                   </div>
