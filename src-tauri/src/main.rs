@@ -59,6 +59,8 @@ mod pill; // Pill overlay window creation, positioning, and visibility managemen
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
+#[cfg(target_os = "macos")]
+mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod tray; // System tray icon creation and event handling
@@ -144,17 +146,31 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
         .lock()
         .map_err(|e| format!("lock error: {}", e))?;
     if let Some(params) = guard.take() {
+        // Start the listener
         start_listener(
+            app.clone(),
+            params.recording_tx.clone(),
+            params.config_rx.clone(),
+            params.action_hotkey_rx.clone(),
+            params.recording_state.clone(),
+        );
+        println!("✅ Global key listener started (Input Monitoring will now be used)");
+
+        // Set up macOS sleep/wake watcher to re-spawn the listener after wake.
+        // rdev's CGEventTap gets invalidated when macOS sleeps, so we need a fresh
+        // listener thread after wake. The old dead thread exits on its own.
+        #[cfg(target_os = "macos")]
+        sleep_watcher::start_sleep_watcher(
             app.clone(),
             params.recording_tx,
             params.config_rx,
             params.action_hotkey_rx,
             params.recording_state,
         );
-        println!("✅ Global key listener started (Input Monitoring will now be used)");
     }
     Ok(())
 }
+
 
 /// Main entry point for the Tauri application
 ///
