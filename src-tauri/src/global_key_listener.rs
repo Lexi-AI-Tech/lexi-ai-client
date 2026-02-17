@@ -289,9 +289,9 @@ const MIN_PRESS_RELEASE_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Grace period for subset hotkeys — how long to wait for a superset combo
 /// (including cross-list: recording subset of action, or vice versa) before
-/// triggering the shorter hotkey. 200ms accounts for typical user latency
+/// triggering the shorter hotkey. 150ms accounts for typical user latency
 /// when rolling from one key to the next (e.g. Fn then Control).
-const SUBSET_GRACE_PERIOD: Duration = Duration::from_millis(200);
+const SUBSET_GRACE_PERIOD: Duration = Duration::from_millis(150);
 
 /// Result of processing a hotkey event
 #[derive(Debug, Clone)]
