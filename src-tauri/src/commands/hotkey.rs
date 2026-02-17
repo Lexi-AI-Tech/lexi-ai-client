@@ -5,7 +5,7 @@
 //! - **Hotkeys**: trigger recording for transcription.
 //! - **Action hotkeys**: trigger recording for voice actions.
 
-use crate::commands::app_config::{fetch_config_from_server, update_app_config, AppConfig};
+use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
 use crate::global_key_listener::{
     hotkey_to_canonical,
     validate_hotkey,
@@ -75,7 +75,7 @@ pub async fn update_hotkey(
 /// Get the current hotkey configuration
 #[tauri::command]
 pub async fn get_current_hotkey(app: AppHandle) -> Result<String, String> {
-    let config = fetch_config_from_server(&app).await?;
+    let config = get_app_config(app).await?;
     let hotkeys = config
         .hotkeys
         .ok_or_else(|| "Server did not provide hotkeys".to_string())?;

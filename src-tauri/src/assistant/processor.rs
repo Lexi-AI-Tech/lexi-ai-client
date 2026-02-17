@@ -11,7 +11,7 @@
 
 use super::service::AssistantService;
 
-use crate::commands::app_config::fetch_config_from_server;
+use crate::commands::app_config::get_app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::shortcuts::check_shortcuts;
 
@@ -60,7 +60,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Fetch app config in parallel with transcription (for shortcuts)
         let config_handle = {
             let app = app_handle.clone();
-            tauri::async_runtime::spawn(async move { fetch_config_from_server(&app).await })
+            tauri::async_runtime::spawn(async move { get_app_config(app).await })
         };
 
         let transcription_start = Instant::now();
@@ -93,41 +93,45 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     transcription
                 );
 
-                // Notify frontend of successful transcription
+                // Notify frontend of successful transcription (emit immediately, not in blocking task)
                 app_handle
                     .emit("transcription_success", &transcription)
                     .unwrap_or_default();
 
                 // Only process if transcription is not empty
                 if !transcription.trim().is_empty() {
-                    // Check if transcription matches a shortcut (uses pre-fetched shortcuts)
-                    let text_to_inject = check_shortcuts(&shortcuts, &transcription)
-                        .unwrap_or_else(|| transcription.clone());
+                    // Run shortcut check + text injection on a blocking thread so we never
+                    // block the async runtime (clipboard and AppleScript can block or deadlock).
+                    let transcription_clone = transcription.clone();
+                    let shortcuts_clone = shortcuts.clone();
+                    let app = app_handle.clone();
+                    let join = tokio::task::spawn_blocking(move || {
+                        // Check if transcription matches a shortcut (uses pre-fetched shortcuts)
+                        let text_to_inject = check_shortcuts(&shortcuts_clone, &transcription_clone)
+                            .unwrap_or_else(|| transcription_clone.clone());
 
-                    if text_to_inject != transcription {
-                        println!(
-                            "🔧 Command detected: '{}' -> '{}'",
-                            transcription.trim(),
-                            text_to_inject
-                        );
-                    }
+                        if text_to_inject != transcription_clone {
+                            println!(
+                                "🔧 Command detected: '{}' -> '{}'",
+                                transcription_clone.trim(),
+                                text_to_inject
+                            );
+                        }
 
-                    // Inject the text (or shortcut replacement)
-                    let injector = TextInjector::new();
-                    match injector.inject_text(&text_to_inject) {
-                        Ok(_) => {
-                            // Successfully injected text into active application
-                            app_handle
-                                .emit("injection_success", ())
-                                .unwrap_or_default();
+                        // Inject the text (or shortcut replacement)
+                        let injector = TextInjector::new();
+                        match injector.inject_text(&text_to_inject) {
+                            Ok(_) => {
+                                let _ = app.emit("injection_success", ());
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to inject text: {}", e);
+                                let _ = app.emit("injection_error", e.to_string());
+                            }
                         }
-                        Err(e) => {
-                            eprintln!("Failed to inject text: {}", e);
-                            // Notify frontend of injection failure
-                            app_handle
-                                .emit("injection_error", e.to_string())
-                                .unwrap_or_default();
-                        }
+                    });
+                    if let Err(e) = join.await {
+                        eprintln!("spawn_blocking join failed: {}", e);
                     }
                 }
             }

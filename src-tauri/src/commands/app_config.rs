@@ -63,8 +63,8 @@ struct ServerAppConfigResponse {
 
 /// Get the complete app configuration from server
 ///
-/// Pure fetch — no side effects (no autostart sync, no hotkey state updates).
-/// Use `initialize_app_config` at app launch to also sync OS state.
+/// Fetches fresh config from server and updates in-memory hotkey state.
+/// Does NOT sync autostart status — that is only done at launch or when updating the setting.
 #[tauri::command]
 pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     println!("🔄 Fetching app config from server...");
@@ -78,6 +78,9 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
         "✅ Fetched config from server with hotkeys: {:?}",
         config.hotkeys
     );
+
+    // Update in-memory state for hotkeys
+    update_hotkey_state(&app, &config);
 
     Ok(config)
 }
