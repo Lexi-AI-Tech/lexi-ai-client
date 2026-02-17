@@ -60,6 +60,8 @@ mod pill; // Pill overlay window creation, positioning, and visibility managemen
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
+#[cfg(target_os = "macos")]
+mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod tray; // System tray icon creation and event handling
@@ -74,7 +76,6 @@ use google_oauth::OAuthState;
 
 use state::{
     ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState,
-    TranscriptionTaskState,
 };
 use window::show_and_focus_main_window;
 
@@ -154,9 +155,16 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
             params.recording_state,
         );
         println!("✅ Global key listener started (Input Monitoring will now be used)");
+
+        // Set up macOS sleep/wake watcher to restart the app after wake.
+        // macOS destroys CGEventTap, stales HTTP sockets, and invalidates audio handles
+        // during sleep — a full restart is the cleanest way to recover.
+        #[cfg(target_os = "macos")]
+        sleep_watcher::start_sleep_watcher(app.clone());
     }
     Ok(())
 }
+
 
 /// Main entry point for the Tauri application
 ///
@@ -216,9 +224,6 @@ pub fn main() {
 
     builder
         .manage(OAuthState::default())
-        .manage(TranscriptionTaskState {
-            task_handle: Mutex::new(None),
-        })
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
             request_input_monitoring_permission,

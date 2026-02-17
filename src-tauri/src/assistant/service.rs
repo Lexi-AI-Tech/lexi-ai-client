@@ -43,7 +43,7 @@ impl AssistantService {
     /// Initializes the HTTP client.
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::new(), // Create a new HTTP client
+            client: reqwest::Client::new(),
         }
     }
 

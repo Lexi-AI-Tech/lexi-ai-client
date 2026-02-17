@@ -252,7 +252,11 @@ fn is_reserved_single_letter(canonical: &str) -> bool {
     if canonical.contains('+') {
         return false;
     }
-    canonical.len() == 1 && canonical.chars().next().map_or(false, |c| c.is_ascii_alphabetic())
+    canonical.len() == 1
+        && canonical
+            .chars()
+            .next()
+            .map_or(false, |c| c.is_ascii_alphabetic())
 }
 
 fn is_reserved_macos_shortcut(hotkey: &str) -> bool {
@@ -285,8 +289,10 @@ pub fn validate_assistant_action_hotkeys_no_overlap(
     assistant_hotkeys: &[String],
     action_hotkeys: &[String],
 ) -> Result<(), String> {
-    let action_set: std::collections::HashSet<_> =
-        action_hotkeys.iter().map(|h| hotkey_to_canonical(h)).collect();
+    let action_set: std::collections::HashSet<_> = action_hotkeys
+        .iter()
+        .map(|h| hotkey_to_canonical(h))
+        .collect();
     for h in assistant_hotkeys {
         if action_set.contains(&hotkey_to_canonical(h)) {
             return Err(ASSISTANT_ACTION_HOTKEY_OVERLAP_MSG.to_string());
@@ -328,6 +334,10 @@ struct PendingHotkey {
     created_at: Instant,
 }
 
+/// Minimum cooldown after deactivation before the same hotkey can re-activate.
+/// Prevents the macOS Fn key phantom re-press (KeyRelease immediately followed by KeyPress).
+const REACTIVATION_COOLDOWN: Duration = Duration::from_millis(200);
+
 /// Tracks which configured hotkeys are 'active' (pressed)
 struct KeyStateTracker {
     /// Hotkey strings that are currently considered active
@@ -338,6 +348,8 @@ struct KeyStateTracker {
     pressed_keys: HashSet<String>,
     /// A hotkey activation waiting for the grace period to expire
     pending_activation: Option<PendingHotkey>,
+    /// When each hotkey was last deactivated (for cooldown)
+    last_deactivated_at: std::collections::HashMap<String, Instant>,
 }
 
 impl KeyStateTracker {
@@ -347,6 +359,7 @@ impl KeyStateTracker {
             last_press_at: None,
             pressed_keys: HashSet::new(),
             pending_activation: None,
+            last_deactivated_at: std::collections::HashMap::new(),
         }
     }
 
@@ -405,7 +418,14 @@ impl KeyStateTracker {
 
         if is_press {
             // Check if this hotkey is fully pressed
-            if self.matches_hotkey(&hotkey_normalized) {
+            if self.matches_hotkey(&hotkey_normalized, trigger_key) {
+                // Reject phantom re-press: if this hotkey was deactivated very recently, ignore
+                if let Some(deactivated_at) = self.last_deactivated_at.get(&hotkey_normalized) {
+                    if deactivated_at.elapsed() < REACTIVATION_COOLDOWN {
+                        return None; // Phantom re-press, ignore
+                    }
+                }
+
                 // Only trigger if not already active
                 if !self.active_hotkeys.contains(&hotkey_normalized) {
                     let cmd = if is_action {
@@ -457,6 +477,8 @@ impl KeyStateTracker {
                 // If the released key is one of the parts, deactivate
                 if parts.contains(&trigger_key.to_string()) {
                     self.active_hotkeys.remove(&hotkey_normalized);
+                    self.last_deactivated_at
+                        .insert(hotkey_normalized.clone(), Instant::now());
 
                     println!("🔑 Hotkey Deactivated: {}", hotkey_normalized);
 
