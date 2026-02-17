@@ -79,25 +79,48 @@ impl TextInjector {
     /// clipboard is not preserved by default for performance. If you need to
     /// preserve it, uncomment the clipboard save/restore code below.
     pub fn inject_text(&self, text: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut clipboard = Clipboard::new()?;
+        println!("📋 TextInjector: starting injection ({} chars)", text.len());
 
-        // Step 1: Set clipboard to the text we want to inject
-        // arboard handles UTF-8 encoding and special characters automatically
-        clipboard.set_text(text)?;
+        let text_owned = text.to_string();
+        let result =
+            std::panic::catch_unwind(move || -> Result<(), Box<dyn Error + Send + Sync>> {
+                let mut clipboard = Clipboard::new()?;
+                println!("📋 TextInjector: clipboard created");
 
-        // Small delay to ensure clipboard is ready
-        thread::sleep(Duration::from_millis(50));
+                // Step 1: Set clipboard to the text we want to inject
+                clipboard.set_text(&text_owned)?;
+                println!("📋 TextInjector: clipboard text set");
 
-        // Step 2: Simulate paste keystroke via keyboard_simulator module
-        // Handles platform-specific implementation (AppleScript on macOS, enigo on Windows/Linux)
-        crate::keyboard_simulator::simulate_paste()?;
+                // Small delay to ensure clipboard is ready
+                thread::sleep(Duration::from_millis(50));
 
-        // Brief delay to ensure paste processes (some apps need a moment)
-        thread::sleep(Duration::from_millis(50));
+                // Step 2: Simulate paste keystroke
+                crate::keyboard_simulator::simulate_paste()?;
+                println!("📋 TextInjector: paste simulated");
 
-        // Step 3: Flush clipboard so injected text doesn't remain in clipboard
-        let _ = clipboard.clear();
+                // Brief delay to ensure paste processes
+                thread::sleep(Duration::from_millis(50));
 
-        Ok(())
+                // Step 3: Flush clipboard
+                let _ = clipboard.clear();
+                println!("📋 TextInjector: clipboard cleared, done");
+
+                Ok(())
+            });
+
+        match result {
+            Ok(inner) => inner,
+            Err(panic_info) => {
+                let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "Unknown panic in text injection".to_string()
+                };
+                eprintln!("💥 TextInjector panicked: {}", msg);
+                Err(msg.into())
+            }
+        }
     }
 }
