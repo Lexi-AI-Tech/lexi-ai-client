@@ -93,20 +93,24 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     transcription
                 );
 
-                // Notify frontend of successful transcription (emit immediately, not in blocking task)
+                // Notify frontend of successful transcription (emit immediately, not in blocking task).
+                // Emit to app (main window, etc.) and explicitly to pill so the overlay always receives it
+                // and returns to idle — app.emit() from an async task can sometimes not reach the pill window.
                 app_handle
                     .emit("transcription_success", &transcription)
                     .unwrap_or_default();
+                let _ = app_handle.emit_to("pill", "transcription_success", &transcription);
 
                 // Only process if transcription is not empty
                 if !transcription.trim().is_empty() {
                     // Run shortcut check + text injection on a blocking thread so we never
                     // block the async runtime (clipboard and AppleScript can block or deadlock).
+                    // Do NOT emit from inside the blocking thread — that can deadlock the app
+                    // (main thread waiting on something the blocking thread holds). Await here and
+                    // emit from the async task only.
                     let transcription_clone = transcription.clone();
                     let shortcuts_clone = shortcuts.clone();
-                    let app = app_handle.clone();
-                    let join = tokio::task::spawn_blocking(move || {
-                        // Check if transcription matches a shortcut (uses pre-fetched shortcuts)
+                    let inject_result = tokio::task::spawn_blocking(move || {
                         let text_to_inject = check_shortcuts(&shortcuts_clone, &transcription_clone)
                             .unwrap_or_else(|| transcription_clone.clone());
 
@@ -118,20 +122,27 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                             );
                         }
 
-                        // Inject the text (or shortcut replacement)
                         let injector = TextInjector::new();
-                        match injector.inject_text(&text_to_inject) {
-                            Ok(_) => {
-                                let _ = app.emit("injection_success", ());
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to inject text: {}", e);
-                                let _ = app.emit("injection_error", e.to_string());
-                            }
+                        injector.inject_text(&text_to_inject).map_err(|e| e.to_string())
+                    })
+                    .await;
+
+                    match inject_result {
+                        Ok(Ok(_)) => {
+                            app_handle.emit("injection_success", ()).unwrap_or_default();
                         }
-                    });
-                    if let Err(e) = join.await {
-                        eprintln!("spawn_blocking join failed: {}", e);
+                        Ok(Err(e)) => {
+                            eprintln!("Failed to inject text: {}", e);
+                            app_handle
+                                .emit("injection_error", e)
+                                .unwrap_or_default();
+                        }
+                        Err(join_err) => {
+                            eprintln!("Injection task panicked or was cancelled: {}", join_err);
+                            app_handle
+                                .emit("injection_error", "Injection task failed".to_string())
+                                .unwrap_or_default();
+                        }
                     }
                 }
             }
@@ -142,10 +153,11 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     transcription_duration.as_secs_f64(),
                     e
                 );
-                // Notify frontend of transcription failure
+                // Notify frontend of transcription failure; ensure pill receives it.
                 app_handle
-                    .emit("transcription_error", error_msg)
+                    .emit("transcription_error", error_msg.clone())
                     .unwrap_or_default();
+                let _ = app_handle.emit_to("pill", "transcription_error", &error_msg);
             }
         }
     });

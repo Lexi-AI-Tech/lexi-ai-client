@@ -4,9 +4,8 @@
 //! Configuration is fetched from the server and synced with OS-level settings (autostart).
 //!
 //! ## Unified Commands
-//! - `get_app_config` - Get complete app configuration (pure fetch, no side effects)
+//! - `get_app_config` - Get complete app configuration
 //! - `update_app_config` - Update app configuration (automatically syncs autostart and cloud)
-//! - `initialize_app_config` - App launch initialization (syncs autostart + hotkey state)
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -63,13 +62,13 @@ struct ServerAppConfigResponse {
 
 /// Get the complete app configuration from server
 ///
-/// Fetches fresh config from server and updates in-memory hotkey state.
-/// Does NOT sync autostart status — that is only done at launch or when updating the setting.
+/// Always attempts to fetch fresh config from server.
+/// Syncs autostart status from OS-level settings.
 #[tauri::command]
 pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     println!("🔄 Fetching app config from server...");
 
-    let config = fetch_config_from_server(&app).await.map_err(|e| {
+    let mut config = fetch_config_from_server(&app).await.map_err(|e| {
         println!("⚠️  Failed to fetch from server: {}", e);
         e
     })?;
@@ -79,34 +78,12 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
         config.hotkeys
     );
 
+    // Sync launch_on_system_startup with actual OS autostart status
+    // REMOVED: This function is now a pure fetch. Autostart sync happens only when updating settings.
+    // sync_autostart_status(&app, &mut config);
+
     // Update in-memory state for hotkeys
     update_hotkey_state(&app, &config);
-
-    Ok(config)
-}
-
-/// Initialize app config at launch
-///
-/// Fetches config from server, syncs autostart with OS, and updates in-memory hotkey state.
-/// Should be called once at app startup.
-pub async fn initialize_app_config(app: AppHandle) -> Result<AppConfig, String> {
-    println!("🚀 Initializing app config at launch...");
-
-    let mut config = fetch_config_from_server(&app).await.map_err(|e| {
-        println!("⚠️  Failed to fetch from server: {}", e);
-        e
-    })?;
-
-    // Sync autostart with OS at launch
-    sync_autostart_status(&app, &mut config);
-
-    // Update in-memory hotkey state
-    update_hotkey_state(&app, &config);
-
-    println!(
-        "✅ App config initialized with hotkeys: {:?}",
-        config.hotkeys
-    );
 
     Ok(config)
 }
@@ -162,11 +139,11 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
 /// Pushes to cloud, then re-fetches the updated config and syncs OS/hotkey state from it.
 #[tauri::command]
 pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
-    // Check if launch_on_system_startup is being updated
-    let updating_autostart = config.launch_on_system_startup.is_some();
-
     // Fetch current to merge properly
     let mut current_config = fetch_config_from_server(&app).await?;
+
+    // Check if launch_on_system_startup is being updated
+    let updating_autostart = config.launch_on_system_startup.is_some();
 
     // Merge provided config with current config
     merge_config(&mut current_config, config);

@@ -159,10 +159,13 @@ pub async fn start_room_recording(
         loop {
             match audio_rx.recv() {
                 Ok(chunk) => {
-                    let guard = websocket_audio_tx.lock().unwrap();
-                    if let Some(ref tx) = *guard {
-                        // Send to tokio channel using blocking send
-                        let tx_clone = tx.clone();
+                    // Clone sender inside lock, then release lock before block_on to avoid deadlock
+                    // (async code must not need to acquire websocket_audio_tx while we block).
+                    let tx_opt = {
+                        let guard = websocket_audio_tx.lock().unwrap_or_else(|e| e.into_inner());
+                        (*guard).clone()
+                    };
+                    if let Some(tx_clone) = tx_opt {
                         if let Err(e) = rt_handle.block_on(tx_clone.send(chunk)) {
                             eprintln!("Failed to send audio chunk to WebSocket: {}", e);
                             break;

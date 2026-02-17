@@ -591,8 +591,14 @@ pub fn start_listener(
 
             let key_str = normalize_key_string(&key_to_string(&key));
 
-            // 1. Check Recording Mode (UI Hotkey Selection)
-            let is_recording_mode = recording_state_for_rdev.lock().map(|g| *g).unwrap_or(false);
+            // 1. Check Recording Mode (UI Hotkey Selection); recover from poison so we don't get stuck
+            let is_recording_mode = recording_state_for_rdev
+                .lock()
+                .map(|g| *g)
+                .unwrap_or_else(|e| {
+                    eprintln!("⚠️ Recording state mutex was poisoned, assuming not in recording mode");
+                    *e.into_inner()
+                });
 
             if is_recording_mode {
                 if is_press {
@@ -607,9 +613,14 @@ pub fn start_listener(
             }
 
             // 2. Update Physical Key State
+            // Recover from poison so one bad panic doesn't permanently disable hotkeys (Err => return
+            // would skip every key after the first poison).
             let mut tracker = match key_state_tracker_local.lock() {
-                Ok(t) => t,
-                Err(_) => return,
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    eprintln!("⚠️ Key state tracker mutex was poisoned, recovering for this event");
+                    poisoned.into_inner()
+                }
             };
             tracker.update_key_state(&key_str, is_press);
 
@@ -750,8 +761,15 @@ fn dispatch_command(
             let tracker = tracker_arc.clone();
             std::thread::spawn(move || {
                 std::thread::sleep(SUBSET_GRACE_PERIOD);
-                // After sleep, check if pending is still valid and timed out
-                let mut t = tracker.lock().unwrap();
+                // After sleep, check if pending is still valid and timed out.
+                // Use into_inner() on poison so we don't panic the worker thread.
+                let mut t = match tracker.lock() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => {
+                        eprintln!("⚠️ Key state tracker mutex poisoned in Pending worker, recovering");
+                        poisoned.into_inner()
+                    }
+                };
                 if let Some(res) = t.check_pending_timeout() {
                     if let HotkeyCommandResult::SendNow(cmd) = res {
                         if let Err(e) = tx.send(cmd) {
