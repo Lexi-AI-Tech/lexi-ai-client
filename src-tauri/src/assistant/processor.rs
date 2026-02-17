@@ -11,7 +11,7 @@
 
 use super::service::AssistantService;
 
-use crate::commands::app_config::get_app_config;
+use crate::commands::app_config::fetch_config_from_server;
 use crate::commands::auth::get_auth_token_async;
 use crate::shortcuts::check_shortcuts;
 
@@ -60,7 +60,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Fetch app config in parallel with transcription (for shortcuts)
         let config_handle = {
             let app = app_handle.clone();
-            tauri::async_runtime::spawn(async move { get_app_config(app).await })
+            tauri::async_runtime::spawn(async move { fetch_config_from_server(&app).await })
         };
 
         let transcription_start = Instant::now();

@@ -88,7 +88,7 @@ use permissions::{
 use actions::commands::{delete_action_history, get_action_history};
 use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
-use commands::app_config::{get_app_config, update_app_config};
+use commands::app_config::{get_app_config, initialize_app_config, update_app_config};
 use commands::auth::{
     clear_auth_data, get_api_base_url, get_auth_data, get_auth_token, get_current_user,
     get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
@@ -338,36 +338,25 @@ pub fn main() {
 
 
 
-            // Load hotkeys from server (no local persistence; empty if server unreachable)
-            let initial_config = {
+            // Load config from server at launch (syncs autostart + hotkey state)
+            let (initial_hotkeys, initial_action_hotkeys) = {
                 let app_handle_for_store = app_handle.clone();
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
-                    let config = get_app_config(app_handle_for_store).await
+                    let config = initialize_app_config(app_handle_for_store).await
                         .unwrap_or_else(|e| {
-                            println!("⚠️  Server config unavailable ({}), using empty hotkeys", e);
+                            println!("⚠️  Server config unavailable ({}), using defaults", e);
                             crate::commands::app_config::AppConfig::default()
                         });
-                    config.hotkeys.unwrap_or_default()
+                    (
+                        config.hotkeys.unwrap_or_default(),
+                        config.action_hotkeys.unwrap_or_default(),
+                    )
                 })
             };
-            println!("🔑 Recording hotkeys: {:?}", initial_config);
-            let (config_tx, config_rx) = watch::channel(initial_config.clone());
-
-            // Load action hotkeys from server (empty if server unreachable)
-            let initial_action_hotkeys = {
-                let app_handle_for_store = app_handle.clone();
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(async {
-                    let config = get_app_config(app_handle_for_store).await
-                        .unwrap_or_else(|e| {
-                            println!("⚠️  Server config unavailable ({}), using empty action hotkeys", e);
-                            crate::commands::app_config::AppConfig::default()
-                        });
-                    config.action_hotkeys.unwrap_or_default()
-                })
-            };
+            println!("🔑 Recording hotkeys: {:?}", initial_hotkeys);
             println!("🎯 Action hotkeys: {:?}", initial_action_hotkeys);
+            let (config_tx, config_rx) = watch::channel(initial_hotkeys);
             let (action_hotkey_tx, action_hotkey_rx) = watch::channel(initial_action_hotkeys);
 
             // Create recording state and manage it

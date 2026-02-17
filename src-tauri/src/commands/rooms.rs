@@ -97,7 +97,7 @@ pub async fn start_room_recording(
         .ok_or("Authentication required")?;
 
     // Get language from app config
-    let app_config = crate::commands::app_config::get_app_config(app.clone())
+    let app_config = crate::commands::app_config::fetch_config_from_server(&app)
         .await
         .map_err(|e| format!("Failed to load app config: {}", e))?;
 
