@@ -418,7 +418,7 @@ impl KeyStateTracker {
 
         if is_press {
             // Check if this hotkey is fully pressed
-            if self.matches_hotkey(&hotkey_normalized, trigger_key) {
+            if self.matches_hotkey(&hotkey_normalized) {
                 // Reject phantom re-press: if this hotkey was deactivated very recently, ignore
                 if let Some(deactivated_at) = self.last_deactivated_at.get(&hotkey_normalized) {
                     if deactivated_at.elapsed() < REACTIVATION_COOLDOWN {

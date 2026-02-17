@@ -26,24 +26,23 @@ use tauri::{AppHandle, Emitter};
 /// * `audio_data` - The WAV audio data to transcribe
 /// * `app_handle` - The Tauri AppHandle for emitting events and accessing state
 pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
-    let app_handle_for_task = app_handle.clone();
-
-    // Spawn a new transcription task using Tauri's async runtime
-    // This returns a JoinHandle that we can use to abort the task
-    let task = tauri::async_runtime::spawn(async move {
+    // Spawn a fire-and-forget async task for transcription + injection.
+    // We need spawn because transcribe_audio() is async (HTTP await) but
+    // process_audio() is called from a synchronous recording thread.
+    tauri::async_runtime::spawn(async move {
         println!("Processing audio, size: {} bytes", audio_data.len());
 
         // Notify frontend that transcription has started
-        app_handle_for_task
+        app_handle
             .emit("processing_start", ())
             .unwrap_or_default();
 
         // Get authentication token from secure storage (with automatic refresh if needed)
-        let auth_token = get_auth_token_async(&app_handle_for_task).await;
+        let auth_token = get_auth_token_async(&app_handle).await;
 
         if auth_token.is_none() {
             let error_msg = "User unauthenticated. Please log in.";
-            app_handle_for_task
+            app_handle
                 .emit("error", error_msg)
                 .unwrap_or_default();
             return;
@@ -61,7 +60,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             .transcribe_audio(
                 audio_data,
                 auth_token,
-                Some(app_handle_for_task.clone()),
+                Some(app_handle.clone()),
                 offline_transcription,
             )
             .await;
@@ -78,14 +77,14 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 );
 
                 // Notify frontend of successful transcription
-                app_handle_for_task
+                app_handle
                     .emit("transcription_success", &transcription)
                     .unwrap_or_default();
 
                 // Only process if transcription is not empty
                 if !transcription.trim().is_empty() {
                     // Check if transcription matches a shortcut command (from app config)
-                    let text_to_inject = check_command(&app_handle_for_task, &transcription)
+                    let text_to_inject = check_command(&app_handle, &transcription)
                         .await
                         .unwrap_or_else(|| transcription.clone());
 
@@ -102,14 +101,14 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     match injector.inject_text(&text_to_inject) {
                         Ok(_) => {
                             // Successfully injected text into active application
-                            app_handle_for_task
+                            app_handle
                                 .emit("injection_success", ())
                                 .unwrap_or_default();
                         }
                         Err(e) => {
                             eprintln!("Failed to inject text: {}", e);
                             // Notify frontend of injection failure
-                            app_handle_for_task
+                            app_handle
                                 .emit("injection_error", e.to_string())
                                 .unwrap_or_default();
                         }
@@ -124,7 +123,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     e
                 );
                 // Notify frontend of transcription failure
-                app_handle_for_task
+                app_handle
                     .emit("transcription_error", error_msg)
                     .unwrap_or_default();
             }
