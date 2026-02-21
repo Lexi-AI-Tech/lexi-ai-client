@@ -409,7 +409,27 @@ export const SettingsPage: React.FC = () => {
   // Don't render settings content until config is loaded to prevent flash of defaults
   if (isLoading) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+      <div
+        style={{
+          padding: "2rem 2.5rem",
+          background: "#ffffff",
+          minHeight: "100vh",
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            marginBottom: "2rem",
+            fontSize: "24px",
+            fontWeight: 600,
+            color: "#111827",
+            letterSpacing: "-0.025em",
+          }}
+        >
+          Settings
+        </h2>
         <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
           Loading settings...
         </div>
@@ -421,14 +441,23 @@ export const SettingsPage: React.FC = () => {
   // This prevents showing cached config when user is logged out
   if (!authStore.isAuthenticated) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+      <div
+        style={{
+          padding: "2rem 2.5rem",
+          background: "#ffffff",
+          minHeight: "100vh",
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        }}
+      >
         <h2
           style={{
-            fontSize: "18px",
-            fontWeight: 500,
+            margin: 0,
+            marginBottom: "2rem",
+            fontSize: "24px",
+            fontWeight: 600,
             color: "#111827",
-            marginBottom: "16px",
-            marginTop: 0,
+            letterSpacing: "-0.025em",
           }}
         >
           Settings
@@ -467,14 +496,23 @@ export const SettingsPage: React.FC = () => {
   // Show error state if config failed to load
   if (config === null) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+      <div
+        style={{
+          padding: "2rem 2.5rem",
+          background: "#ffffff",
+          minHeight: "100vh",
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        }}
+      >
         <h2
           style={{
-            fontSize: "18px",
-            fontWeight: 500,
+            margin: 0,
+            marginBottom: "2rem",
+            fontSize: "24px",
+            fontWeight: 600,
             color: "#111827",
-            marginBottom: "16px",
-            marginTop: 0,
+            letterSpacing: "-0.025em",
           }}
         >
           Settings
@@ -499,14 +537,23 @@ export const SettingsPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+    <div
+      style={{
+        padding: "2rem 2.5rem",
+        background: "#ffffff",
+        minHeight: "100vh",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+      }}
+    >
       <h2
         style={{
-          fontSize: "18px",
-          fontWeight: 500,
+          margin: 0,
+          marginBottom: "2rem",
+          fontSize: "24px",
+          fontWeight: 600,
           color: "#111827",
-          marginBottom: "24px",
-          marginTop: 0,
+          letterSpacing: "-0.025em",
         }}
       >
         Settings

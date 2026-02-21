@@ -181,34 +181,33 @@ export const TranscriptsList: React.FC = () => {
 
   return (
     <div
-      className="settings"
       style={{
-        display: "flex",
-        flexDirection: "column",
-        flex: 1,
-        minHeight: 0,
-        padding: "32px",
+        padding: "2rem 2.5rem",
+        background: "#ffffff",
+        minHeight: "100vh",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
       }}
     >
-      <div
+      <h2
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "12px",
+          margin: 0,
+          marginBottom: "2rem",
+          fontSize: "24px",
+          fontWeight: 600,
+          color: "#111827",
+          letterSpacing: "-0.025em",
         }}
       >
-        <h3>
-          Transcripts{" "}
-          {total > 0 && (
-            <span
-              style={{ fontSize: "12px", fontWeight: "normal", opacity: 0.6 }}
-            >
-              ({total})
-            </span>
-          )}
-        </h3>
-      </div>
+        Transcripts{" "}
+        {total > 0 && (
+          <span
+            style={{ fontSize: "14px", fontWeight: "normal", color: "#6b7280" }}
+          >
+            ({total})
+          </span>
+        )}
+      </h2>
 
       {!showContent && (
         <div
