@@ -5,6 +5,7 @@ import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { formatDateTime } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import { HotkeySelector } from "./HotkeySelector";
 import "./home/home.css";
 
 
@@ -14,7 +15,6 @@ export const ActionsPage: React.FC = () => {
     useState<PaginatedActionHistoryResponse | null>(null);
   const [actionHotkeys, setActionHotkeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -136,13 +136,10 @@ export const ActionsPage: React.FC = () => {
   // Load app config (for hotkey)
   const loadConfig = async () => {
     try {
-      setIsLoadingConfig(true);
       const config = await invoke<AppConfig>("get_app_config");
       setActionHotkeys(config.action_hotkeys || []);
     } catch (err) {
       console.error("Failed to load app config:", err);
-    } finally {
-      setIsLoadingConfig(false);
     }
   };
 
@@ -286,153 +283,12 @@ export const ActionsPage: React.FC = () => {
 
       {/* Global Hotkey Section */}
       <div style={{ marginBottom: "3rem" }}>
-        <h3
-          style={{
-            margin: 0,
-            marginBottom: "0.5rem",
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#111827",
-          }}
-        >
-          Action Hotkey
-        </h3>
-        <p
-          style={{ fontSize: "14px", color: "#6b7280", marginBottom: "1.5rem" }}
-        >
-          Hold this hotkey combination to record a voice command
-          for performing an action.
-        </p>
-
-        <div
-          style={{
-            backgroundColor: "#1f2937",
-            padding: "1.5rem",
-            borderRadius: "0.75rem",
-            maxWidth: "600px",
-          }}
-        >
-          {isLoadingConfig ? (
-            <div style={{ color: "#9ca3af", fontSize: "14px" }}>
-              Loading hotkey...
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-              {actionHotkeys && actionHotkeys.length > 0 ? (
-                actionHotkeys.map((hotkey, index) => (
-                  <div
-                    key={`action-${index}-${hotkey}`}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    {hotkey.split("+").map((key, keyIndex, arr) => {
-                      const keyName = key.trim().toLowerCase();
-                      // symbolTop: true = symbol on top, false = symbol on bottom (like fn key)
-                      const keySymbols: Record<string, { symbol: string; label: string; symbolTop: boolean }> = {
-                        'fn': { symbol: 'fn', label: '🌐', symbolTop: true },
-                        'control': { symbol: '^', label: 'control', symbolTop: true },
-                        'ctrl': { symbol: '^', label: 'control', symbolTop: true },
-                        'command': { symbol: '⌘', label: 'command', symbolTop: true },
-                        'cmd': { symbol: '⌘', label: 'command', symbolTop: true },
-                        'option': { symbol: '⌥', label: 'option', symbolTop: true },
-                        'alt': { symbol: '⌥', label: 'option', symbolTop: true },
-                        'shift': { symbol: '⇧', label: 'shift', symbolTop: true },
-                        'caps': { symbol: '⇪', label: 'caps', symbolTop: true },
-                        'capslock': { symbol: '⇪', label: 'caps lock', symbolTop: true },
-                        'tab': { symbol: '⇥', label: 'tab', symbolTop: true },
-                        'escape': { symbol: '⎋', label: 'esc', symbolTop: true },
-                        'esc': { symbol: '⎋', label: 'esc', symbolTop: true },
-                        'return': { symbol: '↩', label: 'return', symbolTop: true },
-                        'enter': { symbol: '↩', label: 'enter', symbolTop: true },
-                        'delete': { symbol: '⌫', label: 'delete', symbolTop: true },
-                        'backspace': { symbol: '⌫', label: 'delete', symbolTop: true },
-                        'space': { symbol: '␣', label: 'space', symbolTop: true },
-                      };
-                      const keyInfo = keySymbols[keyName];
-                      
-                      return (
-                        <React.Fragment key={`${index}-${keyIndex}-${key}`}>
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              flexDirection: "column",
-                              alignItems: "flex-start",
-                              justifyContent: "space-between",
-                              padding: "8px 12px",
-                              minWidth: "60px",
-                              minHeight: "52px",
-                              background: "linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)",
-                              color: "#fff",
-                              borderRadius: "6px",
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif',
-                              boxShadow: "0 1px 0 1px #1a1a1a, 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
-                              border: "1px solid #4a4a4c",
-                              position: "relative",
-                            }}
-                          >
-                            {keyInfo?.symbolTop !== false && keyInfo && (
-                              <span style={{ 
-                                fontSize: "14px", 
-                                lineHeight: 1, 
-                                color: "rgba(255,255,255,0.9)",
-                                position: "absolute",
-                                top: "8px",
-                                right: "10px",
-                              }}>
-                                {keyInfo.symbol}
-                              </span>
-                            )}
-                            <span style={{ 
-                              fontSize: "11px", 
-                              fontWeight: 400, 
-                              letterSpacing: "0.02em",
-                              color: "rgba(255,255,255,0.85)",
-                              marginTop: "auto",
-                            }}>
-                              {keyInfo ? keyInfo.label : key.trim()}
-                            </span>
-                            {keyInfo?.symbolTop === false && (
-                              <span style={{ fontSize: "16px", lineHeight: 1, color: "rgba(255,255,255,0.7)", marginTop: "2px" }}>
-                                {keyInfo.symbol}
-                              </span>
-                            )}
-                          </span>
-                          {keyIndex < arr.length - 1 && (
-                            <span
-                              style={{
-                                color: "#6b7280",
-                                fontSize: "16px",
-                                fontWeight: 400,
-                              }}
-                            >
-                              +
-                            </span>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </div>
-                ))
-              ) : (
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                    color: "#9ca3af",
-                    display: "inline-block",
-                  }}
-                >
-                  No action hotkeys configured
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <HotkeySelector
+          label="Action Hotkey"
+          description="Hold this hotkey combination to record a voice command for performing an action."
+          value={{ hotkeys: actionHotkeys }}
+          disabled={true}
+        />
       </div>
 
       {/* Action History Section */}
@@ -832,41 +688,41 @@ export const ActionsPage: React.FC = () => {
           </>
         )}
 
-      {deleteConfirmId && (
-        <div
-          className="delete-modal-overlay"
-          onClick={closeDeleteConfirm}
-        >
+        {deleteConfirmId && (
           <div
-            className="delete-modal-content"
-            onClick={(e) => e.stopPropagation()}
+            className="delete-modal-overlay"
+            onClick={closeDeleteConfirm}
           >
-            <h3>Delete action?</h3>
-            <p>
-              This action cannot be undone. The action history entry will be
-              permanently removed.
-            </p>
-            <div className="delete-modal-actions">
-              <button
-                type="button"
-                className="delete-modal-btn-cancel"
-                onClick={closeDeleteConfirm}
-                disabled={!!deletingId}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="delete-modal-btn-delete"
-                onClick={handleConfirmDeleteAction}
-                disabled={!!deletingId}
-              >
-                {deletingId ? "Deleting..." : "Delete"}
-              </button>
+            <div
+              className="delete-modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3>Delete action?</h3>
+              <p>
+                This action cannot be undone. The action history entry will be
+                permanently removed.
+              </p>
+              <div className="delete-modal-actions">
+                <button
+                  type="button"
+                  className="delete-modal-btn-cancel"
+                  onClick={closeDeleteConfirm}
+                  disabled={!!deletingId}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="delete-modal-btn-delete"
+                  onClick={handleConfirmDeleteAction}
+                  disabled={!!deletingId}
+                >
+                  {deletingId ? "Deleting..." : "Delete"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
     </div>
   );
