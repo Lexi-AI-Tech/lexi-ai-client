@@ -9,7 +9,6 @@ export const VocabularyPage: React.FC = () => {
   const toast = useToast();
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [newVocabularyValue, setNewVocabularyValue] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -29,16 +28,13 @@ export const VocabularyPage: React.FC = () => {
   useEffect(() => {
     const loadConfig = async () => {
       setIsLoading(true);
-      setError(null);
 
       try {
         const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
         setConfig(loadedConfig);
       } catch (err: any) {
         console.error("Failed to load app config:", err);
-        const msg = err?.message || "Failed to load vocabulary";
-        setError(msg);
-        toast.error(msg);
+        toast.error(err?.message || "Failed to load vocabulary");
       } finally {
         setIsLoading(false);
       }
@@ -65,7 +61,6 @@ export const VocabularyPage: React.FC = () => {
 
   // Update config function
   const updateConfig = async (updates: Partial<TauriAppConfig>) => {
-    setError(null);
     setIsUpdating(true);
     try {
       const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
@@ -75,9 +70,7 @@ export const VocabularyPage: React.FC = () => {
       return updatedConfig;
     } catch (err: any) {
       console.error("Failed to update config:", err);
-      const msg = err?.message || "Failed to update vocabulary";
-      setError(msg);
-      toast.error(msg);
+      toast.error(err?.message || "Failed to update vocabulary");
       throw err;
     } finally {
       setIsUpdating(false);
@@ -87,7 +80,7 @@ export const VocabularyPage: React.FC = () => {
   // Add new vocabulary item
   const handleAddVocabulary = async () => {
     if (!newVocabularyValue.trim()) {
-      setError("Vocabulary value cannot be empty");
+      toast.warning("Vocabulary value cannot be empty");
       return;
     }
 
@@ -98,7 +91,6 @@ export const VocabularyPage: React.FC = () => {
       await updateConfig({ vocabulary: updatedVocabulary });
       setNewVocabularyValue("");
       setShowAddForm(false);
-      setError(null);
       toast.success("Vocabulary added");
     } catch (err) {
       // Error already set by updateConfig
@@ -125,10 +117,8 @@ export const VocabularyPage: React.FC = () => {
     try {
       await updateConfig({ vocabulary: updatedVocabulary });
       setDeleteConfirmValue(null);
-      setError(null);
       toast.success("Vocabulary removed");
     } catch (err) {
-      // Error already set by updateConfig
       toast.error((err as Error)?.message || "Failed to remove vocabulary item");
     } finally {
       setDeletingValue(null);
@@ -187,22 +177,6 @@ export const VocabularyPage: React.FC = () => {
       >
         Vocabulary
       </h2>
-
-      {error && (
-        <div
-          style={{
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            color: "#b91c1c",
-            fontSize: "13px",
-            padding: "12px 16px",
-            marginBottom: "24px",
-            borderRadius: "8px",
-          }}
-        >
-          {error}
-        </div>
-      )}
 
       {/* Add Vocabulary Form */}
       {showAddForm && (
@@ -390,16 +364,13 @@ export const VocabularyPage: React.FC = () => {
               onClick={() => {
                 const loadConfig = async () => {
                   setIsLoading(true);
-                  setError(null);
                   try {
                     const loadedConfig =
                       await invoke<TauriAppConfig>("get_app_config");
                     setConfig(loadedConfig);
                   } catch (err: any) {
                     console.error("Failed to load app config:", err);
-                    const msg = err?.message || "Failed to load vocabulary";
-                    setError(msg);
-                    toast.error(msg);
+                    toast.error(err?.message || "Failed to load vocabulary");
                   } finally {
                     setIsLoading(false);
                   }

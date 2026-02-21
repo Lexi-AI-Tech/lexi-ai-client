@@ -17,7 +17,6 @@ export const ActionsPage: React.FC = () => {
     useState<PaginatedActionHistoryResponse | null>(null);
   const [actionHotkeys, setActionHotkeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioProgress, setAudioProgress] = useState<number>(0);
@@ -38,7 +37,7 @@ export const ActionsPage: React.FC = () => {
   const handleConfirmDeleteAction = async () => {
     if (!deleteConfirmId) return;
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      setError("Please sign in to delete actions");
+      toast.error("Please sign in to delete actions");
       return;
     }
 
@@ -59,11 +58,9 @@ export const ActionsPage: React.FC = () => {
       if (isAuthError) {
         console.log("Auth error deleting action, clearing auth");
         authStore.clearAuth();
-        setError(null);
       } else {
-        setError(errorMessage);
+        toast.error(errorMessage);
       }
-      toast.error(errorMessage);
     } finally {
       setDeletingId(null);
     }
@@ -98,14 +95,12 @@ export const ActionsPage: React.FC = () => {
   const loadActionHistory = async () => {
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
       setActionHistory(null);
-      setError(null);
       setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      setError(null);
       const data = await invoke<PaginatedActionHistoryResponse>(
         "get_action_history",
         {
@@ -127,9 +122,7 @@ export const ActionsPage: React.FC = () => {
         console.log("Auth error loading action history, clearing auth");
         authStore.clearAuth();
         setActionHistory(null);
-        setError(null);
       } else {
-        setError(errorMessage);
         toast.error(errorMessage);
       }
     } finally {
@@ -235,9 +228,7 @@ export const ActionsPage: React.FC = () => {
             onSuccess={() => {
               // Actions will be loaded automatically via useEffect
             }}
-            onError={(err) => {
-              setError(err || "Authentication failed");
-            }}
+            onError={() => {}}
           />
         </div>
       </div>
@@ -266,24 +257,6 @@ export const ActionsPage: React.FC = () => {
       >
         Actions
       </h2>
-
-      {error && (
-        <div
-          className="permission-message"
-          style={{
-            background: "#fef2f2",
-            borderColor: "#fecaca",
-            color: "#b91c1c",
-            fontSize: "11px",
-            padding: "12px",
-            marginBottom: "16px",
-            borderRadius: "0.5rem",
-            border: "1px solid",
-          }}
-        >
-          {error}
-        </div>
-      )}
 
       {/* Global Hotkey Section */}
       <div style={{ marginBottom: "3rem" }}>

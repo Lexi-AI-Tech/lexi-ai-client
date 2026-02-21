@@ -14,7 +14,6 @@ export const RoomsPage: React.FC = () => {
   const toast = useToast();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -24,12 +23,9 @@ export const RoomsPage: React.FC = () => {
     try {
       const result = await invoke<Room[]>("list_rooms");
       setRooms(result);
-      setError(null);
     } catch (err: any) {
       console.error("Failed to fetch rooms:", err);
-      const msg = err.message || "Failed to fetch rooms";
-      setError(msg);
-      toast.error(msg);
+      toast.error(err.message || "Failed to fetch rooms");
     } finally {
       setLoading(false);
     }
@@ -179,8 +175,6 @@ export const RoomsPage: React.FC = () => {
         <div style={{ padding: "20px", textAlign: "center", opacity: 0.6 }}>
           Loading rooms...
         </div>
-      ) : error ? (
-        <div style={{ padding: "20px", color: "salmon" }}>{error}</div>
       ) : rooms.length === 0 ? (
         <div style={{ padding: "40px", textAlign: "center", opacity: 0.6 }}>
           <p>No rooms found.</p>

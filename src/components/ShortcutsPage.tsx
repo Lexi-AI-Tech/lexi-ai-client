@@ -12,7 +12,6 @@ export const ShortcutsPage: React.FC = () => {
   const toast = useToast();
   const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showCreateShortcut, setShowCreateShortcut] = useState(false);
   const [newShortcut, setNewShortcut] = useState("");
   const [newValue, setNewValue] = useState("");
@@ -29,14 +28,12 @@ export const ShortcutsPage: React.FC = () => {
   const loadShortcuts = async () => {
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
       setShortcuts([]);
-      setError(null);
       setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      setError(null);
       const data = await invoke<Shortcut[]>("get_shortcuts");
       setShortcuts(data);
     } catch (err: any) {
@@ -52,9 +49,7 @@ export const ShortcutsPage: React.FC = () => {
         console.log("Auth error loading shortcuts, clearing auth");
         authStore.clearAuth();
         setShortcuts([]);
-        setError(null);
       } else {
-        setError(errorMessage);
         toast.error(errorMessage);
       }
     } finally {
@@ -90,17 +85,16 @@ export const ShortcutsPage: React.FC = () => {
 
   const handleCreateShortcut = async () => {
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      setError("Please sign in to create shortcuts");
+      toast.error("Please sign in to create shortcuts");
       return;
     }
 
     if (!newShortcut.trim() || !newValue.trim()) {
-      setError("Both shortcut and value are required");
+      toast.warning("Both shortcut and value are required");
       return;
     }
 
     try {
-      setError(null);
       await invoke<Shortcut>("create_shortcut", {
         request: {
           shortcut: newShortcut.trim(),
@@ -123,9 +117,7 @@ export const ShortcutsPage: React.FC = () => {
       if (isAuthError) {
         console.log("Auth error creating shortcut, clearing auth");
         authStore.clearAuth();
-        setError(null);
       } else {
-        setError(errorMessage);
         toast.error(errorMessage);
       }
     }
@@ -133,7 +125,7 @@ export const ShortcutsPage: React.FC = () => {
 
   const handleUpdateShortcut = async (shortcut: Shortcut) => {
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      setError("Please sign in to update shortcuts");
+      toast.error("Please sign in to update shortcuts");
       return;
     }
 
@@ -148,7 +140,6 @@ export const ShortcutsPage: React.FC = () => {
     }
 
     try {
-      setError(null);
       await invoke<Shortcut>("update_shortcut", {
         shortcutId: shortcut.id,
         request: {
@@ -170,9 +161,7 @@ export const ShortcutsPage: React.FC = () => {
       if (isAuthError) {
         console.log("Auth error updating shortcut, clearing auth");
         authStore.clearAuth();
-        setError(null);
       } else {
-        setError(errorMessage);
         toast.error(errorMessage);
       }
     }
@@ -189,13 +178,12 @@ export const ShortcutsPage: React.FC = () => {
   const handleConfirmDeleteShortcut = async () => {
     if (!deleteConfirmId) return;
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      setError("Please sign in to delete shortcuts");
+      toast.error("Please sign in to delete shortcuts");
       return;
     }
 
     setDeletingId(deleteConfirmId);
     try {
-      setError(null);
       await invoke("delete_shortcut", {
         shortcutId: deleteConfirmId,
       });
@@ -213,9 +201,7 @@ export const ShortcutsPage: React.FC = () => {
       if (isAuthError) {
         console.log("Auth error deleting shortcut, clearing auth");
         authStore.clearAuth();
-        setError(null);
       } else {
-        setError(errorMessage);
         toast.error(errorMessage);
       }
     } finally {
@@ -300,9 +286,7 @@ export const ShortcutsPage: React.FC = () => {
             onSuccess={() => {
               // Shortcuts will be loaded automatically via useEffect
             }}
-            onError={(err) => {
-              setError(err || "Authentication failed");
-            }}
+            onError={() => {}}
           />
         </div>
       </div>
@@ -331,22 +315,6 @@ export const ShortcutsPage: React.FC = () => {
       >
         Shortcuts
       </h2>
-
-      {error && (
-        <div
-          style={{
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            color: "#b91c1c",
-            fontSize: "13px",
-            padding: "12px 16px",
-            marginBottom: "24px",
-            borderRadius: "8px",
-          }}
-        >
-          {error}
-        </div>
-      )}
 
       {/* Create Shortcut Form */}
       {showCreateShortcut && (

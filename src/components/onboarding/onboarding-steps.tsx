@@ -29,7 +29,7 @@ export function WelcomeStep({
   onBack?: () => void | Promise<void>;
   showBack?: boolean;
 }) {
-  const { isAuthenticated, error } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   return (
     <motion.div
@@ -86,7 +86,6 @@ export function WelcomeStep({
                 onSuccess={() => console.log("Login successful")}
                 onError={(err) => console.error("Login error:", err)}
               />
-              {error && <div className="auth-error">{error}</div>}
             </>
           )}
         </div>

@@ -41,8 +41,6 @@ export const SettingsPage: React.FC = () => {
     useState<boolean | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   // Hotkey state
   const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
     hotkeys: [],
@@ -68,7 +66,6 @@ export const SettingsPage: React.FC = () => {
   useEffect(() => {
     const loadConfig = async () => {
       setIsLoading(true);
-      setError(null);
 
       try {
         const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
@@ -90,9 +87,7 @@ export const SettingsPage: React.FC = () => {
         );
       } catch (err: any) {
         console.error("Failed to load app config:", err);
-        const msg = err?.message || "Failed to load configuration";
-        setError(msg);
-        toast.error(msg);
+        toast.error(err?.message || "Failed to load configuration");
       } finally {
         setIsLoading(false);
       }
@@ -187,7 +182,6 @@ export const SettingsPage: React.FC = () => {
 
   // Generic update function for app config
   const updateConfig = async (updates: Partial<TauriAppConfig>) => {
-    setError(null);
     try {
       const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
         config: updates,
@@ -196,9 +190,7 @@ export const SettingsPage: React.FC = () => {
       return updatedConfig;
     } catch (err: any) {
       console.error("Failed to update config:", err);
-      const msg = err?.message || "Failed to update setting";
-      setError(msg);
-      toast.error(msg);
+      toast.error(err?.message || "Failed to update setting");
       throw err;
     }
   };
@@ -233,8 +225,6 @@ export const SettingsPage: React.FC = () => {
     }
 
     setIsUpdating(true);
-    setError(null);
-    setSuccess(false);
 
     try {
       const updates: Partial<TauriAppConfig> = {};
@@ -281,9 +271,7 @@ export const SettingsPage: React.FC = () => {
         setCurrentActionHotkeys({ hotkeys: updatedConfig.action_hotkeys });
       }
 
-      setSuccess(true);
       toast.success("Settings saved");
-      setTimeout(() => setSuccess(false), 2000);
     } catch (err: any) {
       // Revert hotkeys to the last known good state from the original config
       if (hotkeysChanged) {
@@ -491,9 +479,7 @@ export const SettingsPage: React.FC = () => {
             onSuccess={() => {
               // Settings will be loaded automatically via useEffect
             }}
-            onError={(err) => {
-              setError(err || "Authentication failed");
-            }}
+            onError={() => {}}
           />
         </div>
       </div>
@@ -524,21 +510,6 @@ export const SettingsPage: React.FC = () => {
         >
           Settings
         </h2>
-        {error && (
-          <div
-            style={{
-              background: "#fef2f2",
-              border: "1px solid #fecaca",
-              color: "#b91c1c",
-              fontSize: "13px",
-              padding: "12px 16px",
-              marginBottom: "24px",
-              borderRadius: "8px",
-            }}
-          >
-            {error}
-          </div>
-        )}
       </div>
     );
   }
@@ -1042,39 +1013,6 @@ export const SettingsPage: React.FC = () => {
             )}
           </button>
         </div>
-
-        {/* Global Error & Success Banners */}
-        {error && (
-          <div
-            style={{
-              background: "#fef2f2",
-              border: "1px solid #fecaca",
-              color: "#b91c1c",
-              fontSize: "13px",
-              padding: "12px 16px",
-              marginTop: "16px",
-              borderRadius: "8px",
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div
-            style={{
-              background: "#ecfdf5",
-              border: "1px solid #a7f3d0",
-              color: "#047857",
-              fontSize: "13px",
-              padding: "12px 16px",
-              marginTop: "16px",
-              borderRadius: "8px",
-            }}
-          >
-            Settings saved successfully!
-          </div>
-        )}
       </div>
     </div>
   );

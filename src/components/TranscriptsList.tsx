@@ -20,7 +20,6 @@ export const TranscriptsList: React.FC = () => {
   const toast = useToast();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -33,11 +32,6 @@ export const TranscriptsList: React.FC = () => {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioProgress, setAudioProgress] = useState<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Clear error on mount to prevent stale error messages
-  useEffect(() => {
-    setError(null);
-  }, []);
 
   // Infinite scrolling observer
   const observer = useRef<IntersectionObserver | null>(null);
@@ -62,13 +56,11 @@ export const TranscriptsList: React.FC = () => {
     if (!authStore.isInitialized) return;
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
       setTranscripts([]);
-      setError(null);
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    setError(null);
 
     let cancelled = false;
     (async () => {
@@ -233,9 +225,7 @@ export const TranscriptsList: React.FC = () => {
           </p>
           <GoogleLoginButton
             onSuccess={() => { }}
-            onError={(err) => {
-              setError(err || "Authentication failed");
-            }}
+            onError={() => {}}
           />
         </div>
       )}
@@ -253,20 +243,7 @@ export const TranscriptsList: React.FC = () => {
         </div>
       )}
 
-      {showContent && !showLogin && error && (
-        <div
-          className="permission-message"
-          style={{
-            background: "#fef2f2",
-            borderColor: "#fecaca",
-            color: "#b91c1c",
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      {showContent && !showLogin && !loading && !error && transcripts.length === 0 && (
+      {showContent && !showLogin && !loading && transcripts.length === 0 && (
         <div
           style={{
             textAlign: "center",
