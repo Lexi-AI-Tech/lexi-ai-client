@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Search, RefreshCw, Plus, X, Trash2 } from "lucide-react";
+import { Search, RefreshCw, Plus, X, Trash2, Edit } from "lucide-react";
 import type { TauriAppConfig } from "../types";
 import { useToast } from "./toast/useToast";
 import "./home/home.css";
@@ -21,6 +21,8 @@ export const VocabularyPage: React.FC = () => {
     null,
   );
   const [deletingValue, setDeletingValue] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
 
   const vocabulary = config?.vocabulary || [];
 
@@ -122,6 +124,40 @@ export const VocabularyPage: React.FC = () => {
       toast.error((err as Error)?.message || "Failed to remove vocabulary item");
     } finally {
       setDeletingValue(null);
+    }
+  };
+
+  const startEditVocabulary = (value: string) => {
+    setEditingValue(value);
+    setEditDraft(value);
+  };
+
+  const cancelEditVocabulary = () => {
+    setEditingValue(null);
+    setEditDraft("");
+  };
+
+  const saveEditVocabulary = async () => {
+    if (!editingValue) return;
+    const trimmed = editDraft.trim();
+    if (!trimmed) {
+      toast.warning("Vocabulary value cannot be empty");
+      return;
+    }
+    if (trimmed === editingValue) {
+      cancelEditVocabulary();
+      return;
+    }
+    const currentVocabulary = vocabulary || [];
+    const updatedVocabulary = currentVocabulary.map((v) =>
+      v === editingValue ? trimmed : v
+    );
+    try {
+      await updateConfig({ vocabulary: updatedVocabulary });
+      toast.success("Vocabulary updated");
+      cancelEditVocabulary();
+    } catch (err) {
+      // Error already shown by updateConfig
     }
   };
 
@@ -546,8 +582,47 @@ export const VocabularyPage: React.FC = () => {
                     position: "absolute",
                     top: "12px",
                     right: "12px",
+                    display: "flex",
+                    gap: "6px",
                   }}
                 >
+                  {editingValue !== item ? (
+                    <button
+                      onClick={() => startEditVocabulary(item)}
+                      disabled={isUpdating || !!deletingValue}
+                      style={{
+                        padding: "6px",
+                        backgroundColor: "#f3f4f6",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor:
+                          isUpdating || deletingValue
+                            ? "not-allowed"
+                            : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#6b7280",
+                        transition: "all 0.2s ease",
+                        opacity: isUpdating || deletingValue ? 0.5 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isUpdating && !deletingValue) {
+                          e.currentTarget.style.backgroundColor = "#e5e7eb";
+                          e.currentTarget.style.color = "#111827";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isUpdating && !deletingValue) {
+                          e.currentTarget.style.backgroundColor = "#f3f4f6";
+                          e.currentTarget.style.color = "#6b7280";
+                        }
+                      }}
+                      title="Edit vocabulary"
+                    >
+                      <Edit size={14} />
+                    </button>
+                  ) : null}
                   <button
                     onClick={() => openDeleteConfirm(item)}
                     disabled={isUpdating || !!deletingValue}
@@ -580,17 +655,82 @@ export const VocabularyPage: React.FC = () => {
                     <Trash2 size={14} />
                   </button>
                 </div>
-                <div style={{ paddingRight: "50px" }}>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#111827",
-                      fontWeight: 400,
-                      marginBottom: "4px",
-                    }}
-                  >
-                    {item}
-                  </div>
+                <div style={{ paddingRight: "60px" }}>
+                  {editingValue === item ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "8px",
+                      }}
+                    >
+                      <input
+                        type="text"
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEditVocabulary();
+                          if (e.key === "Escape") cancelEditVocabulary();
+                        }}
+                        autoFocus
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          fontSize: "15px",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "6px",
+                          color: "#111827",
+                          outline: "none",
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          type="button"
+                          onClick={cancelEditVocabulary}
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "14px",
+                            backgroundColor: "#f3f4f6",
+                            color: "#6b7280",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveEditVocabulary}
+                          disabled={isUpdating}
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            backgroundColor: "#111827",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: isUpdating ? "not-allowed" : "pointer",
+                            opacity: isUpdating ? 0.7 : 1,
+                          }}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: "15px",
+                        color: "#111827",
+                        fontWeight: 400,
+                        marginBottom: "4px",
+                      }}
+                    >
+                      {item}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
