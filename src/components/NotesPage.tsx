@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  Mic,
   Search,
   LayoutGrid,
   RefreshCw,
@@ -159,7 +158,27 @@ export const NotesPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+    <div
+      style={{
+        padding: "2rem 2.5rem",
+        background: "#ffffff",
+        minHeight: "100vh",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <h2
+        style={{
+          margin: 0,
+          marginBottom: "2rem",
+          fontSize: "24px",
+          fontWeight: 600,
+          color: "#111827",
+          letterSpacing: "-0.025em",
+        }}
+      >
+        Notes
+      </h2>
       {/* Quick Thoughts Section */}
       <div style={{ marginBottom: "48px" }}>
         <h2
@@ -183,33 +202,6 @@ export const NotesPage: React.FC = () => {
             minHeight: "200px",
           }}
         >
-          {/* Microphone Icon */}
-          <div
-            style={{
-              position: "absolute",
-              top: "16px",
-              right: "16px",
-              cursor: "pointer",
-              color: "#6b7280",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "32px",
-              height: "32px",
-              borderRadius: "6px",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f3f4f6";
-              e.currentTarget.style.color = "#111827";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-              e.currentTarget.style.color = "#6b7280";
-            }}
-          >
-            <Mic size={18} />
-          </div>
 
           {/* Textarea */}
           <textarea

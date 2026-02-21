@@ -218,7 +218,27 @@ export const ShortcutsPage: React.FC = () => {
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+      <div
+        style={{
+          padding: "2rem 2.5rem",
+          background: "#ffffff",
+          minHeight: "100vh",
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            marginBottom: "2rem",
+            fontSize: "24px",
+            fontWeight: 600,
+            color: "#111827",
+            letterSpacing: "-0.025em",
+          }}
+        >
+          Shortcuts
+        </h2>
         <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
           Loading...
         </div>
@@ -229,14 +249,23 @@ export const ShortcutsPage: React.FC = () => {
   // Show login prompt if not authenticated
   if (!authStore.isAuthenticated) {
     return (
-      <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+      <div
+        style={{
+          padding: "2rem 2.5rem",
+          background: "#ffffff",
+          minHeight: "100vh",
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        }}
+      >
         <h2
           style={{
-            fontSize: "18px",
-            fontWeight: 500,
+            margin: 0,
+            marginBottom: "2rem",
+            fontSize: "24px",
+            fontWeight: 600,
             color: "#111827",
-            marginBottom: "16px",
-            marginTop: 0,
+            letterSpacing: "-0.025em",
           }}
         >
           Shortcuts
@@ -273,14 +302,23 @@ export const ShortcutsPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+    <div
+      style={{
+        padding: "2rem 2.5rem",
+        background: "#ffffff",
+        minHeight: "100vh",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+      }}
+    >
       <h2
         style={{
-          fontSize: "18px",
-          fontWeight: 500,
+          margin: 0,
+          marginBottom: "2rem",
+          fontSize: "24px",
+          fontWeight: 600,
           color: "#111827",
-          marginBottom: "16px",
-          marginTop: 0,
+          letterSpacing: "-0.025em",
         }}
       >
         Shortcuts

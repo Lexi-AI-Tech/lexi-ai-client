@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, RefreshCw, Check, Trash2, Sparkles, Play, Pause, Square } from "lucide-react";
+import { Copy, Check, Trash2, Sparkles, Play, Pause } from "lucide-react";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
@@ -26,7 +26,7 @@ export const TranscriptsList: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [originalTooltipId, setOriginalTooltipId] = useState<string | null>(null);
-  
+
   // Audio playback state
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioProgress, setAudioProgress] = useState<number>(0);
@@ -37,84 +37,23 @@ export const TranscriptsList: React.FC = () => {
     setError(null);
   }, []);
 
-  // Fetch transcripts function
-  const fetchTranscripts = useCallback(async () => {
-    // This function should only be called when we're ready to fetch
-    // (initialized, authenticated, and tokens loaded)
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      // Should not happen if called correctly, but handle gracefully
-      setTranscripts([]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
+  // Infinite scrolling observer
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastElementRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (loading) return;
+      if (observer.current) observer.current.disconnect();
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await invoke<{
-        transcripts: Transcript[];
-        total: number;
-        page: number;
-        page_size: number;
-        total_pages: number;
-      }>("get_transcripts", {
-        page,
-        pageSize: 10,
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && page < totalPages) {
+          setPage((prevPage) => prevPage + 1);
+        }
       });
-      setTranscripts(response.transcripts);
-      setTotalPages(response.total_pages);
-      setTotal(response.total);
-    } catch (err: any) {
-      console.error("Failed to fetch transcripts:", err);
 
-      // Check error type
-      const errorMessage = err.message || "Failed to load transcripts";
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("403") ||
-        errorMessage.includes("Unauthorized");
-
-      // Check for network errors (server unreachable, no internet, etc.)
-      const isNetworkError =
-        err.name === "TypeError" ||
-        err.name === "NetworkError" ||
-        errorMessage.includes("Failed to fetch") ||
-        errorMessage.includes("NetworkError") ||
-        errorMessage.includes("network") ||
-        errorMessage.includes("ECONNREFUSED");
-
-      if (isAuthError) {
-        // Auth error - Rust backend already tried to refresh token via get_auth_token_async()
-        // If we still got 401, the refresh failed or tokens are invalid
-        // The backend will emit auth_expired event, which authStore will handle
-        // Don't show error - just let the UI transition to login state
-        console.log(
-          "🔴 Auth error after Rust-side refresh attempt, clearing auth",
-        );
-        authStore.clearAuth();
-        setTranscripts([]);
-        setError(null); // No error message - silent logout
-      } else if (isNetworkError) {
-        // Network error - don't show error on initial load, just log it
-        // User can retry manually if needed
-        console.warn("Network error while fetching transcripts:", err);
-        setTranscripts([]);
-        setError(null); // Don't show network errors as they're often temporary
-      } else {
-        // Other API errors - show error message
-        setError(errorMessage);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    authStore.isAuthenticated,
-    authStore.isInitialized,
-    authStore.tokens?.access_token,
-    page,
-  ]);
+      if (node) observer.current.observe(node);
+    },
+    [loading, page, totalPages]
+  );
 
   // Fetch transcripts when authenticated and page changes (same pattern as HomePage: single effect, no callback in deps to avoid double fetch)
   useEffect(() => {
@@ -141,7 +80,9 @@ export const TranscriptsList: React.FC = () => {
         }>("get_transcripts", { page, pageSize: 10 });
 
         if (cancelled) return;
-        setTranscripts(response.transcripts);
+        setTranscripts((prev) =>
+          page === 1 ? response.transcripts : [...prev, ...response.transcripts]
+        );
         setTotalPages(response.total_pages);
         setTotal(response.total);
       } catch (err: any) {
@@ -177,7 +118,8 @@ export const TranscriptsList: React.FC = () => {
     try {
       await invoke("delete_transcript", { transcriptId: deleteConfirmId });
       setDeleteConfirmId(null);
-      await fetchTranscripts();
+      setTranscripts((prev) => prev.filter((t) => t.id !== deleteConfirmId));
+      setTotal((prev) => Math.max(0, prev - 1));
     } catch (err: any) {
       console.error("Failed to delete transcript:", err);
       alert(err.message || "Failed to delete transcript");
@@ -204,41 +146,31 @@ export const TranscriptsList: React.FC = () => {
       setPlayingId(null);
       return;
     }
-    
+
     // Stop any currently playing audio
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    
+
     // Create new audio element
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
-    
+
     audio.addEventListener('timeupdate', () => {
       if (audio.duration) {
         setAudioProgress((audio.currentTime / audio.duration) * 100);
       }
     });
-    
+
     audio.addEventListener('ended', () => {
       setPlayingId(null);
       setAudioProgress(0);
     });
-    
+
     audio.play();
     setPlayingId(transcriptId);
     setAudioProgress(0);
   };
-
-  const handleStopAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    setPlayingId(null);
-    setAudioProgress(0);
-  };
-
 
   // Same as HomePage: always show the page shell; show loading/login/content inside (no full-page gate)
   const showContent =
@@ -249,59 +181,33 @@ export const TranscriptsList: React.FC = () => {
 
   return (
     <div
-      className="settings"
       style={{
-        display: "flex",
-        flexDirection: "column",
-        flex: 1,
-        minHeight: 0,
-        padding: "32px",
+        padding: "2rem 2.5rem",
+        background: "#ffffff",
+        minHeight: "100vh",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
       }}
     >
-      <div
+      <h2
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "12px",
+          margin: 0,
+          marginBottom: "2rem",
+          fontSize: "24px",
+          fontWeight: 600,
+          color: "#111827",
+          letterSpacing: "-0.025em",
         }}
       >
-        <h3>
-          Transcripts{" "}
-          {total > 0 && (
-            <span
-              style={{ fontSize: "12px", fontWeight: "normal", opacity: 0.6 }}
-            >
-              ({total})
-            </span>
-          )}
-        </h3>
-        {totalPages > 1 && (
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <button
-              className="transcript-btn"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1 || loading}
-              style={{ fontSize: "11px", padding: "4px 8px" }}
-            >
-              ← Prev
-            </button>
-            <span
-              style={{ fontSize: "11px", color: "rgba(255, 255, 255, 0.6)" }}
-            >
-              {page} / {totalPages}
-            </span>
-            <button
-              className="transcript-btn"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages || loading}
-              style={{ fontSize: "11px", padding: "4px 8px" }}
-            >
-              Next →
-            </button>
-          </div>
+        Transcripts{" "}
+        {total > 0 && (
+          <span
+            style={{ fontSize: "14px", fontWeight: "normal", color: "#6b7280" }}
+          >
+            ({total})
+          </span>
         )}
-      </div>
+      </h2>
 
       {!showContent && (
         <div
@@ -321,7 +227,7 @@ export const TranscriptsList: React.FC = () => {
             Sign in to view your transcription history
           </p>
           <GoogleLoginButton
-            onSuccess={() => {}}
+            onSuccess={() => { }}
             onError={(err) => {
               setError(err || "Authentication failed");
             }}
@@ -372,7 +278,7 @@ export const TranscriptsList: React.FC = () => {
 
       {showContent && !showLogin && transcripts.length > 0 && (
         <div className="transcripts-list transcripts-table" style={{ position: "relative" }}>
-          {loading && (
+          {loading && page === 1 && (
             <div
               style={{
                 position: "absolute",
@@ -393,237 +299,240 @@ export const TranscriptsList: React.FC = () => {
             <span>Transcript</span>
             <span>Actions</span>
           </div>
-          {transcripts.map((transcript) => (
-            <div
-              key={transcript.id}
-              className="transcript-item transcripts-table-row"
-            >
-              <div className="transcript-cell transcript-cell-date">
-                {formatDateRelative(transcript.created_at)}
-              </div>
-              <div className="transcript-cell transcript-cell-text">
-                {(() => {
-                  const isEnhanced =
-                    transcript.is_enhanced && !!transcript.enhanced_text;
-                  const displayText = isEnhanced
-                    ? transcript.enhanced_text!
-                    : transcript.original_text || "";
-                  const hasText = !!displayText;
-                  const isPlaying = playingId === transcript.id;
-
-                  return (
-                    <div className="transcript-display-cell" style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-                      {/* Minimal Audio Player */}
-                      {transcript.audio_file_url && (
-                        <div 
-                          style={{ 
-                            display: "flex", 
-                            alignItems: "center", 
-                            gap: "4px",
-                            flexShrink: 0,
-                          }}
-                        >
-                          <button
-                            onClick={() => handlePlayAudio(transcript.id, transcript.audio_file_url as string)}
-                            style={{
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "50%",
-                              border: "none",
-                              background: isPlaying 
-                                ? "#1a1a1a" 
-                                : "#f3f4f6",
-                              color: isPlaying ? "#fff" : "#6b7280",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                              position: "relative",
-                              overflow: "hidden",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isPlaying) {
-                                e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.color = "#374151";
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isPlaying) {
-                                e.currentTarget.style.background = "#f3f4f6";
-                                e.currentTarget.style.color = "#6b7280";
-                              }
-                            }}
-                            title={isPlaying ? "Pause" : "Play audio"}
-                          >
-                            {/* Progress ring when playing */}
-                            {isPlaying && (
-                              <svg
-                                style={{
-                                  position: "absolute",
-                                  width: "28px",
-                                  height: "28px",
-                                  transform: "rotate(-90deg)",
-                                }}
-                              >
-                                <circle
-                                  cx="14"
-                                  cy="14"
-                                  r="12"
-                                  fill="none"
-                                  stroke="rgba(255,255,255,0.2)"
-                                  strokeWidth="2"
-                                />
-                                <circle
-                                  cx="14"
-                                  cy="14"
-                                  r="12"
-                                  fill="none"
-                                  stroke="#fff"
-                                  strokeWidth="2"
-                                  strokeDasharray={`${audioProgress * 0.754} 75.4`}
-                                  strokeLinecap="round"
-                                />
-                              </svg>
-                            )}
-                            {isPlaying ? (
-                              <Pause size={12} fill="currentColor" />
-                            ) : (
-                              <Play size={12} fill="currentColor" style={{ marginLeft: "2px" }} />
-                            )}
-                          </button>
-                        </div>
-                      )}
-                      
-                      {/* Transcript Text */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {hasText ? (
-                          <>
-                            <span className="transcript-item-text">
-                              {displayText}
-                            </span>
-                            {isEnhanced && (
-                              <div className="transcript-enhanced-badges">
-                                <span
-                                  className="transcript-enhanced-badge"
-                                  title="This is an enhanced version of the transcript (improved grammar and clarity)"
-                                >
-                                  <Sparkles size={12} />
-                                  Enhanced
-                                </span>
-                                <span
-                                  className="transcript-view-original-trigger"
-                                  onMouseEnter={() =>
-                                    setOriginalTooltipId(transcript.id)
-                                  }
-                                  onMouseLeave={() =>
-                                    setOriginalTooltipId(null)
-                                  }
-                                >
-                                  View original
-                                  {originalTooltipId === transcript.id && (
-                                    <div
-                                      className="transcript-original-tooltip"
-                                      onMouseEnter={() =>
-                                        setOriginalTooltipId(transcript.id)
-                                      }
-                                      onMouseLeave={() =>
-                                        setOriginalTooltipId(null)
-                                      }
-                                    >
-                                      <div className="transcript-original-tooltip-label">
-                                        Original transcription
-                                      </div>
-                                      <div className="transcript-original-tooltip-text">
-                                        {transcript.original_text}
-                                      </div>
-                                    </div>
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <span className="transcript-item-empty">
-                            {transcript.status === "processing"
-                              ? "Processing..."
-                              : "No text available"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="transcript-cell transcript-cell-meta">
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    flexWrap: "wrap",
-                  }}
-                >
+          {transcripts.map((transcript, index) => {
+            const isLastElement = index === transcripts.length - 1;
+            return (
+              <div
+                ref={isLastElement ? lastElementRef : null}
+                key={transcript.id}
+                className="transcript-item transcripts-table-row"
+              >
+                <div className="transcript-cell transcript-cell-date">
+                  {formatDateRelative(transcript.created_at)}
+                </div>
+                <div className="transcript-cell transcript-cell-text">
                   {(() => {
                     const isEnhanced =
                       transcript.is_enhanced && !!transcript.enhanced_text;
-                    const copyText =
-                      isEnhanced && transcript.enhanced_text
-                        ? transcript.enhanced_text
-                        : transcript.original_text || "";
-                    return copyText ? (
-                    <button
-                      onClick={() =>
-                        handleCopyToClipboard(copyText, transcript.id)
-                      }
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: "32px",
-                        height: "32px",
-                        padding: 0,
-                        background:
-                          copiedId === transcript.id ? "#dcfce7" : "#ffffff",
-                        border:
-                          copiedId === transcript.id
-                            ? "1px solid #22c55e"
-                            : "1px solid #e5e7eb",
-                        borderRadius: "0.5rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        color:
-                          copiedId === transcript.id ? "#16a34a" : "#6b7280",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (copiedId !== transcript.id) {
-                          e.currentTarget.style.background = "#f9fafb";
-                          e.currentTarget.style.borderColor = "#d1d5db";
-                          e.currentTarget.style.color = "#111827";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (copiedId !== transcript.id) {
-                          e.currentTarget.style.background = "#ffffff";
-                          e.currentTarget.style.borderColor = "#e5e7eb";
-                          e.currentTarget.style.color = "#6b7280";
-                        }
-                      }}
-                      title={
-                        copiedId === transcript.id
-                          ? "Copied!"
-                          : "Copy transcript"
-                      }
-                    >
-                      {copiedId === transcript.id ? (
-                        <Check size={16} strokeWidth={2.5} />
-                      ) : (
-                        <Copy size={16} />
-                      )}
-                    </button>
-                    ) : null;
+                    const displayText = isEnhanced
+                      ? transcript.enhanced_text!
+                      : transcript.original_text || "";
+                    const hasText = !!displayText;
+                    const isPlaying = playingId === transcript.id;
+
+                    return (
+                      <div className="transcript-display-cell" style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                        {/* Minimal Audio Player */}
+                        {transcript.audio_file_url && (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <button
+                              onClick={() => handlePlayAudio(transcript.id, transcript.audio_file_url as string)}
+                              style={{
+                                width: "28px",
+                                height: "28px",
+                                borderRadius: "50%",
+                                border: "none",
+                                background: isPlaying
+                                  ? "#1a1a1a"
+                                  : "#f3f4f6",
+                                color: isPlaying ? "#fff" : "#6b7280",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                position: "relative",
+                                overflow: "hidden",
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isPlaying) {
+                                  e.currentTarget.style.background = "#e5e7eb";
+                                  e.currentTarget.style.color = "#374151";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isPlaying) {
+                                  e.currentTarget.style.background = "#f3f4f6";
+                                  e.currentTarget.style.color = "#6b7280";
+                                }
+                              }}
+                              title={isPlaying ? "Pause" : "Play audio"}
+                            >
+                              {/* Progress ring when playing */}
+                              {isPlaying && (
+                                <svg
+                                  style={{
+                                    position: "absolute",
+                                    width: "28px",
+                                    height: "28px",
+                                    transform: "rotate(-90deg)",
+                                  }}
+                                >
+                                  <circle
+                                    cx="14"
+                                    cy="14"
+                                    r="12"
+                                    fill="none"
+                                    stroke="rgba(255,255,255,0.2)"
+                                    strokeWidth="2"
+                                  />
+                                  <circle
+                                    cx="14"
+                                    cy="14"
+                                    r="12"
+                                    fill="none"
+                                    stroke="#fff"
+                                    strokeWidth="2"
+                                    strokeDasharray={`${audioProgress * 0.754} 75.4`}
+                                    strokeLinecap="round"
+                                  />
+                                </svg>
+                              )}
+                              {isPlaying ? (
+                                <Pause size={12} fill="currentColor" />
+                              ) : (
+                                <Play size={12} fill="currentColor" style={{ marginLeft: "2px" }} />
+                              )}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Transcript Text */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {hasText ? (
+                            <>
+                              <span className="transcript-item-text">
+                                {displayText}
+                              </span>
+                              {isEnhanced && (
+                                <div className="transcript-enhanced-badges">
+                                  <span
+                                    className="transcript-enhanced-badge"
+                                    title="This is an enhanced version of the transcript (improved grammar and clarity)"
+                                  >
+                                    <Sparkles size={12} />
+                                    Enhanced
+                                  </span>
+                                  <span
+                                    className="transcript-view-original-trigger"
+                                    onMouseEnter={() =>
+                                      setOriginalTooltipId(transcript.id)
+                                    }
+                                    onMouseLeave={() =>
+                                      setOriginalTooltipId(null)
+                                    }
+                                  >
+                                    View original
+                                    {originalTooltipId === transcript.id && (
+                                      <div
+                                        className="transcript-original-tooltip"
+                                        onMouseEnter={() =>
+                                          setOriginalTooltipId(transcript.id)
+                                        }
+                                        onMouseLeave={() =>
+                                          setOriginalTooltipId(null)
+                                        }
+                                      >
+                                        <div className="transcript-original-tooltip-label">
+                                          Original transcription
+                                        </div>
+                                        <div className="transcript-original-tooltip-text">
+                                          {transcript.original_text}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="transcript-item-empty">
+                              {transcript.status === "processing"
+                                ? "Processing..."
+                                : "No text available"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
                   })()}
-                  {/* <button
+                </div>
+                <div className="transcript-cell transcript-cell-meta">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {(() => {
+                      const isEnhanced =
+                        transcript.is_enhanced && !!transcript.enhanced_text;
+                      const copyText =
+                        isEnhanced && transcript.enhanced_text
+                          ? transcript.enhanced_text
+                          : transcript.original_text || "";
+                      return copyText ? (
+                        <button
+                          onClick={() =>
+                            handleCopyToClipboard(copyText, transcript.id)
+                          }
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "32px",
+                            height: "32px",
+                            padding: 0,
+                            background:
+                              copiedId === transcript.id ? "#dcfce7" : "#ffffff",
+                            border:
+                              copiedId === transcript.id
+                                ? "1px solid #22c55e"
+                                : "1px solid #e5e7eb",
+                            borderRadius: "0.5rem",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            color:
+                              copiedId === transcript.id ? "#16a34a" : "#6b7280",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (copiedId !== transcript.id) {
+                              e.currentTarget.style.background = "#f9fafb";
+                              e.currentTarget.style.borderColor = "#d1d5db";
+                              e.currentTarget.style.color = "#111827";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (copiedId !== transcript.id) {
+                              e.currentTarget.style.background = "#ffffff";
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.color = "#6b7280";
+                            }
+                          }}
+                          title={
+                            copiedId === transcript.id
+                              ? "Copied!"
+                              : "Copy transcript"
+                          }
+                        >
+                          {copiedId === transcript.id ? (
+                            <Check size={16} strokeWidth={2.5} />
+                          ) : (
+                            <Copy size={16} />
+                          )}
+                        </button>
+                      ) : null;
+                    })()}
+                    {/* <button
                     onClick={() => {
                       // Regenerate action - placeholder for now
                       console.log(
@@ -659,46 +568,52 @@ export const TranscriptsList: React.FC = () => {
                   >
                     <RefreshCw size={16} />
                   </button> */}
-                  <button
-                    onClick={() => openDeleteConfirm(transcript.id)}
-                    disabled={!!deletingId}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: "32px",
-                      height: "32px",
-                      padding: 0,
-                      background: "#ffffff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "0.5rem",
-                      cursor: deletingId ? "not-allowed" : "pointer",
-                      transition: "all 0.2s ease",
-                      color: "#6b7280",
-                      opacity: deletingId ? 0.6 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!deletingId) {
-                        e.currentTarget.style.background = "#fef2f2";
-                        e.currentTarget.style.borderColor = "#fecaca";
-                        e.currentTarget.style.color = "#dc2626";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!deletingId) {
-                        e.currentTarget.style.background = "#ffffff";
-                        e.currentTarget.style.borderColor = "#e5e7eb";
-                        e.currentTarget.style.color = "#6b7280";
-                      }
-                    }}
-                    title="Delete transcript"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                    <button
+                      onClick={() => openDeleteConfirm(transcript.id)}
+                      disabled={!!deletingId}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "32px",
+                        height: "32px",
+                        padding: 0,
+                        background: "#ffffff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        cursor: deletingId ? "not-allowed" : "pointer",
+                        transition: "all 0.2s ease",
+                        color: "#6b7280",
+                        opacity: deletingId ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!deletingId) {
+                          e.currentTarget.style.background = "#fef2f2";
+                          e.currentTarget.style.borderColor = "#fecaca";
+                          e.currentTarget.style.color = "#dc2626";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!deletingId) {
+                          e.currentTarget.style.background = "#ffffff";
+                          e.currentTarget.style.borderColor = "#e5e7eb";
+                          e.currentTarget.style.color = "#6b7280";
+                        }
+                      }}
+                      title="Delete transcript"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
+            );
+          })}
+          {loading && page > 1 && (
+            <div style={{ padding: "16px", display: "flex", justifyContent: "center", width: "100%" }}>
+              <div className="loading-spinner" />
             </div>
-          ))}
+          )}
         </div>
       )}
 

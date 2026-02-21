@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import type { Transcript } from "../../types";
+import type { Transcript, HotkeyConfig } from "../../types";
 import "./home.css";
 
 // Analytics interfaces
@@ -118,6 +118,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
   const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
+  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(["fn"]);
 
   const [stats, setStats] = useState<AnalyticsStats>({
     words_typed_this_week: 0,
@@ -193,6 +194,21 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
     fetchStats();
   }, [fetchTranscripts, fetchStats]);
 
+  useEffect(() => {
+    const fetchHotkey = async () => {
+      try {
+        const hotkeyJson = await invoke<string>("get_current_hotkey");
+        const hotkeyData: HotkeyConfig = JSON.parse(hotkeyJson);
+        if (hotkeyData.hotkeys && hotkeyData.hotkeys.length > 0) {
+          setTranscriptionHotkeys(hotkeyData.hotkeys);
+        }
+      } catch (err) {
+        console.error("Failed to load global hotkey:", err);
+      }
+    };
+    fetchHotkey();
+  }, []);
+
   const userName = user?.name?.split(" ")[0] || "there";
 
   const maxChartValue = useMemo(() => {
@@ -226,7 +242,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
         <div className="tip-content">
           <span className="tip-label">Quick tip</span>
           <p className="tip-text">
-            Hold <kbd className="hotkey-badge">fn</kbd> key and speak naturally
+            Hold{" "}
+            {transcriptionHotkeys.map((key, i) => (
+              <React.Fragment key={key}>
+                {i > 0 && " or "}
+                <kbd className="hotkey-badge">{key}</kbd>
+              </React.Fragment>
+            ))}{" "}
+            key{transcriptionHotkeys.length > 1 && "s"} and speak naturally
             — Lexi will transcribe in real-time
           </p>
         </div>
@@ -291,7 +314,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
                 </div>
                 <p className="empty-title">No transcriptions yet</p>
                 <p className="empty-sub">
-                  Hold fn and speak to create your first transcription
+                  Hold {transcriptionHotkeys.join(" or ")} and speak to create your first transcription
                 </p>
               </div>
             ) : (
@@ -401,7 +424,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
                   Avg.{" "}
                   {Math.round(
                     stats.words_typed_this_week /
-                      Math.max(chartData.total_transcriptions, 1),
+                    Math.max(chartData.total_transcriptions, 1),
                   )}{" "}
                   words per session
                 </span>
