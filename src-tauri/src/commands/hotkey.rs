@@ -4,7 +4,6 @@
 //! Hotkeys are managed via app config (server-synced) and runtime listeners.
 
 use crate::commands::app_config::{get_app_config, update_app_config, AppConfig};
-use crate::global_key_listener::validate_hotkey;
 use crate::state::{HotkeyRecordingState, HotkeyWatchState};
 use serde::Deserialize;
 use serde_json;
@@ -36,18 +35,6 @@ pub async fn update_hotkey(
         .map_err(|e| format!("Failed to parse hotkey config: {}", e))?;
 
     let new_hotkeys = config.hotkeys;
-
-    // Validate: maximum 3 hotkeys
-    if new_hotkeys.len() > 3 {
-        return Err("Maximum of 3 hotkeys allowed".to_string());
-    }
-
-    // Validate each hotkey
-    for hotkey in &new_hotkeys {
-        if let Err(e) = validate_hotkey(hotkey) {
-            return Err(e);
-        }
-    }
 
     // Get current config to preserve other fields
     let current_config = get_app_config(app.clone())

@@ -191,13 +191,6 @@ pub(crate) fn normalize_key_string(key: &str) -> String {
     }
 }
 
-pub fn validate_hotkey(hotkey: &str) -> Result<(), String> {
-    if hotkey.trim().is_empty() {
-        return Err("Hotkey cannot be empty".to_string());
-    }
-    Ok(())
-}
-
 // ============================================================================
 // Hotkey Tracking Logic
 // ============================================================================

@@ -16,9 +16,9 @@ import {
   getLanguageName,
 } from "../lib/constants";
 import type { TauriAppConfig, HotkeyConfig } from "../types";
-
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useAuthStore } from "../store/authStore";
+import { HotkeySelector } from "./HotkeySelector";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -41,9 +41,11 @@ export const SettingsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
   // Hotkey state
   const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
+    hotkeys: [],
+  });
+  const [currentActionHotkeys, setCurrentActionHotkeys] = useState<HotkeyConfig>({
     hotkeys: [],
   });
   const [activeSection, setActiveSection] = useState<
@@ -58,6 +60,7 @@ export const SettingsPage: React.FC = () => {
   const enhanceTranscription = config?.enhance_transcription;
 
   const configHotkeys = config?.hotkeys || [];
+  const configActionHotkeys = config?.action_hotkeys || [];
 
   // Load app config on mount
   useEffect(() => {
@@ -134,12 +137,19 @@ export const SettingsPage: React.FC = () => {
           setCurrentHotkeys(hotkey);
         }
       }
+
+      // Load action hotkeys from config
+      if (configActionHotkeys.length > 0) {
+        setCurrentActionHotkeys({
+          hotkeys: configActionHotkeys.slice(0, 3),
+        });
+      }
     };
 
     if (config) {
       loadHotkeys();
     }
-  }, [config, configHotkeys]);
+  }, [config, configHotkeys, configActionHotkeys]);
 
   // Listen for hotkey updates from backend
   useEffect(() => {
@@ -206,7 +216,13 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
 
-    if (!languageChanged && !autostartChanged && !enhanceChanged) {
+    const hotkeysChanged =
+      JSON.stringify(currentHotkeys.hotkeys) !== JSON.stringify(configHotkeys);
+
+    const actionHotkeysChanged =
+      JSON.stringify(currentActionHotkeys.hotkeys) !== JSON.stringify(configActionHotkeys);
+
+    if (!languageChanged && !autostartChanged && !enhanceChanged && !hotkeysChanged && !actionHotkeysChanged) {
       return; // No changes needed
     }
 
@@ -225,6 +241,12 @@ export const SettingsPage: React.FC = () => {
       }
       if (enhanceChanged && selectedEnhanceTranscription !== null) {
         updates.enhance_transcription = selectedEnhanceTranscription;
+      }
+      if (hotkeysChanged) {
+        updates.hotkeys = currentHotkeys.hotkeys;
+      }
+      if (actionHotkeysChanged) {
+        updates.action_hotkeys = currentActionHotkeys.hotkeys;
       }
       const updatedConfig = await updateConfig(updates);
 
@@ -246,10 +268,23 @@ export const SettingsPage: React.FC = () => {
         setSelectedEnhanceTranscription(updatedConfig.enhance_transcription);
       }
 
+      if (updatedConfig.hotkeys) {
+        setCurrentHotkeys({ hotkeys: updatedConfig.hotkeys });
+      }
+      if (updatedConfig.action_hotkeys) {
+        setCurrentActionHotkeys({ hotkeys: updatedConfig.action_hotkeys });
+      }
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (err: any) {
-      // Error already set by updateConfig
+      // Revert hotkeys to the last known good state from the original config
+      if (hotkeysChanged) {
+        setCurrentHotkeys({ hotkeys: configHotkeys.slice(0, 3) });
+      }
+      if (actionHotkeysChanged) {
+        setCurrentActionHotkeys({ hotkeys: configActionHotkeys.slice(0, 3) });
+      }
     } finally {
       setIsUpdating(false);
     }
@@ -262,9 +297,7 @@ export const SettingsPage: React.FC = () => {
       selectedLanguage !== undefined &&
       selectedLanguage !== currentLanguage;
 
-    // Compare autostart (handle null/undefined properly)
-    // If selectedAutostart is null, it means unchanged, so no change
-    // If selectedAutostart is a boolean, compare it to current value
+    // Compare autostart
     const currentAutostart = autostartEnabled ?? false;
     const autostartChanged =
       selectedAutostart !== null &&
@@ -278,8 +311,30 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
 
-    return languageChanged || autostartChanged || enhanceChanged;
+    const hotkeysChanged =
+      JSON.stringify(currentHotkeys.hotkeys) !== JSON.stringify(configHotkeys);
+
+    const actionHotkeysChanged =
+      JSON.stringify(currentActionHotkeys.hotkeys) !== JSON.stringify(configActionHotkeys);
+
+    return languageChanged || autostartChanged || enhanceChanged || hotkeysChanged || actionHotkeysChanged;
   };
+
+  // Auto-save changes when state dependencies change
+  useEffect(() => {
+    if (config && hasChanges() && !isUpdating) {
+      const timeoutId = setTimeout(() => {
+        handleSaveSettings();
+      }, 500); // Small debounce
+      return () => clearTimeout(timeoutId);
+    }
+  }, [
+    selectedLanguage,
+    selectedAutostart,
+    selectedEnhanceTranscription,
+    currentHotkeys,
+    currentActionHotkeys,
+  ]);
 
   const handleToggleAutostart = () => {
     const currentValue = selectedAutostart ?? autostartEnabled ?? false;
@@ -811,51 +866,7 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                justifyContent: "flex-end",
-              }}
-            >
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    handleSaveSettings();
-                  }
-                }}
-                disabled={isUpdating || !hasChanges() || isLoading}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  background: "#111827",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "6px",
-                  opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
-                  cursor:
-                    isUpdating || !hasChanges() || isLoading
-                      ? "not-allowed"
-                      : "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#374151";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#111827";
-                  }
-                }}
-              >
-                {isUpdating ? "Saving..." : "Save Settings"}
-              </button>
-            </div>
+
 
             {error && (
               <div
@@ -940,83 +951,7 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                justifyContent: "flex-end",
-              }}
-            >
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    handleSaveSettings();
-                  }
-                }}
-                disabled={isUpdating || !hasChanges() || isLoading}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  background: "#111827",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "6px",
-                  opacity: isUpdating || !hasChanges() || isLoading ? 0.5 : 1,
-                  cursor:
-                    isUpdating || !hasChanges() || isLoading
-                      ? "not-allowed"
-                      : "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#374151";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isUpdating && hasChanges() && !isLoading) {
-                    e.currentTarget.style.background = "#111827";
-                  }
-                }}
-              >
-                {isUpdating ? "Saving..." : "Save Settings"}
-              </button>
-            </div>
 
-            {error && (
-              <div
-                style={{
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#b91c1c",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div
-                style={{
-                  background: "#ecfdf5",
-                  border: "1px solid #a7f3d0",
-                  color: "#047857",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
-                Settings saved successfully!
-              </div>
-            )}
           </div>
         )}
 
@@ -1034,200 +969,61 @@ export const SettingsPage: React.FC = () => {
                 marginBottom: "24px",
               }}
             >
-              {/* Transcription Hotkeys */}
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#9ca3af",
-                  marginBottom: "12px",
-                }}
-              >
-                Transcription Hotkeys
+              <div style={{ marginBottom: "32px" }}>
+                <HotkeySelector
+                  label="Transcription Hotkeys"
+                  description="Hold to record audio for transcription"
+                  value={currentHotkeys}
+                  onChange={setCurrentHotkeys}
+                  maxHotkeys={3}
+                  disabled={isLoading || isUpdating}
+                />
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginBottom: "24px" }}>
-                {currentHotkeys.hotkeys.length > 0 ? (
-                  currentHotkeys.hotkeys.map((hotkey, index) => {
-                    const keySymbols: Record<string, { symbol: string; label: string }> = {
-                      'fn': { symbol: 'fn', label: '🌐' },
-                      'control': { symbol: '^', label: 'control' },
-                      'ctrl': { symbol: '^', label: 'control' },
-                      'command': { symbol: '⌘', label: 'command' },
-                      'cmd': { symbol: '⌘', label: 'command' },
-                      'option': { symbol: '⌥', label: 'option' },
-                      'alt': { symbol: '⌥', label: 'option' },
-                      'shift': { symbol: '⇧', label: 'shift' },
-                    };
-                    return (
-                      <div
-                        style={{
-                          backgroundColor: "#1f2937",
-                          padding: "1.5rem",
-                          borderRadius: "0.75rem",
-                          maxWidth: "600px",
-                        }}
-                      >
-                        <div
-                          key={`transcription-${index}-${hotkey}`}
-                          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                        >
-                          {hotkey.split("+").map((key, keyIndex, arr) => {
-                            const keyName = key.trim().toLowerCase();
-                            const keyInfo = keySymbols[keyName];
-                            return (
-                              <React.Fragment key={`${index}-${keyIndex}-${key}`}>
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-start",
-                                    justifyContent: "space-between",
-                                    padding: "6px 8px",
-                                    minWidth: "54px",
-                                    minHeight: "48px",
-                                    background: "linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)",
-                                    color: "#fff",
-                                    borderRadius: "6px",
-                                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-                                    boxShadow: "0 1px 0 1px #1a1a1a, 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
-                                    border: "1px solid #4a4a4c",
-                                    position: "relative",
-                                  }}
-                                >
-                                  {keyInfo && (
-                                    <span style={{ fontSize: "13px", position: "absolute", top: "8px", right: "10px", color: "rgba(255,255,255,0.9)" }}>
-                                      {keyInfo.symbol}
-                                    </span>
-                                  )}
-                                  <span style={{ fontSize: "10px", fontWeight: 400, color: "rgba(255,255,255,0.85)", marginTop: "auto" }}>
-                                    {keyInfo ? keyInfo.label : key.trim()}
-                                  </span>
-                                </span>
-                                {keyIndex < arr.length - 1 && (
-                                  <span style={{ color: "#9ca3af", fontSize: "14px", fontWeight: 400 }}>+</span>
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div
-                    style={{
-                      padding: "8px 12px",
-                      background: "#f3f4f6",
-                      borderRadius: "6px",
-                      fontSize: "13px",
-                      color: "#9ca3af",
-                      display: "inline-block",
-                    }}
-                  >
-                    No hotkeys configured
-                  </div>
-                )}
+              <div style={{ marginBottom: "24px" }}>
+                <HotkeySelector
+                  label="Action Hotkeys"
+                  description="Hold to record a voice command for actions"
+                  value={currentActionHotkeys}
+                  onChange={setCurrentActionHotkeys}
+                  maxHotkeys={3}
+                  disabled={isLoading || isUpdating}
+                />
               </div>
 
-              {/* Action Hotkeys */}
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#9ca3af",
-                  marginBottom: "12px",
-                }}
-              >
-                Action Hotkeys
-              </div>
 
-              <div
-                style={{
-                  backgroundColor: "#1f2937",
-                  padding: "1.5rem",
-                  borderRadius: "0.75rem",
-                  maxWidth: "600px",
-                }}
-              >              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-                  {config?.action_hotkeys && config.action_hotkeys.length > 0 ? (
-                    config.action_hotkeys.map((hotkey, index) => {
-                      const keySymbols: Record<string, { symbol: string; label: string }> = {
-                        'fn': { symbol: 'fn', label: '🌐' },
-                        'control': { symbol: '^', label: 'control' },
-                        'ctrl': { symbol: '^', label: 'control' },
-                        'command': { symbol: '⌘', label: 'command' },
-                        'cmd': { symbol: '⌘', label: 'command' },
-                        'option': { symbol: '⌥', label: 'option' },
-                        'alt': { symbol: '⌥', label: 'option' },
-                        'shift': { symbol: '⇧', label: 'shift' },
-                      };
-                      return (
-                        <div
-                          key={`action-${index}-${hotkey}`}
-                          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                        >
-                          {hotkey.split("+").map((key, keyIndex, arr) => {
-                            const keyName = key.trim().toLowerCase();
-                            const keyInfo = keySymbols[keyName];
-                            return (
-                              <React.Fragment key={`${index}-${keyIndex}-${key}`}>
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-start",
-                                    justifyContent: "space-between",
-                                    padding: "6px 8px",
-                                    minWidth: "54px",
-                                    minHeight: "48px",
-                                    background: "linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)",
-                                    color: "#fff",
-                                    borderRadius: "6px",
-                                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-                                    boxShadow: "0 1px 0 1px #1a1a1a, 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
-                                    border: "1px solid #4a4a4c",
-                                    position: "relative",
-                                  }}
-                                >
-                                  {keyInfo && (
-                                    <span style={{ fontSize: "13px", position: "absolute", top: "8px", right: "10px", color: "rgba(255,255,255,0.9)" }}>
-                                      {keyInfo.symbol}
-                                    </span>
-                                  )}
-                                  <span style={{ fontSize: "10px", fontWeight: 400, color: "rgba(255,255,255,0.85)", marginTop: "auto" }}>
-                                    {keyInfo ? keyInfo.label : key.trim()}
-                                  </span>
-                                </span>
-                                {keyIndex < arr.length - 1 && (
-                                  <span style={{ color: "#9ca3af", fontSize: "14px", fontWeight: 400 }}>+</span>
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div
-                      style={{
-                        padding: "8px 12px",
-                        background: "#f3f4f6",
-                        borderRadius: "6px",
-                        fontSize: "13px",
-                        color: "#9ca3af",
-                        display: "inline-block",
-                      }}
-                    >
-                      No action hotkeys configured
-                    </div>
-                  )}
+
+              {error && (
+                <div
+                  style={{
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    color: "#b91c1c",
+                    fontSize: "13px",
+                    padding: "12px 16px",
+                    marginTop: "16px",
+                    borderRadius: "8px",
+                  }}
+                >
+                  {error}
                 </div>
-              </div>
+              )}
+
+              {success && (
+                <div
+                  style={{
+                    background: "#ecfdf5",
+                    border: "1px solid #a7f3d0",
+                    color: "#047857",
+                    fontSize: "13px",
+                    padding: "12px 16px",
+                    marginTop: "16px",
+                    borderRadius: "8px",
+                  }}
+                >
+                  Settings saved successfully!
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -147,8 +147,8 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
 
     println!("✅ App config updated in memory");
 
-    // Sync to cloud first
-    sync_config_to_cloud(&app, &current_config).await;
+    // Sync to cloud first. If the server rejects it (e.g. invalid hotkeys), this will error and abort the update.
+    sync_config_to_cloud(&app, &current_config).await?;
 
     // Re-fetch from server to get the updated config (source of truth), then sync status from it
     let mut updated_config = fetch_config_from_server(&app).await?;
@@ -322,12 +322,12 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
 }
 
 /// Sync app configuration to cloud API (best-effort, failures are logged)
-async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
+async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     let auth_token = match get_auth_token_async(app).await {
         Some(token) => token,
         None => {
             println!("⚠️  No auth token available, skipping cloud sync");
-            return;
+            return Ok(());
         }
     };
 
@@ -349,19 +349,23 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) {
             let status = response.status();
             if status.is_success() {
                 println!("✅ App config synced to cloud successfully");
+                Ok(())
             } else {
-                let error_text = response
-                    .text()
+                let json_value: serde_json::Value = response
+                    .json()
                     .await
-                    .unwrap_or_else(|_| "Unknown error".to_string());
+                    .unwrap_or_else(|_| serde_json::json!({}));
+                let error_msg = extract_error_message(&json_value, status);
                 eprintln!(
                     "⚠️  Failed to sync app config to cloud ({}): {}",
-                    status, error_text
+                    status, error_msg
                 );
+                Err(error_msg)
             }
         }
         Err(e) => {
             eprintln!("⚠️  Failed to sync app config to cloud: {}", e);
+            Err(format!("Network error: {}", e))
         }
     }
 }
