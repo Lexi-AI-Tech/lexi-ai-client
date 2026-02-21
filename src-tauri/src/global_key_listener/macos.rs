@@ -21,21 +21,73 @@ use std::ptr::{null_mut, NonNull};
 /// Convert macOS virtual keycode to our internal Key enum
 fn macos_keycode_to_key(keycode: i64) -> Key {
     match keycode {
-        0x37 => Key::Command, // Command Left
-        0x36 => Key::Command, // Command Right
-        0x3B => Key::Control, // Control Left
-        0x3E => Key::Control, // Control Right
-        0x3A => Key::Option,  // Option Left
-        0x3D => Key::Option,  // Option Right
-        0x38 => Key::Shift,   // Shift Left
-        0x3C => Key::Shift,   // Shift Right
-        0x3F => Key::Fn,
-        0x31 => Key::Space,
+        0x00 => Key::KeyA,
+        0x01 => Key::KeyS,
+        0x02 => Key::KeyD,
+        0x03 => Key::KeyF,
+        0x04 => Key::KeyH,
+        0x05 => Key::KeyG,
+        0x06 => Key::KeyZ,
+        0x07 => Key::KeyX,
+        0x08 => Key::KeyC,
+        0x09 => Key::KeyV,
+        0x0A => Key::Backquote,
+        0x0B => Key::KeyB,
+        0x0C => Key::KeyQ,
+        0x0D => Key::KeyW,
+        0x0E => Key::KeyE,
+        0x0F => Key::KeyR,
+        0x10 => Key::KeyY,
+        0x11 => Key::KeyT,
+        0x12 => Key::Num1,
+        0x13 => Key::Num2,
+        0x14 => Key::Num3,
+        0x15 => Key::Num4,
+        0x16 => Key::Num6,
+        0x17 => Key::Num5,
+        0x18 => Key::Equal,
+        0x19 => Key::Num9,
+        0x1A => Key::Num7,
+        0x1B => Key::Minus,
+        0x1C => Key::Num8,
+        0x1D => Key::Num0,
+        0x1E => Key::RightBracket,
+        0x1F => Key::KeyO,
+        0x20 => Key::KeyU,
+        0x21 => Key::LeftBracket,
+        0x22 => Key::KeyI,
+        0x23 => Key::KeyP,
         0x24 => Key::Enter,
-        0x35 => Key::Escape,
+        0x25 => Key::KeyL,
+        0x26 => Key::KeyJ,
+        0x27 => Key::Quote,
+        0x28 => Key::KeyK,
+        0x29 => Key::Semicolon,
+        0x2A => Key::Backslash,
+        0x2B => Key::Comma,
+        0x2C => Key::Slash,
+        0x2D => Key::KeyN,
+        0x2E => Key::KeyM,
+        0x2F => Key::Period,
         0x30 => Key::Tab,
+        0x31 => Key::Space,
+        0x32 => Key::Backquote,
         0x33 => Key::Backspace,
-        0x75 => Key::Delete,
+        0x35 => Key::Escape,
+        0x36 => Key::Command, // Command Right
+        0x37 => Key::Command, // Command Left
+        0x38 => Key::Shift,   // Shift Left
+        0x3A => Key::Option,  // Option Left
+        0x3B => Key::Control, // Control Left
+        0x3C => Key::Shift,   // Shift Right
+        0x3D => Key::Option,  // Option Right
+        0x3E => Key::Control, // Control Right
+        0x3F => Key::Fn,
+        0x47 => Key::Delete,
+        0x7B => Key::LeftArrow,
+        0x7C => Key::RightArrow,
+        0x7D => Key::DownArrow,
+        0x7E => Key::UpArrow,
         k => Key::Unknown(k as u16),
     }
 }
@@ -175,7 +227,7 @@ unsafe extern "C-unwind" fn raw_callback(
         }
     }
 
-    println!("key_str: {:?}, internal_key: {:?}", key_str, internal_key);
+    // println!("key_str: {:?}, internal_key: {:?}", key_str, internal_key);
 
     // If the key is Fn, consume it to prevent the macOS emoji popup
     if internal_key == Key::Fn {
