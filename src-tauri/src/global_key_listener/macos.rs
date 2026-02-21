@@ -70,6 +70,12 @@ unsafe extern "C-unwind" fn raw_callback(
     let keycode =
         CGEvent::integer_value_field(Some(cg_event.as_ref()), CGEventField::KeyboardEventKeycode);
 
+    // Completely swallow Globe/Fn key synthetic keyDown/keyUp (179) to prevent macOS emoji popup
+    if keycode == 179 {
+        CGEvent::set_type(Some(cg_event.as_ref()), CGEventType::Null);
+        return null_mut();
+    }
+
     // For FlagsChanged (modifiers like Fn, Shift, Cmd), there is no 'KeyUp' event type.
     // Instead, macOS sends a FlagsChanged whenever it changes state.
     // We determine press vs release by checking if the specific flag is currently set in the event flags.
@@ -167,6 +173,14 @@ unsafe extern "C-unwind" fn raw_callback(
                 }
             }
         }
+    }
+
+    println!("key_str: {:?}, internal_key: {:?}", key_str, internal_key);
+
+    // If the key is Fn, consume it to prevent the macOS emoji popup
+    if internal_key == Key::Fn {
+        CGEvent::set_type(Some(cg_event.as_ref()), CGEventType::Null);
+        return null_mut();
     }
 
     // Pass the event on to macOS applications unchanged
