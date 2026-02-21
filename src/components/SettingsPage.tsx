@@ -320,21 +320,7 @@ export const SettingsPage: React.FC = () => {
     return languageChanged || autostartChanged || enhanceChanged || hotkeysChanged || actionHotkeysChanged;
   };
 
-  // Auto-save changes when state dependencies change
-  useEffect(() => {
-    if (config && hasChanges() && !isUpdating) {
-      const timeoutId = setTimeout(() => {
-        handleSaveSettings();
-      }, 500); // Small debounce
-      return () => clearTimeout(timeoutId);
-    }
-  }, [
-    selectedLanguage,
-    selectedAutostart,
-    selectedEnhanceTranscription,
-    currentHotkeys,
-    currentActionHotkeys,
-  ]);
+  // Removed auto-save useEffect in favor of manual Save Settings button
 
   const handleToggleAutostart = () => {
     const currentValue = selectedAutostart ?? autostartEnabled ?? false;
@@ -1025,6 +1011,47 @@ export const SettingsPage: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Global Save Button Area */}
+        {hasChanges() && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginTop: "32px",
+              borderTop: "1px solid #e5e7eb",
+              paddingTop: "24px",
+            }}
+          >
+            <button
+              onClick={handleSaveSettings}
+              disabled={isUpdating}
+              style={{
+                backgroundColor: isUpdating ? "#9ca3af" : "#000000",
+                color: "#ffffff",
+                padding: "10px 24px",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontWeight: 500,
+                border: "none",
+                cursor: isUpdating ? "not-allowed" : "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              {isUpdating ? (
+                <>
+                  <div className="spinner-small" style={{ width: "16px", height: "16px", border: "2px solid #ffffff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                  Saving...
+                </>
+              ) : (
+                "Save Settings"
+              )}
+            </button>
           </div>
         )}
       </div>
