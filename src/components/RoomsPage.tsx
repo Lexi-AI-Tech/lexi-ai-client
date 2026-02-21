@@ -8,8 +8,10 @@ import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Room } from "../types";
 import { RoomLiveView } from "./RoomLiveView";
+import { useToast } from "./toast/useToast";
 
 export const RoomsPage: React.FC = () => {
+  const toast = useToast();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,9 @@ export const RoomsPage: React.FC = () => {
       setError(null);
     } catch (err: any) {
       console.error("Failed to fetch rooms:", err);
-      setError(err.message || "Failed to fetch rooms");
+      const msg = err.message || "Failed to fetch rooms";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -46,9 +50,10 @@ export const RoomsPage: React.FC = () => {
       // Immediately open the new room
       setSelectedRoomId(room.id);
       fetchRooms();
+      toast.success("Room created");
     } catch (err: any) {
       console.error("Failed to create room:", err);
-      alert(err.message || "Failed to create room");
+      toast.error(err.message || "Failed to create room");
     }
   };
 

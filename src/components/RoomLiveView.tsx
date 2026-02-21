@@ -12,6 +12,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Room, RoomTranscriptSegment } from "../types";
 import { SpeakerNamingModal } from "./SpeakerNamingModal";
+import { useToast } from "./toast/useToast";
 
 interface RoomLiveViewProps {
   roomId: string;
@@ -29,6 +30,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
   roomId,
   onBack,
 }) => {
+  const toast = useToast();
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
@@ -219,7 +221,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
         "room-websocket-error",
         (event) => {
           console.error("WebSocket error:", event.payload);
-          alert(`Transcription error: ${event.payload}`);
+          toast.error(`Transcription error: ${event.payload}`);
           stopRecording();
         },
       );
@@ -233,7 +235,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
       console.log("✅ Recording started successfully");
     } catch (err) {
       console.error("Failed to start recording:", err);
-      alert(`Failed to start recording: ${err}`);
+      toast.error(`Failed to start recording: ${err}`);
       stopRecording();
     }
   };

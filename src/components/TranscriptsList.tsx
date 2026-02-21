@@ -12,10 +12,12 @@ import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import { useToast } from "./toast/useToast";
 import "./home/home.css";
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();
+  const toast = useToast();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,9 +122,10 @@ export const TranscriptsList: React.FC = () => {
       setDeleteConfirmId(null);
       setTranscripts((prev) => prev.filter((t) => t.id !== deleteConfirmId));
       setTotal((prev) => Math.max(0, prev - 1));
+      toast.success("Transcript deleted");
     } catch (err: any) {
       console.error("Failed to delete transcript:", err);
-      alert(err.message || "Failed to delete transcript");
+      toast.error(err.message || "Failed to delete transcript");
     } finally {
       setDeletingId(null);
     }
@@ -133,8 +136,10 @@ export const TranscriptsList: React.FC = () => {
       await invoke("copy_to_clipboard", { text });
       setCopiedId(transcriptId);
       setTimeout(() => setCopiedId(null), 250);
+      toast.success("Copied to clipboard");
     } catch (err) {
       console.error("Failed to copy to clipboard:", err);
+      toast.error("Failed to copy to clipboard");
     }
   };
 

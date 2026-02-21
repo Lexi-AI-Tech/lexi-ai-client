@@ -19,6 +19,7 @@ import type { TauriAppConfig, HotkeyConfig } from "../types";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useAuthStore } from "../store/authStore";
 import { HotkeySelector } from "./HotkeySelector";
+import { useToast } from "./toast/useToast";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -28,6 +29,7 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
 
 export const SettingsPage: React.FC = () => {
   const authStore = useAuthStore();
+  const toast = useToast();
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(
     null,
@@ -88,7 +90,9 @@ export const SettingsPage: React.FC = () => {
         );
       } catch (err: any) {
         console.error("Failed to load app config:", err);
-        setError(err?.message || "Failed to load configuration");
+        const msg = err?.message || "Failed to load configuration";
+        setError(msg);
+        toast.error(msg);
       } finally {
         setIsLoading(false);
       }
@@ -192,7 +196,9 @@ export const SettingsPage: React.FC = () => {
       return updatedConfig;
     } catch (err: any) {
       console.error("Failed to update config:", err);
-      setError(err?.message || "Failed to update setting");
+      const msg = err?.message || "Failed to update setting";
+      setError(msg);
+      toast.error(msg);
       throw err;
     }
   };
@@ -276,6 +282,7 @@ export const SettingsPage: React.FC = () => {
       }
 
       setSuccess(true);
+      toast.success("Settings saved");
       setTimeout(() => setSuccess(false), 2000);
     } catch (err: any) {
       // Revert hotkeys to the last known good state from the original config

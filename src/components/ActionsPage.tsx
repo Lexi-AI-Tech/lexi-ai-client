@@ -6,11 +6,13 @@ import { formatDateTime } from "../lib/dateUtils";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import { useToast } from "./toast/useToast";
 import "../styles/components/hotkey-selector.css";
 import "./home/home.css";
 
 export const ActionsPage: React.FC = () => {
   const authStore = useAuthStore();
+  const toast = useToast();
   const [actionHistory, setActionHistory] =
     useState<PaginatedActionHistoryResponse | null>(null);
   const [actionHotkeys, setActionHotkeys] = useState<string[]>([]);
@@ -45,6 +47,7 @@ export const ActionsPage: React.FC = () => {
       await invoke("delete_action_history", { actionId: deleteConfirmId });
       setDeleteConfirmId(null);
       await loadActionHistory();
+      toast.success("Action deleted");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to delete action";
       const isAuthError =
@@ -60,7 +63,7 @@ export const ActionsPage: React.FC = () => {
       } else {
         setError(errorMessage);
       }
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setDeletingId(null);
     }
@@ -127,6 +130,7 @@ export const ActionsPage: React.FC = () => {
         setError(null);
       } else {
         setError(errorMessage);
+        toast.error(errorMessage);
       }
     } finally {
       setIsLoading(false);

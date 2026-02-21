@@ -9,11 +9,13 @@ import {
   X,
 } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
+import { useToast } from "./toast/useToast";
 import "./home/home.css";
 
 type ViewMode = "list" | "grid";
 
 export const NotesPage: React.FC = () => {
+  const toast = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -64,9 +66,10 @@ export const NotesPage: React.FC = () => {
       });
       setContent("");
       await fetchNotes();
+      toast.success("Note created");
     } catch (err) {
       console.error("Failed to create note:", err);
-      alert(`Failed to create note: ${err}`);
+      toast.error(`Failed to create note: ${err}`);
     } finally {
       setIsCreating(false);
     }
@@ -86,8 +89,9 @@ export const NotesPage: React.FC = () => {
       setEditingId(null);
       setContent("");
       await fetchNotes();
+      toast.success("Note updated");
     } catch (err) {
-      alert(`Failed to update note: ${err}`);
+      toast.error(`Failed to update note: ${err}`);
     } finally {
       setIsCreating(false);
     }
@@ -109,8 +113,9 @@ export const NotesPage: React.FC = () => {
       await invoke("delete_note", { noteId: deleteConfirmId });
       setDeleteConfirmId(null);
       await fetchNotes();
+      toast.success("Note deleted");
     } catch (err) {
-      alert(`Failed to delete note: ${err}`);
+      toast.error(`Failed to delete note: ${err}`);
     } finally {
       setDeletingId(null);
     }

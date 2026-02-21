@@ -4,10 +4,12 @@ import { Search, RefreshCw, Plus, X, Edit, Trash2 } from "lucide-react";
 import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import { useToast } from "./toast/useToast";
 import "./home/home.css";
 
 export const ShortcutsPage: React.FC = () => {
   const authStore = useAuthStore();
+  const toast = useToast();
   const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +55,7 @@ export const ShortcutsPage: React.FC = () => {
         setError(null);
       } else {
         setError(errorMessage);
+        toast.error(errorMessage);
       }
     } finally {
       setIsLoading(false);
@@ -108,6 +111,7 @@ export const ShortcutsPage: React.FC = () => {
       setNewValue("");
       setShowCreateShortcut(false);
       await loadShortcuts();
+      toast.success("Shortcut created");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to create shortcut";
       const isAuthError =
@@ -122,6 +126,7 @@ export const ShortcutsPage: React.FC = () => {
         setError(null);
       } else {
         setError(errorMessage);
+        toast.error(errorMessage);
       }
     }
   };
@@ -153,6 +158,7 @@ export const ShortcutsPage: React.FC = () => {
       });
       await loadShortcuts();
       setEditingShortcut(null);
+      toast.success("Shortcut updated");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to update shortcut";
       const isAuthError =
@@ -167,6 +173,7 @@ export const ShortcutsPage: React.FC = () => {
         setError(null);
       } else {
         setError(errorMessage);
+        toast.error(errorMessage);
       }
     }
   };
@@ -194,6 +201,7 @@ export const ShortcutsPage: React.FC = () => {
       });
       setDeleteConfirmId(null);
       await loadShortcuts();
+      toast.success("Shortcut deleted");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to delete shortcut";
       const isAuthError =
@@ -208,8 +216,8 @@ export const ShortcutsPage: React.FC = () => {
         setError(null);
       } else {
         setError(errorMessage);
+        toast.error(errorMessage);
       }
-      alert(errorMessage);
     } finally {
       setDeletingId(null);
     }

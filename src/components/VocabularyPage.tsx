@@ -2,9 +2,11 @@ import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Search, RefreshCw, Plus, X, Trash2 } from "lucide-react";
 import type { TauriAppConfig } from "../types";
+import { useToast } from "./toast/useToast";
 import "./home/home.css";
 
 export const VocabularyPage: React.FC = () => {
+  const toast = useToast();
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +36,9 @@ export const VocabularyPage: React.FC = () => {
         setConfig(loadedConfig);
       } catch (err: any) {
         console.error("Failed to load app config:", err);
-        setError(err?.message || "Failed to load vocabulary");
+        const msg = err?.message || "Failed to load vocabulary";
+        setError(msg);
+        toast.error(msg);
       } finally {
         setIsLoading(false);
       }
@@ -71,7 +75,9 @@ export const VocabularyPage: React.FC = () => {
       return updatedConfig;
     } catch (err: any) {
       console.error("Failed to update config:", err);
-      setError(err?.message || "Failed to update vocabulary");
+      const msg = err?.message || "Failed to update vocabulary";
+      setError(msg);
+      toast.error(msg);
       throw err;
     } finally {
       setIsUpdating(false);
@@ -93,6 +99,7 @@ export const VocabularyPage: React.FC = () => {
       setNewVocabularyValue("");
       setShowAddForm(false);
       setError(null);
+      toast.success("Vocabulary added");
     } catch (err) {
       // Error already set by updateConfig
     }
@@ -119,11 +126,10 @@ export const VocabularyPage: React.FC = () => {
       await updateConfig({ vocabulary: updatedVocabulary });
       setDeleteConfirmValue(null);
       setError(null);
+      toast.success("Vocabulary removed");
     } catch (err) {
       // Error already set by updateConfig
-      alert(
-        (err as Error)?.message || "Failed to remove vocabulary item",
-      );
+      toast.error((err as Error)?.message || "Failed to remove vocabulary item");
     } finally {
       setDeletingValue(null);
     }
@@ -391,7 +397,9 @@ export const VocabularyPage: React.FC = () => {
                     setConfig(loadedConfig);
                   } catch (err: any) {
                     console.error("Failed to load app config:", err);
-                    setError(err?.message || "Failed to load vocabulary");
+                    const msg = err?.message || "Failed to load vocabulary";
+                    setError(msg);
+                    toast.error(msg);
                   } finally {
                     setIsLoading(false);
                   }

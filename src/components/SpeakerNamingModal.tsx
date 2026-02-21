@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Room, RoomTranscriptSegment } from "../types";
+import { useToast } from "./toast/useToast";
 
 interface SpeakerNamingModalProps {
   room: Room;
@@ -19,6 +20,7 @@ export const SpeakerNamingModal: React.FC<SpeakerNamingModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const toast = useToast();
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
@@ -64,9 +66,10 @@ export const SpeakerNamingModal: React.FC<SpeakerNamingModalProps> = ({
       });
       onSave(updatedRoom);
       onClose();
+      toast.success("Speaker names saved");
     } catch (err) {
       console.error("Failed to save speaker names:", err);
-      alert("Failed to save speaker names. Please try again.");
+      toast.error("Failed to save speaker names. Please try again.");
     } finally {
       setSaving(false);
     }
