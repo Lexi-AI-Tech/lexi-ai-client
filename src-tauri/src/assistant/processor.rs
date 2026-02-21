@@ -28,10 +28,11 @@ use tauri::{AppHandle, Emitter};
 /// * `audio_data` - The WAV audio data to transcribe
 /// * `app_handle` - The Tauri AppHandle for emitting events and accessing state
 pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
-    // Spawn a fire-and-forget async task for transcription + injection.
-    // We need spawn because transcribe_audio() is async (HTTP await) but
-    // process_audio() is called from a synchronous recording thread.
-    tauri::async_runtime::spawn(async move {
+    let app_handle_for_task = app_handle.clone();
+
+    // Spawn a new transcription task using Tauri's async runtime
+    // This returns a JoinHandle that we can use to abort the task
+    let _task = tauri::async_runtime::spawn(async move {
         println!("Processing audio, size: {} bytes", audio_data.len());
 
         // Notify frontend that transcription has started

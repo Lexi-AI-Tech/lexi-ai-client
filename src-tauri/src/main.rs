@@ -9,7 +9,7 @@
 //! The application provides the following features:
 //!
 //! 1. **Global Hotkey Monitoring**: Listens for configurable hotkey press/release events
-//!    (default: Function key) via `rdev` to start/stop audio recording system-wide
+//!    (default: Function key) to start/stop audio recording system-wide
 //! 2. **Audio Recording**: Captures audio from the default microphone using `cpal`
 //!    (Cross-Platform Audio Library) and converts it to WAV format
 //! 3. **Speech-to-Text Transcription**: Sends audio to Lexi AI Server API endpoint
@@ -32,7 +32,7 @@
 //! ## Permissions Required (macOS)
 //!
 //! - **Microphone**: For audio recording
-//! - **Input Monitoring**: For global keyboard event listening (rdev)
+//! - **Input Monitoring**: For global keyboard event listening
 //! - **Accessibility**: For text injection and cursor context retrieval
 
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
@@ -51,7 +51,7 @@ mod audio;
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
 mod cursor_context; // Cursor context retrieval using macOS Accessibility API (AXUIElement)
-mod global_key_listener; // Unified hotkey management (rdev for Fn key, Tauri shortcuts for others)
+mod global_key_listener; // Unified hotkey management
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 mod os_event_consumers; // OS-level event consumers (e.g. suppress Fn → emoji picker on macOS)
@@ -171,7 +171,7 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
 /// Sets up the application with the following:
 /// 1. Uses default Regular activation policy (app appears in Dock like normal macOS app)
 /// 2. Initializes pill overlay window with NSPanel for floating above fullscreen apps
-/// 3. Starts global keyboard listener in background thread (rdev) to monitor Function key
+/// 3. Starts global keyboard listener in background thread to monitor Function key
 /// 4. Spawns dedicated recording thread that responds to Function key press/release signals
 /// 5. Configures window close behavior to hide instead of close (keeps app running for hotkeys)
 /// 6. Registers Tauri commands for permissions, OAuth, text injection, and pill window control
