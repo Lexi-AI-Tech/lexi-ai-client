@@ -979,79 +979,80 @@ export const SettingsPage: React.FC = () => {
 
 
 
-              {error && (
-                <div
-                  style={{
-                    background: "#fef2f2",
-                    border: "1px solid #fecaca",
-                    color: "#b91c1c",
-                    fontSize: "13px",
-                    padding: "12px 16px",
-                    marginTop: "16px",
-                    borderRadius: "8px",
-                  }}
-                >
-                  {error}
-                </div>
-              )}
 
-              {success && (
-                <div
-                  style={{
-                    background: "#ecfdf5",
-                    border: "1px solid #a7f3d0",
-                    color: "#047857",
-                    fontSize: "13px",
-                    padding: "12px 16px",
-                    marginTop: "16px",
-                    borderRadius: "8px",
-                  }}
-                >
-                  Settings saved successfully!
-                </div>
-              )}
             </div>
           </div>
         )}
 
         {/* Global Save Button Area */}
-        {hasChanges() && (
-          <div
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: "32px",
+            borderTop: "1px solid #e5e7eb",
+            paddingTop: "24px",
+          }}
+        >
+          <button
+            onClick={handleSaveSettings}
+            disabled={isUpdating || !hasChanges()}
             style={{
+              backgroundColor: isUpdating || !hasChanges() ? "#9ca3af" : "#000000",
+              color: "#ffffff",
+              padding: "10px 24px",
+              borderRadius: "8px",
+              fontSize: "14px",
+              fontWeight: 500,
+              border: "none",
+              cursor: isUpdating || !hasChanges() ? "not-allowed" : "pointer",
+              transition: "all 0.2s ease",
               display: "flex",
-              justifyContent: "flex-end",
-              marginTop: "32px",
-              borderTop: "1px solid #e5e7eb",
-              paddingTop: "24px",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
-            <button
-              onClick={handleSaveSettings}
-              disabled={isUpdating}
-              style={{
-                backgroundColor: isUpdating ? "#9ca3af" : "#000000",
-                color: "#ffffff",
-                padding: "10px 24px",
-                borderRadius: "8px",
-                fontSize: "14px",
-                fontWeight: 500,
-                border: "none",
-                cursor: isUpdating ? "not-allowed" : "pointer",
-                transition: "all 0.2s ease",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              {isUpdating ? (
-                <>
-                  <div className="spinner-small" style={{ width: "16px", height: "16px", border: "2px solid #ffffff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-                  Saving...
-                </>
-              ) : (
-                "Save Settings"
-              )}
-            </button>
+            {isUpdating ? (
+              <>
+                <div className="spinner-small" style={{ width: "16px", height: "16px", border: "2px solid #ffffff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                Saving...
+              </>
+            ) : (
+              "Save Settings"
+            )}
+          </button>
+        </div>
+
+        {/* Global Error & Success Banners */}
+        {error && (
+          <div
+            style={{
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              color: "#b91c1c",
+              fontSize: "13px",
+              padding: "12px 16px",
+              marginTop: "16px",
+              borderRadius: "8px",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div
+            style={{
+              background: "#ecfdf5",
+              border: "1px solid #a7f3d0",
+              color: "#047857",
+              fontSize: "13px",
+              padding: "12px 16px",
+              marginTop: "16px",
+              borderRadius: "8px",
+            }}
+          >
+            Settings saved successfully!
           </div>
         )}
       </div>
