@@ -513,7 +513,7 @@ export const NotesPage: React.FC = () => {
                 onMouseEnter={() => setHoveredNoteId(note.id)}
                 onMouseLeave={() => setHoveredNoteId(null)}
               >
-                {/* Action buttons - shown on hover */}
+                {/* Action buttons */}
                 <div
                   style={{
                     position: "absolute",
@@ -521,8 +521,6 @@ export const NotesPage: React.FC = () => {
                     right: "12px",
                     display: "flex",
                     gap: "6px",
-                    opacity: hoveredNoteId === note.id ? 1 : 0,
-                    transition: "opacity 0.2s ease",
                   }}
                   className="note-actions"
                 >
@@ -577,6 +575,7 @@ export const NotesPage: React.FC = () => {
                         e.currentTarget.style.backgroundColor = "#fef2f2";
                       }
                     }}
+                    title="Delete note"
                   >
                     <Trash2 size={14} />
                   </button>

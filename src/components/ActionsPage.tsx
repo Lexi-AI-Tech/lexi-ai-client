@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Trash2 } from "lucide-react";
 import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { formatDateTime } from "../lib/dateUtils";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
@@ -420,37 +420,35 @@ export const ActionsPage: React.FC = () => {
                       )}
                     </div>
                     <button
-                      className="transcript-btn"
                       onClick={() => openDeleteConfirm(action.id)}
                       disabled={!!deletingId}
                       style={{
-                        padding: "0.5rem 1rem",
-                        fontSize: "0.8125rem",
-                        fontWeight: 500,
-                        backgroundColor: "#ffffff",
-                        border: "1px solid #fecaca",
-                        borderRadius: "0.5rem",
-                        color: "#b91c1c",
+                        padding: "6px",
+                        backgroundColor: "#fef2f2",
+                        border: "none",
+                        borderRadius: "4px",
                         cursor: deletingId ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#ef4444",
                         transition: "all 0.2s ease",
-                        whiteSpace: "nowrap",
                         marginLeft: "1rem",
                         opacity: deletingId ? 0.6 : 1,
                       }}
                       onMouseEnter={(e) => {
                         if (!deletingId) {
-                          e.currentTarget.style.background = "#fef2f2";
-                          e.currentTarget.style.borderColor = "#fca5a5";
+                          e.currentTarget.style.backgroundColor = "#fee2e2";
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!deletingId) {
-                          e.currentTarget.style.background = "#ffffff";
-                          e.currentTarget.style.borderColor = "#fecaca";
+                          e.currentTarget.style.backgroundColor = "#fef2f2";
                         }
                       }}
+                      title="Delete action"
                     >
-                      Delete
+                      <Trash2 size={14} />
                     </button>
                   </div>
 

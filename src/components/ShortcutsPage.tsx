@@ -851,7 +851,7 @@ export const ShortcutsPage: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      {/* Action buttons - shown on hover */}
+                      {/* Action buttons */}
                       <div
                         style={{
                           position: "absolute",
@@ -859,8 +859,6 @@ export const ShortcutsPage: React.FC = () => {
                           right: "12px",
                           display: "flex",
                           gap: "6px",
-                          opacity: hoveredShortcutId === shortcut.id ? 1 : 0,
-                          transition: "opacity 0.2s ease",
                         }}
                       >
                         <button
@@ -914,6 +912,7 @@ export const ShortcutsPage: React.FC = () => {
                               e.currentTarget.style.backgroundColor = "#fef2f2";
                             }
                           }}
+                          title="Delete shortcut"
                         >
                           <Trash2 size={14} />
                         </button>
