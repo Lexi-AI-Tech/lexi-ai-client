@@ -30,7 +30,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
     // Spawn a new transcription task using Tauri's async runtime
     // This returns a JoinHandle that we can use to abort the task
-    let task = tauri::async_runtime::spawn(async move {
+    let _task = tauri::async_runtime::spawn(async move {
         println!("Processing audio, size: {} bytes", audio_data.len());
 
         // Notify frontend that transcription has started

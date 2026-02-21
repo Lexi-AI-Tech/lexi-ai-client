@@ -2,10 +2,12 @@
 //!
 //! Registers for `NSWorkspaceDidWakeNotification` and `NSWorkspaceWillSleepNotification`
 //! to detect when the system sleeps and wakes. On wake, calls `app_handle.restart()` to
-//! fully relaunch the app — this revives the rdev CGEventTap AND refreshes all HTTP
-//! connections, audio handles, and other OS resources that macOS invalidates during sleep.
+//! fully relaunch the app — this revives the global CGEventTap AND refreshes all HTTP
+//! connections., audio handles, and other OS resources that macOS invalidates during sleep.
 //!
 //! Uses the Objective-C runtime (`objc` crate) to create a minimal observer class.
+
+#![allow(unexpected_cfgs)]
 
 /// Registers a macOS observer for sleep/wake notifications.
 ///

@@ -11,8 +11,8 @@
 //!    - System Location: Privacy & Security → Microphone
 //!
 //! 2. **Input Monitoring Permission**
-//!    - Required for: Global keyboard event listening via `rdev::listen`
-//!    - Triggered by: Starting the keyboard listener
+//!    - Required for: Global keyboard event listening
+//!    - Triggered by: Attempting to create a CGEventTap
 //!    - System Location: Privacy & Security → Input Monitoring
 //!
 //! 3. **Accessibility Permission**
@@ -35,9 +35,9 @@
 
 use tauri::AppHandle;
 
+use crate::audio::recorder::AudioRecorder;
 #[cfg(target_os = "macos")]
 use objc::runtime::Class;
-use crate::audio::recorder::AudioRecorder;
 #[cfg(target_os = "macos")]
 use objc::{msg_send, sel, sel_impl};
 #[cfg(target_os = "macos")]
@@ -51,10 +51,13 @@ pub fn check_microphone_permission() -> Result<bool, String> {
     // AVAuthorizationStatusAuthorized = 3
     const AV_AUTHORIZATION_STATUS_AUTHORIZED: i64 = 3;
 
-    let av_class = Class::get("AVCaptureDevice").ok_or_else(|| "AVCaptureDevice unavailable".to_string())?;
-    let ns_string_class = Class::get("NSString").ok_or_else(|| "NSString unavailable".to_string())?;
+    let av_class =
+        Class::get("AVCaptureDevice").ok_or_else(|| "AVCaptureDevice unavailable".to_string())?;
+    let ns_string_class =
+        Class::get("NSString").ok_or_else(|| "NSString unavailable".to_string())?;
     let c_str = CString::new("soun").map_err(|e| e.to_string())?;
-    let media_type: *mut objc::runtime::Object = unsafe { msg_send![ns_string_class, stringWithUTF8String: c_str.as_ptr()] };
+    let media_type: *mut objc::runtime::Object =
+        unsafe { msg_send![ns_string_class, stringWithUTF8String: c_str.as_ptr()] };
     let status: i64 = unsafe { msg_send![av_class, authorizationStatusForMediaType: media_type] };
 
     Ok(status == AV_AUTHORIZATION_STATUS_AUTHORIZED)
@@ -114,9 +117,15 @@ pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
 fn open_permission_pane_impl(pane: &str) -> Result<(), String> {
     use std::process::Command;
     let url = match pane {
-        "microphone" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
-        "accessibility" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
-        "input_monitoring" => "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
+        "microphone" => {
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+        }
+        "accessibility" => {
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        }
+        "input_monitoring" => {
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+        }
         _ => return Err(format!("Unknown pane: {}", pane)),
     };
     Command::new("open")
@@ -169,22 +178,44 @@ pub fn request_microphone_permission() -> Result<bool, String> {
 }
 
 /// Request Input Monitoring permission on macOS
-/// This will trigger the system permission dialog by attempting to use rdev::listen
+/// This will trigger the system permission dialog by attempting to create a test CGEventTap
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> {
-    use rdev::{listen, Event};
+    use objc2_core_graphics::{
+        CGEvent, CGEventMask, CGEventTapCallBack, CGEventTapLocation, CGEventTapOptions,
+        CGEventTapPlacement, CGEventTapProxy, CGEventType,
+    };
+    use std::os::raw::c_void;
+    use std::ptr::{null_mut, NonNull};
     use std::thread;
 
     // Open System Settings pane so user can enable if the modal doesn't show
     let _ = open_permission_pane_impl("input_monitoring");
 
-    // Spawn a thread to attempt starting a test listener, which triggers the permission dialog
+    // Spawn a thread to attempt starting a test tap, which triggers the permission dialog
     thread::spawn(move || {
+        unsafe extern "C-unwind" fn dummy_callback(
+            _proxy: CGEventTapProxy,
+            _type: CGEventType,
+            cg_event: NonNull<CGEvent>,
+            _user_info: *mut c_void,
+        ) -> *mut CGEvent {
+            cg_event.as_ptr()
+        }
+
         let _ = std::panic::catch_unwind(|| {
-            let _ = listen(move |_event: Event| {
-                // Empty callback - we just want to trigger the permission dialog
-            });
+            unsafe {
+                let callback: CGEventTapCallBack = Some(dummy_callback);
+                let _tap = CGEvent::tap_create(
+                    CGEventTapLocation::HIDEventTap,
+                    CGEventTapPlacement::HeadInsertEventTap,
+                    CGEventTapOptions::Default,
+                    (1 << 12) as CGEventMask, // 12 is kCGEventFlagsChanged
+                    callback,
+                    null_mut(),
+                );
+            }
             println!("Input Monitoring permission dialog should have appeared");
         });
     });
