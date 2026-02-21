@@ -851,40 +851,6 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
             </div>
-
-
-
-            {error && (
-              <div
-                style={{
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#b91c1c",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div
-                style={{
-                  background: "#ecfdf5",
-                  border: "1px solid #a7f3d0",
-                  color: "#047857",
-                  fontSize: "13px",
-                  padding: "12px 16px",
-                  marginTop: "16px",
-                  borderRadius: "8px",
-                }}
-              >
-                Settings saved successfully!
-              </div>
-            )}
           </div>
         )}
 
@@ -958,7 +924,7 @@ export const SettingsPage: React.FC = () => {
               <div style={{ marginBottom: "32px" }}>
                 <HotkeySelector
                   label="Transcription Hotkeys"
-                  description="Hold to record audio for transcription"
+                  description={`Hold ${currentHotkeys.hotkeys.length > 0 && !currentHotkeys.hotkeys[0].includes("+") ? "this key" : "this hotkey combination"} to record audio for transcription`}
                   value={currentHotkeys}
                   onChange={setCurrentHotkeys}
                   maxHotkeys={3}
@@ -969,7 +935,7 @@ export const SettingsPage: React.FC = () => {
               <div style={{ marginBottom: "24px" }}>
                 <HotkeySelector
                   label="Action Hotkeys"
-                  description="Hold to record a voice command for actions"
+                  description={`Hold ${currentActionHotkeys.hotkeys.length > 0 && !currentActionHotkeys.hotkeys[0].includes("+") ? "this key" : "this hotkey combination"} to record a voice command for actions`}
                   value={currentActionHotkeys}
                   onChange={setCurrentActionHotkeys}
                   maxHotkeys={3}

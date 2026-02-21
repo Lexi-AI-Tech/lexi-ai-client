@@ -3,11 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { Play, Pause } from "lucide-react";
 import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { formatDateTime } from "../lib/dateUtils";
+import { KEY_SYMBOLS } from "../lib/keySymbols";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
-import { HotkeySelector } from "./HotkeySelector";
+import "../styles/components/hotkey-selector.css";
 import "./home/home.css";
-
 
 export const ActionsPage: React.FC = () => {
   const authStore = useAuthStore();
@@ -283,12 +283,49 @@ export const ActionsPage: React.FC = () => {
 
       {/* Global Hotkey Section */}
       <div style={{ marginBottom: "3rem" }}>
-        <HotkeySelector
-          label="Action Hotkey"
-          description="Hold this hotkey combination to record a voice command for performing an action."
-          value={{ hotkeys: actionHotkeys }}
-          disabled={true}
-        />
+        <div className="hotkey-selector">
+          <div className="hotkey-selector__header">
+            <label className="hotkey-selector__label">Action Hotkeys</label>
+            <p className="hotkey-selector__description">
+              {`Hold ${actionHotkeys.length > 0 && !actionHotkeys[0].includes("+") ? "this key" : "this hotkey combination"} to record a voice command for actions`}
+            </p>
+          </div>
+
+          <div className="hotkey-selector__chips">
+            {actionHotkeys.length > 0 ? (
+              actionHotkeys.map((hotkey, index) => {
+                const keys = hotkey.split("+");
+                return (
+                  <div key={`hotkey-${index}-${hotkey}`} className="hotkey-selector__chip-wrapper" style={{ paddingRight: 0 }}>
+                    <div className="hotkey-selector__chip">
+                      {keys.map((key, keyIndex) => {
+                        const keyName = key.trim().toLowerCase();
+                        const keyInfo = KEY_SYMBOLS[keyName];
+                        return (
+                          <span key={`${keyIndex}-${key}`} className="hotkey-selector__key-row">
+                            <span className="hotkey-selector__key-cap">
+                              {keyInfo && (
+                                <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>
+                              )}
+                              <span className="hotkey-selector__key-label">
+                                {keyInfo ? keyInfo.label : key.trim()}
+                              </span>
+                            </span>
+                            {keyIndex < keys.length - 1 && <span className="hotkey-selector__plus">+</span>}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ color: "#9ca3af", fontSize: "14px", padding: "12px 16px" }}>
+                No action hotkeys configured.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Action History Section */}

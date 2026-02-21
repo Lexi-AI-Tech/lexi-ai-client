@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { KEY_SYMBOLS } from "../lib/keySymbols";
 import type { HotkeyConfig } from "../types";
 import "../styles/components/hotkey-selector.css";
 
@@ -13,28 +14,6 @@ interface HotkeySelectorProps {
   description?: string;
 }
 
-// Mac key symbols for display
-const KEY_SYMBOLS: Record<string, { symbol: string; label: string }> = {
-  fn: { symbol: "fn", label: "🌐" },
-  control: { symbol: "^", label: "control" },
-  ctrl: { symbol: "^", label: "control" },
-  command: { symbol: "⌘", label: "command" },
-  cmd: { symbol: "⌘", label: "command" },
-  option: { symbol: "⌥", label: "option" },
-  alt: { symbol: "⌥", label: "option" },
-  shift: { symbol: "⇧", label: "shift" },
-  caps: { symbol: "⇪", label: "caps" },
-  capslock: { symbol: "⇪", label: "caps lock" },
-  tab: { symbol: "⇥", label: "tab" },
-  escape: { symbol: "⎋", label: "esc" },
-  esc: { symbol: "⎋", label: "esc" },
-  return: { symbol: "↩", label: "return" },
-  enter: { symbol: "↩", label: "enter" },
-  delete: { symbol: "⌫", label: "delete" },
-  backspace: { symbol: "⌫", label: "delete" },
-  space: { symbol: "␣", label: "space" },
-};
-
 /** Canonical modifier order for storage (Control+Option+Command+Shift+Key, Fn first when present) */
 const MODIFIER_ORDER = ["Fn", "Control", "Option", "Command", "Shift"];
 
@@ -44,7 +23,7 @@ export function HotkeySelector({
   maxHotkeys = 3,
   disabled = false,
   label = "Hotkeys",
-  description = "Press keys to record a hotkey combination",
+  description,
 }: HotkeySelectorProps) {
   const [hotkeys, setHotkeys] = useState<string[]>(value.hotkeys);
   const [isRecording, setIsRecording] = useState(false);
@@ -59,9 +38,17 @@ export function HotkeySelector({
     if (propStr !== lastPropValue.current) {
       setHotkeys(value.hotkeys);
       lastPropValue.current = propStr;
-      lastNotified.current = propStr;
     }
   }, [value.hotkeys]);
+
+  // Determine dynamic description base on configured hotkey
+  const determineDescription = () => {
+    if (description) return description;
+
+    // Check if the first hotkey has a '+' indicating a combo
+    const isCombo = hotkeys.length > 0 ? hotkeys[0].includes("+") : true;
+    return `Press keys to record a hotkey ${isCombo ? "combination" : ""}`.trim();
+  };
 
   // Notify parent of changes
   useEffect(() => {
@@ -216,7 +203,7 @@ export function HotkeySelector({
     <div className="hotkey-selector">
       <div className="hotkey-selector__header">
         <label className="hotkey-selector__label">{label}</label>
-        <p className="hotkey-selector__description">{description}</p>
+        <p className="hotkey-selector__description">{determineDescription()}</p>
       </div>
 
       <div className="hotkey-selector__chips">
