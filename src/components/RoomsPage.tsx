@@ -9,6 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Room } from "../types";
 import { RoomLiveView } from "./RoomLiveView";
 import { useToast } from "./toast/useToast";
+import { PageLoader } from "./ui/PageLoader";
 
 export const RoomsPage: React.FC = () => {
   const toast = useToast();
@@ -172,9 +173,7 @@ export const RoomsPage: React.FC = () => {
       )}
 
       {loading && rooms.length === 0 ? (
-        <div style={{ padding: "20px", textAlign: "center", opacity: 0.6 }}>
-          Loading rooms...
-        </div>
+        <PageLoader />
       ) : rooms.length === 0 ? (
         <div style={{ padding: "40px", textAlign: "center", opacity: 0.6 }}>
           <p>No rooms found.</p>

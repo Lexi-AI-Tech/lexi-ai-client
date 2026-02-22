@@ -13,6 +13,7 @@ import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
+import { PageLoader } from "./ui/PageLoader";
 import "./home/home.css";
 
 export const TranscriptsList: React.FC = () => {
@@ -185,7 +186,10 @@ export const TranscriptsList: React.FC = () => {
       </h2>
 
       {!showContent && (
-        <div className="transcripts-empty-wrap">Loading...</div>
+        <div className="transcripts-page">
+          <h2 className="transcripts-page-title">Transcripts</h2>
+          <PageLoader className="page__empty" />
+        </div>
       )}
 
       {showLogin && showContent && (
@@ -201,9 +205,7 @@ export const TranscriptsList: React.FC = () => {
       )}
 
       {showContent && !showLogin && loading && transcripts.length === 0 && (
-        <div className="loading-state transcripts-loading-inline">
-          <div className="loading-spinner" />
-        </div>
+        <PageLoader className="transcripts-loading-inline" />
       )}
 
       {showContent && !showLogin && !loading && transcripts.length === 0 && (
@@ -219,7 +221,7 @@ export const TranscriptsList: React.FC = () => {
         <div className="transcripts-list transcripts-table transcripts-list-wrapper">
           {loading && page === 1 && (
             <div className="transcripts-loading-overlay">
-              <div className="loading-spinner" />
+              <PageLoader />
             </div>
           )}
           <div className="transcripts-table-header">
@@ -358,7 +360,7 @@ export const TranscriptsList: React.FC = () => {
           })}
           {loading && page > 1 && (
             <div className="transcripts-load-more">
-              <div className="loading-spinner" />
+              <PageLoader />
             </div>
           )}
         </div>

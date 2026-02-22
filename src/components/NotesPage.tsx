@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
 import { useToast } from "./toast/useToast";
+import { PageLoader } from "./ui/PageLoader";
 import "./home/home.css";
 
 type ViewMode = "list" | "grid";
@@ -171,8 +172,9 @@ export const NotesPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
-        Loading notes...
+      <div className="page">
+        <h2 className="page__title">Notes</h2>
+        <PageLoader className="page__empty" />
       </div>
     );
   }

@@ -8,6 +8,7 @@ import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
 import "../styles/components/hotkey-selector.css";
+import { PageLoader } from "./ui/PageLoader";
 import "./home/home.css";
 
 export const ActionsPage: React.FC = () => {
@@ -153,39 +154,9 @@ export const ActionsPage: React.FC = () => {
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Actions
-        </h2>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "40px",
-            color: "#6b7280",
-            fontSize: "14px",
-          }}
-        >
-          Loading...
-        </div>
+      <div className="page">
+        <h2 className="page__title">Actions</h2>
+        <PageLoader className="page__empty" />
       </div>
     );
   }
@@ -320,19 +291,7 @@ export const ActionsPage: React.FC = () => {
         </h3>
 
         {isLoading ? (
-          <div
-            style={{
-              padding: "3rem 1rem",
-              textAlign: "center",
-              color: "#6b7280",
-              fontSize: "0.875rem",
-              background: "#ffffff",
-              border: "1px solid #f3f4f6",
-              borderRadius: "0.75rem",
-            }}
-          >
-            Loading action history...
-          </div>
+          <PageLoader />
         ) : !actionHistory || actionHistory.actions.length === 0 ? (
           <div
             style={{

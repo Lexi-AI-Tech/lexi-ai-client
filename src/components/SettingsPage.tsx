@@ -20,6 +20,7 @@ import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useAuthStore } from "../store/authStore";
 import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
+import { PageLoader } from "./ui/PageLoader";
 
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
@@ -350,7 +351,7 @@ export const SettingsPage: React.FC = () => {
     return (
       <div className="page">
         <h2 className="page__title">Settings</h2>
-        <div className="page__empty">Loading settings...</div>
+        <PageLoader className="page__empty" />
       </div>
     );
   }

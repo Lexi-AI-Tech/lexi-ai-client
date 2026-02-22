@@ -13,6 +13,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Room, RoomTranscriptSegment } from "../types";
 import { SpeakerNamingModal } from "./SpeakerNamingModal";
 import { useToast } from "./toast/useToast";
+import { PageLoader } from "./ui/PageLoader";
 
 interface RoomLiveViewProps {
   roomId: string;
@@ -266,7 +267,11 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
   };
 
   if (loading && !room) {
-    return <div style={{ padding: 20 }}>Loading room...</div>;
+    return (
+      <div style={{ padding: 20, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 120 }}>
+        <PageLoader />
+      </div>
+    );
   }
 
   return (

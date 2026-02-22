@@ -409,6 +409,11 @@
   color: #9ca3af;
 }
 
+.home-loading-full {
+  margin-top: 2rem;
+  min-height: 200px;
+}
+
 .empty-icon {
   width: 4rem;
   height: 4rem;
