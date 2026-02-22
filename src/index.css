@@ -1492,6 +1492,12 @@ textarea.form-input {
   color: #16a34a;
 }
 
+/* Note copy button copied state (same as transcript) */
+.btn--icon-sm.note-copy-copied {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
 .transcript-action-btn--delete:hover {
   background: #fef2f2;
   border-color: #fecaca;
