@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, Check, Trash2, Sparkles, Play, Pause } from "lucide-react";
+import { Copy, Check, Trash2, Play, Pause } from "lucide-react";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
@@ -26,7 +26,6 @@ export const TranscriptsList: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [originalTooltipId, setOriginalTooltipId] = useState<string | null>(null);
 
   // Audio playback state
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -226,6 +225,7 @@ export const TranscriptsList: React.FC = () => {
           <div className="transcripts-table-header">
             <span>Date</span>
             <span>Transcript</span>
+            <span>App</span>
             <span>Actions</span>
           </div>
           {transcripts.map((transcript, index) => {
@@ -294,51 +294,9 @@ export const TranscriptsList: React.FC = () => {
                         {/* Transcript Text */}
                         <div className="transcript-text-cell">
                           {hasText ? (
-                            <>
-                              <span className="transcript-item-text">
-                                {displayText}
-                              </span>
-                              {isEnhanced && (
-                                <div className="transcript-enhanced-badges">
-                                  <span
-                                    className="transcript-enhanced-badge"
-                                    title="This is an enhanced version of the transcript (improved grammar and clarity)"
-                                  >
-                                    <Sparkles size={12} />
-                                    Enhanced
-                                  </span>
-                                  <span
-                                    className="transcript-view-original-trigger"
-                                    onMouseEnter={() =>
-                                      setOriginalTooltipId(transcript.id)
-                                    }
-                                    onMouseLeave={() =>
-                                      setOriginalTooltipId(null)
-                                    }
-                                  >
-                                    View original
-                                    {originalTooltipId === transcript.id && (
-                                      <div
-                                        className="transcript-original-tooltip"
-                                        onMouseEnter={() =>
-                                          setOriginalTooltipId(transcript.id)
-                                        }
-                                        onMouseLeave={() =>
-                                          setOriginalTooltipId(null)
-                                        }
-                                      >
-                                        <div className="transcript-original-tooltip-label">
-                                          Original transcription
-                                        </div>
-                                        <div className="transcript-original-tooltip-text">
-                                          {transcript.original_text}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </span>
-                                </div>
-                              )}
-                            </>
+                            <span className="transcript-item-text">
+                              {displayText}
+                            </span>
                           ) : (
                             <span className="transcript-item-empty">
                               {transcript.status === "processing"
@@ -350,6 +308,9 @@ export const TranscriptsList: React.FC = () => {
                       </div>
                     );
                   })()}
+                </div>
+                <div className="transcript-cell transcript-cell-app">
+                  {transcript.focused_app || "—"}
                 </div>
                 <div className="transcript-cell transcript-cell-meta">
                   <div className="transcript-actions-cell">

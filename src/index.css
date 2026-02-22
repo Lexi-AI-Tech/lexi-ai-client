@@ -1588,7 +1588,7 @@ textarea.form-input {
 
 .transcripts-table-header {
   display: grid;
-  grid-template-columns: 110px 1fr 150px;
+  grid-template-columns: 110px 1fr 130px 150px;
   padding: 12px 12px;
   font-size: 11px;
   font-weight: 600;
@@ -1600,7 +1600,7 @@ textarea.form-input {
 
 .transcripts-table-row {
   display: grid;
-  grid-template-columns: 100px 1fr 150px;
+  grid-template-columns: 100px 1fr 130px 150px;
   align-items: flex-start;
   gap: 8px;
 }
@@ -1611,6 +1611,14 @@ textarea.form-input {
 
 .transcript-cell-date {
   color: #6b7280;
+  white-space: nowrap;
+}
+
+.transcript-cell-app {
+  font-size: 12px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
