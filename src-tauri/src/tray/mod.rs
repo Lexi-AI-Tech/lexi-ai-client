@@ -18,6 +18,12 @@
 //! init_system_tray(app)?;
 //! ```
 
+#[cfg(target_os = "macos")]
+mod macos;
+
+#[cfg(target_os = "windows")]
+mod windows;
+
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Manager};
@@ -72,6 +78,12 @@ pub fn init_system_tray(app: &mut App) -> Result<(), tauri::Error> {
         .on_menu_event(handle_tray_menu_event)
         .on_tray_icon_event(handle_tray_icon_event)
         .build(app)?;
+
+    #[cfg(target_os = "macos")]
+    macos::on_tray_created(&*app);
+
+    #[cfg(target_os = "windows")]
+    windows::on_tray_created(&*app);
 
     println!("🎯 System tray created successfully");
 

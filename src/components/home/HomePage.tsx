@@ -249,7 +249,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
                 <kbd className="hotkey-badge">{key}</kbd>
               </React.Fragment>
             ))}{" "}
-            key{transcriptionHotkeys.length > 1 && "s"} and speak naturally
+            key and speak naturally
             — Lexi will transcribe in real-time
           </p>
         </div>
