@@ -85,10 +85,11 @@ pub fn spawn_recording_thread(
         let mut ctx = RecordingContext::new();
         // Reduced from 200ms to 50ms for faster response to key presses
         // This is the maximum latency for receiving a recording command
-        const TIMEOUT_CHECK_INTERVAL: Duration = Duration::from_millis(10); // Ultra fast check
+        const TIMEOUT_CHECK_INTERVAL: Duration = Duration::from_millis(10);
         const STUCK_THRESHOLD: Duration = Duration::from_secs(8);
-        /// Recordings shorter than this are not sent to the API
-        const MIN_RECORDING_DURATION: Duration = Duration::from_millis(500); // 0.5 seconds
+        const MIN_RECORDING_DURATION: Duration = Duration::from_millis(500);
+        /// Delay after tearing down a recorder before opening a new CoreAudio session (macOS orange mic).
+        const CORE_AUDIO_RELEASE_DELAY: Duration = Duration::from_millis(50);
 
         loop {
             let command = match recording_rx.recv_timeout(TIMEOUT_CHECK_INTERVAL) {
@@ -106,8 +107,9 @@ pub fn spawn_recording_thread(
                             ctx.last_command_at.elapsed().as_secs()
                         );
                         ctx.transition_to(RecordingPhase::Error(RecordingError::AudioStreamFailed));
-                        // Try to recover by cleaning up
-                        ctx.recorder = None;
+                        if let Some(mut rec) = ctx.recorder.take() {
+                            rec.release_stream();
+                        }
                         ctx.started_at = None;
                         ctx.transition_to(RecordingPhase::Idle);
                         app_handle
@@ -140,7 +142,11 @@ pub fn spawn_recording_thread(
                     ctx.transition_to(RecordingPhase::Starting);
                     println!("🎙️  Starting recording... Mode: {:?}", ctx.mode);
 
-                    // Show the pill window when recording starts
+                    if let Some(mut rec) = ctx.recorder.take() {
+                        rec.release_stream();
+                    }
+                    thread::sleep(CORE_AUDIO_RELEASE_DELAY);
+
                     if let Some(pill_window) = app_handle.get_webview_window("pill") {
                         if let Err(e) = pill_window.show() {
                             eprintln!("⚠️  Failed to show pill window: {}", e);
@@ -193,6 +199,7 @@ pub fn spawn_recording_thread(
                             app_handle
                                 .emit(event_name, e.to_string())
                                 .unwrap_or_default();
+                            ctx.transition_to(RecordingPhase::Idle);
                         }
                     }
                 }
