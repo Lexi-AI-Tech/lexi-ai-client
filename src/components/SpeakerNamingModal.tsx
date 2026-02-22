@@ -84,99 +84,36 @@ export const SpeakerNamingModal: React.FC<SpeakerNamingModalProps> = ({
   };
 
   return (
-    <div
-      className="modal-overlay"
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
-        zIndex: 1000,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <div
-        className="modal-content"
-        style={{
-          backgroundColor: "#1e1e1e",
-          padding: "24px",
-          borderRadius: "12px",
-          width: "600px",
-          maxHeight: "80vh",
-          overflowY: "auto",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-        }}
-      >
-        <h3 style={{ marginTop: 0, marginBottom: "20px" }}>Name Speakers</h3>
-        <p style={{ fontSize: "13px", opacity: 0.7, marginBottom: "24px" }}>
+    <div className="modal-overlay">
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <h3>Name Speakers</h3>
+        <p className="modal-content__desc">
           Assign names to the detected speakers. This will update all
           transcripts.
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <div className="modal-speakers">
           {uniqueSpeakers.map((speakerLabel) => (
-            <div
-              key={speakerLabel}
-              style={{
-                padding: "16px",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                borderRadius: "8px",
-              }}
-            >
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontSize: "13px",
-                  opacity: 0.8,
-                }}
-              >
-                {speakerLabel}
-              </label>
+            <div key={speakerLabel} className="modal-speaker-card">
+              <label>{speakerLabel}</label>
               <input
                 type="text"
+                className="form-input--dark"
                 value={speakerNames[speakerLabel] || ""}
                 onChange={(e) => handleNameChange(speakerLabel, e.target.value)}
                 placeholder="Enter speaker name"
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  backgroundColor: "#333",
-                  border: "1px solid #444",
-                  color: "white",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                }}
               />
-              <div
-                style={{
-                  marginTop: "8px",
-                  fontSize: "12px",
-                  opacity: 0.6,
-                  fontStyle: "italic",
-                }}
-              >
-                Sample: "{getSampleText(speakerLabel).substring(0, 100)}..."
+              <div className="modal-speaker-sample">
+                Sample: &quot;{getSampleText(speakerLabel).substring(0, 100)}...&quot;
               </div>
             </div>
           ))}
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: "12px",
-            marginTop: "24px",
-          }}
-        >
+        <div className="modal-actions">
           <button
             type="button"
-            className="settings-button"
+            className="btn btn--secondary"
             onClick={onClose}
             disabled={saving}
           >
@@ -184,7 +121,7 @@ export const SpeakerNamingModal: React.FC<SpeakerNamingModalProps> = ({
           </button>
           <button
             type="button"
-            className="settings-button primary"
+            className="btn btn--primary"
             onClick={handleSave}
             disabled={saving}
           >

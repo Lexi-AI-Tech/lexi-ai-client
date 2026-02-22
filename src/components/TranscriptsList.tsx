@@ -177,50 +177,21 @@ export const TranscriptsList: React.FC = () => {
     authStore.isInitialized && !authStore.isAuthenticated;
 
   return (
-    <div
-      style={{
-        padding: "2rem 2.5rem",
-        background: "#ffffff",
-        minHeight: "100vh",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      <h2
-        style={{
-          margin: 0,
-          marginBottom: "2rem",
-          fontSize: "24px",
-          fontWeight: 600,
-          color: "#111827",
-          letterSpacing: "-0.025em",
-        }}
-      >
+    <div className="transcripts-page">
+      <h2 className="transcripts-page-title">
         Transcripts{" "}
         {total > 0 && (
-          <span
-            style={{ fontSize: "14px", fontWeight: "normal", color: "#6b7280" }}
-          >
-            ({total})
-          </span>
+          <span className="transcripts-page-title-count">({total})</span>
         )}
       </h2>
 
       {!showContent && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "24px",
-            color: "#6b7280",
-          }}
-        >
-          Loading...
-        </div>
+        <div className="transcripts-empty-wrap">Loading...</div>
       )}
 
       {showLogin && showContent && (
-        <div style={{ textAlign: "center", padding: "16px 0" }}>
-          <p className="permission-text" style={{ marginBottom: "16px" }}>
+        <div className="transcripts-login-wrap">
+          <p className="permission-text">
             Sign in to view your transcription history
           </p>
           <GoogleLoginButton
@@ -231,48 +202,24 @@ export const TranscriptsList: React.FC = () => {
       )}
 
       {showContent && !showLogin && loading && transcripts.length === 0 && (
-        <div
-          className="loading-state"
-          style={{
-            width: "100%",
-            flex: 1,
-            justifyContent: "center",
-          }}
-        >
+        <div className="loading-state transcripts-loading-inline">
           <div className="loading-spinner" />
         </div>
       )}
 
       {showContent && !showLogin && !loading && transcripts.length === 0 && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "24px",
-            color: "#6b7280",
-          }}
-        >
+        <div className="transcripts-empty-wrap">
           <p>No transcripts yet.</p>
-          <p style={{ fontSize: "11px", marginTop: "8px", opacity: 0.7 }}>
+          <p className="transcripts-empty-sub">
             Start recording to create your first transcript!
           </p>
         </div>
       )}
 
       {showContent && !showLogin && transcripts.length > 0 && (
-        <div className="transcripts-list transcripts-table" style={{ position: "relative" }}>
+        <div className="transcripts-list transcripts-table transcripts-list-wrapper">
           {loading && page === 1 && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "rgba(255, 255, 255, 0.7)",
-                borderRadius: "8px",
-                zIndex: 10,
-              }}
-            >
+            <div className="transcripts-loading-overlay">
               <div className="loading-spinner" />
             </div>
           )}
@@ -303,60 +250,18 @@ export const TranscriptsList: React.FC = () => {
                     const isPlaying = playingId === transcript.id;
 
                     return (
-                      <div className="transcript-display-cell" style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                      <div className="transcript-display-cell">
                         {/* Minimal Audio Player */}
                         {transcript.audio_file_url && (
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              flexShrink: 0,
-                            }}
-                          >
+                          <div className="transcript-audio-cell">
                             <button
+                              type="button"
                               onClick={() => handlePlayAudio(transcript.id, transcript.audio_file_url as string)}
-                              style={{
-                                width: "28px",
-                                height: "28px",
-                                borderRadius: "50%",
-                                border: "none",
-                                background: isPlaying
-                                  ? "#1a1a1a"
-                                  : "#f3f4f6",
-                                color: isPlaying ? "#fff" : "#6b7280",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                position: "relative",
-                                overflow: "hidden",
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isPlaying) {
-                                  e.currentTarget.style.background = "#e5e7eb";
-                                  e.currentTarget.style.color = "#374151";
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isPlaying) {
-                                  e.currentTarget.style.background = "#f3f4f6";
-                                  e.currentTarget.style.color = "#6b7280";
-                                }
-                              }}
+                              className={`transcript-play-btn ${isPlaying ? "playing" : ""}`}
                               title={isPlaying ? "Pause" : "Play audio"}
                             >
-                              {/* Progress ring when playing */}
                               {isPlaying && (
-                                <svg
-                                  style={{
-                                    position: "absolute",
-                                    width: "28px",
-                                    height: "28px",
-                                    transform: "rotate(-90deg)",
-                                  }}
-                                >
+                                <svg className="transcript-progress-ring" aria-hidden>
                                   <circle
                                     cx="14"
                                     cy="14"
@@ -380,14 +285,14 @@ export const TranscriptsList: React.FC = () => {
                               {isPlaying ? (
                                 <Pause size={12} fill="currentColor" />
                               ) : (
-                                <Play size={12} fill="currentColor" style={{ marginLeft: "2px" }} />
+                                <Play size={12} fill="currentColor" className="icon-play-offset" />
                               )}
                             </button>
                           </div>
                         )}
 
                         {/* Transcript Text */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="transcript-text-cell">
                           {hasText ? (
                             <>
                               <span className="transcript-item-text">
@@ -447,14 +352,7 @@ export const TranscriptsList: React.FC = () => {
                   })()}
                 </div>
                 <div className="transcript-cell transcript-cell-meta">
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
+                  <div className="transcript-actions-cell">
                     {(() => {
                       const isEnhanced =
                         transcript.is_enhanced && !!transcript.enhanced_text;
@@ -464,42 +362,11 @@ export const TranscriptsList: React.FC = () => {
                           : transcript.original_text || "";
                       return copyText ? (
                         <button
+                          type="button"
                           onClick={() =>
                             handleCopyToClipboard(copyText, transcript.id)
                           }
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: "32px",
-                            height: "32px",
-                            padding: 0,
-                            background:
-                              copiedId === transcript.id ? "#dcfce7" : "#ffffff",
-                            border:
-                              copiedId === transcript.id
-                                ? "1px solid #22c55e"
-                                : "1px solid #e5e7eb",
-                            borderRadius: "0.5rem",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            color:
-                              copiedId === transcript.id ? "#16a34a" : "#6b7280",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (copiedId !== transcript.id) {
-                              e.currentTarget.style.background = "#f9fafb";
-                              e.currentTarget.style.borderColor = "#d1d5db";
-                              e.currentTarget.style.color = "#111827";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (copiedId !== transcript.id) {
-                              e.currentTarget.style.background = "#ffffff";
-                              e.currentTarget.style.borderColor = "#e5e7eb";
-                              e.currentTarget.style.color = "#6b7280";
-                            }
-                          }}
+                          className={`transcript-action-btn transcript-action-btn--copy ${copiedId === transcript.id ? "copied" : ""}`}
                           title={
                             copiedId === transcript.id
                               ? "Copied!"
@@ -514,74 +381,11 @@ export const TranscriptsList: React.FC = () => {
                         </button>
                       ) : null;
                     })()}
-                    {/* <button
-                    onClick={() => {
-                      // Regenerate action - placeholder for now
-                      console.log(
-                        "Regenerate clicked for transcript:",
-                        transcript.id,
-                      );
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: "32px",
-                      height: "32px",
-                      padding: 0,
-                      background: "#ffffff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "0.5rem",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      color: "#6b7280",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#f9fafb";
-                      e.currentTarget.style.borderColor = "#d1d5db";
-                      e.currentTarget.style.color = "#111827";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "#ffffff";
-                      e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.color = "#6b7280";
-                    }}
-                    title="Regenerate transcript"
-                  >
-                    <RefreshCw size={16} />
-                  </button> */}
                     <button
+                      type="button"
                       onClick={() => openDeleteConfirm(transcript.id)}
                       disabled={!!deletingId}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: "32px",
-                        height: "32px",
-                        padding: 0,
-                        background: "#ffffff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "0.5rem",
-                        cursor: deletingId ? "not-allowed" : "pointer",
-                        transition: "all 0.2s ease",
-                        color: "#6b7280",
-                        opacity: deletingId ? 0.6 : 1,
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!deletingId) {
-                          e.currentTarget.style.background = "#fef2f2";
-                          e.currentTarget.style.borderColor = "#fecaca";
-                          e.currentTarget.style.color = "#dc2626";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!deletingId) {
-                          e.currentTarget.style.background = "#ffffff";
-                          e.currentTarget.style.borderColor = "#e5e7eb";
-                          e.currentTarget.style.color = "#6b7280";
-                        }
-                      }}
+                      className="transcript-action-btn transcript-action-btn--delete"
                       title="Delete transcript"
                     >
                       <Trash2 size={16} />
@@ -592,7 +396,7 @@ export const TranscriptsList: React.FC = () => {
             );
           })}
           {loading && page > 1 && (
-            <div style={{ padding: "16px", display: "flex", justifyContent: "center", width: "100%" }}>
+            <div className="transcripts-load-more">
               <div className="loading-spinner" />
             </div>
           )}

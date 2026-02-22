@@ -209,77 +209,21 @@ export const ShortcutsPage: React.FC = () => {
     }
   };
 
-  // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Shortcuts
-        </h2>
-        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
-          Loading...
-        </div>
+      <div className="page">
+        <h2 className="page__title">Shortcuts</h2>
+        <div className="page__empty">Loading...</div>
       </div>
     );
   }
 
-  // Show login prompt if not authenticated
   if (!authStore.isAuthenticated) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Shortcuts
-        </h2>
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "12px",
-            padding: "40px",
-            textAlign: "center",
-          }}
-        >
-          <p
-            style={{
-              fontSize: "14px",
-              color: "#6b7280",
-              marginBottom: "20px",
-            }}
-          >
+      <div className="page">
+        <h2 className="page__title">Shortcuts</h2>
+        <div className="panel panel--center">
+          <p className="panel__message">
             Sign in to access your shortcuts
           </p>
           <GoogleLoginButton
@@ -294,173 +238,44 @@ export const ShortcutsPage: React.FC = () => {
   }
 
   return (
-    <div
-      style={{
-        padding: "2rem 2.5rem",
-        background: "#ffffff",
-        minHeight: "100vh",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      <h2
-        style={{
-          margin: 0,
-          marginBottom: "2rem",
-          fontSize: "24px",
-          fontWeight: 600,
-          color: "#111827",
-          letterSpacing: "-0.025em",
-        }}
-      >
-        Shortcuts
-      </h2>
+    <div className="page">
+      <h2 className="page__title">Shortcuts</h2>
 
-      {/* Create Shortcut Form */}
       {showCreateShortcut && (
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "12px",
-            padding: "20px",
-            marginBottom: "24px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "11px",
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              color: "#9ca3af",
-              marginBottom: "8px",
-            }}
-          >
-            Shortcut
-          </div>
+        <div className="panel">
+          <div className="panel__label">Shortcut</div>
           <input
             type="text"
+            className="form-input form-input--lg"
             value={newShortcut}
             onChange={(e) => setNewShortcut(e.target.value)}
             placeholder="e.g., 'hey lexi'"
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              fontSize: "14px",
-              backgroundColor: "#ffffff",
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-              color: "#111827",
-              marginBottom: "16px",
-              outline: "none",
-              transition: "all 0.2s ease",
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = "#d1d5db";
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = "#e5e7eb";
-            }}
           />
-          <div
-            style={{
-              fontSize: "11px",
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              color: "#9ca3af",
-              marginBottom: "8px",
-            }}
-          >
-            Value
-          </div>
+          <div className="panel__label">Value</div>
           <textarea
+            className="form-input form-input--lg"
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
             placeholder="e.g., 'Hello, this is Lexi'"
             rows={4}
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              fontSize: "14px",
-              fontFamily: "inherit",
-              backgroundColor: "#ffffff",
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-              color: "#111827",
-              marginBottom: "16px",
-              outline: "none",
-              transition: "all 0.2s ease",
-              resize: "vertical",
-              minHeight: "80px",
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = "#d1d5db";
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = "#e5e7eb";
-            }}
           />
-          <div
-            style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}
-          >
+          <div className="btn-row">
             <button
+              type="button"
               onClick={() => {
                 setShowCreateShortcut(false);
                 setNewShortcut("");
                 setNewValue("");
               }}
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "#f3f4f6",
-                color: "#6b7280",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: 500,
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#e5e7eb";
-                e.currentTarget.style.color = "#111827";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#f3f4f6";
-                e.currentTarget.style.color = "#6b7280";
-              }}
+              className="btn btn--secondary"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleCreateShortcut}
               disabled={!newShortcut.trim() || !newValue.trim()}
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "#111827",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "6px",
-                cursor:
-                  !newShortcut.trim() || !newValue.trim()
-                    ? "not-allowed"
-                    : "pointer",
-                fontSize: "14px",
-                fontWeight: 500,
-                opacity: !newShortcut.trim() || !newValue.trim() ? 0.5 : 1,
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                if (newShortcut.trim() && newValue.trim()) {
-                  e.currentTarget.style.backgroundColor = "#374151";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (newShortcut.trim() && newValue.trim()) {
-                  e.currentTarget.style.backgroundColor = "#111827";
-                }
-              }}
+              className="btn btn--primary"
             >
               Create
             </button>
@@ -468,82 +283,23 @@ export const ShortcutsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Shortcuts Section */}
       <div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "16px",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "11px",
-              fontWeight: 600,
-              color: "#9ca3af",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              margin: 0,
-            }}
-          >
-            ALL SHORTCUTS
-          </h3>
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+        <div className="vocab-header">
+          <h3 className="vocab-header__title">ALL SHORTCUTS</h3>
+          <div className="vocab-actions">
             <button
               type="button"
               onClick={handleSearchClick}
-              style={{
-                background: showSearch ? "#f3f4f6" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: showSearch ? "#111827" : "#9ca3af",
-                padding: "4px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "4px",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!showSearch) {
-                  e.currentTarget.style.backgroundColor = "#f3f4f6";
-                  e.currentTarget.style.color = "#111827";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!showSearch) {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "#9ca3af";
-                }
-              }}
+              className={`btn btn--icon ${showSearch ? "active" : ""}`}
+              aria-label="Search"
             >
               <Search size={16} />
             </button>
             <button
               type="button"
               onClick={loadShortcuts}
-              style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: "#9ca3af",
-                padding: "4px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "4px",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f3f4f6";
-                e.currentTarget.style.color = "#111827";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "#9ca3af";
-              }}
+              className="btn btn--icon"
+              aria-label="Refresh"
             >
               <RefreshCw size={16} />
             </button>
@@ -554,94 +310,30 @@ export const ShortcutsPage: React.FC = () => {
                 setNewShortcut("");
                 setNewValue("");
               }}
-              style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: "#9ca3af",
-                padding: "4px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "4px",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f3f4f6";
-                e.currentTarget.style.color = "#111827";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "#9ca3af";
-              }}
+              className="btn btn--icon"
+              aria-label="Add shortcut"
             >
               <Plus size={16} />
             </button>
           </div>
         </div>
 
-        {/* Search Input */}
         {showSearch && (
-          <div
-            style={{
-              marginBottom: "16px",
-              position: "relative",
-            }}
-          >
+          <div className="search-wrap">
             <input
               type="text"
+              className="form-input form-input--with-clear"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search shortcuts..."
               autoFocus
-              style={{
-                width: "100%",
-                padding: "10px 40px 10px 12px",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                fontSize: "14px",
-                fontFamily: "inherit",
-                outline: "none",
-                transition: "all 0.2s ease",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#d1d5db";
-                e.currentTarget.style.boxShadow =
-                  "0 0 0 3px rgba(0, 0, 0, 0.05)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow = "none";
-              }}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                style={{
-                  position: "absolute",
-                  right: "8px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "#9ca3af",
-                  padding: "4px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f3f4f6";
-                  e.currentTarget.style.color = "#111827";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "#9ca3af";
-                }}
+                className="search-clear"
+                aria-label="Clear search"
               >
                 <X size={16} />
               </button>

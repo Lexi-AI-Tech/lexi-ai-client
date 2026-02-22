@@ -135,14 +135,7 @@ function App() {
   if (showLoading) {
     return (
       <div className="app">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100vh",
-          }}
-        >
+        <div className="app-loading-screen">
           {showLoadingScreen ? <div className="app-loading-spinner" /> : null}
         </div>
       </div>

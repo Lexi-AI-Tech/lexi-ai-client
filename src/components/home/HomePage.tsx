@@ -84,8 +84,8 @@ const StatCard: React.FC<StatCardProps> = ({
   subValue,
   accentColor,
 }) => (
-  <motion.div className="stat-card" variants={itemVariants}>
-    <div className="stat-card-icon" style={{ background: accentColor }}>
+  <motion.div className="stat-card" variants={itemVariants} style={{ ["--stat-accent" as string]: accentColor }}>
+    <div className="stat-card-icon">
       <Icon size={20} />
     </div>
     <div className="stat-card-content">
@@ -396,10 +396,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
                     key={i}
                     className="chart-bar"
                     style={{
-                      height: `${(value / maxChartValue) * 100}%`,
-                      opacity: i === chartData.data.length - 1 ? 1 : 0.5,
-                      minHeight: value > 0 ? "4px" : "0",
-                    }}
+                      ["--chart-height" as string]: `${(value / maxChartValue) * 100}%`,
+                      ["--chart-opacity" as string]: i === chartData.data.length - 1 ? 1 : 0.5,
+                      ["--chart-min-height" as string]: value > 0 ? "4px" : "0",
+                    } as React.CSSProperties}
                     title={`${value} transcriptions`}
                   />
                 ))}

@@ -334,69 +334,13 @@ export const SettingsPage: React.FC = () => {
     disabled?: boolean;
   }> = ({ enabled, onToggle, disabled = false }) => (
     <button
+      type="button"
       onClick={onToggle}
       disabled={disabled}
-      style={{
-        width: "48px",
-        height: "28px",
-        borderRadius: "14px",
-        border: "none",
-        background: enabled
-          ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-          : "#e5e7eb",
-        cursor: disabled ? "not-allowed" : "pointer",
-        position: "relative",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        opacity: disabled ? 0.5 : 1,
-        boxShadow: enabled
-          ? "0 2px 8px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
-          : "inset 0 2px 4px rgba(0, 0, 0, 0.06)",
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled && enabled) {
-          e.currentTarget.style.boxShadow =
-            "0 4px 12px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
-        } else if (!disabled && !enabled) {
-          e.currentTarget.style.background = "#d1d5db";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!disabled && enabled) {
-          e.currentTarget.style.boxShadow =
-            "0 2px 8px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
-        } else if (!disabled && !enabled) {
-          e.currentTarget.style.background = "#e5e7eb";
-        }
-      }}
+      className={`toggle-switch ${enabled ? "on" : ""}`}
     >
-      <div
-        style={{
-          width: "22px",
-          height: "22px",
-          borderRadius: "50%",
-          background: "#ffffff",
-          position: "absolute",
-          top: "3px",
-          left: enabled ? "23px" : "3px",
-          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          boxShadow: enabled
-            ? "0 2px 6px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1)"
-            : "0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.1)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {enabled && (
-          <div
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-            }}
-          />
-        )}
+      <div className="toggle-switch__thumb">
+        {enabled && <div className="toggle-switch__dot" />}
       </div>
     </button>
   );
@@ -404,187 +348,51 @@ export const SettingsPage: React.FC = () => {
   // Don't render settings content until config is loaded to prevent flash of defaults
   if (isLoading) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Settings
-        </h2>
-        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
-          Loading settings...
-        </div>
+      <div className="page">
+        <h2 className="page__title">Settings</h2>
+        <div className="page__empty">Loading settings...</div>
       </div>
     );
   }
 
-  // Show login prompt if not authenticated
-  // This prevents showing cached config when user is logged out
   if (!authStore.isAuthenticated) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Settings
-        </h2>
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "12px",
-            padding: "40px",
-            textAlign: "center",
-          }}
-        >
-          <p
-            style={{
-              fontSize: "14px",
-              color: "#6b7280",
-              marginBottom: "20px",
-            }}
-          >
+      <div className="page">
+        <h2 className="page__title">Settings</h2>
+        <div className="panel panel--center">
+          <p className="panel__message">
             Sign in to access your settings
           </p>
-          <GoogleLoginButton
-            onSuccess={() => {
-              // Settings will be loaded automatically via useEffect
-            }}
-            onError={() => {}}
-          />
+          <GoogleLoginButton onSuccess={() => {}} onError={() => {}} />
         </div>
       </div>
     );
   }
 
-  // Show error state if config failed to load
   if (config === null) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Settings
-        </h2>
+      <div className="page">
+        <h2 className="page__title">Settings</h2>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        padding: "2rem 2.5rem",
-        background: "#ffffff",
-        minHeight: "100vh",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-      }}
-    >
-      <h2
-        style={{
-          margin: 0,
-          marginBottom: "2rem",
-          fontSize: "24px",
-          fontWeight: 600,
-          color: "#111827",
-          letterSpacing: "-0.025em",
-        }}
-      >
-        Settings
-      </h2>
+    <div className="page">
+      <h2 className="page__title">Settings</h2>
 
-      {/* Section Navigation */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          marginBottom: "32px",
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="section-tabs">
         {[
           { id: "account" as const, label: "Account", icon: Monitor },
           { id: "transcription" as const, label: "Transcription", icon: Mic },
           { id: "general" as const, label: "General", icon: Power },
-          {
-            id: "hotkeys" as const,
-            label: "Hotkeys",
-            icon: Keyboard,
-          },
+          { id: "hotkeys" as const, label: "Hotkeys", icon: Keyboard },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
+            type="button"
             onClick={() => setActiveSection(id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 16px",
-              borderRadius: "8px",
-              border: "none",
-              background: activeSection === id ? "#111827" : "#f3f4f6",
-              color: activeSection === id ? "#ffffff" : "#6b7280",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              fontSize: "14px",
-              fontWeight: activeSection === id ? 500 : 400,
-            }}
-            onMouseEnter={(e) => {
-              if (activeSection !== id) {
-                e.currentTarget.style.background = "#e5e7eb";
-                e.currentTarget.style.color = "#111827";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeSection !== id) {
-                e.currentTarget.style.background = "#f3f4f6";
-                e.currentTarget.style.color = "#6b7280";
-              }
-            }}
+            className={`section-tab ${activeSection === id ? "active" : ""}`}
           >
             <Icon size={16} />
             <span>{label}</span>
@@ -594,233 +402,60 @@ export const SettingsPage: React.FC = () => {
 
       {/* Main Content Area */}
       <div>
-        {/* Account Section */}
         {activeSection === "account" && (
           <div>
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#9ca3af",
-                  marginBottom: "16px",
-                }}
-              >
-                Account
-              </div>
+            <div className="panel panel--lg">
+              <div className="panel__label panel__label--spaced">Account</div>
               <GoogleLoginButton />
             </div>
           </div>
         )}
 
-        {/* Transcription Section */}
         {activeSection === "transcription" && (
           <div>
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "#9ca3af",
-                  marginBottom: "12px",
-                }}
-              >
-                Language
-              </div>
-              <div
-                ref={languageDropdownRef}
-                style={{ position: "relative", marginBottom: "12px" }}
-              >
+            <div className="panel panel--lg mb-16">
+              <div className="panel__label panel__label--spaced">Language</div>
+              <div ref={languageDropdownRef} className="rel mb-12">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!isUpdating && !isLoading) {
-                      setIsLanguageDropdownOpen(!isLanguageDropdownOpen);
-                    }
-                  }}
+                  onClick={() => !isUpdating && !isLoading && setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
                   disabled={isUpdating || isLoading}
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    fontSize: "14px",
-                    fontFamily: "inherit",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    color: "#111827",
-                    cursor: isUpdating || isLoading ? "not-allowed" : "pointer",
-                    opacity: isUpdating || isLoading ? 0.5 : 1,
-                    transition: "all 0.2s ease",
-                    outline: "none",
-                    fontWeight: 500,
-                    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-                    textAlign: "left",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isUpdating && !isLoading) {
-                      e.currentTarget.style.borderColor = "#d1d5db";
-                      e.currentTarget.style.boxShadow =
-                        "0 2px 4px rgba(0, 0, 0, 0.08)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isLanguageDropdownOpen) {
-                      e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.boxShadow =
-                        "0 1px 2px rgba(0, 0, 0, 0.05)";
-                    }
-                  }}
+                  className="select-trigger"
                 >
                   <span>
                     {selectedLanguage
-                      ? SUPPORTED_LANGUAGES.find(
-                        (l) => l.value === selectedLanguage,
-                      )?.label || "Select language"
+                      ? SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label || "Select language"
                       : "Auto Detect Language"}
                   </span>
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      color: "#6b7280",
-                      transform: isLanguageDropdownOpen
-                        ? "rotate(180deg)"
-                        : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                    }}
-                  />
+                  <ChevronDown size={18} className={`dropdown-chevron ${isLanguageDropdownOpen ? "open" : ""}`} />
                 </button>
-
                 {isLanguageDropdownOpen && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      marginTop: "4px",
-                      backgroundColor: "#ffffff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                      zIndex: 1000,
-                      maxHeight: "300px",
-                      overflowY: "auto",
-                      overflowX: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "8px 0",
-                      }}
-                    >
+                  <div className="select-dropdown">
+                    <div className="select-dropdown__list">
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedLanguage(null);
-                          setIsLanguageDropdownOpen(false);
-                        }}
-                        style={{
-                          width: "100%",
-                          padding: "10px 16px",
-                          backgroundColor: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          fontSize: "14px",
-                          color: "#111827",
-                          transition: "background-color 0.15s ease",
-                          textAlign: "left",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#f3f4f6";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }}
+                        onClick={() => { setSelectedLanguage(null); setIsLanguageDropdownOpen(false); }}
+                        className="select-option"
                       >
                         <span>Auto Detect Language</span>
-                        {!selectedLanguage && (
-                          <Check
-                            size={16}
-                            style={{ color: "#111827", flexShrink: 0 }}
-                          />
-                        )}
+                        {!selectedLanguage && <Check size={16} className="check flex-shrink-0" />}
                       </button>
-                      {SUPPORTED_LANGUAGES.filter(
-                        (lang) => lang.value !== "auto",
-                      ).map((lang) => (
+                      {SUPPORTED_LANGUAGES.filter((lang) => lang.value !== "auto").map((lang) => (
                         <button
                           key={lang.value}
                           type="button"
-                          onClick={() => {
-                            setSelectedLanguage(lang.value as LanguageCode);
-                            setIsLanguageDropdownOpen(false);
-                          }}
-                          style={{
-                            width: "100%",
-                            padding: "10px 16px",
-                            backgroundColor: "transparent",
-                            border: "none",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            fontSize: "14px",
-                            color: "#111827",
-                            transition: "background-color 0.15s ease",
-                            textAlign: "left",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "#f3f4f6";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "transparent";
-                          }}
+                          onClick={() => { setSelectedLanguage(lang.value as LanguageCode); setIsLanguageDropdownOpen(false); }}
+                          className="select-option"
                         >
                           <span>{lang.label}</span>
-                          {selectedLanguage === lang.value && (
-                            <Check
-                              size={16}
-                              style={{ color: "#111827", flexShrink: 0 }}
-                            />
-                          )}
+                          {selectedLanguage === lang.value && <Check size={16} className="check flex-shrink-0" />}
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "#9ca3af",
-                }}
-              >
+              <div className="settings-hint">
                 {selectedLanguage === "auto"
                   ? "Automatically detected from your audio input."
                   : selectedLanguage
@@ -829,48 +464,14 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "24px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#111827",
-                      marginBottom: "4px",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Enhance Transcription
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      color: "#6b7280",
-                    }}
-                  >
-                    Use AI to improve accuracy and formatting.
-                  </div>
+            <div className="panel panel--lg mb-24">
+              <div className="settings-row">
+                <div className="settings-row__content">
+                  <div className="settings-row__title">Enhance Transcription</div>
+                  <div className="settings-row__desc">Use AI to improve accuracy and formatting.</div>
                 </div>
                 <ToggleSwitch
-                  enabled={
-                    (selectedEnhanceTranscription ??
-                      enhanceTranscription ??
-                      false) === true
-                  }
+                  enabled={(selectedEnhanceTranscription ?? enhanceTranscription ?? false) === true}
                   onToggle={handleToggleEnhanceTranscription}
                   disabled={isLoading || isUpdating}
                 />
@@ -879,74 +480,28 @@ export const SettingsPage: React.FC = () => {
           </div>
         )}
 
-        {/* General Section */}
         {activeSection === "general" && (
           <div>
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "24px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#111827",
-                      marginBottom: "4px",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Start on System Startup
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      color: "#6b7280",
-                    }}
-                  >
-                    Automatically launch when your computer starts.
-                  </div>
+            <div className="panel panel--lg mb-24">
+              <div className="settings-row">
+                <div className="settings-row__content">
+                  <div className="settings-row__title">Start on System Startup</div>
+                  <div className="settings-row__desc">Automatically launch when your computer starts.</div>
                 </div>
                 <ToggleSwitch
-                  enabled={
-                    (selectedAutostart ?? autostartEnabled ?? false) === true
-                  }
+                  enabled={(selectedAutostart ?? autostartEnabled ?? false) === true}
                   onToggle={handleToggleAutostart}
                   disabled={isLoading || isUpdating}
                 />
               </div>
             </div>
-
-
           </div>
         )}
 
-        {/* Hotkeys Section */}
         {activeSection === "hotkeys" && (
           <div>
-
-
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "24px",
-              }}
-            >
-              <div style={{ marginBottom: "32px" }}>
+            <div className="panel panel--lg mb-24">
+              <div className="mb-32">
                 <HotkeySelector
                   label="Transcription Hotkeys"
                   description={`Hold ${currentHotkeys.hotkeys.length > 0 && !currentHotkeys.hotkeys[0].includes("+") ? "this key" : "this hotkey combination"} to record audio for transcription`}
@@ -956,8 +511,7 @@ export const SettingsPage: React.FC = () => {
                   disabled={isLoading || isUpdating}
                 />
               </div>
-
-              <div style={{ marginBottom: "24px" }}>
+              <div className="mb-24">
                 <HotkeySelector
                   label="Action Hotkeys"
                   description={`Hold ${currentActionHotkeys.hotkeys.length > 0 && !currentActionHotkeys.hotkeys[0].includes("+") ? "this key" : "this hotkey combination"} to record a voice command for actions`}
@@ -967,45 +521,20 @@ export const SettingsPage: React.FC = () => {
                   disabled={isLoading || isUpdating}
                 />
               </div>
-
-
-
-
             </div>
           </div>
         )}
 
-        {/* Global Save Button Area */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginTop: "32px",
-            borderTop: "1px solid #e5e7eb",
-            paddingTop: "24px",
-          }}
-        >
+        <div className="settings-save-bar">
           <button
+            type="button"
             onClick={handleSaveSettings}
             disabled={isUpdating || !hasChanges()}
-            style={{
-              backgroundColor: isUpdating || !hasChanges() ? "#9ca3af" : "#000000",
-              color: "#ffffff",
-              padding: "10px 24px",
-              borderRadius: "8px",
-              fontSize: "14px",
-              fontWeight: 500,
-              border: "none",
-              cursor: isUpdating || !hasChanges() ? "not-allowed" : "pointer",
-              transition: "all 0.2s ease",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
+            className="btn-save"
           >
             {isUpdating ? (
               <>
-                <div className="spinner-small" style={{ width: "16px", height: "16px", border: "2px solid #ffffff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                <div className="spinner-small" />
                 Saving...
               </>
             ) : (
