@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useAuthStore, authStore } from "../../store/authStore";
 import { onboardingStore } from "../../store/onboardingStore";
 import type { GoogleLoginButtonProps } from "../../types";
+import { useToast } from "../toast/useToast";
 
 import "./auth.css";
 
@@ -13,6 +14,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 }) => {
   const { clearAuth, setLoading, setError, user, isAuthenticated } =
     useAuthStore();
+  const toast = useToast();
   const [loading, setLocalLoading] = useState(false);
 
   // Listen for OAuth events from Rust backend
@@ -51,6 +53,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
           const errorMsg = event.payload || "Authentication failed";
           setError(errorMsg);
+          toast.error(errorMsg);
           setLoading(false);
           setLocalLoading(false);
 
@@ -65,7 +68,9 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         if (!isMounted) return;
         console.log("⏱️  OAuth timeout event received");
 
-        setError("Authentication timed out. Please try again.");
+        const msg = "Authentication timed out. Please try again.";
+        setError(msg);
+        toast.error(msg);
         setLoading(false);
         setLocalLoading(false);
 
@@ -134,6 +139,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       const errorMessage = error?.message || "Google login failed";
       console.error("Google Login Failed:", error);
       setError(errorMessage);
+      toast.error(errorMessage);
       setLocalLoading(false);
       setLoading(false);
 

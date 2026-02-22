@@ -67,6 +67,7 @@ mod tray; // System tray icon creation and event handling
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
+mod titlebar; // Title bar customization (hide title, match background on macOS)
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use audio::thread::spawn_recording_thread;
@@ -287,6 +288,10 @@ pub fn main() {
         .setup(move |app| {
             // Create system tray first to avoid borrow checker issues
             tray::init_system_tray(app)?;
+
+            if let Some(window) = app.get_webview_window("main") {
+                titlebar::apply_to_window(&window);
+            }
 
             let app_handle = app.handle();
 

@@ -7,13 +7,18 @@ import {
   Edit,
   Trash2,
   X,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
+import { useToast } from "./toast/useToast";
+import { PageLoader } from "./ui/PageLoader";
 import "./home/home.css";
 
 type ViewMode = "list" | "grid";
 
 export const NotesPage: React.FC = () => {
+  const toast = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -23,6 +28,7 @@ export const NotesPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Form state
   const [content, setContent] = useState("");
@@ -64,9 +70,10 @@ export const NotesPage: React.FC = () => {
       });
       setContent("");
       await fetchNotes();
+      toast.success("Note created");
     } catch (err) {
       console.error("Failed to create note:", err);
-      alert(`Failed to create note: ${err}`);
+      toast.error(`Failed to create note: ${err}`);
     } finally {
       setIsCreating(false);
     }
@@ -86,10 +93,23 @@ export const NotesPage: React.FC = () => {
       setEditingId(null);
       setContent("");
       await fetchNotes();
+      toast.success("Note updated");
     } catch (err) {
-      alert(`Failed to update note: ${err}`);
+      toast.error(`Failed to update note: ${err}`);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleCopyNote = async (text: string, noteId: string) => {
+    try {
+      await invoke("copy_to_clipboard", { text });
+      setCopiedId(noteId);
+      setTimeout(() => setCopiedId(null), 250);
+      toast.success("Copied to clipboard");
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      toast.error("Failed to copy to clipboard");
     }
   };
 
@@ -109,8 +129,9 @@ export const NotesPage: React.FC = () => {
       await invoke("delete_note", { noteId: deleteConfirmId });
       setDeleteConfirmId(null);
       await fetchNotes();
+      toast.success("Note deleted");
     } catch (err) {
-      alert(`Failed to delete note: ${err}`);
+      toast.error(`Failed to delete note: ${err}`);
     } finally {
       setDeletingId(null);
     }
@@ -151,8 +172,9 @@ export const NotesPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
-        Loading notes...
+      <div className="page">
+        <h2 className="page__title">Notes</h2>
+        <PageLoader className="page__empty" />
       </div>
     );
   }
@@ -508,7 +530,7 @@ export const NotesPage: React.FC = () => {
                 onMouseEnter={() => setHoveredNoteId(note.id)}
                 onMouseLeave={() => setHoveredNoteId(null)}
               >
-                {/* Action buttons - shown on hover */}
+                {/* Action buttons */}
                 <div
                   style={{
                     position: "absolute",
@@ -516,37 +538,31 @@ export const NotesPage: React.FC = () => {
                     right: "12px",
                     display: "flex",
                     gap: "6px",
-                    opacity: hoveredNoteId === note.id ? 1 : 0,
-                    transition: "opacity 0.2s ease",
                   }}
                   className="note-actions"
                 >
                   <button
+                    type="button"
+                    onClick={() => handleCopyNote(note.content, note.id)}
+                    className={`btn btn--icon-sm ${copiedId === note.id ? "note-copy-copied" : ""}`}
+                    title={copiedId === note.id ? "Copied!" : "Copy note"}
+                  >
+                    {copiedId === note.id ? (
+                      <Check size={14} strokeWidth={2.5} />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleEdit(note)}
-                    style={{
-                      padding: "6px",
-                      backgroundColor: "#f3f4f6",
-                      border: "none",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#6b7280",
-                      transition: "all 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#e5e7eb";
-                      e.currentTarget.style.color = "#111827";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f3f4f6";
-                      e.currentTarget.style.color = "#6b7280";
-                    }}
+                    className="btn btn--icon-sm"
+                    title="Edit note"
                   >
                     <Edit size={14} />
                   </button>
                   <button
+                    type="button"
                     onClick={() => openDeleteConfirm(note.id)}
                     disabled={!!deletingId}
                     style={{
@@ -572,6 +588,7 @@ export const NotesPage: React.FC = () => {
                         e.currentTarget.style.backgroundColor = "#fef2f2";
                       }
                     }}
+                    title="Delete note"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -584,7 +601,7 @@ export const NotesPage: React.FC = () => {
                     lineHeight: 1.6,
                     whiteSpace: "pre-wrap",
                     fontSize: "14px",
-                    paddingRight: "60px",
+                    paddingRight: "90px",
                     flex: 1,
                     overflow: viewMode === "grid" ? "hidden" : "visible",
                     display: viewMode === "grid" ? "-webkit-box" : "block",

@@ -39,7 +39,7 @@
         "label": "main",
         "fullscreen": false,
         "resizable": true,
-        "title": "Lexi AI",
+        "title": "",
         "width": 1360,
         "height": 900,
         "minWidth": 350,
@@ -50,7 +50,8 @@
         "transparent": false,
         "url": "index.html",
         "devtools": false,
-        "visible": true
+        "visible": true,
+        "titleBarStyle": "Transparent"
       }
     ],
     "withGlobalTauri": false

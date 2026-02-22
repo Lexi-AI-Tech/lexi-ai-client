@@ -1,21 +1,23 @@
 import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Trash2 } from "lucide-react";
 import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { formatDateTime } from "../lib/dateUtils";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
+import { useToast } from "./toast/useToast";
 import "../styles/components/hotkey-selector.css";
+import { PageLoader } from "./ui/PageLoader";
 import "./home/home.css";
 
 export const ActionsPage: React.FC = () => {
   const authStore = useAuthStore();
+  const toast = useToast();
   const [actionHistory, setActionHistory] =
     useState<PaginatedActionHistoryResponse | null>(null);
   const [actionHotkeys, setActionHotkeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioProgress, setAudioProgress] = useState<number>(0);
@@ -36,7 +38,7 @@ export const ActionsPage: React.FC = () => {
   const handleConfirmDeleteAction = async () => {
     if (!deleteConfirmId) return;
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      setError("Please sign in to delete actions");
+      toast.error("Please sign in to delete actions");
       return;
     }
 
@@ -45,6 +47,7 @@ export const ActionsPage: React.FC = () => {
       await invoke("delete_action_history", { actionId: deleteConfirmId });
       setDeleteConfirmId(null);
       await loadActionHistory();
+      toast.success("Action deleted");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to delete action";
       const isAuthError =
@@ -56,11 +59,9 @@ export const ActionsPage: React.FC = () => {
       if (isAuthError) {
         console.log("Auth error deleting action, clearing auth");
         authStore.clearAuth();
-        setError(null);
       } else {
-        setError(errorMessage);
+        toast.error(errorMessage);
       }
-      alert(errorMessage);
     } finally {
       setDeletingId(null);
     }
@@ -95,14 +96,12 @@ export const ActionsPage: React.FC = () => {
   const loadActionHistory = async () => {
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
       setActionHistory(null);
-      setError(null);
       setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      setError(null);
       const data = await invoke<PaginatedActionHistoryResponse>(
         "get_action_history",
         {
@@ -124,9 +123,8 @@ export const ActionsPage: React.FC = () => {
         console.log("Auth error loading action history, clearing auth");
         authStore.clearAuth();
         setActionHistory(null);
-        setError(null);
       } else {
-        setError(errorMessage);
+        toast.error(errorMessage);
       }
     } finally {
       setIsLoading(false);
@@ -156,39 +154,9 @@ export const ActionsPage: React.FC = () => {
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Actions
-        </h2>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "40px",
-            color: "#6b7280",
-            fontSize: "14px",
-          }}
-        >
-          Loading...
-        </div>
+      <div className="page">
+        <h2 className="page__title">Actions</h2>
+        <PageLoader className="page__empty" />
       </div>
     );
   }
@@ -231,9 +199,7 @@ export const ActionsPage: React.FC = () => {
             onSuccess={() => {
               // Actions will be loaded automatically via useEffect
             }}
-            onError={(err) => {
-              setError(err || "Authentication failed");
-            }}
+            onError={() => {}}
           />
         </div>
       </div>
@@ -262,24 +228,6 @@ export const ActionsPage: React.FC = () => {
       >
         Actions
       </h2>
-
-      {error && (
-        <div
-          className="permission-message"
-          style={{
-            background: "#fef2f2",
-            borderColor: "#fecaca",
-            color: "#b91c1c",
-            fontSize: "11px",
-            padding: "12px",
-            marginBottom: "16px",
-            borderRadius: "0.5rem",
-            border: "1px solid",
-          }}
-        >
-          {error}
-        </div>
-      )}
 
       {/* Global Hotkey Section */}
       <div style={{ marginBottom: "3rem" }}>
@@ -343,19 +291,7 @@ export const ActionsPage: React.FC = () => {
         </h3>
 
         {isLoading ? (
-          <div
-            style={{
-              padding: "3rem 1rem",
-              textAlign: "center",
-              color: "#6b7280",
-              fontSize: "0.875rem",
-              background: "#ffffff",
-              border: "1px solid #f3f4f6",
-              borderRadius: "0.75rem",
-            }}
-          >
-            Loading action history...
-          </div>
+          <PageLoader />
         ) : !actionHistory || actionHistory.actions.length === 0 ? (
           <div
             style={{
@@ -443,37 +379,35 @@ export const ActionsPage: React.FC = () => {
                       )}
                     </div>
                     <button
-                      className="transcript-btn"
                       onClick={() => openDeleteConfirm(action.id)}
                       disabled={!!deletingId}
                       style={{
-                        padding: "0.5rem 1rem",
-                        fontSize: "0.8125rem",
-                        fontWeight: 500,
-                        backgroundColor: "#ffffff",
-                        border: "1px solid #fecaca",
-                        borderRadius: "0.5rem",
-                        color: "#b91c1c",
+                        padding: "6px",
+                        backgroundColor: "#fef2f2",
+                        border: "none",
+                        borderRadius: "4px",
                         cursor: deletingId ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#ef4444",
                         transition: "all 0.2s ease",
-                        whiteSpace: "nowrap",
                         marginLeft: "1rem",
                         opacity: deletingId ? 0.6 : 1,
                       }}
                       onMouseEnter={(e) => {
                         if (!deletingId) {
-                          e.currentTarget.style.background = "#fef2f2";
-                          e.currentTarget.style.borderColor = "#fca5a5";
+                          e.currentTarget.style.backgroundColor = "#fee2e2";
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!deletingId) {
-                          e.currentTarget.style.background = "#ffffff";
-                          e.currentTarget.style.borderColor = "#fecaca";
+                          e.currentTarget.style.backgroundColor = "#fef2f2";
                         }
                       }}
+                      title="Delete action"
                     >
-                      Delete
+                      <Trash2 size={14} />
                     </button>
                   </div>
 

@@ -11,6 +11,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { ToastProvider } from "./components/toast/ToastProvider";
 import "./index.css";
 
 // Get the root DOM element and render the App component
@@ -18,5 +19,6 @@ import "./index.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
+    <ToastProvider />
   </React.StrictMode>,
 );

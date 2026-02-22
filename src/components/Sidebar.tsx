@@ -11,48 +11,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="sidebar">
       <div
         className="sidebar-logo"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-start",
-          marginBottom: "24px",
-          cursor: "pointer",
-          transition: "all 0.2s ease",
-          borderRadius: "8px",
-          margin: "8px 8px 24px 18px",
-        }}
         onClick={() => onNavigate("home")}
       >
-        <div
-          style={{
-            width: "36px",
-            height: "36px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginRight: "10px",
-            flexShrink: 0,
-            backgroundColor: "#1C1C1C",
-            borderRadius: "10px",
-          }}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: "20px", height: "20px", color: "#ffffff" }}>
+        <div className="sidebar-logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
           </svg>
         </div>
-        <span
-          style={{
-            fontSize: "28px",
-            fontWeight: 600,
-            letterSpacing: "-0.01em ",
-            lineHeight: "32px",
-            fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            color: "#1C1C1C",
-          }}
-        >
-          Lexi AI
-        </span>
+        <span className="sidebar-logo-text">Lexi AI</span>
       </div>
       <nav className="sidebar-nav">
         {/* Home */}

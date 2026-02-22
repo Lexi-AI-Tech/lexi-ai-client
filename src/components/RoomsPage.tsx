@@ -8,11 +8,13 @@ import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Room } from "../types";
 import { RoomLiveView } from "./RoomLiveView";
+import { useToast } from "./toast/useToast";
+import { PageLoader } from "./ui/PageLoader";
 
 export const RoomsPage: React.FC = () => {
+  const toast = useToast();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -22,10 +24,9 @@ export const RoomsPage: React.FC = () => {
     try {
       const result = await invoke<Room[]>("list_rooms");
       setRooms(result);
-      setError(null);
     } catch (err: any) {
       console.error("Failed to fetch rooms:", err);
-      setError(err.message || "Failed to fetch rooms");
+      toast.error(err.message || "Failed to fetch rooms");
     } finally {
       setLoading(false);
     }
@@ -46,9 +47,10 @@ export const RoomsPage: React.FC = () => {
       // Immediately open the new room
       setSelectedRoomId(room.id);
       fetchRooms();
+      toast.success("Room created");
     } catch (err: any) {
       console.error("Failed to create room:", err);
-      alert(err.message || "Failed to create room");
+      toast.error(err.message || "Failed to create room");
     }
   };
 
@@ -171,11 +173,7 @@ export const RoomsPage: React.FC = () => {
       )}
 
       {loading && rooms.length === 0 ? (
-        <div style={{ padding: "20px", textAlign: "center", opacity: 0.6 }}>
-          Loading rooms...
-        </div>
-      ) : error ? (
-        <div style={{ padding: "20px", color: "salmon" }}>{error}</div>
+        <PageLoader />
       ) : rooms.length === 0 ? (
         <div style={{ padding: "40px", textAlign: "center", opacity: 0.6 }}>
           <p>No rooms found.</p>

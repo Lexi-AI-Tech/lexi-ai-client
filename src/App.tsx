@@ -34,11 +34,14 @@ type Page =
   | "shortcuts"
   | "notes"
 
+const LOADING_DELAY_MS = 150; // Only show loading spinner if init takes longer than this (avoids brief flash on first load)
+
 function App() {
   const authStore = useAuthStore();
   const { isCompleted, isInitialized, refreshState } = useOnboardingStore();
   const [currentPage, setCurrentPage] = useState<Page>("home");
   const [onboardingSyncDone, setOnboardingSyncDone] = useState(false);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const prevCompletedRef = useRef(isCompleted);
 
   // When not authenticated, reset sync flag so we sync again after next login
@@ -119,19 +122,21 @@ function App() {
     (authStore.isAuthenticated && !onboardingSyncDone) ||
     !isInitialized;
 
+  // Defer showing the loading screen so we don't flash "Loading..." when init finishes in a few ms
+  useEffect(() => {
+    if (!showLoading) {
+      setShowLoadingScreen(false);
+      return;
+    }
+    const id = setTimeout(() => setShowLoadingScreen(true), LOADING_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [showLoading]);
+
   if (showLoading) {
     return (
       <div className="app">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100vh",
-            color: "rgba(0, 0, 0, 0.6)",
-          }}
-        >
-          Loading...
+        <div className="app-loading-screen">
+          {showLoadingScreen ? <div className="app-loading-spinner" /> : null}
         </div>
       </div>
     );
