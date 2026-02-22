@@ -25,8 +25,10 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
 use std::io::Cursor;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 /// AudioRecorder manages audio capture from the default input device
 ///
@@ -40,6 +42,9 @@ pub struct AudioRecorder {
     audio_data: Arc<Mutex<Vec<f32>>>,   // Shared buffer storing captured audio samples
     volume_tx: Option<Sender<f32>>,     // Optional channel for real-time volume updates
     stream_tx: Option<Sender<Vec<u8>>>, // Optional channel for streaming audio data
+    /// Shared with the stream callback. Set false before dropping the stream so the callback
+    /// stops and CoreAudio can release the session (fixes macOS orange mic indicator).
+    recording_active: Arc<AtomicBool>,
 }
 
 impl AudioRecorder {
@@ -83,10 +88,25 @@ impl AudioRecorder {
         Self {
             device,
             config,
-            stream: None,                                 // No active stream initially
-            audio_data: Arc::new(Mutex::new(Vec::new())), // Empty audio buffer
-            volume_tx: None,                              // No volume callback by default
-            stream_tx: None,                              // No streaming by default
+            stream: None,
+            audio_data: Arc::new(Mutex::new(Vec::new())),
+            volume_tx: None,
+            stream_tx: None,
+            recording_active: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Releases the audio stream so CoreAudio closes the session and macOS clears the mic indicator.
+    /// Call before dropping the recorder when not going through `stop_recording()` (e.g. stuck
+    /// recovery or replacing the recorder at Start).
+    pub fn release_stream(&mut self) {
+        self.recording_active.store(false, Ordering::SeqCst);
+        std::thread::sleep(Duration::from_millis(30));
+        if let Some(stream) = self.stream.take() {
+            let _ = stream.pause();
+            std::thread::sleep(Duration::from_millis(30));
+            drop(stream);
+            std::thread::sleep(Duration::from_millis(20));
         }
     }
 
@@ -105,30 +125,27 @@ impl AudioRecorder {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.stream_tx = stream_sender;
 
-        // Clone the Arc to share the audio buffer with the stream callback
         let audio_data = Arc::clone(&self.audio_data);
+        let recording_active = Arc::clone(&self.recording_active);
 
-        // Clear any previous recording data
         audio_data.lock().unwrap().clear();
+        recording_active.store(true, Ordering::SeqCst);
 
-        // Clone the config for use in the stream callback
         let config = self.config.clone();
         let _channels = config.channels;
-
-        // Clone senders for the callback
         let volume_tx = self.volume_tx.clone();
         let stream_tx = self.stream_tx.clone();
 
-        // For throttling volume updates (every ~50ms worth of samples)
         let sample_rate = config.sample_rate.0 as usize;
         let samples_per_update = sample_rate / 20; // ~50ms
         let sample_counter = Arc::new(Mutex::new(0usize));
 
-        // Build the input stream with callbacks
         let stream = self.device.build_input_stream(
             &config,
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                // 1. Buffer for legacy stop_recording
+                if !recording_active.load(Ordering::Relaxed) {
+                    return;
+                }
                 {
                     let mut audio_buffer = audio_data.lock().unwrap();
                     audio_buffer.extend_from_slice(data);
@@ -183,10 +200,13 @@ impl AudioRecorder {
     /// Returns the WAV file data as a byte vector, ready to be sent to the API.
     /// Returns an error if the conversion fails.
     pub fn stop_recording(&mut self) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-        // Stop the stream by dropping it
-        // This automatically stops the audio capture
+        self.recording_active.store(false, Ordering::SeqCst);
+        std::thread::sleep(Duration::from_millis(30));
         if let Some(stream) = self.stream.take() {
+            let _ = stream.pause();
+            std::thread::sleep(Duration::from_millis(30));
             drop(stream);
+            std::thread::sleep(Duration::from_millis(20));
         }
 
         // Extract the captured audio data from the shared buffer
