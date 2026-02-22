@@ -244,29 +244,11 @@ export const Pill: React.FC = () => {
           },
         );
 
-        // Listen for processing start — resize window to processing size
-        const unlistenProcessing = await listen(
-          "processing_start",
-          async () => {
-            setStatus("processing");
-            const window = getCurrentWindow();
-            try {
-              if (!idlePositionRef.current) return;
-              const idleX = idlePositionRef.current.x;
-              const idleY = idlePositionRef.current.y;
-              const procX = idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
-              const procY = idleY - HEIGHT_DIFF;
-              await window.setSize(
-                new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
-              );
-              await window.setPosition(
-                new LogicalPosition(procX, procY),
-              );
-            } catch (e) {
-              console.error("Failed to resize to processing:", e);
-            }
-          },
-        );
+        // Listen for processing start — status only; resize is done in
+        // recording_stopped/action_recording_stopped to avoid double-resize race.
+        const unlistenProcessing = await listen("processing_start", () => {
+          setStatus("processing");
+        });
 
         // Listen for transcription success
         const unlistenSuccess = await listen(
