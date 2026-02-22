@@ -25,37 +25,9 @@
 //! - **macOS**: Frontmost app via active-win-pos-rs; selected text via clipboard copy simulation.
 //! - **Other Platforms**: Returns `None` (not supported).
 
-// Suppress warnings from objc crate's msg_send! macro about unexpected cfg conditions
-#![allow(unexpected_cfgs)]
-
-#[cfg(target_os = "macos")]
-use objc::{msg_send, sel, sel_impl};
-#[cfg(target_os = "macos")]
-use std::ffi::c_void;
-
 use arboard::Clipboard;
 use std::thread;
 use std::time::Duration;
-
-// Core Graphics types (used by capture_current_screen)
-#[cfg(target_os = "macos")]
-#[repr(C)]
-struct CGPoint {
-    x: f64,
-    y: f64,
-}
-#[cfg(target_os = "macos")]
-#[repr(C)]
-struct CGSize {
-    width: f64,
-    height: f64,
-}
-#[cfg(target_os = "macos")]
-#[repr(C)]
-struct CGRect {
-    origin: CGPoint,
-    size: CGSize,
-}
 
 // ============================================================================
 // Public Types
@@ -168,138 +140,8 @@ pub fn get_selected_text_via_clipboard() -> Option<String> {
     }
 }
 
-/// Capture the entire screen and return it as a base64-encoded PNG string
-///
-/// This function:
-/// 1. Captures the entire screen using `CGWindowListCreateImage()`
-/// 2. Converts the CGImage to PNG format using NSImage
-/// 3. Encodes the PNG data as base64 and logs it
-///
-/// Returns the base64-encoded PNG string if successful, or None if capture fails.
-///
-/// NOTE: This function is currently disabled. Screen capturing feature has been removed.
-/// The function is kept for potential future use but is not called anywhere in the codebase.
-#[cfg(target_os = "macos")]
-#[allow(dead_code)]
-pub fn capture_current_screen() -> Option<String> {
-    unsafe {
-        objc::rc::autoreleasepool(|| {
-            use base64::{engine::general_purpose::STANDARD, Engine as _};
-            use cocoa::base::id;
-
-            // Get the main display bounds
-            let screen_class = objc::runtime::Class::get("NSScreen").unwrap();
-            let screens: id = msg_send![screen_class, screens];
-            let main_screen: id = msg_send![screens, objectAtIndex: 0usize];
-            let frame: cocoa::foundation::NSRect = msg_send![main_screen, frame];
-
-            // Capture the screen using Core Graphics
-            extern "C" {
-                fn CGWindowListCreateImage(
-                    screen_bounds: CGRect,
-                    window_list_option: u32,
-                    window_id: u32,
-                    image_option: u32,
-                ) -> *const c_void; // CGImageRef
-                fn CGImageRelease(image: *const c_void);
-            }
-
-            const K_CGWINDOW_LIST_OPTION_ON_SCREEN_ONLY: u32 = 1;
-            const K_CGWINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS: u32 = 16;
-            const K_CG_WINDOW_IMAGE_DEFAULT: u32 = 0;
-
-            // Convert NSRect to CGRect (they have the same memory layout)
-            let cg_rect = CGRect {
-                origin: CGPoint {
-                    x: frame.origin.x,
-                    y: frame.origin.y,
-                },
-                size: CGSize {
-                    width: frame.size.width,
-                    height: frame.size.height,
-                },
-            };
-
-            let cg_image = CGWindowListCreateImage(
-                cg_rect,
-                K_CGWINDOW_LIST_OPTION_ON_SCREEN_ONLY | K_CGWINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS,
-                0, // kCGNullWindowID
-                K_CG_WINDOW_IMAGE_DEFAULT,
-            );
-
-            if cg_image.is_null() {
-                eprintln!("Failed to capture screen: CGWindowListCreateImage returned null");
-                return None;
-            }
-
-            // Convert CGImage to NSImage for easier PNG export
-            let ns_image_class = objc::runtime::Class::get("NSImage").unwrap();
-            let ns_image: id = msg_send![ns_image_class, alloc];
-            let ns_image: id = msg_send![ns_image, initWithCGImage: cg_image size: frame.size];
-
-            // Release CGImage as we now have NSImage
-            CGImageRelease(cg_image);
-
-            // Convert NSImage to PNG data
-            let tiff_data: id = msg_send![ns_image, TIFFRepresentation];
-            if tiff_data.is_null() {
-                eprintln!("Failed to get TIFF representation");
-                return None;
-            }
-
-            let bitmap_image_rep_class = objc::runtime::Class::get("NSBitmapImageRep").unwrap();
-            let bitmap_rep: id = msg_send![bitmap_image_rep_class, imageRepWithData: tiff_data];
-            if bitmap_rep.is_null() {
-                eprintln!("Failed to create bitmap representation");
-                return None;
-            }
-
-            // Convert to PNG (NSBitmapImageFileTypePNG = 4)
-            // Create empty dictionary for PNG properties
-            let ns_dict_class = objc::runtime::Class::get("NSDictionary").unwrap();
-            let png_props: id = msg_send![ns_dict_class, dictionary];
-            let png_data: id =
-                msg_send![bitmap_rep, representationUsingType: 4 properties: png_props];
-
-            if png_data.is_null() {
-                eprintln!("Failed to convert to PNG");
-                return None;
-            }
-
-            // Get PNG data bytes
-            let ns_data_len: usize = msg_send![png_data, length];
-            let ns_data_bytes: *const u8 = msg_send![png_data, bytes];
-
-            if ns_data_bytes.is_null() || ns_data_len == 0 {
-                eprintln!("Failed to get PNG data bytes");
-                return None;
-            }
-
-            let png_slice = std::slice::from_raw_parts(ns_data_bytes, ns_data_len);
-
-            // Encode to base64
-            let base64_string = STANDARD.encode(png_slice);
-
-            // Log the base64 string (function is disabled but kept for potential future use)
-            println!(
-                "✅ Screen captured - Base64 encoded PNG (length: {}) [DISABLED]",
-                base64_string.len()
-            );
-
-            Some(base64_string)
-        })
-    }
-}
-
 /// Stub implementation for non-macOS platforms
 #[cfg(not(target_os = "macos"))]
 pub fn get_cursor_context() -> Option<CursorContext> {
-    None
-}
-
-/// Stub implementation for non-macOS platforms
-#[cfg(not(target_os = "macos"))]
-#[allow(dead_code)]
-pub fn capture_current_screen() -> Option<String> {
     None
 }
