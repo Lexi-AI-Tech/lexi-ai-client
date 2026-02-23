@@ -224,9 +224,7 @@ export const ShortcutsPage: React.FC = () => {
       <div className="page">
         <h2 className="page__title">Shortcuts</h2>
         <div className="panel panel--center">
-          <p className="panel__message">
-            Sign in to access your shortcuts
-          </p>
+          <p className="panel__message">Sign in to access your shortcuts</p>
           <GoogleLoginButton
             onSuccess={() => {
               // Shortcuts will be loaded automatically via useEffect
@@ -634,10 +632,7 @@ export const ShortcutsPage: React.FC = () => {
       </div>
 
       {deleteConfirmId && (
-        <div
-          className="delete-modal-overlay"
-          onClick={closeDeleteConfirm}
-        >
+        <div className="delete-modal-overlay" onClick={closeDeleteConfirm}>
           <div
             className="delete-modal-content"
             onClick={(e) => e.stopPropagation()}

@@ -104,7 +104,8 @@ export const SpeakerNamingModal: React.FC<SpeakerNamingModalProps> = ({
                 placeholder="Enter speaker name"
               />
               <div className="modal-speaker-sample">
-                Sample: &quot;{getSampleText(speakerLabel).substring(0, 100)}...&quot;
+                Sample: &quot;{getSampleText(speakerLabel).substring(0, 100)}
+                ...&quot;
               </div>
             </div>
           ))}

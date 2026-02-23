@@ -54,8 +54,10 @@ pub async fn get_notes(
     let page = page.unwrap_or(1);
     let page_size = page_size.unwrap_or(20);
 
-    let params = [("page", page.to_string()),
-        ("page_size", page_size.to_string())];
+    let params = [
+        ("page", page.to_string()),
+        ("page_size", page_size.to_string()),
+    ];
 
     let query_string = params
         .iter()

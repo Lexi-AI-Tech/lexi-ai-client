@@ -48,7 +48,7 @@ export const TranscriptsList: React.FC = () => {
 
       if (node) observer.current.observe(node);
     },
-    [loading, page, totalPages]
+    [loading, page, totalPages],
   );
 
   // Fetch transcripts when authenticated and page changes (same pattern as HomePage: single effect, no callback in deps to avoid double fetch)
@@ -75,7 +75,9 @@ export const TranscriptsList: React.FC = () => {
 
         if (cancelled) return;
         setTranscripts((prev) =>
-          page === 1 ? response.transcripts : [...prev, ...response.transcripts]
+          page === 1
+            ? response.transcripts
+            : [...prev, ...response.transcripts],
         );
         setTotalPages(response.total_pages);
         setTotal(response.total);
@@ -153,13 +155,13 @@ export const TranscriptsList: React.FC = () => {
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
 
-    audio.addEventListener('timeupdate', () => {
+    audio.addEventListener("timeupdate", () => {
       if (audio.duration) {
         setAudioProgress((audio.currentTime / audio.duration) * 100);
       }
     });
 
-    audio.addEventListener('ended', () => {
+    audio.addEventListener("ended", () => {
       setPlayingId(null);
       setAudioProgress(0);
     });
@@ -173,8 +175,7 @@ export const TranscriptsList: React.FC = () => {
   const showContent =
     authStore.isInitialized &&
     (!authStore.isAuthenticated || !!authStore.tokens?.access_token);
-  const showLogin =
-    authStore.isInitialized && !authStore.isAuthenticated;
+  const showLogin = authStore.isInitialized && !authStore.isAuthenticated;
 
   return (
     <div className="transcripts-page">
@@ -197,10 +198,7 @@ export const TranscriptsList: React.FC = () => {
           <p className="permission-text">
             Sign in to view your transcription history
           </p>
-          <GoogleLoginButton
-            onSuccess={() => { }}
-            onError={() => {}}
-          />
+          <GoogleLoginButton onSuccess={() => {}} onError={() => {}} />
         </div>
       )}
 
@@ -258,12 +256,20 @@ export const TranscriptsList: React.FC = () => {
                           <div className="transcript-audio-cell">
                             <button
                               type="button"
-                              onClick={() => handlePlayAudio(transcript.id, transcript.audio_file_url as string)}
+                              onClick={() =>
+                                handlePlayAudio(
+                                  transcript.id,
+                                  transcript.audio_file_url as string,
+                                )
+                              }
                               className={`transcript-play-btn ${isPlaying ? "playing" : ""}`}
                               title={isPlaying ? "Pause" : "Play audio"}
                             >
                               {isPlaying && (
-                                <svg className="transcript-progress-ring" aria-hidden>
+                                <svg
+                                  className="transcript-progress-ring"
+                                  aria-hidden
+                                >
                                   <circle
                                     cx="14"
                                     cy="14"
@@ -287,7 +293,11 @@ export const TranscriptsList: React.FC = () => {
                               {isPlaying ? (
                                 <Pause size={12} fill="currentColor" />
                               ) : (
-                                <Play size={12} fill="currentColor" className="icon-play-offset" />
+                                <Play
+                                  size={12}
+                                  fill="currentColor"
+                                  className="icon-play-offset"
+                                />
                               )}
                             </button>
                           </div>
@@ -367,10 +377,7 @@ export const TranscriptsList: React.FC = () => {
       )}
 
       {deleteConfirmId && (
-        <div
-          className="delete-modal-overlay"
-          onClick={closeDeleteConfirm}
-        >
+        <div className="delete-modal-overlay" onClick={closeDeleteConfirm}>
           <div
             className="delete-modal-content"
             onClick={(e) => e.stopPropagation()}

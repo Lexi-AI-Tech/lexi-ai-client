@@ -268,7 +268,15 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
 
   if (loading && !room) {
     return (
-      <div style={{ padding: 20, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 120 }}>
+      <div
+        style={{
+          padding: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 120,
+        }}
+      >
         <PageLoader />
       </div>
     );

@@ -18,7 +18,11 @@ fn normalize_for_shortcut_lookup(s: &str) -> String {
         .chars()
         .filter(|c| c.is_alphanumeric() || c.is_whitespace())
         .collect();
-    s.split_whitespace().collect::<Vec<_>>().join(" ").trim().to_string()
+    s.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .to_string()
 }
 
 /// Returns a HashMap of voice commands and their corresponding replacement values from app config.

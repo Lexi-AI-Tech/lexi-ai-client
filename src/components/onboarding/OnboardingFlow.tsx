@@ -20,11 +20,16 @@ export const OnboardingFlow: React.FC = () => {
   const hotkey: string | null = null;
   const currentStepIndex = (() => {
     switch (currentStep) {
-      case "welcome": return 0;
-      case "permissions": return 1;
-      case "hotkey-test": return 2;
-      case "microphone-test": return 3;
-      default: return 0;
+      case "welcome":
+        return 0;
+      case "permissions":
+        return 1;
+      case "hotkey-test":
+        return 2;
+      case "microphone-test":
+        return 3;
+      default:
+        return 0;
     }
   })();
   const showBack = currentStepIndex > 0;

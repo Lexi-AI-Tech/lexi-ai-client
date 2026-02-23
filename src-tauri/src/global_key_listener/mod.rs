@@ -230,10 +230,7 @@ impl KeyStateTracker {
     }
 
     fn matches_hotkey(&self, hotkey_config: &str, _trigger_key: &str) -> bool {
-        let parts: Vec<String> = hotkey_config
-            .split('+')
-            .map(normalize_key_string)
-            .collect();
+        let parts: Vec<String> = hotkey_config.split('+').map(normalize_key_string).collect();
         if parts.is_empty() {
             return false;
         }

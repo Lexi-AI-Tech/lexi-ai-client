@@ -63,14 +63,14 @@ In the **lexi-ai-client** repository:
 1. Go to **Settings** → **Secrets and variables** → **Actions**.
 2. Click **New repository secret** and add each of the following:
 
-| Secret name | Value |
-|-------------|--------|
-| **APPLE_CERTIFICATE** | The entire contents of `certificate-base64.txt` (the base64 string) |
-| **APPLE_CERTIFICATE_PASSWORD** | The password you set when exporting the .p12 in step 2 |
-| **KEYCHAIN_PASSWORD** | Any strong random string (e.g. from a password manager); used only for the temporary CI keychain |
-| **APPLE_ID** | The Apple ID email used for the Developer account |
-| **APPLE_APP_SPECIFIC_PASSWORD** | The app-specific password from step 4 |
-| **APPLE_TEAM_ID** | The Team ID from step 5 |
+| Secret name                     | Value                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **APPLE_CERTIFICATE**           | The entire contents of `certificate-base64.txt` (the base64 string)                              |
+| **APPLE_CERTIFICATE_PASSWORD**  | The password you set when exporting the .p12 in step 2                                           |
+| **KEYCHAIN_PASSWORD**           | Any strong random string (e.g. from a password manager); used only for the temporary CI keychain |
+| **APPLE_ID**                    | The Apple ID email used for the Developer account                                                |
+| **APPLE_APP_SPECIFIC_PASSWORD** | The app-specific password from step 4                                                            |
+| **APPLE_TEAM_ID**               | The Team ID from step 5                                                                          |
 
 ---
 

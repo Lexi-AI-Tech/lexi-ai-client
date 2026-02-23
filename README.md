@@ -116,7 +116,9 @@ export APPLE_TEAM_ID="FWLCJN85BF"
 
 npm run tauri build
 ```
-or 
+
+or
+
 ```bash
 xcrun notarytool submit \
 "/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg" \
@@ -127,29 +129,34 @@ xcrun notarytool submit \
 ```
 
 Staple the app
+
 ```bash
 xcrun stapler staple \
 "/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/macos/Lexi AI.app"
 ```
 
 Staple the dmg
+
 ```bash
 xcrun stapler staple \
 "/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
 ```
 
 Final Gatekeeper Test
+
 ```bash
 spctl -a -vvv -t install \
 "/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
 ```
 
 Staple Check
+
 ```bash
 spctl -a -vvv -t install "/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
 ```
 
 Tauri Build
+
 ```bash
 APPLE_ID="saivallampati6@gmail.com" APPLE_PASSWORD="ylra-xsdw-debh-qavs" APPLE_TEAM_ID="FWLCJN85BF" npm run tauri build
 ```

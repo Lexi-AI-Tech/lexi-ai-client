@@ -85,7 +85,11 @@ const StatCard: React.FC<StatCardProps> = ({
   subValue,
   accentColor,
 }) => (
-  <motion.div className="stat-card" variants={itemVariants} style={{ ["--stat-accent" as string]: accentColor }}>
+  <motion.div
+    className="stat-card"
+    variants={itemVariants}
+    style={{ ["--stat-accent" as string]: accentColor }}
+  >
     <div className="stat-card-icon">
       <Icon size={20} />
     </div>
@@ -120,7 +124,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
   const [loading, setLoading] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
-  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>([]);
+  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(
+    [],
+  );
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
 
@@ -160,10 +166,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
         const data = await invoke<ChartData>("get_analytics_chart", { period });
         setChartData(data);
       } catch (error: any) {
-        console.error(`Failed to fetch analytics chart for period ${period}:`, error);
+        console.error(
+          `Failed to fetch analytics chart for period ${period}:`,
+          error,
+        );
       }
     },
-    [isAuthenticated, tokens?.access_token]
+    [isAuthenticated, tokens?.access_token],
   );
 
   // Initial load: fetch all dashboard data once, then show content
@@ -175,24 +184,32 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
     let cancelled = false;
     (async () => {
       try {
-        await Promise.all([
-          fetchTranscripts(),
-          fetchStats(),
-          fetchChart("7d"),
-        ]);
+        await Promise.all([fetchTranscripts(), fetchStats(), fetchChart("7d")]);
       } catch (_) {}
       if (!cancelled) setInitialLoadDone(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, tokens?.access_token, fetchTranscripts, fetchStats, fetchChart]);
+  }, [
+    isAuthenticated,
+    tokens?.access_token,
+    fetchTranscripts,
+    fetchStats,
+    fetchChart,
+  ]);
 
   // Refetch chart when period changes (after initial load)
   useEffect(() => {
     if (!initialLoadDone || !isAuthenticated || !tokens?.access_token) return;
     fetchChart(activePeriod);
-  }, [initialLoadDone, activePeriod, fetchChart, isAuthenticated, tokens?.access_token]);
+  }, [
+    initialLoadDone,
+    activePeriod,
+    fetchChart,
+    isAuthenticated,
+    tokens?.access_token,
+  ]);
 
   useEffect(() => {
     const fetchHotkey = async () => {
@@ -222,7 +239,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
   };
   const maxChartValue = useMemo(
     () => Math.max(...resolvedChartData.data, 1),
-    [resolvedChartData.data]
+    [resolvedChartData.data],
   );
 
   if (!initialLoadDone) {
@@ -418,11 +435,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
                   <div
                     key={i}
                     className="chart-bar"
-                    style={{
-                      ["--chart-height" as string]: `${(value / maxChartValue) * 100}%`,
-                      ["--chart-opacity" as string]: i === resolvedChartData.data.length - 1 ? 1 : 0.5,
-                      ["--chart-min-height" as string]: value > 0 ? "4px" : "0",
-                    } as React.CSSProperties}
+                    style={
+                      {
+                        ["--chart-height" as string]: `${(value / maxChartValue) * 100}%`,
+                        ["--chart-opacity" as string]:
+                          i === resolvedChartData.data.length - 1 ? 1 : 0.5,
+                        ["--chart-min-height" as string]:
+                          value > 0 ? "4px" : "0",
+                      } as React.CSSProperties
+                    }
                     title={`${value} transcriptions`}
                   />
                 ))}
@@ -438,7 +459,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
               <div className="insight-item">
                 <span className="insight-dot success" />
                 <span className="insight-text">
-                  {resolvedChartData.total_transcriptions} successful this period
+                  {resolvedChartData.total_transcriptions} successful this
+                  period
                 </span>
               </div>
               <div className="insight-item">
@@ -447,7 +469,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
                   Avg.{" "}
                   {Math.round(
                     resolvedStats.words_typed_this_week /
-                    Math.max(resolvedChartData.total_transcriptions, 1),
+                      Math.max(resolvedChartData.total_transcriptions, 1),
                   )}{" "}
                   words per session
                 </span>

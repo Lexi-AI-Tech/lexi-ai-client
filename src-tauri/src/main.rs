@@ -63,20 +63,18 @@ mod shortcuts; // Voice command shortcuts that replace transcriptions with prede
 mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod titlebar; // Title bar customization (hide title, match background on macOS)
 mod tray; // System tray icon creation and event handling
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
-mod titlebar; // Title bar customization (hide title, match background on macOS)
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 
-use state::{
-    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState,
-};
+use state::{ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -100,8 +98,8 @@ use commands::hotkey::{
 use commands::notes::{create_note, delete_note, get_note, get_notes, update_note};
 use commands::onboarding::{
     complete_onboarding, complete_server_onboarding, get_onboarding_state,
-    get_server_onboarding_status, next_onboarding_step, previous_onboarding_step,
-    reset_onboarding, set_onboarding_step,
+    get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
+    set_onboarding_step,
 };
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
@@ -163,7 +161,6 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
     }
     Ok(())
 }
-
 
 /// Main entry point for the Tauri application
 ///

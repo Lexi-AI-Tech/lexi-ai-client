@@ -262,7 +262,9 @@ export function PermissionsStep({
               </div>
             ) : (
               <span className="permission-allow-hint">
-                {item.state.checking ? "..." : "Click to open system permission"}
+                {item.state.checking
+                  ? "..."
+                  : "Click to open system permission"}
               </span>
             )}
           </div>
@@ -389,9 +391,8 @@ export function TryItStep({
       const unlistenStopped = await listen("recording_stopped", () =>
         setIsListening(false),
       );
-      const unlistenTranscription = await listen(
-        "transcription_success",
-        () => setSetupWorking(true),
+      const unlistenTranscription = await listen("transcription_success", () =>
+        setSetupWorking(true),
       );
       unlisten = () => {
         unlistenGlobal();

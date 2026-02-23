@@ -188,13 +188,17 @@ export function HotkeySelector({
       <span key={`${keyIndex}-${key}`} className="hotkey-selector__key-row">
         <span className="hotkey-selector__key-cap">
           {keyInfo && (
-            <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>
+            <span className="hotkey-selector__key-symbol">
+              {keyInfo.symbol}
+            </span>
           )}
           <span className="hotkey-selector__key-label">
             {keyInfo ? keyInfo.label : key.trim()}
           </span>
         </span>
-        {keyIndex < totalKeys - 1 && <span className="hotkey-selector__plus">+</span>}
+        {keyIndex < totalKeys - 1 && (
+          <span className="hotkey-selector__plus">+</span>
+        )}
       </span>
     );
   };
@@ -210,7 +214,10 @@ export function HotkeySelector({
         {hotkeys.map((hotkey, index) => {
           const keys = hotkey.split("+");
           return (
-            <div key={`hotkey-${index}-${hotkey}`} className="hotkey-selector__chip-wrapper">
+            <div
+              key={`hotkey-${index}-${hotkey}`}
+              className="hotkey-selector__chip-wrapper"
+            >
               <div className="hotkey-selector__chip">
                 {keys.map((key, keyIndex) =>
                   renderKeyCap(key, keyIndex, keys.length),

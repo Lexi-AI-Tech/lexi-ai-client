@@ -32,7 +32,7 @@ type Page =
   | "vocabulary"
   | "actions"
   | "shortcuts"
-  | "notes"
+  | "notes";
 
 const LOADING_DELAY_MS = 150; // Only show loading spinner if init takes longer than this (avoids brief flash on first load)
 
@@ -65,7 +65,7 @@ function App() {
       try {
         const status = await invoke<{ is_complete: boolean; version: number }>(
           "get_server_onboarding_status",
-          { version: ONBOARDING_VERSION }
+          { version: ONBOARDING_VERSION },
         );
         if (cancelled) return;
         if (status.is_complete) {
