@@ -302,9 +302,7 @@ pub fn spawn_recording_thread(
                         println!("🔄 Seamlessly switching recording mode: Assistant → Action");
                         ctx.mode = RecordingMode::Action;
                         // Swap pill UI modes
-                        app_handle
-                            .emit("recording_stopped", ())
-                            .unwrap_or_default();
+                        app_handle.emit("recording_stopped", ()).unwrap_or_default();
                         app_handle
                             .emit("action_recording_started", ())
                             .unwrap_or_default();
@@ -322,16 +320,14 @@ pub fn spawn_recording_thread(
                         app_handle
                             .emit("action_recording_stopped", ())
                             .unwrap_or_default();
-                        app_handle
-                            .emit("recording_started", ())
-                            .unwrap_or_default();
+                        app_handle.emit("recording_started", ()).unwrap_or_default();
                     }
                 }
 
                 // ── ERROR HANDLING / IGNORED STATES ─────────────────
 
                 // Ignoring duplicates and mid-state switches
-                (RecordingCommand::Start, _) 
+                (RecordingCommand::Start, _)
                 | (RecordingCommand::ActionStart, _)
                 | (RecordingCommand::SwitchToAction, _)
                 | (RecordingCommand::SwitchToAssistant, _) => {
