@@ -84,7 +84,7 @@ pub async fn get_transcripts(
 
     utils::log_api_request("Get paginated list of transcripts", "GET", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -136,7 +136,7 @@ pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Tra
 
     utils::log_api_request("Get specific transcript by ID", "GET", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -188,7 +188,7 @@ pub async fn delete_transcript(app: AppHandle, transcript_id: String) -> Result<
 
     utils::log_api_request("Delete transcript by ID", "DELETE", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .delete(&url)
         .header("Authorization", format!("Bearer {}", auth_token))

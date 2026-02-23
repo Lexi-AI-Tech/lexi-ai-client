@@ -36,7 +36,7 @@ pub async fn get_analytics_stats(app: AppHandle) -> Result<StatsResponse, String
 
     utils::log_api_request("Get user statistics", "GET", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -85,7 +85,7 @@ pub async fn get_analytics_chart(
 
     utils::log_api_request("Get chart data for specific period", "GET", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))

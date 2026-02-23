@@ -210,8 +210,9 @@ impl AudioRecorder {
         }
 
         // Extract the captured audio data from the shared buffer
-        let audio_buffer = self.audio_data.lock().unwrap();
-        let audio_data = audio_buffer.clone();
+        // using std::mem::take to avoid copying data while holding the lock
+        let mut audio_buffer = self.audio_data.lock().unwrap();
+        let audio_data = std::mem::take(&mut *audio_buffer);
         drop(audio_buffer); // Release the lock as soon as possible
 
         // Define WAV file specification

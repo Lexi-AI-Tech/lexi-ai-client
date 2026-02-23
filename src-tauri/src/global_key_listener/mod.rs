@@ -232,7 +232,7 @@ impl KeyStateTracker {
     fn matches_hotkey(&self, hotkey_config: &str, _trigger_key: &str) -> bool {
         let parts: Vec<String> = hotkey_config
             .split('+')
-            .map(|s| normalize_key_string(s))
+            .map(normalize_key_string)
             .collect();
         if parts.is_empty() {
             return false;
@@ -268,40 +268,38 @@ impl KeyStateTracker {
                     return Some(HotkeyCommandResult::SendNow(cmd));
                 }
             }
-        } else {
-            if self.active_hotkeys.contains(&hotkey_normalized) {
-                let parts: Vec<String> = hotkey_normalized
-                    .split('+')
-                    .map(|s| normalize_key_string(s))
-                    .collect();
+        } else if self.active_hotkeys.contains(&hotkey_normalized) {
+            let parts: Vec<String> = hotkey_normalized
+                .split('+')
+                .map(normalize_key_string)
+                .collect();
 
-                if parts.contains(&trigger_key.to_string()) {
-                    self.active_hotkeys.remove(&hotkey_normalized);
-                    self.last_deactivated_at
-                        .insert(hotkey_normalized.clone(), Instant::now());
+            if parts.contains(&trigger_key.to_string()) {
+                self.active_hotkeys.remove(&hotkey_normalized);
+                self.last_deactivated_at
+                    .insert(hotkey_normalized.clone(), Instant::now());
 
-                    println!("🔑 Hotkey Deactivated: {}", hotkey_normalized);
+                println!("🔑 Hotkey Deactivated: {}", hotkey_normalized);
 
-                    let elapsed = self
-                        .last_press_at
-                        .map(|t| t.elapsed())
-                        .unwrap_or(MIN_PRESS_RELEASE_INTERVAL);
-                    let base_cmd = if is_action {
-                        RecordingCommand::ActionStop
-                    } else {
-                        RecordingCommand::Stop
-                    };
+                let elapsed = self
+                    .last_press_at
+                    .map(|t| t.elapsed())
+                    .unwrap_or(MIN_PRESS_RELEASE_INTERVAL);
+                let base_cmd = if is_action {
+                    RecordingCommand::ActionStop
+                } else {
+                    RecordingCommand::Stop
+                };
 
-                    if elapsed >= MIN_PRESS_RELEASE_INTERVAL {
-                        return Some(HotkeyCommandResult::SendNow(base_cmd));
-                    } else {
-                        let remaining = MIN_PRESS_RELEASE_INTERVAL - elapsed;
-                        println!(
-                            "⏱️  Release before minimum interval, delaying Stop by {:.2}s",
-                            remaining.as_secs_f64()
-                        );
-                        return Some(HotkeyCommandResult::SendStopAfter(remaining));
-                    }
+                if elapsed >= MIN_PRESS_RELEASE_INTERVAL {
+                    return Some(HotkeyCommandResult::SendNow(base_cmd));
+                } else {
+                    let remaining = MIN_PRESS_RELEASE_INTERVAL - elapsed;
+                    println!(
+                        "⏱️  Release before minimum interval, delaying Stop by {:.2}s",
+                        remaining.as_secs_f64()
+                    );
+                    return Some(HotkeyCommandResult::SendStopAfter(remaining));
                 }
             }
         }

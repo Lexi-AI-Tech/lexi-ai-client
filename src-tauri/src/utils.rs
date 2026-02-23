@@ -28,3 +28,13 @@ pub fn get_device_type() -> &'static str {
 pub fn log_api_request(_purpose: &str, _method: &str, _url: &str) {
     // println!("🌐 API Request: {} {} | Purpose: {}", _method, _url, _purpose);
 }
+
+/// Creates a reqwest client with a strict timeout to prevent indefinite hangs
+/// when the network drops or the server is unresponsive.
+pub fn create_http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+}

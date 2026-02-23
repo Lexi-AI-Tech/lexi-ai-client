@@ -171,7 +171,7 @@ fn handle_tray_icon_event(tray: &tauri::tray::TrayIcon, event: TrayIconEvent) {
                     println!("✅ Window hidden via tray click");
                 }
             } else {
-                show_and_focus_main_window(&app);
+                show_and_focus_main_window(app);
             }
         }
     }

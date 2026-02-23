@@ -44,7 +44,7 @@ pub async fn get_shortcuts(app: AppHandle) -> Result<Vec<Shortcut>, String> {
 
     utils::log_api_request("Get all shortcuts", "GET", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -96,7 +96,7 @@ pub async fn create_shortcut(
 
     utils::log_api_request("Create new shortcut", "POST", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -152,7 +152,7 @@ pub async fn update_shortcut(
 
     utils::log_api_request("Update shortcut", "PUT", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .put(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -204,7 +204,7 @@ pub async fn delete_shortcut(app: AppHandle, shortcut_id: String) -> Result<(), 
 
     utils::log_api_request("Delete shortcut", "DELETE", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .delete(&url)
         .header("Authorization", format!("Bearer {}", auth_token))

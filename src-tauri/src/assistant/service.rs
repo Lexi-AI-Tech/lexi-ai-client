@@ -43,7 +43,7 @@ impl AssistantService {
     /// Initializes the HTTP client.
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: crate::utils::create_http_client(),
         }
     }
 
@@ -83,7 +83,7 @@ impl AssistantService {
         // Check if offline transcription is enabled
         if offline_transcription {
             // COMMENTED OUT: Offline transcription using local Whisper model
-            return Err("Offline transcription is currently disabled. Please use server-based transcription.".into());
+            Err("Offline transcription is currently disabled. Please use server-based transcription.".into())
 
             // println!("📦 Using offline transcription (local Whisper model)");
 

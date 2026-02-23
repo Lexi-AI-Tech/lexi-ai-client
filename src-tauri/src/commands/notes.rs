@@ -54,10 +54,8 @@ pub async fn get_notes(
     let page = page.unwrap_or(1);
     let page_size = page_size.unwrap_or(20);
 
-    let params = vec![
-        ("page", page.to_string()),
-        ("page_size", page_size.to_string()),
-    ];
+    let params = [("page", page.to_string()),
+        ("page_size", page_size.to_string())];
 
     let query_string = params
         .iter()
@@ -71,7 +69,7 @@ pub async fn get_notes(
         query_string
     );
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -117,7 +115,7 @@ pub async fn get_note(app: AppHandle, note_id: String) -> Result<Note, String> {
 
     let url = format!("{}/api/v1/notes/{}", crate::config::api_base_url(), note_id);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -165,7 +163,7 @@ pub async fn create_note(app: AppHandle, content: String) -> Result<Note, String
 
     let request_body = CreateNoteRequest { content };
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -219,7 +217,7 @@ pub async fn update_note(
 
     let request_body = UpdateNoteRequest { content };
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .put(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -267,7 +265,7 @@ pub async fn delete_note(app: AppHandle, note_id: String) -> Result<(), String> 
 
     let url = format!("{}/api/v1/notes/{}", crate::config::api_base_url(), note_id);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .delete(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
