@@ -214,8 +214,19 @@ pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
         ActivationPolicy::Regular // Shows in dock
     };
     
+    let was_focused = app.get_webview_window("main")
+        .map(|w| w.is_focused().unwrap_or(false))
+        .unwrap_or(false);
+    
     let _ = app.set_activation_policy(policy);
     println!("✅ Synced: app icon hidden = {}", hide_icon);
+    
+    if was_focused {
+        // macOS drops application focus natively when changing activation policies.
+        // If the user was actively using the app (e.g., clicking "Save" in Settings),
+        // forcefully regain focus so they aren't booted out of the window.
+        crate::window::show_and_focus_main_window(app);
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
