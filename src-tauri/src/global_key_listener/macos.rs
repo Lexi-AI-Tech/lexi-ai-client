@@ -1,7 +1,5 @@
 //! macOS Native Event Tap Listener
 
-#![cfg(target_os = "macos")]
-
 use crate::RecordingCommand;
 use std::sync::{mpsc, Arc, Mutex};
 use tauri::{AppHandle, Emitter};
@@ -174,11 +172,11 @@ unsafe extern "C-unwind" fn raw_callback(
             if let Ok(mut tracker) = state.tracker.lock() {
                 tracker.update_key_state(&key_str, is_actual_press);
 
-                let recording_hotkeys = state.config_rx.borrow().clone();
-                let action_hotkeys = state.action_hotkey_rx.borrow().clone();
+                let recording_hotkeys_guard = state.config_rx.borrow();
+                let action_hotkeys_guard = state.action_hotkey_rx.borrow();
 
                 let mut triggered_action_cmd = None;
-                for hotkey in &action_hotkeys {
+                for hotkey in &*action_hotkeys_guard {
                     if let Some(cmd) =
                         tracker.process_event(hotkey, &key_str, is_actual_press, true)
                     {
@@ -189,7 +187,7 @@ unsafe extern "C-unwind" fn raw_callback(
 
                 let mut triggered_rec_cmd = None;
                 if triggered_action_cmd.is_none() {
-                    for hotkey in &recording_hotkeys {
+                    for hotkey in &*recording_hotkeys_guard {
                         if let Some(cmd) =
                             tracker.process_event(hotkey, &key_str, is_actual_press, false)
                         {

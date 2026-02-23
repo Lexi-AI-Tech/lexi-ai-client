@@ -244,22 +244,33 @@ export const ActionsPage: React.FC = () => {
               actionHotkeys.map((hotkey, index) => {
                 const keys = hotkey.split("+");
                 return (
-                  <div key={`hotkey-${index}-${hotkey}`} className="hotkey-selector__chip-wrapper" style={{ paddingRight: 0 }}>
+                  <div
+                    key={`hotkey-${index}-${hotkey}`}
+                    className="hotkey-selector__chip-wrapper"
+                    style={{ paddingRight: 0 }}
+                  >
                     <div className="hotkey-selector__chip">
                       {keys.map((key, keyIndex) => {
                         const keyName = key.trim().toLowerCase();
                         const keyInfo = KEY_SYMBOLS[keyName];
                         return (
-                          <span key={`${keyIndex}-${key}`} className="hotkey-selector__key-row">
+                          <span
+                            key={`${keyIndex}-${key}`}
+                            className="hotkey-selector__key-row"
+                          >
                             <span className="hotkey-selector__key-cap">
                               {keyInfo && (
-                                <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>
+                                <span className="hotkey-selector__key-symbol">
+                                  {keyInfo.symbol}
+                                </span>
                               )}
                               <span className="hotkey-selector__key-label">
                                 {keyInfo ? keyInfo.label : key.trim()}
                               </span>
                             </span>
-                            {keyIndex < keys.length - 1 && <span className="hotkey-selector__plus">+</span>}
+                            {keyIndex < keys.length - 1 && (
+                              <span className="hotkey-selector__plus">+</span>
+                            )}
                           </span>
                         );
                       })}
@@ -268,7 +279,13 @@ export const ActionsPage: React.FC = () => {
                 );
               })
             ) : (
-              <div style={{ color: "#9ca3af", fontSize: "14px", padding: "12px 16px" }}>
+              <div
+                style={{
+                  color: "#9ca3af",
+                  fontSize: "14px",
+                  padding: "12px 16px",
+                }}
+              >
                 No action hotkeys configured.
               </div>
             )}
@@ -473,7 +490,7 @@ export const ActionsPage: React.FC = () => {
                             onClick={() =>
                               handlePlayActionAudio(
                                 action.id,
-                                action.output_audio_file_url!
+                                action.output_audio_file_url!,
                               )
                             }
                             style={{
@@ -660,10 +677,7 @@ export const ActionsPage: React.FC = () => {
         )}
 
         {deleteConfirmId && (
-          <div
-            className="delete-modal-overlay"
-            onClick={closeDeleteConfirm}
-          >
+          <div className="delete-modal-overlay" onClick={closeDeleteConfirm}>
             <div
               className="delete-modal-content"
               onClick={(e) => e.stopPropagation()}

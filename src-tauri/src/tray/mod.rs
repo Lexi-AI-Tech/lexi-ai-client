@@ -51,13 +51,15 @@ use crate::window::show_and_focus_main_window;
 pub fn init_system_tray(app: &mut App) -> Result<(), tauri::Error> {
     // Create system tray menu items
     let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
-    let paste_transcript_item =
-        MenuItem::with_id(app, "paste_last_transcript", "Paste last transcript", true, None::<&str>)?;
-    let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let tray_menu = Menu::with_items(
+    let paste_transcript_item = MenuItem::with_id(
         app,
-        &[&show_item, &paste_transcript_item, &quit_item],
+        "paste_last_transcript",
+        "Paste last transcript",
+        true,
+        None::<&str>,
     )?;
+    let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let tray_menu = Menu::with_items(app, &[&show_item, &paste_transcript_item, &quit_item])?;
 
     // Get the default window icon for the tray
     let tray_icon = app.default_window_icon().ok_or_else(|| {
@@ -171,7 +173,7 @@ fn handle_tray_icon_event(tray: &tauri::tray::TrayIcon, event: TrayIconEvent) {
                     println!("✅ Window hidden via tray click");
                 }
             } else {
-                show_and_focus_main_window(&app);
+                show_and_focus_main_window(app);
             }
         }
     }

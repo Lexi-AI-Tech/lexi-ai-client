@@ -361,7 +361,9 @@
 
 .permission-card--clickable {
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
 }
 
 .permission-card--clickable:hover:not([aria-disabled="true"]) {

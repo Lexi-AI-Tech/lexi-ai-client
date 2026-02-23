@@ -1,7 +1,7 @@
 //! macOS title bar styling: match window background to app grey (#f1f3f5).
 
-#![cfg(target_os = "macos")]
-
+use cocoa::appkit::NSWindow;
+use cocoa::base::id;
 use tauri::WebviewWindow;
 
 /// Applies macOS-specific title bar styling so the native title bar
@@ -9,9 +9,6 @@ use tauri::WebviewWindow;
 pub fn apply_style(window: &WebviewWindow) {
     if let Ok(ns_window_ptr) = window.ns_window() {
         unsafe {
-            use cocoa::appkit::NSWindow;
-            use cocoa::base::id;
-
             let ns_window = ns_window_ptr as id;
             let r = 241.0 / 255.0;
             let g = 243.0 / 255.0;

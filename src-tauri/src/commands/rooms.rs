@@ -49,7 +49,7 @@ pub async fn create_room(app: AppHandle, name: String) -> Result<Room, String> {
         .await
         .ok_or("Authentication required")?;
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
 
     let payload = RoomCreate { name };
@@ -156,25 +156,17 @@ pub async fn start_room_recording(
         tokio::runtime::Handle::try_current().map_err(|_| "No tokio runtime available")?;
 
     thread::spawn(move || {
-        loop {
-            match audio_rx.recv() {
-                Ok(chunk) => {
-                    let guard = websocket_audio_tx.lock().unwrap();
-                    if let Some(ref tx) = *guard {
-                        // Send to tokio channel using blocking send
-                        let tx_clone = tx.clone();
-                        if let Err(e) = rt_handle.block_on(tx_clone.send(chunk)) {
-                            eprintln!("Failed to send audio chunk to WebSocket: {}", e);
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                Err(_) => {
-                    // Channel closed
+        while let Ok(chunk) = audio_rx.recv() {
+            let guard = websocket_audio_tx.lock().unwrap();
+            if let Some(ref tx) = *guard {
+                // Send to tokio channel using blocking send
+                let tx_clone = tx.clone();
+                if let Err(e) = rt_handle.block_on(tx_clone.send(chunk)) {
+                    eprintln!("Failed to send audio chunk to WebSocket: {}", e);
                     break;
                 }
+            } else {
+                break;
             }
         }
     });
@@ -244,7 +236,7 @@ pub async fn list_rooms(app: AppHandle) -> Result<Vec<Room>, String> {
         .await
         .ok_or("Authentication required")?;
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
 
     utils::log_api_request("List user's rooms", "GET", &url);
@@ -278,7 +270,7 @@ pub async fn get_room_details(
         .await
         .ok_or("Authentication required")?;
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
 
     utils::log_api_request("Get room details", "GET", &url);
@@ -313,7 +305,7 @@ pub async fn update_room(
         .await
         .ok_or("Authentication required")?;
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
 
     let payload = RoomUpdate { name };
@@ -351,7 +343,7 @@ pub async fn update_speaker(
         .await
         .ok_or("Authentication required")?;
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let url = format!(
         "{}/api/v1/rooms/{}/speakers",
         crate::config::api_base_url(),

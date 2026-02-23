@@ -224,7 +224,6 @@ export const NotesPage: React.FC = () => {
             minHeight: "200px",
           }}
         >
-
           {/* Textarea */}
           <textarea
             value={content}
@@ -739,10 +738,7 @@ export const NotesPage: React.FC = () => {
       )}
 
       {deleteConfirmId && (
-        <div
-          className="delete-modal-overlay"
-          onClick={closeDeleteConfirm}
-        >
+        <div className="delete-modal-overlay" onClick={closeDeleteConfirm}>
           <div
             className="delete-modal-content"
             onClick={(e) => e.stopPropagation()}

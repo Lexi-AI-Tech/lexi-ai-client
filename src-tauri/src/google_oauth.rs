@@ -186,7 +186,7 @@ pub async fn start_google_login(
     let api_base_url = config::api_base_url();
     let store_verifier_url = format!("{}/api/v1/auth/oauth/verifier", api_base_url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let store_result = client
         .post(&store_verifier_url)
         .json(&serde_json::json!({

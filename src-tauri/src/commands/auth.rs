@@ -245,10 +245,10 @@ async fn refresh_access_token(
     refresh_token: &str,
 ) -> Result<Option<String>, String> {
     use crate::api_endpoints::auth;
-    use reqwest;
+
     use serde_json::json;
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let url = auth::refresh_url();
 
     let device_type = utils::get_device_type();
@@ -610,7 +610,7 @@ pub async fn get_current_user(app: AppHandle) -> Result<UserInfo, String> {
 
     utils::log_api_request("Get current user information", "GET", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -653,7 +653,7 @@ pub async fn logout(app: AppHandle) -> Result<(), String> {
 
     utils::log_api_request("Logout from backend", "POST", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))

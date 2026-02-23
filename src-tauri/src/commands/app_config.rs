@@ -94,12 +94,12 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
     let auth_token = match get_auth_token_async(app).await {
         Some(token) => token,
         None => {
-            crate::commands::auth::handle_auth_expired(&app);
+            crate::commands::auth::handle_auth_expired(app);
             return Err("Please sign in to sync your settings".to_string());
         }
     };
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let url = app_config::get_url(Some(&format!("system_type={}", utils::get_system_type())));
 
     utils::log_api_request("Fetch app configuration from server", "GET", &url);
@@ -331,7 +331,7 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(),
         }
     };
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let url = app_config::update_url();
     let request_body = build_request_body(config);
 

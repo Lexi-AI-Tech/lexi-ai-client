@@ -36,9 +36,9 @@ const HEIGHT_DIFF = RECORDING_SIZE.height - IDLE_SIZE.height;
  * This prevents the visible repositioning issue.
  */
 export const Pill: React.FC = () => {
-  const [status, setStatus] = useState<"idle" | "recording" | "processing" | "speaking">(
-    "idle",
-  );
+  const [status, setStatus] = useState<
+    "idle" | "recording" | "processing" | "speaking"
+  >("idle");
   const [isActionMode, setIsActionMode] = useState(false); // Track if action hotkey is active
   const [isHovered, setIsHovered] = useState(false);
   const [audioLevels, setAudioLevels] = useState<number[]>([]);
@@ -147,8 +147,7 @@ export const Pill: React.FC = () => {
             const idleX = idlePositionRef.current.x;
             const idleY = idlePositionRef.current.y;
 
-            const recX =
-              idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
+            const recX = idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
             const recY = idleY - HEIGHT_DIFF;
 
             console.log(
@@ -158,9 +157,7 @@ export const Pill: React.FC = () => {
             await window.setSize(
               new LogicalSize(RECORDING_SIZE.width, RECORDING_SIZE.height),
             );
-            await window.setPosition(
-              new LogicalPosition(recX, recY),
-            );
+            await window.setPosition(new LogicalPosition(recX, recY));
           } catch (e) {
             console.error("Failed to expand window:", e);
           }
@@ -183,16 +180,13 @@ export const Pill: React.FC = () => {
               const idleX = idlePositionRef.current.x;
               const idleY = idlePositionRef.current.y;
 
-              const recX =
-                idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
+              const recX = idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
               const recY = idleY - HEIGHT_DIFF;
 
               await window.setSize(
                 new LogicalSize(RECORDING_SIZE.width, RECORDING_SIZE.height),
               );
-              await window.setPosition(
-                new LogicalPosition(recX, recY),
-              );
+              await window.setPosition(new LogicalPosition(recX, recY));
             } catch (e) {
               console.error("Failed to expand window:", e);
             }
@@ -212,9 +206,7 @@ export const Pill: React.FC = () => {
             await window.setSize(
               new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
             );
-            await window.setPosition(
-              new LogicalPosition(procX, procY),
-            );
+            await window.setPosition(new LogicalPosition(procX, procY));
           } catch (e) {
             console.error("Failed to resize to processing:", e);
           }
@@ -230,14 +222,13 @@ export const Pill: React.FC = () => {
               if (!idlePositionRef.current) return;
               const idleX = idlePositionRef.current.x;
               const idleY = idlePositionRef.current.y;
-              const procX = idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
+              const procX =
+                idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
               const procY = idleY - HEIGHT_DIFF;
               await window.setSize(
                 new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
               );
-              await window.setPosition(
-                new LogicalPosition(procX, procY),
-              );
+              await window.setPosition(new LogicalPosition(procX, procY));
             } catch (e) {
               console.error("Failed to resize to processing:", e);
             }
@@ -516,9 +507,7 @@ export const Pill: React.FC = () => {
             await window.setSize(
               new LogicalSize(SPEAKING_SIZE.width, SPEAKING_SIZE.height),
             );
-            await window.setPosition(
-              new LogicalPosition(speakX, speakY),
-            );
+            await window.setPosition(new LogicalPosition(speakX, speakY));
           } catch (e) {
             console.error("Failed to resize for speaking:", e);
           }
@@ -646,7 +635,8 @@ export const Pill: React.FC = () => {
       const curveFactor = Math.sin((i / (numBars - 1)) * Math.PI);
       const curvedLevel = level * (0.65 + curveFactor * 0.35);
       return (
-        minBarHeight + (maxBarHeight - minBarHeight) * Math.max(0.12, curvedLevel)
+        minBarHeight +
+        (maxBarHeight - minBarHeight) * Math.max(0.12, curvedLevel)
       );
     });
 
@@ -781,78 +771,79 @@ export const Pill: React.FC = () => {
       style={baseStyle}
     >
       {/* Chasing border light — color changes based on state */}
-      {status !== "idle" && (() => {
-        // Pick colors based on state
-        let color1: string, color2: string, color3: string, speed: string;
-        if (status === "speaking") {
-          // Speaking/TTS: purple
-          color1 = "#a855f7";   // Purple
-          color2 = "#d8b4fe";   // Light purple
-          color3 = "rgba(168, 85, 247, 0.1)";
-          speed = "1.8s";
-        } else if (status === "processing") {
-          // Processing: cool blue/cyan
-          color1 = "#3b82f6";   // Blue
-          color2 = "#93c5fd";   // Light blue
-          color3 = "rgba(59, 130, 246, 0.1)";
-          speed = "1.5s";
-        } else if (isActionMode) {
-          // Smart actions: warm orange
-          color1 = "#f97316";   // Orange
-          color2 = "#fdba74";   // Light orange
-          color3 = "rgba(249, 115, 22, 0.1)";
-          speed = "2s";
-        } else {
-          // Normal recording: green
-          color1 = "#22c55e";   // Green
-          color2 = "#86efac";   // Light green
-          color3 = "rgba(34, 197, 94, 0.1)";
-          speed = "2s";
-        }
+      {status !== "idle" &&
+        (() => {
+          // Pick colors based on state
+          let color1: string, color2: string, color3: string, speed: string;
+          if (status === "speaking") {
+            // Speaking/TTS: purple
+            color1 = "#a855f7"; // Purple
+            color2 = "#d8b4fe"; // Light purple
+            color3 = "rgba(168, 85, 247, 0.1)";
+            speed = "1.8s";
+          } else if (status === "processing") {
+            // Processing: cool blue/cyan
+            color1 = "#3b82f6"; // Blue
+            color2 = "#93c5fd"; // Light blue
+            color3 = "rgba(59, 130, 246, 0.1)";
+            speed = "1.5s";
+          } else if (isActionMode) {
+            // Smart actions: warm orange
+            color1 = "#f97316"; // Orange
+            color2 = "#fdba74"; // Light orange
+            color3 = "rgba(249, 115, 22, 0.1)";
+            speed = "2s";
+          } else {
+            // Normal recording: green
+            color1 = "#22c55e"; // Green
+            color2 = "#86efac"; // Light green
+            color3 = "rgba(34, 197, 94, 0.1)";
+            speed = "2s";
+          }
 
-        return (
-          <>
-            <style>
-              {`
+          return (
+            <>
+              <style>
+                {`
                 @keyframes borderFlow {
                   0% { transform: rotate(0deg); }
                   100% { transform: rotate(360deg); }
                 }
               `}
-            </style>
-            {/* Outer glow container */}
-            <div
-              style={{
-                position: "absolute",
-                inset: "-2px",
-                borderRadius: "20px",
-                overflow: "hidden",
-                pointerEvents: "none",
-              }}
-            >
-              {/* Rotating gradient that creates the chasing effect */}
+              </style>
+              {/* Outer glow container */}
               <div
                 style={{
                   position: "absolute",
-                  inset: "-50%",
-                  background: `conic-gradient(from 0deg, transparent 0deg, transparent 30deg, ${color3} 80deg, ${color1} 150deg, ${color2} 180deg, ${color1} 210deg, ${color3} 280deg, transparent 330deg, transparent 360deg)`,
-                  animation: `borderFlow ${speed} linear infinite`,
+                  inset: "-2px",
+                  borderRadius: "20px",
+                  overflow: "hidden",
+                  pointerEvents: "none",
+                }}
+              >
+                {/* Rotating gradient that creates the chasing effect */}
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: "-50%",
+                    background: `conic-gradient(from 0deg, transparent 0deg, transparent 30deg, ${color3} 80deg, ${color1} 150deg, ${color2} 180deg, ${color1} 210deg, ${color3} 280deg, transparent 330deg, transparent 360deg)`,
+                    animation: `borderFlow ${speed} linear infinite`,
+                  }}
+                />
+              </div>
+              {/* Inner black fill to mask center, creating border effect */}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: "0",
+                  borderRadius: "18px",
+                  backgroundColor: "rgba(0, 0, 0, 0.9)",
+                  pointerEvents: "none",
                 }}
               />
-            </div>
-            {/* Inner black fill to mask center, creating border effect */}
-            <div
-              style={{
-                position: "absolute",
-                inset: "0",
-                borderRadius: "18px",
-                backgroundColor: "rgba(0, 0, 0, 0.9)",
-                pointerEvents: "none",
-              }}
-            />
-          </>
-        );
-      })()}
+            </>
+          );
+        })()}
 
       {/* Icon container - only show for active states */}
       {status !== "idle" && (
@@ -887,11 +878,7 @@ export const Pill: React.FC = () => {
               </style>
               <svg width={50} height={26} viewBox="0 0 50 26" fill="none">
                 {/* Speaker icon */}
-                <path
-                  d="M12 8L8 11H5v4h3l4 3V8z"
-                  fill="white"
-                  opacity={0.9}
-                />
+                <path d="M12 8L8 11H5v4h3l4 3V8z" fill="white" opacity={0.9} />
                 {/* Sound arc 1 — close */}
                 <path
                   d="M18 9.5c1.5 1.2 2.5 3 2.5 5s-1 3.8-2.5 5"
@@ -919,31 +906,45 @@ export const Pill: React.FC = () => {
                   }}
                 />
                 {/* Dots that pulse — representing speech */}
-                <circle cx="33" cy="10" r="1.5" fill="white" opacity={0.6}
-                  style={{ animation: "speakPulse1 0.8s ease-in-out infinite" }} />
-                <circle cx="37" cy="13" r="1.5" fill="white" opacity={0.8}
-                  style={{ animation: "speakPulse1 0.8s ease-in-out 0.15s infinite" }} />
-                <circle cx="41" cy="10" r="1.5" fill="white" opacity={0.6}
-                  style={{ animation: "speakPulse1 0.8s ease-in-out 0.3s infinite" }} />
+                <circle
+                  cx="33"
+                  cy="10"
+                  r="1.5"
+                  fill="white"
+                  opacity={0.6}
+                  style={{ animation: "speakPulse1 0.8s ease-in-out infinite" }}
+                />
+                <circle
+                  cx="37"
+                  cy="13"
+                  r="1.5"
+                  fill="white"
+                  opacity={0.8}
+                  style={{
+                    animation: "speakPulse1 0.8s ease-in-out 0.15s infinite",
+                  }}
+                />
+                <circle
+                  cx="41"
+                  cy="10"
+                  r="1.5"
+                  fill="white"
+                  opacity={0.6}
+                  style={{
+                    animation: "speakPulse1 0.8s ease-in-out 0.3s infinite",
+                  }}
+                />
               </svg>
             </>
           ) : status === "processing" ? (
             <>
               {/* Processing: bars + loader */}
-              <WaveformIcon
-                width={52}
-                height={22}
-                audioLevels={[]}
-              />
+              <WaveformIcon width={52} height={22} audioLevels={[]} />
               <LoaderIcon size={14} color="white" />
             </>
           ) : (
             /* Recording: bars fill the pill */
-            <WaveformIcon
-              width={56}
-              height={26}
-              audioLevels={smoothedLevels}
-            />
+            <WaveformIcon width={56} height={26} audioLevels={smoothedLevels} />
           )}
         </div>
       )}

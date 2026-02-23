@@ -40,14 +40,14 @@ Capture uses **cpal** (Cross-Platform Audio Library); on macOS this goes through
 
 ### 3.1 Components
 
-| Component | Location | Role |
-|-----------|----------|------|
-| **Global key listener** | Outside this module | Sends `RecordingCommand` (Start / Stop / ActionStart / ActionStop) on an `mpsc` channel. Does not touch audio. |
-| **Recording thread** | `thread.rs` | Single `std::thread` that owns the state machine and the `AudioRecorder`. Only place that creates or drops the recorder. Receives commands, runs start/stop logic, emits Tauri events. |
-| **AudioRecorder** | `recorder.rs` | Holds cpal `Device`, `StreamConfig`, optional `Stream`, shared buffer (`Arc<Mutex<Vec<f32>>>`), and `recording_active: Arc<AtomicBool>`. Builds and tears down the input stream. |
-| **Stream callback** | `recorder.rs` (closure in `build_input_stream`) | Runs on cpal’s real-time thread. Reads `recording_active`, pushes samples into the buffer, optionally streams bytes and sends volume. |
-| **Volume forwarder** | `thread.rs` (spawned per session) | Receives `f32` volume on a channel and emits `volume-update` to the frontend. Exits when the session’s sender is dropped (when the recorder that owned it is dropped). |
-| **Tauri / frontend** | Outside this module | Listens for `recording_started`, `recording_stopped`, `volume-update`, `recording_skipped`, `recording_error`, etc. |
+| Component               | Location                                        | Role                                                                                                                                                                                   |
+| ----------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Global key listener** | Outside this module                             | Sends `RecordingCommand` (Start / Stop / ActionStart / ActionStop) on an `mpsc` channel. Does not touch audio.                                                                         |
+| **Recording thread**    | `thread.rs`                                     | Single `std::thread` that owns the state machine and the `AudioRecorder`. Only place that creates or drops the recorder. Receives commands, runs start/stop logic, emits Tauri events. |
+| **AudioRecorder**       | `recorder.rs`                                   | Holds cpal `Device`, `StreamConfig`, optional `Stream`, shared buffer (`Arc<Mutex<Vec<f32>>>`), and `recording_active: Arc<AtomicBool>`. Builds and tears down the input stream.       |
+| **Stream callback**     | `recorder.rs` (closure in `build_input_stream`) | Runs on cpal’s real-time thread. Reads `recording_active`, pushes samples into the buffer, optionally streams bytes and sends volume.                                                  |
+| **Volume forwarder**    | `thread.rs` (spawned per session)               | Receives `f32` volume on a channel and emits `volume-update` to the frontend. Exits when the session’s sender is dropped (when the recorder that owned it is dropped).                 |
+| **Tauri / frontend**    | Outside this module                             | Listens for `recording_started`, `recording_stopped`, `volume-update`, `recording_skipped`, `recording_error`, etc.                                                                    |
 
 ### 3.2 State machine (recording thread)
 

@@ -46,9 +46,10 @@ export const SettingsPage: React.FC = () => {
   const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
     hotkeys: [],
   });
-  const [currentActionHotkeys, setCurrentActionHotkeys] = useState<HotkeyConfig>({
-    hotkeys: [],
-  });
+  const [currentActionHotkeys, setCurrentActionHotkeys] =
+    useState<HotkeyConfig>({
+      hotkeys: [],
+    });
   const [activeSection, setActiveSection] = useState<
     "account" | "transcription" | "general" | "hotkeys"
   >("account");
@@ -219,9 +220,16 @@ export const SettingsPage: React.FC = () => {
       JSON.stringify(currentHotkeys.hotkeys) !== JSON.stringify(configHotkeys);
 
     const actionHotkeysChanged =
-      JSON.stringify(currentActionHotkeys.hotkeys) !== JSON.stringify(configActionHotkeys);
+      JSON.stringify(currentActionHotkeys.hotkeys) !==
+      JSON.stringify(configActionHotkeys);
 
-    if (!languageChanged && !autostartChanged && !enhanceChanged && !hotkeysChanged && !actionHotkeysChanged) {
+    if (
+      !languageChanged &&
+      !autostartChanged &&
+      !enhanceChanged &&
+      !hotkeysChanged &&
+      !actionHotkeysChanged
+    ) {
       return; // No changes needed
     }
 
@@ -311,9 +319,16 @@ export const SettingsPage: React.FC = () => {
       JSON.stringify(currentHotkeys.hotkeys) !== JSON.stringify(configHotkeys);
 
     const actionHotkeysChanged =
-      JSON.stringify(currentActionHotkeys.hotkeys) !== JSON.stringify(configActionHotkeys);
+      JSON.stringify(currentActionHotkeys.hotkeys) !==
+      JSON.stringify(configActionHotkeys);
 
-    return languageChanged || autostartChanged || enhanceChanged || hotkeysChanged || actionHotkeysChanged;
+    return (
+      languageChanged ||
+      autostartChanged ||
+      enhanceChanged ||
+      hotkeysChanged ||
+      actionHotkeysChanged
+    );
   };
 
   // Removed auto-save useEffect in favor of manual Save Settings button
@@ -361,9 +376,7 @@ export const SettingsPage: React.FC = () => {
       <div className="page">
         <h2 className="page__title">Settings</h2>
         <div className="panel panel--center">
-          <p className="panel__message">
-            Sign in to access your settings
-          </p>
+          <p className="panel__message">Sign in to access your settings</p>
           <GoogleLoginButton onSuccess={() => {}} onError={() => {}} />
         </div>
       </div>
@@ -419,37 +432,58 @@ export const SettingsPage: React.FC = () => {
               <div ref={languageDropdownRef} className="rel mb-12">
                 <button
                   type="button"
-                  onClick={() => !isUpdating && !isLoading && setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
+                  onClick={() =>
+                    !isUpdating &&
+                    !isLoading &&
+                    setIsLanguageDropdownOpen(!isLanguageDropdownOpen)
+                  }
                   disabled={isUpdating || isLoading}
                   className="select-trigger"
                 >
                   <span>
                     {selectedLanguage
-                      ? SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label || "Select language"
+                      ? SUPPORTED_LANGUAGES.find(
+                          (l) => l.value === selectedLanguage,
+                        )?.label || "Select language"
                       : "Auto Detect Language"}
                   </span>
-                  <ChevronDown size={18} className={`dropdown-chevron ${isLanguageDropdownOpen ? "open" : ""}`} />
+                  <ChevronDown
+                    size={18}
+                    className={`dropdown-chevron ${isLanguageDropdownOpen ? "open" : ""}`}
+                  />
                 </button>
                 {isLanguageDropdownOpen && (
                   <div className="select-dropdown">
                     <div className="select-dropdown__list">
                       <button
                         type="button"
-                        onClick={() => { setSelectedLanguage(null); setIsLanguageDropdownOpen(false); }}
+                        onClick={() => {
+                          setSelectedLanguage(null);
+                          setIsLanguageDropdownOpen(false);
+                        }}
                         className="select-option"
                       >
                         <span>Auto Detect Language</span>
-                        {!selectedLanguage && <Check size={16} className="check flex-shrink-0" />}
+                        {!selectedLanguage && (
+                          <Check size={16} className="check flex-shrink-0" />
+                        )}
                       </button>
-                      {SUPPORTED_LANGUAGES.filter((lang) => lang.value !== "auto").map((lang) => (
+                      {SUPPORTED_LANGUAGES.filter(
+                        (lang) => lang.value !== "auto",
+                      ).map((lang) => (
                         <button
                           key={lang.value}
                           type="button"
-                          onClick={() => { setSelectedLanguage(lang.value as LanguageCode); setIsLanguageDropdownOpen(false); }}
+                          onClick={() => {
+                            setSelectedLanguage(lang.value as LanguageCode);
+                            setIsLanguageDropdownOpen(false);
+                          }}
                           className="select-option"
                         >
                           <span>{lang.label}</span>
-                          {selectedLanguage === lang.value && <Check size={16} className="check flex-shrink-0" />}
+                          {selectedLanguage === lang.value && (
+                            <Check size={16} className="check flex-shrink-0" />
+                          )}
                         </button>
                       ))}
                     </div>
@@ -468,11 +502,19 @@ export const SettingsPage: React.FC = () => {
             <div className="panel panel--lg mb-24">
               <div className="settings-row">
                 <div className="settings-row__content">
-                  <div className="settings-row__title">Enhance Transcription</div>
-                  <div className="settings-row__desc">Use AI to improve accuracy and formatting.</div>
+                  <div className="settings-row__title">
+                    Enhance Transcription
+                  </div>
+                  <div className="settings-row__desc">
+                    Use AI to improve accuracy and formatting.
+                  </div>
                 </div>
                 <ToggleSwitch
-                  enabled={(selectedEnhanceTranscription ?? enhanceTranscription ?? false) === true}
+                  enabled={
+                    (selectedEnhanceTranscription ??
+                      enhanceTranscription ??
+                      false) === true
+                  }
                   onToggle={handleToggleEnhanceTranscription}
                   disabled={isLoading || isUpdating}
                 />
@@ -486,11 +528,17 @@ export const SettingsPage: React.FC = () => {
             <div className="panel panel--lg mb-24">
               <div className="settings-row">
                 <div className="settings-row__content">
-                  <div className="settings-row__title">Start on System Startup</div>
-                  <div className="settings-row__desc">Automatically launch when your computer starts.</div>
+                  <div className="settings-row__title">
+                    Start on System Startup
+                  </div>
+                  <div className="settings-row__desc">
+                    Automatically launch when your computer starts.
+                  </div>
                 </div>
                 <ToggleSwitch
-                  enabled={(selectedAutostart ?? autostartEnabled ?? false) === true}
+                  enabled={
+                    (selectedAutostart ?? autostartEnabled ?? false) === true
+                  }
                   onToggle={handleToggleAutostart}
                   disabled={isLoading || isUpdating}
                 />

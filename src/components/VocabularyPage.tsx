@@ -119,7 +119,9 @@ export const VocabularyPage: React.FC = () => {
       setDeleteConfirmValue(null);
       toast.success("Vocabulary removed");
     } catch (err) {
-      toast.error((err as Error)?.message || "Failed to remove vocabulary item");
+      toast.error(
+        (err as Error)?.message || "Failed to remove vocabulary item",
+      );
     } finally {
       setDeletingValue(null);
     }
@@ -148,7 +150,7 @@ export const VocabularyPage: React.FC = () => {
     }
     const currentVocabulary = vocabulary || [];
     const updatedVocabulary = currentVocabulary.map((v) =>
-      v === editingValue ? trimmed : v
+      v === editingValue ? trimmed : v,
     );
     try {
       await updateConfig({ vocabulary: updatedVocabulary });
@@ -234,7 +236,8 @@ export const VocabularyPage: React.FC = () => {
               onClick={async () => {
                 setIsLoading(true);
                 try {
-                  const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
+                  const loadedConfig =
+                    await invoke<TauriAppConfig>("get_app_config");
                   setConfig(loadedConfig);
                 } catch (err: any) {
                   console.error("Failed to load app config:", err);
@@ -362,10 +365,7 @@ export const VocabularyPage: React.FC = () => {
       </div>
 
       {deleteConfirmValue && (
-        <div
-          className="delete-modal-overlay"
-          onClick={closeDeleteConfirm}
-        >
+        <div className="delete-modal-overlay" onClick={closeDeleteConfirm}>
           <div
             className="delete-modal-content"
             onClick={(e) => e.stopPropagation()}

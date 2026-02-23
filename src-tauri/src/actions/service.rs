@@ -47,7 +47,7 @@ impl ActionService {
     /// Initializes the HTTP client.
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: crate::utils::create_http_client(),
         }
     }
 

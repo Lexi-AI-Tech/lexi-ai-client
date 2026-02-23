@@ -64,7 +64,7 @@ pub async fn get_action_history(
 
     utils::log_api_request("Get paginated action history", "GET", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -111,7 +111,7 @@ pub async fn delete_action_history(app: AppHandle, action_id: String) -> Result<
 
     utils::log_api_request("Delete action history entry", "DELETE", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .delete(&url)
         .header("Authorization", format!("Bearer {}", auth_token))

@@ -103,7 +103,7 @@ export const onboardingStore: OnboardingState = {
     try {
       // Persist completion to server (by system type and version) then update local state
       await invoke("complete_server_onboarding", { version: 1 }).catch((e) =>
-        console.error("Failed to mark onboarding complete on server:", e)
+        console.error("Failed to mark onboarding complete on server:", e),
       );
       const state = await invoke<RustOnboardingState>("complete_onboarding");
       currentStep = normalizeStep(state.current_step);

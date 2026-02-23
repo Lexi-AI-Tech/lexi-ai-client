@@ -1,4 +1,4 @@
-import { toast } from 'sonner';
+import { toast } from "sonner";
 
 export interface ToastOptions {
   duration?: number;
@@ -37,13 +37,13 @@ export function useToast() {
     dismiss: (toastId?: string | number) => {
       toast.dismiss(toastId);
     },
-    promise: <T,>(
+    promise: <T>(
       promise: Promise<T>,
       messages: {
         loading: string;
         success: string;
         error: string;
-      }
+      },
     ) => {
       return toast.promise(promise, {
         loading: messages.loading,

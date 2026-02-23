@@ -227,7 +227,7 @@ pub async fn get_server_onboarding_status(
 
     utils::log_api_request("Get server onboarding status", "GET", &url);
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -275,7 +275,7 @@ pub async fn complete_server_onboarding(
         "version": version_param
     });
 
-    let client = reqwest::Client::new();
+    let client = crate::utils::create_http_client();
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))

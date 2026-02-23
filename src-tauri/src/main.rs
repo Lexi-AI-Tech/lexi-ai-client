@@ -63,20 +63,18 @@ mod shortcuts; // Voice command shortcuts that replace transcriptions with prede
 mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
+mod titlebar; // Title bar customization (hide title, match background on macOS)
 mod tray; // System tray icon creation and event handling
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
-mod titlebar; // Title bar customization (hide title, match background on macOS)
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
 
 use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 
-use state::{
-    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState,
-};
+use state::{ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -100,8 +98,8 @@ use commands::hotkey::{
 use commands::notes::{create_note, delete_note, get_note, get_notes, update_note};
 use commands::onboarding::{
     complete_onboarding, complete_server_onboarding, get_onboarding_state,
-    get_server_onboarding_status, next_onboarding_step, previous_onboarding_step,
-    reset_onboarding, set_onboarding_step,
+    get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
+    set_onboarding_step,
 };
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
@@ -164,7 +162,6 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-
 /// Main entry point for the Tauri application
 ///
 /// Sets up the application with the following:
@@ -203,7 +200,7 @@ pub fn main() {
         ))
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             println!("🔄 Second instance launch detected (e.g., from Spotlight or app icon)");
-            show_and_focus_main_window(&app.app_handle());
+            show_and_focus_main_window(app.app_handle());
 
             // Minimal backup retry
             let app_handle = app.app_handle().clone();
@@ -300,7 +297,7 @@ pub fn main() {
             if let Ok(Some(start_urls)) = app.deep_link().get_current() {
                 println!("🔗 App started via deep link: {:?}", start_urls);
                 // Show and focus the main window when opened via deep link
-                show_and_focus_main_window(&app_handle);
+                show_and_focus_main_window(app_handle);
             }
 
             // Listen for deep links when app is already running
@@ -335,37 +332,9 @@ pub fn main() {
 
 
 
-            // Load hotkeys from server (no local persistence; empty if server unreachable)
-            let initial_config = {
-                let app_handle_for_store = app_handle.clone();
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(async {
-                    let config = get_app_config(app_handle_for_store).await
-                        .unwrap_or_else(|e| {
-                            println!("⚠️  Server config unavailable ({}), using empty hotkeys", e);
-                            crate::commands::app_config::AppConfig::default()
-                        });
-                    config.hotkeys.unwrap_or_default()
-                })
-            };
-            println!("🔑 Recording hotkeys: {:?}", initial_config);
-            let (config_tx, config_rx) = watch::channel(initial_config.clone());
-
-            // Load action hotkeys from server (empty if server unreachable)
-            let initial_action_hotkeys = {
-                let app_handle_for_store = app_handle.clone();
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(async {
-                    let config = get_app_config(app_handle_for_store).await
-                        .unwrap_or_else(|e| {
-                            println!("⚠️  Server config unavailable ({}), using empty action hotkeys", e);
-                            crate::commands::app_config::AppConfig::default()
-                        });
-                    config.action_hotkeys.unwrap_or_default()
-                })
-            };
-            println!("🎯 Action hotkeys: {:?}", initial_action_hotkeys);
-            let (action_hotkey_tx, action_hotkey_rx) = watch::channel(initial_action_hotkeys);
+            // Initialize hotkey channels with empty default states to avoid blocking startup.
+            let (config_tx, config_rx) = watch::channel(Vec::new());
+            let (action_hotkey_tx, action_hotkey_rx) = watch::channel(Vec::new());
 
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));
@@ -378,6 +347,15 @@ pub fn main() {
             app.manage(RoomState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
+            });
+
+            // Fetch config in background after state is managed to ensure channels get updated
+            let app_handle_for_config = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                println!("🔄 Background task: Fetching config from server...");
+                if let Err(e) = get_app_config(app_handle_for_config).await {
+                    println!("⚠️  Server config unavailable on startup: {}", e);
+                }
             });
 
             // Defer starting the key listener until the frontend calls start_global_key_listener
@@ -425,7 +403,7 @@ pub fn main() {
                         println!("🔍 Main window received focus event");
                         let is_visible = window.is_visible().unwrap_or(false);
                         if !is_visible {
-                            show_and_focus_main_window(&window.app_handle());
+                            show_and_focus_main_window(window.app_handle());
                         } else {
                             // Already visible, just refocus
                             let _ = window.set_focus();
@@ -456,15 +434,12 @@ pub fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            match event {
-                RunEvent::Reopen { has_visible_windows, .. } => {
-                    println!(
-                        "🍎 RunEvent::Reopen triggered (has_visible_windows: {})",
-                        has_visible_windows
-                    );
-                    show_and_focus_main_window(app_handle);
-                }
-                _ => {}
+            if let RunEvent::Reopen { has_visible_windows, .. } = event {
+                println!(
+                    "🍎 RunEvent::Reopen triggered (has_visible_windows: {})",
+                    has_visible_windows
+                );
+                show_and_focus_main_window(app_handle);
             }
         });
 }

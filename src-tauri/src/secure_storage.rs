@@ -77,7 +77,7 @@ pub fn store_auth_data(_app: &AppHandle, data: &AuthData) -> Result<(), String> 
             .save()
             .map_err(|e| format!("Failed to save store: {}", e))?;
         println!("✅ Auth data stored in Tauri Store (dev mode)");
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(debug_assertions))]
