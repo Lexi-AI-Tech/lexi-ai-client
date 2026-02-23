@@ -114,10 +114,12 @@ use websocket::{start_oauth_websocket, stop_oauth_websocket};
 /// Command to control recording state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecordingCommand {
-    Start,       // Regular recording hotkey pressed
-    Stop,        // Regular recording hotkey released
-    ActionStart, // Action hotkey pressed
-    ActionStop,  // Action hotkey released
+    Start,             // Regular recording hotkey pressed
+    Stop,              // Regular recording hotkey released
+    ActionStart,       // Action hotkey pressed
+    ActionStop,        // Action hotkey released
+    SwitchToAction,    // Mode dynamically switched to Action
+    SwitchToAssistant, // Mode dynamically switched to Assistant
 }
 
 /// State held so the global key listener can be started later (after permissions are granted).
