@@ -35,6 +35,8 @@ pub struct AppConfig {
     pub vocabulary: Option<Vec<String>>,
     /// Hotkey combinations for triggering actions (e.g., ["Fn+Control"])
     pub action_hotkeys: Option<Vec<String>>,
+    /// Whether to hide the app icon from the dock
+    pub hide_icon: Option<bool>,
     /// Shortcuts for text expansion (array of shortcut items)
     pub shortcuts: Option<Vec<Shortcut>>,
 }
@@ -57,6 +59,7 @@ struct ServerAppConfigResponse {
     pub launch_on_system_startup: bool,
     pub vocabulary: Vec<String>,
     pub action_hotkeys: Option<Vec<String>>,
+    pub hide_icon: bool,
     pub shortcuts: Vec<Shortcut>,
 }
 
@@ -81,6 +84,9 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     // Sync launch_on_system_startup with actual OS autostart status
     // This will enable autostart if config has launch_on_system_startup: Some(true) or None (defaults to true)
     sync_autostart_status(&app, &mut config);
+
+    // Sync dock icon status based on config
+    sync_dock_icon_status(&app, &config);
 
     // Update in-memory state for hotkeys
     update_hotkey_state(&app, &config);
@@ -153,6 +159,7 @@ pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppC
     // Re-fetch from server to get the updated config (source of truth), then sync status from it
     let mut updated_config = fetch_config_from_server(&app).await?;
     sync_autostart_status(&app, &mut updated_config);
+    sync_dock_icon_status(&app, &updated_config);
     update_hotkey_state(&app, &updated_config);
 
     Ok(updated_config)
@@ -193,6 +200,29 @@ pub(crate) fn sync_autostart_status(app: &AppHandle, config: &mut AppConfig) {
     }
 }
 
+/// Sync dock icon visibility status from config
+#[cfg(target_os = "macos")]
+pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
+    use tauri::ActivationPolicy;
+    
+    // Default to false (icon is visible) if not set
+    let hide_icon = config.hide_icon.unwrap_or(false);
+    
+    let policy = if hide_icon {
+        ActivationPolicy::Accessory // Hides from dock, keeps menu bar
+    } else {
+        ActivationPolicy::Regular // Shows in dock
+    };
+    
+    let _ = app.set_activation_policy(policy);
+    println!("✅ Synced: app icon hidden = {}", hide_icon);
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn sync_dock_icon_status(_app: &AppHandle, _config: &AppConfig) {
+    // Only supported on macOS
+}
+
 /// Merge provided config into current config (only updates provided fields)
 fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.languages.is_some() {
@@ -212,6 +242,9 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     }
     if provided.action_hotkeys.is_some() {
         current.action_hotkeys = provided.action_hotkeys;
+    }
+    if provided.hide_icon.is_some() {
+        current.hide_icon = provided.hide_icon;
     }
     if provided.shortcuts.is_some() {
         current.shortcuts = provided.shortcuts;
@@ -242,6 +275,7 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         hotkeys: Some(response.hotkeys),
         enhance_transcription: Some(response.enhance_transcription),
         launch_on_system_startup: Some(response.launch_on_system_startup),
+        hide_icon: Some(response.hide_icon),
         vocabulary: Some(response.vocabulary),
         action_hotkeys: response.action_hotkeys,
         shortcuts: Some(response.shortcuts),
@@ -304,6 +338,12 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
         body.insert(
             "action_hotkeys".to_string(),
             serde_json::to_value(action_hotkeys).unwrap(),
+        );
+    }
+    if let Some(hide_icon) = config.hide_icon {
+        body.insert(
+            "hide_icon".to_string(),
+            serde_json::to_value(hide_icon).unwrap(),
         );
     }
     if let Some(ref shortcuts) = config.shortcuts {

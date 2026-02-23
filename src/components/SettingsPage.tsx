@@ -40,6 +40,9 @@ export const SettingsPage: React.FC = () => {
   );
   const [selectedEnhanceTranscription, setSelectedEnhanceTranscription] =
     useState<boolean | null>(null);
+  const [selectedHideIcon, setSelectedHideIcon] = useState<boolean | null>(
+    null,
+  );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   // Hotkey state
@@ -60,6 +63,7 @@ export const SettingsPage: React.FC = () => {
   const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
   const autostartEnabled = config?.launch_on_system_startup;
   const enhanceTranscription = config?.enhance_transcription;
+  const hideIconEnabled = config?.hide_icon;
 
   const configHotkeys = config?.hotkeys || [];
   const configActionHotkeys = config?.action_hotkeys || [];
@@ -87,6 +91,7 @@ export const SettingsPage: React.FC = () => {
         setSelectedEnhanceTranscription(
           loadedConfig.enhance_transcription ?? null,
         );
+        setSelectedHideIcon(loadedConfig.hide_icon ?? null);
       } catch (err: any) {
         console.error("Failed to load app config:", err);
         toast.error(err?.message || "Failed to load configuration");
@@ -216,6 +221,12 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
 
+    const currentHideIcon = hideIconEnabled ?? false;
+    const hideIconChanged =
+      selectedHideIcon !== null &&
+      selectedHideIcon !== undefined &&
+      selectedHideIcon !== currentHideIcon;
+
     const hotkeysChanged =
       JSON.stringify(currentHotkeys.hotkeys) !== JSON.stringify(configHotkeys);
 
@@ -227,6 +238,7 @@ export const SettingsPage: React.FC = () => {
       !languageChanged &&
       !autostartChanged &&
       !enhanceChanged &&
+      !hideIconChanged &&
       !hotkeysChanged &&
       !actionHotkeysChanged
     ) {
@@ -246,6 +258,9 @@ export const SettingsPage: React.FC = () => {
       }
       if (enhanceChanged && selectedEnhanceTranscription !== null) {
         updates.enhance_transcription = selectedEnhanceTranscription;
+      }
+      if (hideIconChanged && selectedHideIcon !== null) {
+        updates.hide_icon = selectedHideIcon;
       }
       if (hotkeysChanged) {
         updates.hotkeys = currentHotkeys.hotkeys;
@@ -271,6 +286,9 @@ export const SettingsPage: React.FC = () => {
       }
       if (enhanceChanged && updatedConfig.enhance_transcription !== undefined) {
         setSelectedEnhanceTranscription(updatedConfig.enhance_transcription);
+      }
+      if (hideIconChanged && updatedConfig.hide_icon !== undefined) {
+        setSelectedHideIcon(updatedConfig.hide_icon);
       }
 
       if (updatedConfig.hotkeys) {
@@ -315,6 +333,12 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
 
+    const currentHideIcon = hideIconEnabled ?? false;
+    const hideIconChanged =
+      selectedHideIcon !== null &&
+      selectedHideIcon !== undefined &&
+      selectedHideIcon !== currentHideIcon;
+
     const hotkeysChanged =
       JSON.stringify(currentHotkeys.hotkeys) !== JSON.stringify(configHotkeys);
 
@@ -326,6 +350,7 @@ export const SettingsPage: React.FC = () => {
       languageChanged ||
       autostartChanged ||
       enhanceChanged ||
+      hideIconChanged ||
       hotkeysChanged ||
       actionHotkeysChanged
     );
@@ -342,6 +367,11 @@ export const SettingsPage: React.FC = () => {
     const currentValue =
       selectedEnhanceTranscription ?? enhanceTranscription ?? false;
     setSelectedEnhanceTranscription(!currentValue);
+  };
+
+  const handleToggleHideIcon = () => {
+    const currentValue = selectedHideIcon ?? hideIconEnabled ?? false;
+    setSelectedHideIcon(!currentValue);
   };
 
   const ToggleSwitch: React.FC<{
@@ -377,7 +407,7 @@ export const SettingsPage: React.FC = () => {
         <h2 className="page__title">Settings</h2>
         <div className="panel panel--center">
           <p className="panel__message">Sign in to access your settings</p>
-          <GoogleLoginButton onSuccess={() => {}} onError={() => {}} />
+          <GoogleLoginButton onSuccess={() => { }} onError={() => { }} />
         </div>
       </div>
     );
@@ -443,8 +473,8 @@ export const SettingsPage: React.FC = () => {
                   <span>
                     {selectedLanguage
                       ? SUPPORTED_LANGUAGES.find(
-                          (l) => l.value === selectedLanguage,
-                        )?.label || "Select language"
+                        (l) => l.value === selectedLanguage,
+                      )?.label || "Select language"
                       : "Auto Detect Language"}
                   </span>
                   <ChevronDown
@@ -543,6 +573,25 @@ export const SettingsPage: React.FC = () => {
                   disabled={isLoading || isUpdating}
                 />
               </div>
+              {navigator.userAgent.toLowerCase().includes("mac") && (
+                <div className="settings-row">
+                  <div className="settings-row__content">
+                    <div className="settings-row__title">
+                      Hide Icon from Dock
+                    </div>
+                    <div className="settings-row__desc">
+                      Hide Lexi from the macOS Dock.
+                    </div>
+                  </div>
+                  <ToggleSwitch
+                    enabled={
+                      (selectedHideIcon ?? hideIconEnabled ?? false) === true
+                    }
+                    onToggle={handleToggleHideIcon}
+                    disabled={isLoading || isUpdating}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
