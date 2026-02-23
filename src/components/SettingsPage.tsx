@@ -555,7 +555,7 @@ export const SettingsPage: React.FC = () => {
 
         {activeSection === "general" && (
           <div>
-            <div className="panel panel--lg mb-24">
+            <div className="panel panel--lg mb-16">
               <div className="settings-row">
                 <div className="settings-row__content">
                   <div className="settings-row__title">
@@ -573,7 +573,9 @@ export const SettingsPage: React.FC = () => {
                   disabled={isLoading || isUpdating}
                 />
               </div>
-              {navigator.userAgent.toLowerCase().includes("mac") && (
+            </div>
+            {navigator.userAgent.toLowerCase().includes("mac") && (
+              <div className="panel panel--lg mb-24">
                 <div className="settings-row">
                   <div className="settings-row__content">
                     <div className="settings-row__title">
@@ -591,8 +593,8 @@ export const SettingsPage: React.FC = () => {
                     disabled={isLoading || isUpdating}
                   />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
