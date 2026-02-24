@@ -293,11 +293,45 @@ pub fn spawn_recording_thread(
                     }
                 }
 
+                // ── DYNAMIC MODE SWITCHING ─────────────────────
+                (
+                    RecordingCommand::SwitchToAction,
+                    RecordingPhase::Recording | RecordingPhase::Starting,
+                ) => {
+                    if ctx.mode == RecordingMode::Assistant {
+                        println!("🔄 Seamlessly switching recording mode: Assistant → Action");
+                        ctx.mode = RecordingMode::Action;
+                        // Swap pill UI modes
+                        app_handle.emit("recording_stopped", ()).unwrap_or_default();
+                        app_handle
+                            .emit("action_recording_started", ())
+                            .unwrap_or_default();
+                    }
+                }
+
+                (
+                    RecordingCommand::SwitchToAssistant,
+                    RecordingPhase::Recording | RecordingPhase::Starting,
+                ) => {
+                    if ctx.mode == RecordingMode::Action {
+                        println!("🔄 Seamlessly switching recording mode: Action → Assistant");
+                        ctx.mode = RecordingMode::Assistant;
+                        // Swap pill UI modes
+                        app_handle
+                            .emit("action_recording_stopped", ())
+                            .unwrap_or_default();
+                        app_handle.emit("recording_started", ()).unwrap_or_default();
+                    }
+                }
+
                 // ── ERROR HANDLING / IGNORED STATES ─────────────────
 
-                // Ignoring duplicates
-                (RecordingCommand::Start, _) | (RecordingCommand::ActionStart, _) => {
-                    // Already recording/starting/stopping
+                // Ignoring duplicates and mid-state switches
+                (RecordingCommand::Start, _)
+                | (RecordingCommand::ActionStart, _)
+                | (RecordingCommand::SwitchToAction, _)
+                | (RecordingCommand::SwitchToAssistant, _) => {
+                    // Already recording/starting/stopping or switch invalid
                 }
 
                 (RecordingCommand::Stop, _) | (RecordingCommand::ActionStop, _) => {

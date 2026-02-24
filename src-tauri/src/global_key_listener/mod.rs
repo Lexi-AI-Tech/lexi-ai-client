@@ -201,7 +201,7 @@ const REACTIVATION_COOLDOWN: Duration = Duration::from_millis(200);
 #[derive(Debug, Clone)]
 pub(crate) enum HotkeyCommandResult {
     SendNow(RecordingCommand),
-    SendStopAfter(Duration),
+    SendStopAfter(RecordingCommand, Duration),
 }
 
 pub(crate) struct KeyStateTracker {
@@ -209,6 +209,7 @@ pub(crate) struct KeyStateTracker {
     last_press_at: Option<Instant>,
     pressed_keys: HashSet<String>,
     last_deactivated_at: std::collections::HashMap<String, Instant>,
+    has_switched_mode: bool,
 }
 
 impl KeyStateTracker {
@@ -218,6 +219,7 @@ impl KeyStateTracker {
             last_press_at: None,
             pressed_keys: HashSet::new(),
             last_deactivated_at: std::collections::HashMap::new(),
+            has_switched_mode: false,
         }
     }
 
@@ -229,79 +231,151 @@ impl KeyStateTracker {
         }
     }
 
-    fn matches_hotkey(&self, hotkey_config: &str, _trigger_key: &str) -> bool {
-        let parts: Vec<String> = hotkey_config.split('+').map(normalize_key_string).collect();
-        if parts.is_empty() {
-            return false;
+    fn activate_hotkey_internal_checks(&self, hotkey_normalized: &str) -> bool {
+        if let Some(deactivated_at) = self.last_deactivated_at.get(hotkey_normalized) {
+            if deactivated_at.elapsed() < REACTIVATION_COOLDOWN {
+                return false;
+            }
         }
-        parts.iter().all(|k| self.pressed_keys.contains(k))
+        true
     }
 
-    pub(crate) fn process_event(
+    fn activate_hotkey(&mut self, hotkey: &str, is_action: bool) -> Option<HotkeyCommandResult> {
+        if self.activate_hotkey_internal_checks(hotkey)
+            && self.active_hotkeys.insert(hotkey.to_string())
+        {
+            let cmd = if is_action {
+                RecordingCommand::ActionStart
+            } else {
+                RecordingCommand::Start
+            };
+            println!("🔑 Hotkey Activated: {}", hotkey);
+            self.last_press_at = Some(Instant::now());
+            self.has_switched_mode = false;
+            Some(HotkeyCommandResult::SendNow(cmd))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn process_events(
         &mut self,
-        hotkey_config: &str,
-        trigger_key: &str,
+        action_hotkeys: &[String],
+        recording_hotkeys: &[String],
+        _trigger_key: &str,
         is_press: bool,
-        is_action: bool,
-    ) -> Option<HotkeyCommandResult> {
-        let hotkey_normalized = hotkey_config.trim().to_string();
+    ) -> Vec<HotkeyCommandResult> {
+        let mut results = Vec::new();
 
         if is_press {
-            if self.matches_hotkey(&hotkey_normalized, trigger_key) {
-                if let Some(deactivated_at) = self.last_deactivated_at.get(&hotkey_normalized) {
-                    if deactivated_at.elapsed() < REACTIVATION_COOLDOWN {
-                        return None;
+            let mut exact_matches = Vec::new();
+
+            let mut check = |hotkey_config: &str, is_action: bool| {
+                let hotkey_normalized = hotkey_config.trim().to_string();
+                let parts: HashSet<String> = hotkey_normalized
+                    .split('+')
+                    .map(normalize_key_string)
+                    .collect();
+                if parts.is_empty() {
+                    return;
+                }
+
+                if self.pressed_keys == parts {
+                    exact_matches.push((hotkey_normalized, is_action, parts));
+                }
+            };
+
+            for h in action_hotkeys {
+                check(h, true);
+            }
+            for h in recording_hotkeys {
+                check(h, false);
+            }
+
+            if !exact_matches.is_empty() {
+                // If there is no active hotkey, we just activate the first exact match we found (which could be the largest if we sort, but for now just first)
+                if self.active_hotkeys.is_empty() {
+                    let (hotkey, is_action, _) = exact_matches.remove(0);
+                    if let Some(res) = self.activate_hotkey(&hotkey, is_action) {
+                        results.push(res);
+                    }
+                } else if !self.has_switched_mode {
+                    // We ALREADY have an active hotkey, but we just perfectly matched ANOTHER hotkey.
+                    // This means they pressed *more* keys to trigger a superset combination.
+                    let (new_hotkey, new_is_action, new_parts) = exact_matches.remove(0);
+
+                    // We only switch if the new hotkey is TRULY larger (has more keys) than the currently active one
+                    // and we find the active hotkey to confirm.
+                    let active_clone = self.active_hotkeys.clone();
+                    for active_hk in active_clone {
+                        let active_parts: HashSet<String> =
+                            active_hk.split('+').map(normalize_key_string).collect();
+
+                        if new_parts.len() > active_parts.len()
+                            && new_parts.is_superset(&active_parts)
+                        {
+                            // Superset detected! Switch modes directly.
+                            println!("🔑 Hotkey Mode Switched: {} -> {}", active_hk, new_hotkey);
+
+                            self.active_hotkeys.remove(&active_hk);
+                            self.active_hotkeys.insert(new_hotkey.clone());
+                            self.has_switched_mode = true;
+
+                            let cmd = if new_is_action {
+                                RecordingCommand::SwitchToAction
+                            } else {
+                                RecordingCommand::SwitchToAssistant
+                            };
+                            results.push(HotkeyCommandResult::SendNow(cmd));
+                            break;
+                        }
                     }
                 }
-
-                if self.active_hotkeys.insert(hotkey_normalized.clone()) {
-                    let cmd = if is_action {
-                        RecordingCommand::ActionStart
-                    } else {
-                        RecordingCommand::Start
-                    };
-                    println!("🔑 Hotkey Activated: {}", hotkey_normalized);
-                    self.last_press_at = Some(Instant::now());
-                    return Some(HotkeyCommandResult::SendNow(cmd));
-                }
             }
-        } else if self.active_hotkeys.contains(&hotkey_normalized) {
-            let parts: Vec<String> = hotkey_normalized
-                .split('+')
-                .map(normalize_key_string)
-                .collect();
+        } else {
+            // Unchanged release logic - triggers Stop or ActionStop depending on what's active.
+            let active_clone = self.active_hotkeys.clone();
 
-            if parts.contains(&trigger_key.to_string()) {
-                self.active_hotkeys.remove(&hotkey_normalized);
-                self.last_deactivated_at
-                    .insert(hotkey_normalized.clone(), Instant::now());
+            // If the user released *any* key that makes up the currently active hotkey, deactivate it.
+            let released_key = normalize_key_string(_trigger_key);
 
-                println!("🔑 Hotkey Deactivated: {}", hotkey_normalized);
+            for active_hotkey in active_clone {
+                let parts: Vec<String> =
+                    active_hotkey.split('+').map(normalize_key_string).collect();
+                if parts.contains(&released_key) {
+                    self.active_hotkeys.remove(&active_hotkey);
+                    self.last_deactivated_at
+                        .insert(active_hotkey.clone(), Instant::now());
 
-                let elapsed = self
-                    .last_press_at
-                    .map(|t| t.elapsed())
-                    .unwrap_or(MIN_PRESS_RELEASE_INTERVAL);
-                let base_cmd = if is_action {
-                    RecordingCommand::ActionStop
-                } else {
-                    RecordingCommand::Stop
-                };
+                    println!("🔑 Hotkey Deactivated: {}", active_hotkey);
 
-                if elapsed >= MIN_PRESS_RELEASE_INTERVAL {
-                    return Some(HotkeyCommandResult::SendNow(base_cmd));
-                } else {
-                    let remaining = MIN_PRESS_RELEASE_INTERVAL - elapsed;
-                    println!(
-                        "⏱️  Release before minimum interval, delaying Stop by {:.2}s",
-                        remaining.as_secs_f64()
-                    );
-                    return Some(HotkeyCommandResult::SendStopAfter(remaining));
+                    let elapsed = self
+                        .last_press_at
+                        .map(|t| t.elapsed())
+                        .unwrap_or(MIN_PRESS_RELEASE_INTERVAL);
+                    let is_action = action_hotkeys.iter().any(|h| h.trim() == active_hotkey);
+
+                    let base_cmd = if is_action {
+                        RecordingCommand::ActionStop
+                    } else {
+                        RecordingCommand::Stop
+                    };
+
+                    if elapsed >= MIN_PRESS_RELEASE_INTERVAL {
+                        results.push(HotkeyCommandResult::SendNow(base_cmd));
+                    } else {
+                        let remaining = MIN_PRESS_RELEASE_INTERVAL - elapsed;
+                        println!(
+                            "⏱️  Release before minimum interval, delaying Stop by {:.2}s",
+                            remaining.as_secs_f64()
+                        );
+                        results.push(HotkeyCommandResult::SendStopAfter(base_cmd, remaining));
+                    }
                 }
             }
         }
 
-        None
+        results
     }
 }
 

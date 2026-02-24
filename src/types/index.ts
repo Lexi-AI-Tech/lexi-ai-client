@@ -88,6 +88,7 @@ export interface AppConfig {
   launch_on_system_startup: boolean;
   vocabulary: string[];
   action_hotkeys: string[] | null;
+  hide_icon: boolean;
   shortcuts: Shortcut[];
 }
 
@@ -103,6 +104,7 @@ export interface AppConfigUpdateRequest {
   launch_on_system_startup?: boolean;
   vocabulary?: string[] | null;
   action_hotkeys?: string[] | null;
+  hide_icon?: boolean;
   shortcuts?: Shortcut[] | null;
 }
 
@@ -115,6 +117,7 @@ export interface TauriAppConfig {
   action_hotkeys?: string[] | null;
   enhance_transcription?: boolean | null;
   launch_on_system_startup?: boolean | null;
+  hide_icon?: boolean | null;
   vocabulary?: string[] | null;
 }
 
@@ -252,13 +255,13 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-    | "home"
-    | "transcripts"
-    | "settings"
-    | "vocabulary"
-    | "actions"
-    | "shortcuts"
-    | "notes";
+  | "home"
+  | "transcripts"
+  | "settings"
+  | "vocabulary"
+  | "actions"
+  | "shortcuts"
+  | "notes";
   onNavigate: (
     page:
       | "home"

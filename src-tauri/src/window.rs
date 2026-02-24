@@ -45,8 +45,10 @@ pub fn show_and_focus_main_window(app: &AppHandle) -> bool {
     if let Some(window) = app.get_webview_window("main") {
         #[cfg(target_os = "macos")]
         {
-            // Force activation to bring window to front
-            activate_app_ignoring_others();
+            // Force activation to bring window to front (must be on main thread)
+            let _ = app.run_on_main_thread(|| {
+                activate_app_ignoring_others();
+            });
         }
 
         if let Err(e) = window.show() {

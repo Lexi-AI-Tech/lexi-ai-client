@@ -179,45 +179,22 @@ unsafe extern "C-unwind" fn raw_callback(
                 let recording_hotkeys_guard = state.config_rx.borrow();
                 let action_hotkeys_guard = state.action_hotkey_rx.borrow();
 
-                let mut triggered_action_cmd = None;
-                for hotkey in &*action_hotkeys_guard {
-                    if let Some(cmd) =
-                        tracker.process_event(hotkey, &key_str, is_actual_press, true)
-                    {
-                        triggered_action_cmd = Some(cmd);
-                        break;
-                    }
-                }
+                let cmds = tracker.process_events(
+                    &*action_hotkeys_guard,
+                    &*recording_hotkeys_guard,
+                    &key_str,
+                    is_actual_press,
+                );
 
-                let mut triggered_rec_cmd = None;
-                if triggered_action_cmd.is_none() {
-                    for hotkey in &*recording_hotkeys_guard {
-                        if let Some(cmd) =
-                            tracker.process_event(hotkey, &key_str, is_actual_press, false)
-                        {
-                            triggered_rec_cmd = Some(cmd);
-                            break;
-                        }
-                    }
-                }
-
-                let cmd_to_send = triggered_action_cmd.clone().or(triggered_rec_cmd);
-                let is_action_triggered = triggered_action_cmd.is_some();
-
-                if let Some(result) = cmd_to_send {
-                    match result {
-                        HotkeyCommandResult::SendNow(cmd) => {
-                            if let Err(e) = state.recording_tx.send(cmd) {
+                for cmd in cmds {
+                    match cmd {
+                        HotkeyCommandResult::SendNow(c) => {
+                            if let Err(e) = state.recording_tx.send(c) {
                                 eprintln!("Failed to send command: {:?}", e);
                             }
                         }
-                        HotkeyCommandResult::SendStopAfter(delay) => {
+                        HotkeyCommandResult::SendStopAfter(stop_cmd, delay) => {
                             let tx = state.recording_tx.clone();
-                            let stop_cmd = if is_action_triggered {
-                                RecordingCommand::ActionStop
-                            } else {
-                                RecordingCommand::Stop
-                            };
                             std::thread::spawn(move || {
                                 std::thread::sleep(delay);
                                 let _ = tx.send(stop_cmd);
