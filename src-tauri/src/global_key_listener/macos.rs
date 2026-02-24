@@ -5,6 +5,12 @@ use std::sync::{mpsc, Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::watch;
 
+#[derive(Debug)]
+enum UIEvent {
+    HotkeyRecorded(serde_json::Value),
+    GlobalInput(String),
+}
+
 use super::{key_to_string, normalize_key_string, HotkeyCommandResult, Key, KeyStateTracker};
 
 use objc2_core_foundation::{kCFRunLoopCommonModes, CFMachPort, CFRunLoop};
@@ -96,7 +102,7 @@ lazy_static::lazy_static! {
 }
 
 struct GlobalListenerState {
-    app: AppHandle,
+    ui_tx: mpsc::Sender<UIEvent>,
     recording_tx: mpsc::Sender<RecordingCommand>,
     config_rx: watch::Receiver<Vec<String>>,
     action_hotkey_rx: watch::Receiver<Vec<String>>,
@@ -157,20 +163,17 @@ unsafe extern "C-unwind" fn raw_callback(
 
             if is_recording_mode {
                 if is_actual_press {
-                    let _ = state.app.emit(
-                        "hotkey-recorded",
-                        serde_json::json!({
-                            "key": key_to_string(&internal_key),
-                            "modifiers": []
-                        }),
-                    );
+                    let _ = state.ui_tx.send(UIEvent::HotkeyRecorded(serde_json::json!({
+                        "key": key_to_string(&internal_key),
+                        "modifiers": []
+                    })));
                 }
                 let event_str = if is_actual_press {
                     format!("key_press: {:?}", key_to_string(&internal_key))
                 } else {
                     format!("key_release: {:?}", key_to_string(&internal_key))
                 };
-                let _ = state.app.emit("global-input", &event_str);
+                let _ = state.ui_tx.send(UIEvent::GlobalInput(event_str));
             }
 
             if let Ok(mut tracker) = state.tracker.lock() {
@@ -225,8 +228,25 @@ pub(crate) fn start_listener(
     action_hotkey_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
 ) {
+    let (ui_tx, ui_rx) = mpsc::channel::<UIEvent>();
+
+    // Spawn UI event emitter thread
+    let app_for_ui = app.clone();
+    std::thread::spawn(move || {
+        while let Ok(event) = ui_rx.recv() {
+            match event {
+                UIEvent::HotkeyRecorded(payload) => {
+                    let _ = app_for_ui.emit("hotkey-recorded", payload);
+                }
+                UIEvent::GlobalInput(payload) => {
+                    let _ = app_for_ui.emit("global-input", &payload);
+                }
+            }
+        }
+    });
+
     *GLOBAL_STATE.lock().unwrap() = Some(GlobalListenerState {
-        app: app.clone(),
+        ui_tx,
         recording_tx,
         config_rx,
         action_hotkey_rx,

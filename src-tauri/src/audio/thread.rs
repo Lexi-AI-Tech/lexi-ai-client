@@ -159,9 +159,16 @@ pub fn spawn_recording_thread(
                     // Spawn thread to forward volume updates to frontend
                     let app_handle_for_volume = app_handle.clone();
                     thread::spawn(move || {
+                        let mut last_emit = std::time::Instant::now();
+                        let throttle_duration = std::time::Duration::from_millis(32); // ~30 fps
+
                         while let Ok(volume) = volume_rx.recv() {
-                            // Emit volume update to frontend for waveform visualization
-                            let _ = app_handle_for_volume.emit("volume-update", volume);
+                            let now = std::time::Instant::now();
+                            if now.duration_since(last_emit) >= throttle_duration {
+                                // Emit volume update to frontend for waveform visualization
+                                let _ = app_handle_for_volume.emit("volume-update", volume);
+                                last_emit = now;
+                            }
                         }
                     });
 
