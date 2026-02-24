@@ -206,30 +206,13 @@ pub(crate) fn sync_autostart_status(app: &AppHandle, config: &mut AppConfig) {
 /// Sync dock icon visibility status from config
 #[cfg(target_os = "macos")]
 pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
-    use tauri::ActivationPolicy;
-    
     // Default to false (icon is visible) if not set
     let hide_icon = config.hide_icon.unwrap_or(false);
     
-    let policy = if hide_icon {
-        ActivationPolicy::Accessory // Hides from dock, keeps menu bar
-    } else {
-        ActivationPolicy::Regular // Shows in dock
-    };
+    // Tauri's set_dock_visibility under the hood calls macOS TransformProcessType
+    let _ = app.set_dock_visibility(!hide_icon);
     
-    let was_focused = app.get_webview_window("main")
-        .map(|w| w.is_focused().unwrap_or(false))
-        .unwrap_or(false);
-    
-    let _ = app.set_activation_policy(policy);
     println!("✅ Synced: app icon hidden = {}", hide_icon);
-    
-    if was_focused {
-        // macOS drops application focus natively when changing activation policies.
-        // If the user was actively using the app (e.g., clicking "Save" in Settings),
-        // forcefully regain focus so they aren't booted out of the window.
-        crate::window::show_and_focus_main_window(app);
-    }
 }
 
 #[cfg(not(target_os = "macos"))]
