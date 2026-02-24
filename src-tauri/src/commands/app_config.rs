@@ -35,8 +35,8 @@ pub struct AppConfig {
     pub vocabulary: Option<Vec<String>>,
     /// Hotkey combinations for triggering actions (e.g., ["Fn+Control"])
     pub action_hotkeys: Option<Vec<String>>,
-    /// Whether to hide the app icon from the dock
-    pub hide_icon: Option<bool>,
+    /// Whether to show the app icon in the dock
+    pub show_icon: Option<bool>,
     /// Shortcuts for text expansion (array of shortcut items)
     pub shortcuts: Option<Vec<Shortcut>>,
 }
@@ -59,7 +59,7 @@ struct ServerAppConfigResponse {
     pub launch_on_system_startup: bool,
     pub vocabulary: Vec<String>,
     pub action_hotkeys: Option<Vec<String>>,
-    pub hide_icon: bool,
+    pub show_icon: bool,
     pub shortcuts: Vec<Shortcut>,
 }
 
@@ -206,13 +206,13 @@ pub(crate) fn sync_autostart_status(app: &AppHandle, config: &mut AppConfig) {
 /// Sync dock icon visibility status from config
 #[cfg(target_os = "macos")]
 pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
-    // Default to false (icon is visible) if not set
-    let hide_icon = config.hide_icon.unwrap_or(false);
+    // Default to true (icon is visible) if not set
+    let show_icon = config.show_icon.unwrap_or(true);
     
     // Tauri's set_dock_visibility under the hood calls macOS TransformProcessType
-    let _ = app.set_dock_visibility(!hide_icon);
+    let _ = app.set_dock_visibility(show_icon);
     
-    println!("✅ Synced: app icon hidden = {}", hide_icon);
+    println!("✅ Synced: app icon shown = {}", show_icon);
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -240,8 +240,8 @@ fn merge_config(current: &mut AppConfig, provided: AppConfig) {
     if provided.action_hotkeys.is_some() {
         current.action_hotkeys = provided.action_hotkeys;
     }
-    if provided.hide_icon.is_some() {
-        current.hide_icon = provided.hide_icon;
+    if provided.show_icon.is_some() {
+        current.show_icon = provided.show_icon;
     }
     if provided.shortcuts.is_some() {
         current.shortcuts = provided.shortcuts;
@@ -272,7 +272,7 @@ fn server_response_to_app_config(response: ServerAppConfigResponse) -> AppConfig
         hotkeys: Some(response.hotkeys),
         enhance_transcription: Some(response.enhance_transcription),
         launch_on_system_startup: Some(response.launch_on_system_startup),
-        hide_icon: Some(response.hide_icon),
+        show_icon: Some(response.show_icon),
         vocabulary: Some(response.vocabulary),
         action_hotkeys: response.action_hotkeys,
         shortcuts: Some(response.shortcuts),
@@ -337,10 +337,10 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
             serde_json::to_value(action_hotkeys).unwrap(),
         );
     }
-    if let Some(hide_icon) = config.hide_icon {
+    if let Some(show_icon) = config.show_icon {
         body.insert(
-            "hide_icon".to_string(),
-            serde_json::to_value(hide_icon).unwrap(),
+            "show_icon".to_string(),
+            serde_json::to_value(show_icon).unwrap(),
         );
     }
     if let Some(ref shortcuts) = config.shortcuts {

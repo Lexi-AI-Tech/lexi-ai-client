@@ -40,7 +40,7 @@ export const SettingsPage: React.FC = () => {
   );
   const [selectedEnhanceTranscription, setSelectedEnhanceTranscription] =
     useState<boolean | null>(null);
-  const [selectedHideIcon, setSelectedHideIcon] = useState<boolean | null>(
+  const [selectedShowIcon, setSelectedShowIcon] = useState<boolean | null>(
     null,
   );
   const [isUpdating, setIsUpdating] = useState(false);
@@ -63,7 +63,7 @@ export const SettingsPage: React.FC = () => {
   const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
   const autostartEnabled = config?.launch_on_system_startup;
   const enhanceTranscription = config?.enhance_transcription;
-  const hideIconEnabled = config?.hide_icon;
+  const showIconEnabled = config?.show_icon;
 
   const configHotkeys = config?.hotkeys || [];
   const configActionHotkeys = config?.action_hotkeys || [];
@@ -91,7 +91,7 @@ export const SettingsPage: React.FC = () => {
         setSelectedEnhanceTranscription(
           loadedConfig.enhance_transcription ?? null,
         );
-        setSelectedHideIcon(loadedConfig.hide_icon ?? null);
+        setSelectedShowIcon(loadedConfig.show_icon ?? null);
       } catch (err: any) {
         console.error("Failed to load app config:", err);
         toast.error(err?.message || "Failed to load configuration");
@@ -221,11 +221,11 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
 
-    const currentHideIcon = hideIconEnabled ?? false;
-    const hideIconChanged =
-      selectedHideIcon !== null &&
-      selectedHideIcon !== undefined &&
-      selectedHideIcon !== currentHideIcon;
+    const currentShowIcon = showIconEnabled ?? true;
+    const showIconChanged =
+      selectedShowIcon !== null &&
+      selectedShowIcon !== undefined &&
+      selectedShowIcon !== currentShowIcon;
 
     const hotkeysChanged =
       JSON.stringify(currentHotkeys.hotkeys) !== JSON.stringify(configHotkeys);
@@ -238,7 +238,7 @@ export const SettingsPage: React.FC = () => {
       !languageChanged &&
       !autostartChanged &&
       !enhanceChanged &&
-      !hideIconChanged &&
+      !showIconChanged &&
       !hotkeysChanged &&
       !actionHotkeysChanged
     ) {
@@ -259,8 +259,8 @@ export const SettingsPage: React.FC = () => {
       if (enhanceChanged && selectedEnhanceTranscription !== null) {
         updates.enhance_transcription = selectedEnhanceTranscription;
       }
-      if (hideIconChanged && selectedHideIcon !== null) {
-        updates.hide_icon = selectedHideIcon;
+      if (showIconChanged && selectedShowIcon !== null) {
+        updates.show_icon = selectedShowIcon;
       }
       if (hotkeysChanged) {
         updates.hotkeys = currentHotkeys.hotkeys;
@@ -287,8 +287,8 @@ export const SettingsPage: React.FC = () => {
       if (enhanceChanged && updatedConfig.enhance_transcription !== undefined) {
         setSelectedEnhanceTranscription(updatedConfig.enhance_transcription);
       }
-      if (hideIconChanged && updatedConfig.hide_icon !== undefined) {
-        setSelectedHideIcon(updatedConfig.hide_icon);
+      if (showIconChanged && updatedConfig.show_icon !== undefined) {
+        setSelectedShowIcon(updatedConfig.show_icon);
       }
 
       if (updatedConfig.hotkeys) {
@@ -333,11 +333,11 @@ export const SettingsPage: React.FC = () => {
       selectedEnhanceTranscription !== undefined &&
       selectedEnhanceTranscription !== currentEnhance;
 
-    const currentHideIcon = hideIconEnabled ?? false;
-    const hideIconChanged =
-      selectedHideIcon !== null &&
-      selectedHideIcon !== undefined &&
-      selectedHideIcon !== currentHideIcon;
+    const currentShowIcon = showIconEnabled ?? true;
+    const showIconChanged =
+      selectedShowIcon !== null &&
+      selectedShowIcon !== undefined &&
+      selectedShowIcon !== currentShowIcon;
 
     const hotkeysChanged =
       JSON.stringify(currentHotkeys.hotkeys) !== JSON.stringify(configHotkeys);
@@ -350,7 +350,7 @@ export const SettingsPage: React.FC = () => {
       languageChanged ||
       autostartChanged ||
       enhanceChanged ||
-      hideIconChanged ||
+      showIconChanged ||
       hotkeysChanged ||
       actionHotkeysChanged
     );
@@ -369,9 +369,9 @@ export const SettingsPage: React.FC = () => {
     setSelectedEnhanceTranscription(!currentValue);
   };
 
-  const handleToggleHideIcon = () => {
-    const currentValue = selectedHideIcon ?? hideIconEnabled ?? false;
-    setSelectedHideIcon(!currentValue);
+  const handleToggleShowIcon = () => {
+    const currentValue = selectedShowIcon ?? showIconEnabled ?? true;
+    setSelectedShowIcon(!currentValue);
   };
 
   const ToggleSwitch: React.FC<{
@@ -579,17 +579,17 @@ export const SettingsPage: React.FC = () => {
                 <div className="settings-row">
                   <div className="settings-row__content">
                     <div className="settings-row__title">
-                      Hide Icon from Dock
+                      Show App Icon in Dock
                     </div>
                     <div className="settings-row__desc">
-                      Hide Lexi from the macOS Dock.
+                      Display Lexi in the macOS Dock.
                     </div>
                   </div>
                   <ToggleSwitch
                     enabled={
-                      (selectedHideIcon ?? hideIconEnabled ?? false) === true
+                      (selectedShowIcon ?? showIconEnabled ?? true) === true
                     }
-                    onToggle={handleToggleHideIcon}
+                    onToggle={handleToggleShowIcon}
                     disabled={isLoading || isUpdating}
                   />
                 </div>
