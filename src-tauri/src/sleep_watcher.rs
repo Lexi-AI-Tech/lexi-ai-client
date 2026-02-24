@@ -32,11 +32,11 @@ pub fn start_sleep_watcher(app_handle: tauri::AppHandle) {
             decl.add_ivar::<*mut std::ffi::c_void>("_appHandle");
 
             extern "C" fn handle_wake(this: &Object, _sel: Sel, _notif: *mut Object) {
-                println!("☀️  System woke from sleep — re-initializing resources in 2s...");
+                println!("☀️  System woke from sleep — re-initializing resources in 7s...");
                 unsafe {
                     std::thread::spawn(move || {
                         // Wait for macOS to fully restore services after wake
-                        std::thread::sleep(std::time::Duration::from_secs(5));
+                        std::thread::sleep(std::time::Duration::from_secs(7));
                         println!("🔄 Wake delay complete, re-enabling global keyboard listener...");
                         crate::global_key_listener::re_enable_tap();
                     });
