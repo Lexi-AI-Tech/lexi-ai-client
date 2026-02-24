@@ -214,7 +214,7 @@ pub async fn get_server_onboarding_status(
 ) -> Result<ServerOnboardingStatus, String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or_else(|| "Authentication required".to_string())?;
+        .map_err(|_| "Authentication required".to_string())?;
 
     let system_type = utils::get_system_type();
     let version_param = version.unwrap_or(1);
@@ -259,7 +259,7 @@ pub async fn complete_server_onboarding(
 ) -> Result<ServerOnboardingStatus, String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or_else(|| "Authentication required".to_string())?;
+        .map_err(|_| "Authentication required".to_string())?;
 
     let system_type = utils::get_system_type();
     let version_param = version.unwrap_or(1);

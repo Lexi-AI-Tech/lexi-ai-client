@@ -25,8 +25,8 @@ pub struct ChartDataResponse {
 #[tauri::command]
 pub async fn get_analytics_stats(app: AppHandle) -> Result<StatsResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
-        Some(token) => token,
-        None => {
+        Ok(token) => token,
+        Err(_) => {
             crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }
@@ -70,8 +70,8 @@ pub async fn get_analytics_chart(
     period: String,
 ) -> Result<ChartDataResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
-        Some(token) => token,
-        None => {
+        Ok(token) => token,
+        Err(_) => {
             crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }

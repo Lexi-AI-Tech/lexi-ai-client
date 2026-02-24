@@ -159,7 +159,7 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
         // macOS destroys CGEventTap, stales HTTP sockets, and invalidates audio handles
         // during sleep — a full restart is the cleanest way to recover.
         #[cfg(target_os = "macos")]
-        sleep_watcher::start_sleep_watcher(app.clone());
+        sleep_watcher::start_watcher(app.clone());
     }
     Ok(())
 }
@@ -317,8 +317,8 @@ pub fn main() {
                 use commands::auth::get_auth_token_async;
                 println!("🔑 Checking auth token on startup...");
                 match get_auth_token_async(&app_handle_for_auth).await {
-                    Some(_) => println!("✅ Auth token valid on startup"),
-                    None => println!("ℹ️  No valid auth token - user needs to login"),
+                    Ok(_) => println!("✅ Auth token valid on startup"),
+                    Err(_) => println!("ℹ️  No valid auth token - user needs to login"),
                 }
             });
 

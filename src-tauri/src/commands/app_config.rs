@@ -98,8 +98,11 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
 /// This always fetches fresh config from server
 pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfig, String> {
     let auth_token = match get_auth_token_async(app).await {
-        Some(token) => token,
-        None => {
+        Ok(token) => token,
+        Err(e) if e == "network_error" => {
+            return Err("Network error while trying to authenticate. Please check your connection.".to_string());
+        }
+        Err(_) => {
             crate::commands::auth::handle_auth_expired(app);
             return Err("Please sign in to sync your settings".to_string());
         }
@@ -375,8 +378,8 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
 /// Sync app configuration to cloud API (best-effort, failures are logged)
 async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     let auth_token = match get_auth_token_async(app).await {
-        Some(token) => token,
-        None => {
+        Ok(token) => token,
+        Err(_) => {
             println!("⚠️  No auth token available, skipping cloud sync");
             return Ok(());
         }
