@@ -157,7 +157,7 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
         // macOS destroys CGEventTap, stales HTTP sockets, and invalidates audio handles
         // during sleep — a full restart is the cleanest way to recover.
         #[cfg(target_os = "macos")]
-        sleep_watcher::start_sleep_watcher(app.clone());
+        sleep_watcher::start_watcher(app.clone());
     }
     Ok(())
 }
