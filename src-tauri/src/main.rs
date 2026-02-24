@@ -315,8 +315,8 @@ pub fn main() {
                 use commands::auth::get_auth_token_async;
                 println!("🔑 Checking auth token on startup...");
                 match get_auth_token_async(&app_handle_for_auth).await {
-                    Some(_) => println!("✅ Auth token valid on startup"),
-                    None => println!("ℹ️  No valid auth token - user needs to login"),
+                    Ok(_) => println!("✅ Auth token valid on startup"),
+                    Err(_) => println!("ℹ️  No valid auth token - user needs to login"),
                 }
             });
 

@@ -72,7 +72,7 @@ impl AssistantService {
     pub async fn transcribe_audio(
         &self,
         audio_data: Vec<u8>,
-        auth_token: Option<String>,
+        auth_token: Result<String, String>,
         app_handle: Option<AppHandle>,
         offline_transcription: bool,
     ) -> Result<(String, Option<CursorContext>), Box<dyn Error + Send + Sync>> {
@@ -149,16 +149,17 @@ impl AssistantService {
             };
 
             // Check if we have a token
-            let current_token = if let Some(token) = auth_token {
-                token
-            } else {
-                println!("🔍 DEBUG: No auth token provided - emitting login_required event");
-                if let Some(handle) = app_handle {
-                    handle.emit("login_required", ()).unwrap_or_else(|e| {
-                        eprintln!("Failed to emit login_required event: {}", e)
-                    });
+            let current_token = match auth_token {
+                Ok(token) => token,
+                Err(e) => {
+                    println!("🔍 DEBUG: No auth token provided (Error: {}) - emitting login_required event", e);
+                    if let Some(handle) = app_handle {
+                        handle.emit("login_required", ()).unwrap_or_else(|e| {
+                            eprintln!("Failed to emit login_required event: {}", e)
+                        });
+                    }
+                    return Err(format!("Authentication required: {}", e).into());
                 }
-                return Err("Authentication required. Please log in to continue.".into());
             };
 
             println!(

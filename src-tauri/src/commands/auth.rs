@@ -359,15 +359,15 @@ async fn refresh_access_token(
 /// * `app` - The Tauri AppHandle to access secure storage
 ///
 /// # Returns
-/// * `Option<String>` - The current access token if available, None otherwise
-pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
+/// * `Result<String, String>` - The current access token if available, or an error string ("expired", "network_error", etc).
+pub async fn get_auth_token_async(app: &AppHandle) -> Result<String, String> {
     // Read auth data from secure storage
     let auth_data = match secure_storage::get_auth_data(app) {
         Ok(Some(data)) => data,
-        Ok(None) => return None,
+        Ok(None) => return Err("no_auth_data".to_string()),
         Err(e) => {
             eprintln!("⚠️  Failed to read auth token from secure storage: {}", e);
-            return None;
+            return Err("storage_error".to_string());
         }
     };
 
@@ -428,7 +428,7 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
                                 .as_secs();
                             if expires_at > now {
                                 println!("✅ Got refreshed token from concurrent refresh");
-                                return Some(data.access_token);
+                                return Ok(data.access_token);
                             }
                         }
                     }
@@ -444,9 +444,9 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
 
             // After waiting, try to get the token again
             if let Ok(Some(data)) = secure_storage::get_auth_data(app) {
-                return Some(data.access_token);
+                return Ok(data.access_token);
             }
-            return None;
+            return Err("expired".to_string());
         }
 
         // We're the first to see expired token - do the refresh
@@ -460,15 +460,23 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
                     if let Ok(mut flag) = refresh_flag_clone.lock() {
                         *flag = false;
                     }
-                    return Some(new_token);
+                    return Ok(new_token);
                 }
-                Ok(None) | Err(_) => {
-                    eprintln!("⚠️  Token refresh failed, user needs to re-authenticate");
+                Ok(None) => {
+                    eprintln!("⚠️  Token refresh rejected by auth server, user needs to re-authenticate");
                     // Reset flag
                     if let Ok(mut flag) = refresh_flag_clone.lock() {
                         *flag = false;
                     }
-                    return None; // Force re-auth
+                    return Err("expired".to_string()); // Force re-auth
+                }
+                Err(e) => {
+                    eprintln!("⚠️  Token refresh failed due to network error: {}", e);
+                    // Reset flag
+                    if let Ok(mut flag) = refresh_flag_clone.lock() {
+                        *flag = false;
+                    }
+                    return Err("network_error".to_string());
                 }
             }
         } else {
@@ -477,7 +485,7 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
             if let Ok(mut flag) = refresh_flag.lock() {
                 *flag = false;
             }
-            return None;
+            return Err("expired".to_string());
         }
     }
 
@@ -518,11 +526,11 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Option<String> {
             println!("🟡 Token expires soon, but refresh already in progress (skipping duplicate)");
         }
         // Return current token immediately (still valid)
-        return Some(auth_data.access_token);
+        return Ok(auth_data.access_token);
     }
 
     // Case 3: Token is valid (>15 min to expiry) - return as-is
-    Some(auth_data.access_token)
+    Ok(auth_data.access_token)
 }
 
 // ============================================================================
@@ -590,7 +598,7 @@ pub struct UserInfo {
 /// Returns the access token if available and valid, None otherwise.
 #[tauri::command]
 pub async fn get_auth_token(app: AppHandle) -> Result<Option<String>, String> {
-    Ok(get_auth_token_async(&app).await)
+    Ok(get_auth_token_async(&app).await.ok())
 }
 
 /// Get the API base URL
@@ -604,7 +612,7 @@ pub fn get_api_base_url() -> String {
 pub async fn get_current_user(app: AppHandle) -> Result<UserInfo, String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or_else(|| "Authentication required".to_string())?;
+        .map_err(|e| format!("Authentication error: {}", e))?;
 
     let url = format!("{}/api/v1/auth/me", crate::config::api_base_url());
 
@@ -647,7 +655,7 @@ pub async fn get_current_user(app: AppHandle) -> Result<UserInfo, String> {
 pub async fn logout(app: AppHandle) -> Result<(), String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or_else(|| "Authentication required".to_string())?;
+        .map_err(|e| format!("Authentication required: {}", e))?;
 
     let url = format!("{}/api/v1/auth/logout", crate::config::api_base_url());
 

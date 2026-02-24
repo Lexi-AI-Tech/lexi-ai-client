@@ -82,7 +82,7 @@ impl ActionService {
         // Get authentication token from secure storage (with automatic refresh if needed)
         let auth_token = get_auth_token_async(app_handle).await;
 
-        if auth_token.is_none() {
+        if auth_token.is_err() {
             let error_msg = "Authentication required. Please log in.";
             eprintln!("⚠️  Warning: No authentication token available. Action will fail.");
             let action_duration = action_start.elapsed();
@@ -141,7 +141,7 @@ impl ActionService {
         audio_data: Option<Vec<u8>>,
         app_name: &str,
         selected_text: Option<String>,
-        auth_token: Option<String>,
+        auth_token: Result<String, String>,
     ) -> Result<ActionResponse, Box<dyn Error>> {
         // Build multipart form
         let mut form = multipart::Form::new().text("app_name", app_name.to_string());
@@ -165,7 +165,7 @@ impl ActionService {
         let mut request = self.client.post(&url).multipart(form);
 
         // Add authorization header if token is provided
-        if let Some(token) = &auth_token {
+        if let Ok(token) = &auth_token {
             request = request.header("Authorization", format!("Bearer {}", token));
         } else {
             return Err("Authentication required".into());

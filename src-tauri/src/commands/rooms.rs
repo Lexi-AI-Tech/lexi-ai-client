@@ -47,7 +47,7 @@ pub struct RoomUpdate {
 pub async fn create_room(app: AppHandle, name: String) -> Result<Room, String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or("Authentication required")?;
+        .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
@@ -94,7 +94,7 @@ pub async fn start_room_recording(
     // Get JWT token for WebSocket authentication
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or("Authentication required")?;
+        .map_err(|_| "Authentication required")?;
 
     // Get language from app config
     let app_config = crate::commands::app_config::get_app_config(app.clone())
@@ -234,7 +234,7 @@ pub async fn stop_room_recording_and_process(
 pub async fn list_rooms(app: AppHandle) -> Result<Vec<Room>, String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or("Authentication required")?;
+        .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
@@ -268,7 +268,7 @@ pub async fn get_room_details(
 ) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or("Authentication required")?;
+        .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
@@ -303,7 +303,7 @@ pub async fn update_room(
 ) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or("Authentication required")?;
+        .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
@@ -341,7 +341,7 @@ pub async fn update_speaker(
 ) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or("Authentication required")?;
+        .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client();
     let url = format!(
