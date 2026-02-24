@@ -44,7 +44,7 @@ pub async fn get_action_history(
 ) -> Result<PaginatedActionHistoryResponse, String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or_else(|| "Authentication required".to_string())?;
+        .map_err(|_| "Authentication required".to_string())?;
 
     let page = page.unwrap_or(1);
     let page_size = page_size.unwrap_or(20);
@@ -101,7 +101,7 @@ pub async fn get_action_history(
 pub async fn delete_action_history(app: AppHandle, action_id: String) -> Result<(), String> {
     let auth_token = get_auth_token_async(&app)
         .await
-        .ok_or_else(|| "Authentication required".to_string())?;
+        .map_err(|_| "Authentication required".to_string())?;
 
     let url = format!(
         "{}/api/v1/actions/history/{}",

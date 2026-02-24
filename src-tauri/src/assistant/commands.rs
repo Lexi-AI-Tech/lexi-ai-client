@@ -47,8 +47,8 @@ pub async fn get_transcripts(
     order_direction: Option<String>,
 ) -> Result<PaginatedTranscriptsResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
-        Some(token) => token,
-        None => {
+        Ok(token) => token,
+        Err(_) => {
             crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }
@@ -121,8 +121,8 @@ pub async fn get_transcripts(
 #[tauri::command]
 pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Transcript, String> {
     let auth_token = match get_auth_token_async(&app).await {
-        Some(token) => token,
-        None => {
+        Ok(token) => token,
+        Err(_) => {
             crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }
@@ -173,8 +173,8 @@ pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Tra
 #[tauri::command]
 pub async fn delete_transcript(app: AppHandle, transcript_id: String) -> Result<(), String> {
     let auth_token = match get_auth_token_async(&app).await {
-        Some(token) => token,
-        None => {
+        Ok(token) => token,
+        Err(_) => {
             crate::commands::auth::handle_auth_expired(&app);
             return Err("Authentication required".to_string());
         }

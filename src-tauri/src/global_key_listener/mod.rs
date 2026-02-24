@@ -328,3 +328,10 @@ pub fn start_listener(
         eprintln!("Global key listener natively unsupported on this target via this module.");
     }
 }
+
+pub fn re_enable_tap() {
+    #[cfg(target_os = "macos")]
+    {
+        macos::re_enable_tap();
+    }
+}

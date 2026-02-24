@@ -1,9 +1,8 @@
 //! macOS Sleep/Wake Detection
 //!
 //! Registers for `NSWorkspaceDidWakeNotification` and `NSWorkspaceWillSleepNotification`
-//! to detect when the system sleeps and wakes. On wake, calls `app_handle.restart()` to
-//! fully relaunch the app — this revives the global CGEventTap AND refreshes all HTTP
-//! connections., audio handles, and other OS resources that macOS invalidates during sleep.
+//! to detect when the system sleeps and wakes. On wake, it re-initializes resources
+//! like the global CGEventTap.
 //!
 //! Uses the Objective-C runtime (`objc` crate) to create a minimal observer class.
 
@@ -11,8 +10,8 @@
 
 /// Registers a macOS observer for sleep/wake notifications.
 ///
-/// When the system wakes from sleep, waits 2 seconds for macOS to fully restore services,
-/// then calls `app_handle.restart()` to relaunch the app with fresh state.
+/// When the system wakes from sleep, waits for macOS to fully restore services,
+/// then re-enables the global key listener.
 pub fn start_sleep_watcher(app_handle: tauri::AppHandle) {
     use objc::declare::ClassDecl;
     use objc::runtime::{Class, Object, Sel};
@@ -31,21 +30,14 @@ pub fn start_sleep_watcher(app_handle: tauri::AppHandle) {
 
             decl.add_ivar::<*mut std::ffi::c_void>("_appHandle");
 
-            extern "C" fn handle_wake(this: &Object, _sel: Sel, _notif: *mut Object) {
-                println!("☀️  System woke from sleep — restarting app in 2s...");
-                unsafe {
-                    let ptr: *mut std::ffi::c_void = *this.get_ivar("_appHandle");
-                    let app_handle = &*(ptr as *const tauri::AppHandle);
-
-                    // Clone handle for the restart thread
-                    let handle = app_handle.clone();
-                    std::thread::spawn(move || {
-                        // Wait for macOS to fully restore services after wake
-                        std::thread::sleep(std::time::Duration::from_secs(2));
-                        println!("🔄 Restarting app to revive all OS resources...");
-                        handle.restart();
-                    });
-                }
+            extern "C" fn handle_wake(_this: &Object, _sel: Sel, _notif: *mut Object) {
+                println!("☀️  System woke from sleep — re-initializing resources in 7s...");
+                std::thread::spawn(move || {
+                    // Wait for macOS to fully restore services after wake
+                    std::thread::sleep(std::time::Duration::from_secs(7));
+                    println!("🔄 Wake delay complete, re-enabling global keyboard listener...");
+                    crate::global_key_listener::re_enable_tap();
+                });
             }
 
             extern "C" fn handle_sleep(_this: &Object, _sel: Sel, _notif: *mut Object) {

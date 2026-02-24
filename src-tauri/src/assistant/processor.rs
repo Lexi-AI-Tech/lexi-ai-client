@@ -41,7 +41,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // Get authentication token from secure storage (with automatic refresh if needed)
         let auth_token = get_auth_token_async(&app_handle_for_task).await;
 
-        if auth_token.is_none() {
+        if auth_token.is_err() {
             let error_msg = "User unauthenticated. Please log in.";
             app_handle_for_task
                 .emit("error", error_msg)

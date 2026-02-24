@@ -102,7 +102,11 @@ struct GlobalListenerState {
     action_hotkey_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
     tracker: Arc<Mutex<KeyStateTracker>>,
+    tap_ptr: Option<*mut c_void>, // CFMachPort is !Send !Sync, so we use a raw pointer
 }
+// Rust's raw pointers are !Send and !Sync, so we must unsafe impl it for the struct
+unsafe impl Send for GlobalListenerState {}
+unsafe impl Sync for GlobalListenerState {}
 
 unsafe extern "C-unwind" fn raw_callback(
     _proxy: CGEventTapProxy,
@@ -251,6 +255,7 @@ pub(crate) fn start_listener(
         action_hotkey_rx,
         recording_state,
         tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+        tap_ptr: None,
     });
 
     std::thread::spawn(move || unsafe {
@@ -270,12 +275,42 @@ pub(crate) fn start_listener(
         let loop_source = CFMachPort::new_run_loop_source(None, Some(&tap), 0)
             .expect("Failed to create loop source");
 
+        // Store the tap port in the global state so it can be re-enabled on system wake
+        // using objc2_core_foundation's CFRetained to pointer memory
+        let tap_ptr = objc2_core_foundation::CFRetained::into_raw(tap).as_ptr() as *mut c_void;
+        if let Ok(mut lock_guard) = GLOBAL_STATE.lock() {
+            if let Some(state) = lock_guard.as_mut() {
+                state.tap_ptr = Some(tap_ptr);
+            }
+        }
+
+        // Use the raw pointer to create a borrowed reference since we consumed it above
+        let tap_ref = unsafe { &*(tap_ptr as *const CFMachPort) };
+
         let current_loop = CFRunLoop::current().unwrap();
         current_loop.add_source(Some(&loop_source), kCFRunLoopCommonModes);
 
-        CGEvent::tap_enable(&tap, true);
+        CGEvent::tap_enable(tap_ref, true);
 
         println!("✅ Native macOS CGEventTap started");
         CFRunLoop::run();
     });
+}
+
+/// Re-enables the global keyboard event tap.
+///
+/// This is specifically used on system wake, as macOS often invalidates
+/// or disables CGEventTaps when the system goes to sleep.
+pub(crate) fn re_enable_tap() {
+    if let Ok(lock_guard) = GLOBAL_STATE.lock() {
+        if let Some(state) = lock_guard.as_ref() {
+            if let Some(tap_ptr) = state.tap_ptr {
+                println!("🔄 Re-enabling CGEventTap after wake...");
+                let tap_ref = unsafe { &*(tap_ptr as *const CFMachPort) };
+                CGEvent::tap_enable(tap_ref, true);
+            } else {
+                eprintln!("⚠️  Cannot re-enable CGEventTap: Tap was not initialized.");
+            }
+        }
+    }
 }
