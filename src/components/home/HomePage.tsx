@@ -63,10 +63,7 @@ const itemVariants = {
 
 // Helper to get greeting based on time
 const getGreeting = (): string => {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
+  return "Hello";
 };
 
 // Stats card component
@@ -185,7 +182,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
     (async () => {
       try {
         await Promise.all([fetchTranscripts(), fetchStats(), fetchChart("7d")]);
-      } catch (_) {}
+      } catch (_) { }
       if (!cancelled) setInitialLoadDone(true);
     })();
     return () => {
@@ -469,7 +466,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
                   Avg.{" "}
                   {Math.round(
                     resolvedStats.words_typed_this_week /
-                      Math.max(resolvedChartData.total_transcriptions, 1),
+                    Math.max(resolvedChartData.total_transcriptions, 1),
                   )}{" "}
                   words per session
                 </span>
