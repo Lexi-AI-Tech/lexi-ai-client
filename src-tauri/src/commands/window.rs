@@ -16,7 +16,7 @@ use tauri::{AppHandle, Manager};
 /// * `Ok(())` - Successfully opened DevTools
 /// * `Err(String)` - An error message if the window was not found
 #[tauri::command]
-pub fn open_devtools(app: AppHandle, window_label: Option<String>) -> Result<(), String> {
+pub async fn open_devtools(app: AppHandle, window_label: Option<String>) -> Result<(), String> {
     let label = window_label.as_deref().unwrap_or("main");
 
     if let Some(window) = app.get_webview_window(label) {

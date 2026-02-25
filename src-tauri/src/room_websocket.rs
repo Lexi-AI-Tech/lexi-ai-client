@@ -146,7 +146,10 @@ impl RoomWebSocket {
                                     let _ = tx.send(());
                                 }
                                 // Emit event to frontend
-                                let _ = app.emit("room-websocket-ready", ());
+                                let app_clone = app.clone();
+                                tauri::async_runtime::spawn(async move {
+                                    let _ = app_clone.emit("room-websocket-ready", ());
+                                });
                                 continue;
                             }
                         }
@@ -166,14 +169,17 @@ impl RoomWebSocket {
                                 println!("📤 Emitting to frontend: {}", json_str);
                             }
 
-                            match app.emit("room-transcript", &msg) {
-                                Ok(_) => {
-                                    println!("✅ Successfully emitted 'room-transcript' event to frontend");
+                            let app_clone = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                match app_clone.emit("room-transcript", &msg) {
+                                    Ok(_) => {
+                                        println!("✅ Successfully emitted 'room-transcript' event to frontend");
+                                    }
+                                    Err(e) => {
+                                        eprintln!("❌ Failed to emit transcript: {}", e);
+                                    }
                                 }
-                                Err(e) => {
-                                    eprintln!("❌ Failed to emit transcript: {}", e);
-                                }
-                            }
+                            });
                         } else {
                             eprintln!("⚠️ Failed to parse message: {}", text);
                         }
@@ -183,8 +189,11 @@ impl RoomWebSocket {
                         break;
                     }
                     Some(Err(e)) => {
-                        eprintln!("WebSocket error: {}", e);
-                        let _ = app.emit("room-websocket-error", format!("{}", e));
+                        let app_clone = app.clone();
+                        let error_msg = format!("{}", e);
+                        tauri::async_runtime::spawn(async move {
+                            let _ = app_clone.emit("room-websocket-error", error_msg);
+                        });
                         break;
                     }
                     None => break,

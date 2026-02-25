@@ -34,18 +34,23 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         println!("Processing audio, size: {} bytes", audio_data.len());
 
         // Notify frontend that transcription has started
-        app_handle_for_task
-            .emit("processing_start", ())
-            .unwrap_or_default();
+        let app_handle_emit = app_handle_for_task.clone();
+        tauri::async_runtime::spawn(async move {
+            app_handle_emit
+                .emit("processing_start", ())
+                .unwrap_or_default();
+        });
 
         // Get authentication token from secure storage (with automatic refresh if needed)
         let auth_token = get_auth_token_async(&app_handle_for_task).await;
 
         if auth_token.is_err() {
-            let error_msg = "User unauthenticated. Please log in.";
-            app_handle_for_task
-                .emit("error", error_msg)
-                .unwrap_or_default();
+            let app_handle_emit = app_handle_for_task.clone();
+            tauri::async_runtime::spawn(async move {
+                app_handle_emit
+                    .emit("error", "User unauthenticated. Please log in.")
+                    .unwrap_or_default();
+            });
             return;
         }
 
@@ -78,9 +83,13 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 );
 
                 // Notify frontend of successful transcription
-                app_handle_for_task
-                    .emit("transcription_success", &transcription)
-                    .unwrap_or_default();
+                let app_handle_emit = app_handle_for_task.clone();
+                let transcription_clone = transcription.clone();
+                tauri::async_runtime::spawn(async move {
+                    app_handle_emit
+                        .emit("transcription_success", &transcription_clone)
+                        .unwrap_or_default();
+                });
 
                 // Only process if transcription is not empty
                 if !transcription.trim().is_empty() {
@@ -102,16 +111,23 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     match injector.inject_text(&text_to_inject) {
                         Ok(_) => {
                             // Successfully injected text into active application
-                            app_handle_for_task
-                                .emit("injection_success", ())
-                                .unwrap_or_default();
+                            let app_handle_emit = app_handle_for_task.clone();
+                            tauri::async_runtime::spawn(async move {
+                                app_handle_emit
+                                    .emit("injection_success", ())
+                                    .unwrap_or_default();
+                            });
                         }
                         Err(e) => {
                             eprintln!("Failed to inject text: {}", e);
                             // Notify frontend of injection failure
-                            app_handle_for_task
-                                .emit("injection_error", e.to_string())
-                                .unwrap_or_default();
+                            let app_handle_emit = app_handle_for_task.clone();
+                            let error_msg = e.to_string();
+                            tauri::async_runtime::spawn(async move {
+                                app_handle_emit
+                                    .emit("injection_error", error_msg)
+                                    .unwrap_or_default();
+                            });
                         }
                     }
                 }
@@ -124,9 +140,12 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     e
                 );
                 // Notify frontend of transcription failure
-                app_handle_for_task
-                    .emit("transcription_error", error_msg)
-                    .unwrap_or_default();
+                let app_handle_emit = app_handle_for_task.clone();
+                tauri::async_runtime::spawn(async move {
+                    app_handle_emit
+                        .emit("transcription_error", error_msg)
+                        .unwrap_or_default();
+                });
             }
         }
     });

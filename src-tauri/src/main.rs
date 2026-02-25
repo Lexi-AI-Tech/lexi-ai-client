@@ -180,11 +180,6 @@ pub fn main() {
         config::api_base_url()
     );
 
-    // Initialize CrabNebula DevTools (only in debug builds)
-    // This should be called as early in the execution of the app as possible
-    #[cfg(debug_assertions)]
-    let devtools = tauri_plugin_devtools::init();
-
     let mut builder = tauri::Builder::default();
 
     // Add tauri-nspanel plugin on macOS for advanced NSPanel features
@@ -213,10 +208,6 @@ pub fn main() {
                 }
             });
         }));
-
-    // Add CrabNebula DevTools plugin (only in debug builds)
-    #[cfg(debug_assertions)]
-    let builder = builder.plugin(devtools);
 
     builder
         .manage(OAuthState::default())

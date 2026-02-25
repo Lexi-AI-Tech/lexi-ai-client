@@ -112,9 +112,12 @@ pub fn spawn_recording_thread(
                         }
                         ctx.started_at = None;
                         ctx.transition_to(RecordingPhase::Idle);
-                        app_handle
-                            .emit("recording_error", "Recording operation timed out")
-                            .unwrap_or_default();
+                        let app_handle_clone = app_handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            app_handle_clone
+                                .emit("recording_error", "Recording operation timed out")
+                                .unwrap_or_default();
+                        });
                     }
                     continue;
                 }
@@ -147,11 +150,14 @@ pub fn spawn_recording_thread(
                     }
                     thread::sleep(CORE_AUDIO_RELEASE_DELAY);
 
-                    if let Some(pill_window) = app_handle.get_webview_window("pill") {
-                        if let Err(e) = pill_window.show() {
-                            eprintln!("⚠️  Failed to show pill window: {}", e);
+                    let app_handle_clone = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Some(pill_window) = app_handle_clone.get_webview_window("pill") {
+                            if let Err(e) = pill_window.show() {
+                                eprintln!("⚠️  Failed to show pill window: {}", e);
+                            }
                         }
-                    }
+                    });
 
                     // Create channel for real-time volume updates
                     let (volume_tx, volume_rx) = mpsc::channel::<f32>();
@@ -175,17 +181,20 @@ pub fn spawn_recording_thread(
                             ctx.transition_to(RecordingPhase::Recording);
                             println!("✅ Recording started successfully");
 
-                            // Emit events based on mode
-                            match ctx.mode {
-                                RecordingMode::Assistant => {
-                                    app_handle.emit("recording_started", ()).unwrap_or_default();
+                            let app_handle_clone = app_handle.clone();
+                            let mode = ctx.mode;
+                            tauri::async_runtime::spawn(async move {
+                                match mode {
+                                    RecordingMode::Assistant => {
+                                        app_handle_clone.emit("recording_started", ()).unwrap_or_default();
+                                    }
+                                    RecordingMode::Action => {
+                                        app_handle_clone
+                                            .emit("action_recording_started", ())
+                                            .unwrap_or_default();
+                                    }
                                 }
-                                RecordingMode::Action => {
-                                    app_handle
-                                        .emit("action_recording_started", ())
-                                        .unwrap_or_default();
-                                }
-                            }
+                            });
                         }
                         Err(e) => {
                             eprintln!("❌ Failed to start recording: {}", e);
@@ -196,9 +205,13 @@ pub fn spawn_recording_thread(
                                 RecordingMode::Action => "action_recording_error",
                                 _ => "recording_error",
                             };
-                            app_handle
-                                .emit(event_name, e.to_string())
-                                .unwrap_or_default();
+                            let app_handle_clone = app_handle.clone();
+                            let error_msg = e.to_string();
+                            tauri::async_runtime::spawn(async move {
+                                app_handle_clone
+                                    .emit(event_name, error_msg)
+                                    .unwrap_or_default();
+                            });
                             ctx.transition_to(RecordingPhase::Idle);
                         }
                     }
@@ -228,19 +241,22 @@ pub fn spawn_recording_thread(
                                     audio_data.len()
                                 );
 
-                                // Emit events based on mode
-                                match ctx.mode {
-                                    RecordingMode::Assistant => {
-                                        app_handle
-                                            .emit("recording_stopped", ())
-                                            .unwrap_or_default();
+                                let app_handle_clone = app_handle.clone();
+                                let mode = ctx.mode;
+                                tauri::async_runtime::spawn(async move {
+                                    match mode {
+                                        RecordingMode::Assistant => {
+                                            app_handle_clone
+                                                .emit("recording_stopped", ())
+                                                .unwrap_or_default();
+                                        }
+                                        RecordingMode::Action => {
+                                            app_handle_clone
+                                                .emit("action_recording_stopped", ())
+                                                .unwrap_or_default();
+                                        }
                                     }
-                                    RecordingMode::Action => {
-                                        app_handle
-                                            .emit("action_recording_stopped", ())
-                                            .unwrap_or_default();
-                                    }
-                                }
+                                });
 
                                 if duration < MIN_RECORDING_DURATION {
                                     println!(
@@ -248,8 +264,10 @@ pub fn spawn_recording_thread(
                                         duration.as_secs_f64(),
                                         MIN_RECORDING_DURATION.as_secs_f64()
                                     );
-                                    // Tell pill/frontend to go back to idle
-                                    app_handle.emit("recording_skipped", ()).unwrap_or_default();
+                                    let app_handle_clone = app_handle.clone();
+                                    tauri::async_runtime::spawn(async move {
+                                        app_handle_clone.emit("recording_skipped", ()).unwrap_or_default();
+                                    });
                                 } else {
                                     // Process the audio based on mode
                                     match ctx.mode {
@@ -277,9 +295,13 @@ pub fn spawn_recording_thread(
                                     RecordingMode::Action => "action_recording_error",
                                     _ => "recording_error",
                                 };
-                                app_handle
-                                    .emit(event_name, e.to_string())
-                                    .unwrap_or_default();
+                                let app_handle_clone = app_handle.clone();
+                                let error_msg = e.to_string();
+                                tauri::async_runtime::spawn(async move {
+                                    app_handle_clone
+                                        .emit(event_name, error_msg)
+                                        .unwrap_or_default();
+                                });
                                 // Transition back to idle to allow recovery
                                 ctx.transition_to(RecordingPhase::Idle);
                             }
@@ -301,11 +323,13 @@ pub fn spawn_recording_thread(
                     if ctx.mode == RecordingMode::Assistant {
                         println!("🔄 Seamlessly switching recording mode: Assistant → Action");
                         ctx.mode = RecordingMode::Action;
-                        // Swap pill UI modes
-                        app_handle.emit("recording_stopped", ()).unwrap_or_default();
-                        app_handle
-                            .emit("action_recording_started", ())
-                            .unwrap_or_default();
+                        let app_handle_clone = app_handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            app_handle_clone.emit("recording_stopped", ()).unwrap_or_default();
+                            app_handle_clone
+                                .emit("action_recording_started", ())
+                                .unwrap_or_default();
+                        });
                     }
                 }
 
@@ -316,11 +340,13 @@ pub fn spawn_recording_thread(
                     if ctx.mode == RecordingMode::Action {
                         println!("🔄 Seamlessly switching recording mode: Action → Assistant");
                         ctx.mode = RecordingMode::Assistant;
-                        // Swap pill UI modes
-                        app_handle
-                            .emit("action_recording_stopped", ())
-                            .unwrap_or_default();
-                        app_handle.emit("recording_started", ()).unwrap_or_default();
+                        let app_handle_clone = app_handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            app_handle_clone
+                                .emit("action_recording_stopped", ())
+                                .unwrap_or_default();
+                            app_handle_clone.emit("recording_started", ()).unwrap_or_default();
+                        });
                     }
                 }
 

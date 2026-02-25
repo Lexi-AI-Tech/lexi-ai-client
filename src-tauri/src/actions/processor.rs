@@ -18,7 +18,10 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         audio_data.len()
     );
 
-    app_handle.emit("processing_start", ()).unwrap_or_default();
+    let app_handle_clone = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        app_handle_clone.emit("processing_start", ()).unwrap_or_default();
+    });
 
     let cursor_context = get_cursor_context();
 
@@ -35,7 +38,10 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             match action_response.action_type.as_str() {
                 "voice" => {
                     println!("🔊 Voice action - playing audio from server");
-                    app_handle.emit("tts_speaking", ()).unwrap_or_default();
+                    let app_handle_clone = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        app_handle_clone.emit("tts_speaking", ()).unwrap_or_default();
+                    });
 
                     let tts_service = TtsService::new(app_handle.clone());
                     match action_response.audio_base64.as_deref() {
@@ -47,21 +53,31 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                                         "[Voice action] total_time_ms={} (from start to playback finished)",
                                         total_ms
                                     );
-                                    app_handle.emit("tts_success", ()).unwrap_or_default();
+                                    let app_handle_clone = app_handle.clone();
+                                    tauri::async_runtime::spawn(async move {
+                                        app_handle_clone.emit("tts_success", ()).unwrap_or_default();
+                                    });
                                 }
                                 Err(e) => {
                                     eprintln!("❌ TTS playback failed: {}", e);
-                                    app_handle
-                                        .emit("tts_error", e.to_string())
-                                        .unwrap_or_default();
+                                    let app_handle_clone = app_handle.clone();
+                                    let error_msg = e.to_string();
+                                    tauri::async_runtime::spawn(async move {
+                                        app_handle_clone
+                                            .emit("tts_error", error_msg)
+                                            .unwrap_or_default();
+                                    });
                                 }
                             }
                         }
                         _ => {
                             eprintln!("❌ No audio in voice action response");
-                            app_handle
-                                .emit("tts_error", "No audio in response")
-                                .unwrap_or_default();
+                            let app_handle_clone = app_handle.clone();
+                            tauri::async_runtime::spawn(async move {
+                                app_handle_clone
+                                    .emit("tts_error", "No audio in response")
+                                    .unwrap_or_default();
+                            });
                         }
                     }
                 }
@@ -69,12 +85,21 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     println!("📝 Text action - injecting text");
                     let injector = TextInjector::new();
                     match injector.inject_text(&action_response.value) {
-                        Ok(_) => app_handle.emit("injection_success", ()).unwrap_or_default(),
+                        Ok(_) => {
+                            let app_handle_clone = app_handle.clone();
+                            tauri::async_runtime::spawn(async move {
+                                app_handle_clone.emit("injection_success", ()).unwrap_or_default();
+                            });
+                        }
                         Err(e) => {
                             eprintln!("❌ Text injection failed: {}", e);
-                            app_handle
-                                .emit("injection_error", e.to_string())
-                                .unwrap_or_default();
+                            let app_handle_clone = app_handle.clone();
+                            let error_msg = e.to_string();
+                            tauri::async_runtime::spawn(async move {
+                                app_handle_clone
+                                    .emit("injection_error", error_msg)
+                                    .unwrap_or_default();
+                            });
                         }
                     }
                 }
