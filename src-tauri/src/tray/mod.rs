@@ -162,19 +162,21 @@ fn handle_tray_icon_event(tray: &tauri::tray::TrayIcon, event: TrayIconEvent) {
         ..
     } = event
     {
-        let app = tray.app_handle();
-        if let Some(window) = app.get_webview_window("main") {
-            let is_visible = window.is_visible().unwrap_or(false);
-            if is_visible {
-                println!("🔄 Hiding window via tray click");
-                if let Err(e) = window.hide() {
-                    eprintln!("❌ Failed to hide window: {}", e);
+        let app_clone = tray.app_handle().clone();
+        tauri::async_runtime::spawn(async move {
+            if let Some(window) = app_clone.get_webview_window("main") {
+                let is_visible = window.is_visible().unwrap_or(false);
+                if is_visible {
+                    println!("🔄 Hiding window via tray click");
+                    if let Err(e) = window.hide() {
+                        eprintln!("❌ Failed to hide window: {}", e);
+                    } else {
+                        println!("✅ Window hidden via tray click");
+                    }
                 } else {
-                    println!("✅ Window hidden via tray click");
+                    show_and_focus_main_window(&app_clone);
                 }
-            } else {
-                show_and_focus_main_window(app);
             }
-        }
+        });
     }
 }
