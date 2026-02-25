@@ -10,7 +10,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "2.0", features = [] }
+tauri-build = { version = "2.5.5", features = [] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
@@ -18,12 +18,12 @@ tauri-build = { version = "2.0", features = [] }
 custom-protocol = ["tauri/custom-protocol"]
 
 [dependencies]
-tauri = { version = "2.0", features = [ "devtools", "tray-icon"] }
-tauri-plugin-store = "2.0"
-tauri-plugin-single-instance = "2"
-tauri-plugin-devtools = "2.0"
-tauri-plugin-deep-link = "2.0"
-tauri-plugin-autostart = "2.0"
+tauri = { version = "2.10.2", features = [ "devtools", "tray-icon"] }
+tauri-plugin-store = "2.4.2"
+tauri-plugin-single-instance = "2.4.0"
+tauri-plugin-devtools = "2.0.1"
+tauri-plugin-deep-link = "2.4.7"
+tauri-plugin-autostart = "2.5.1"
 
 hyper = { version = "1.0", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
