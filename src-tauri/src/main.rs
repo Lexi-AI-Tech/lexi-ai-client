@@ -54,6 +54,7 @@ mod cursor_context; // Cursor context retrieval using macOS Accessibility API (A
 mod global_key_listener; // Unified hotkey management
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
+
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
@@ -62,6 +63,8 @@ mod shortcuts; // Voice command shortcuts that replace transcriptions with prede
 #[cfg(target_os = "macos")]
 mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
+mod meetings; // Meetings module
+
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod titlebar; // Title bar customization (hide title, match background on macOS)
 mod tray; // System tray icon creation and event handling
@@ -69,6 +72,7 @@ mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
+
 
 use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
@@ -100,6 +104,9 @@ use commands::onboarding::{
     complete_onboarding, complete_server_onboarding, get_onboarding_state,
     get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
     set_onboarding_step,
+};
+use meetings::commands::{
+    create_meeting, get_meeting_details, list_meetings, start_meeting_recording, stop_meeting_recording, update_meeting
 };
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
@@ -273,6 +280,12 @@ pub fn main() {
             stop_room_recording_and_process,
             update_room,
             update_speaker,
+            create_meeting,
+            list_meetings,
+            get_meeting_details,
+            start_meeting_recording,
+            stop_meeting_recording,
+            update_meeting,
             start_global_key_listener,
         ])
         .setup(move |app| {
@@ -342,6 +355,11 @@ pub fn main() {
                 command_tx: Mutex::new(None),
             });
 
+            app.manage(crate::state::MeetingState {
+                is_recording: Mutex::new(false),
+                command_tx: Mutex::new(None),
+            });
+
             // Fetch config in background after state is managed to ensure channels get updated
             let app_handle_for_config = app_handle.clone();
             tauri::async_runtime::spawn(async move {
@@ -368,6 +386,9 @@ pub fn main() {
             {
                 // Spawn the unified recording thread
                 spawn_recording_thread(app_handle.clone(), recording_rx);
+                
+                // Start background meeting detector
+                meetings::detector::start_meeting_detector(app_handle.clone());
             }
 
             Ok(())

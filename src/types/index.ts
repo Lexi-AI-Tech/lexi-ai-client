@@ -261,7 +261,8 @@ export interface SidebarProps {
   | "vocabulary"
   | "actions"
   | "shortcuts"
-  | "notes";
+  | "notes"
+  | "meetings";
   onNavigate: (
     page:
       | "home"
@@ -270,7 +271,8 @@ export interface SidebarProps {
       | "vocabulary"
       | "actions"
       | "shortcuts"
-      | "notes",
+      | "notes"
+      | "meetings",
   ) => void;
 }
 

@@ -20,6 +20,8 @@ import { ShortcutsPage } from "./components/ShortcutsPage";
 import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { NotesPage } from "./components/NotesPage";
+import { MeetingsPage } from "./components/MeetingsPage";
+import { MeetingDetectorModal } from "./components/MeetingDetectorModal";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
 
@@ -32,7 +34,8 @@ type Page =
   | "vocabulary"
   | "actions"
   | "shortcuts"
-  | "notes";
+  | "notes"
+  | "meetings";
 
 const LOADING_DELAY_MS = 150; // Only show loading spinner if init takes longer than this (avoids brief flash on first load)
 
@@ -111,10 +114,10 @@ function App() {
     invoke<boolean>("check_input_monitoring_permission")
       .then((granted) => {
         if (granted) {
-          invoke("start_global_key_listener").catch(() => {});
+          invoke("start_global_key_listener").catch(() => { });
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isCompleted]);
 
   const showLoading =
@@ -150,6 +153,7 @@ function App() {
   // Render app with sidebar and page content
   return (
     <div className="app">
+      <MeetingDetectorModal />
       <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
       <div className="main-content">
         {currentPage === "home" && (
@@ -185,6 +189,11 @@ function App() {
         {currentPage === "notes" && (
           <div className="container">
             <NotesPage />
+          </div>
+        )}
+        {currentPage === "meetings" && (
+          <div className="container">
+            <MeetingsPage />
           </div>
         )}
       </div>

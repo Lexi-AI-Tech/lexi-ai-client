@@ -34,3 +34,11 @@ pub struct RoomState {
     pub is_recording: Mutex<bool>,
     pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
 }
+
+/// Meeting recording state
+///
+/// Note: AudioRecorder and MeetingWebSocket cannot be stored here for the same reasons as RoomState.
+pub struct MeetingState {
+    pub is_recording: Mutex<bool>,
+    pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
+}

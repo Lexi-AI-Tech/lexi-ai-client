@@ -47,9 +47,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Transcripts */}
         <button
-          className={`sidebar-item ${
-            currentPage === "transcripts" ? "active" : ""
-          }`}
+          className={`sidebar-item ${currentPage === "transcripts" ? "active" : ""
+            }`}
           onClick={() => onNavigate("transcripts")}
         >
           <svg
@@ -73,9 +72,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Vocabulary */}
         <button
-          className={`sidebar-item ${
-            currentPage === "vocabulary" ? "active" : ""
-          }`}
+          className={`sidebar-item ${currentPage === "vocabulary" ? "active" : ""
+            }`}
           onClick={() => onNavigate("vocabulary")}
         >
           <svg
@@ -99,9 +97,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Actions */}
         <button
-          className={`sidebar-item ${
-            currentPage === "actions" ? "active" : ""
-          }`}
+          className={`sidebar-item ${currentPage === "actions" ? "active" : ""
+            }`}
           onClick={() => onNavigate("actions")}
         >
           <svg
@@ -123,9 +120,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Shortcuts */}
         <button
-          className={`sidebar-item ${
-            currentPage === "shortcuts" ? "active" : ""
-          }`}
+          className={`sidebar-item ${currentPage === "shortcuts" ? "active" : ""
+            }`}
           onClick={() => onNavigate("shortcuts")}
         >
           <svg
@@ -168,11 +164,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Notes</span>
         </button>
 
+        {/* Meetings */}
+        <button
+          className={`sidebar-item ${currentPage === "meetings" ? "active" : ""}`}
+          onClick={() => onNavigate("meetings")}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M23 7l-7 5 7 5V7z"></path>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <span>Meetings</span>
+        </button>
+
         {/* Settings */}
         <button
-          className={`sidebar-item ${
-            currentPage === "settings" ? "active" : ""
-          }`}
+          className={`sidebar-item ${currentPage === "settings" ? "active" : ""
+            }`}
           onClick={() => onNavigate("settings")}
         >
           <svg
