@@ -52,6 +52,10 @@ export const MeetingsPage: React.FC = () => {
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
+    // End meeting confirmation state
+    const [showEndConfirm, setShowEndConfirm] = useState(false);
+    const [isEnding, setIsEnding] = useState(false);
+
     // 1. Fetch historical meetings
     const fetchMeetings = async () => {
         try {
@@ -367,6 +371,7 @@ export const MeetingsPage: React.FC = () => {
                         className="btn btn--secondary"
                         style={{ marginTop: "1rem", width: "100%" }}
                         onClick={handleCreateAndStartMeeting}
+                        disabled={isRecording || isGeneratingSummary}
                     >
                         + Start New Meeting
                     </button>
@@ -414,16 +419,10 @@ export const MeetingsPage: React.FC = () => {
                                                 </button>
                                                 <button
                                                     className="btn"
-                                                    onClick={async () => {
-                                                        const confirmed = window.confirm("Are you sure you want to complete this meeting? The transcript will be finalized and AI will generate a title and summary automatically.");
-                                                        if (!confirmed) return;
-
-                                                        if (isRecording) await stopRecording();
-                                                        await handleGenerateSummary();
-                                                    }}
+                                                    onClick={() => setShowEndConfirm(true)}
                                                     style={{ backgroundColor: "#ef4444", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" }}
                                                 >
-                                                    Complete
+                                                    End
                                                 </button>
                                             </>
                                         )}
@@ -555,12 +554,12 @@ export const MeetingsPage: React.FC = () => {
                                                 onChange={e => setChatInput(e.target.value)}
                                                 placeholder="Ask a question..."
                                                 style={{ flex: 1, padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db" }}
-                                                disabled={isSendingChat}
+                                                disabled={isSendingChat || isRecording}
                                             />
                                             <button
                                                 type="submit"
                                                 className="btn btn--primary"
-                                                disabled={isSendingChat || !chatInput.trim()}
+                                                disabled={isSendingChat || !chatInput.trim() || isRecording}
                                             >
                                                 Send
                                             </button>
@@ -604,6 +603,51 @@ export const MeetingsPage: React.FC = () => {
                                 disabled={!!deletingId}
                             >
                                 {deletingId ? "Deleting..." : "Delete"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showEndConfirm && (
+                <div className="delete-modal-overlay" onClick={() => !isEnding && setShowEndConfirm(false)}>
+                    <div
+                        className="delete-modal-content"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3>End meeting?</h3>
+                        <p>
+                            The transcript will be finalized and AI will generate a title and summary automatically.
+                            You won't be able to resume recording after this.
+                        </p>
+                        <div className="delete-modal-actions">
+                            <button
+                                type="button"
+                                className="delete-modal-btn-cancel"
+                                onClick={() => setShowEndConfirm(false)}
+                                disabled={isEnding}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="delete-modal-btn-delete"
+                                onClick={async () => {
+                                    setIsEnding(true);
+                                    try {
+                                        if (isRecording) await stopRecording();
+                                        await new Promise(r => setTimeout(r, 500));
+                                        await handleGenerateSummary();
+                                    } catch (error) {
+                                        console.error("Failed to end meeting:", error);
+                                    } finally {
+                                        setIsEnding(false);
+                                        setShowEndConfirm(false);
+                                    }
+                                }}
+                                disabled={isEnding}
+                            >
+                                {isEnding ? "Ending..." : "End Meeting"}
                             </button>
                         </div>
                     </div>
