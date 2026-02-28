@@ -388,12 +388,13 @@ export const MeetingsPage: React.FC = () => {
                                         style={activeTab !== "transcript" ? { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db" } : {}}
                                         onClick={() => setActiveTab("transcript")}
                                     >
-                                        Live Transcript
+                                        Transcript
                                     </button>
                                     <button
                                         className={`btn ${activeTab === "summary" ? "btn--primary" : ""}`}
                                         style={activeTab !== "summary" ? { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db" } : {}}
                                         onClick={() => setActiveTab("summary")}
+                                        disabled={isRecording}
                                     >
                                         Summary & Q/A
                                     </button>
