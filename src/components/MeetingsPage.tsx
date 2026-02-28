@@ -18,7 +18,6 @@ interface Meeting {
     created_at: string;
     transcripts?: TranscriptSegment[];
 }
-const APP_PLATFORM_NAME = "Lexi AI";
 
 export const MeetingsPage: React.FC = () => {
     const { tokens } = useAuthStore();
@@ -103,10 +102,9 @@ export const MeetingsPage: React.FC = () => {
         if (!tokens?.access_token) return;
 
         try {
-            const meetingName = `Meeting - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
             const newMeeting = await invoke<Meeting>("create_meeting", {
-                name: meetingName,
-                platform: APP_PLATFORM_NAME
+                name: "Meeting Session",
+                platform: null
             });
 
             // Add to list immediately
@@ -225,7 +223,7 @@ export const MeetingsPage: React.FC = () => {
                                 >
                                     <div style={{ fontWeight: 500, color: "#111827", marginBottom: "4px" }}>{m.name || "Untitled Meeting"}</div>
                                     <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                                        {m.platform || APP_PLATFORM_NAME} • {dateStr} {timeStr}
+                                        {m.platform || "Lexi AI"} • {dateStr} {timeStr}
                                     </div>
                                     <button
                                         onClick={(e) => openDeleteConfirm(e, m.id)}
