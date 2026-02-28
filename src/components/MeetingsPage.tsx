@@ -102,10 +102,10 @@ export const MeetingsPage: React.FC = () => {
             }
         };
 
-        if (activeMeetingId && !isRecording) {
+        if (activeMeetingId) {
             fetchMeetingDetails();
         }
-    }, [activeMeetingId, isRecording]);
+    }, [activeMeetingId]);
 
     // Auto-scroll chat to bottom
     useEffect(() => {
@@ -163,7 +163,6 @@ export const MeetingsPage: React.FC = () => {
         if (!tokens?.access_token) return;
         setIsRecording(true);
         setActiveMeetingId(meetingId);
-        setLiveSegments([]);
 
         try {
             await invoke("start_meeting_recording", { meetingId });
@@ -416,6 +415,9 @@ export const MeetingsPage: React.FC = () => {
                                                 <button
                                                     className="btn"
                                                     onClick={async () => {
+                                                        const confirmed = window.confirm("Are you sure you want to complete this meeting? The transcript will be finalized and AI will generate a title and summary automatically.");
+                                                        if (!confirmed) return;
+
                                                         if (isRecording) await stopRecording();
                                                         await handleGenerateSummary();
                                                     }}
