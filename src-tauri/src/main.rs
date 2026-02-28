@@ -295,7 +295,7 @@ pub fn main() {
         ])
         .setup(move |app| {
             // Create system tray first to avoid borrow checker issues
-            tray::init_system_tray(app)?;
+            let start_meeting_menu_item = tray::init_system_tray(app)?;
 
             if let Some(window) = app.get_webview_window("main") {
                 titlebar::apply_to_window(&window);
@@ -363,6 +363,7 @@ pub fn main() {
             app.manage(crate::state::MeetingState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
+                tray_start_meeting: Mutex::new(Some(start_meeting_menu_item)),
             });
 
             // Fetch config in background after state is managed to ensure channels get updated
