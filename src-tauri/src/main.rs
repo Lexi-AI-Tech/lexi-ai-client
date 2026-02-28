@@ -106,7 +106,9 @@ use commands::onboarding::{
     set_onboarding_step,
 };
 use meetings::commands::{
-    create_meeting, get_meeting_details, list_meetings, start_meeting_recording, stop_meeting_recording, update_meeting, delete_meeting
+    create_meeting, get_meeting_details, list_meetings, start_meeting_recording, 
+    stop_meeting_recording, update_meeting, delete_meeting,
+    summarize_meeting, send_meeting_chat
 };
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
@@ -287,6 +289,8 @@ pub fn main() {
             stop_meeting_recording,
             update_meeting,
             delete_meeting,
+            summarize_meeting,
+            send_meeting_chat,
             start_global_key_listener,
         ])
         .setup(move |app| {

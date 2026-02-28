@@ -42,6 +42,12 @@ pub struct MeetingUpdate {
     pub name: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MeetingChatRequest {
+    pub content: String,
+    pub history: Vec<serde_json::Value>,
+}
+
 /// Create a new meeting
 #[tauri::command]
 pub async fn create_meeting(app: AppHandle, name: String, platform: Option<String>) -> Result<Meeting, String> {
@@ -356,4 +362,75 @@ pub async fn delete_meeting(app: AppHandle, meeting_id: String) -> Result<(), St
     }
 
     Ok(())
+}
+
+/// Summarize a meeting
+#[tauri::command]
+pub async fn summarize_meeting(app: AppHandle, meeting_id: String) -> Result<serde_json::Value, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let client = crate::utils::create_http_client();
+    let url = format!("{}/api/v1/meetings/{}/summarize", crate::config::api_base_url(), meeting_id);
+
+    utils::log_api_request("Summarize meeting", "POST", &url);
+
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+
+    let meeting: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    Ok(meeting)
+}
+
+
+/// Send a chat message to a meeting
+#[tauri::command]
+pub async fn send_meeting_chat(
+    app: AppHandle,
+    meeting_id: String,
+    content: String,
+    history: Vec<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let client = crate::utils::create_http_client();
+    let url = format!("{}/api/v1/meetings/{}/chat", crate::config::api_base_url(), meeting_id);
+
+    let payload = MeetingChatRequest { content, history };
+
+    utils::log_api_request("Send meeting message", "POST", &url);
+
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+
+    let message: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    Ok(message)
 }

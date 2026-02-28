@@ -16,7 +16,15 @@ interface Meeting {
     name: string;
     platform: string | null;
     created_at: string;
+    summary?: string | null;
     transcripts?: TranscriptSegment[];
+}
+
+interface ChatMessage {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    created_at: string;
 }
 
 export const MeetingsPage: React.FC = () => {
@@ -24,10 +32,21 @@ export const MeetingsPage: React.FC = () => {
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
 
+    // Tab state (Transcript vs Summary/QA)
+    const [activeTab, setActiveTab] = useState<"transcript" | "summary">("transcript");
+
     // Real-time state
     const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Summary & Chat state
+    const [activeSummary, setActiveSummary] = useState<string | null>(null);
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [chatInput, setChatInput] = useState("");
+    const [isSendingChat, setIsSendingChat] = useState(false);
+    const chatScrollRef = useRef<HTMLDivElement>(null);
 
     // Deletion state
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -61,6 +80,22 @@ export const MeetingsPage: React.FC = () => {
                 } else {
                     setLiveSegments([]);
                 }
+
+                // Set the summary block
+                if (meetingDetails.summary) {
+                    setActiveSummary(meetingDetails.summary);
+                } else {
+                    setActiveSummary(null);
+                }
+
+                // Fetch Chat History
+                try {
+                    const msgs = await invoke<ChatMessage[]>("get_meeting_messages", { meetingId: activeMeetingId });
+                    setChatMessages(msgs);
+                } catch (err) {
+                    console.error("Failed to load meeting chat history:", err);
+                    setChatMessages([]);
+                }
             } catch (error) {
                 console.error("Failed to fetch meeting details:", error);
                 setLiveSegments([]);
@@ -71,6 +106,13 @@ export const MeetingsPage: React.FC = () => {
             fetchMeetingDetails();
         }
     }, [activeMeetingId, isRecording]);
+
+    // Auto-scroll chat to bottom
+    useEffect(() => {
+        if (chatScrollRef.current) {
+            chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+    }, [chatMessages]);
 
     // 2. Real-time streaming logic via Tauri
     useEffect(() => {
@@ -142,6 +184,65 @@ export const MeetingsPage: React.FC = () => {
             console.error("Failed to stop meeting recording:", error);
         } finally {
             setIsRecording(false);
+        }
+    };
+
+    const handleGenerateSummary = async () => {
+        if (!activeMeetingId || isGeneratingSummary) return;
+
+        setIsGeneratingSummary(true);
+        try {
+            const updatedMeeting = await invoke<Meeting>("summarize_meeting", { meetingId: activeMeetingId });
+
+            // Update the locally cached active Summary
+            setActiveSummary(updatedMeeting.summary || null);
+
+            // Update the meeting list item so it technically persists globally
+            setMeetings(prev => prev.map(m => m.id === updatedMeeting.id ? updatedMeeting : m));
+
+        } catch (error) {
+            console.error("Failed to generate meeting summary:", error);
+            alert("Failed to generate meeting summary.");
+        } finally {
+            setIsGeneratingSummary(false);
+        }
+    };
+
+    const handleSendChatMessage = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+
+        const text = chatInput.trim();
+        if (!text || !activeMeetingId || isSendingChat) return;
+
+        // Optimistic UI Append
+        const tempId = Math.random().toString();
+        const newMessage: ChatMessage = {
+            id: tempId,
+            role: "user",
+            content: text,
+            created_at: new Date().toISOString()
+        };
+
+        setChatMessages(prev => [...prev, newMessage]);
+        setChatInput("");
+        setIsSendingChat(true);
+
+        try {
+            const apiHistory = chatMessages.map(msg => ({ role: msg.role, content: msg.content }));
+            const aiResponse = await invoke<ChatMessage>("send_meeting_message", {
+                meetingId: activeMeetingId,
+                content: text,
+                history: apiHistory
+            });
+
+            setChatMessages(prev => [...prev, aiResponse]);
+        } catch (error) {
+            console.error("Failed to send meeting chat:", error);
+            // Revert optimistic insert
+            setChatMessages(prev => prev.filter(m => m.id !== tempId));
+            setChatInput(text); // Give them their text back
+        } finally {
+            setIsSendingChat(false);
         }
     };
 
@@ -277,66 +378,194 @@ export const MeetingsPage: React.FC = () => {
                     {activeMeetingId ? (
                         <>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                                <div className="panel__label" style={{ margin: 0 }}>Live Transcript - {activeMeetingId}</div>
-                                {isRecording ? (
+                                <div style={{ display: "flex", gap: "12px" }}>
                                     <button
-                                        className="btn"
-                                        onClick={stopRecording}
-                                        style={{ backgroundColor: "#ef4444", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" }}
+                                        className={`btn ${activeTab === "transcript" ? "btn--primary" : ""}`}
+                                        style={activeTab !== "transcript" ? { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db" } : {}}
+                                        onClick={() => setActiveTab("transcript")}
                                     >
-                                        Stop Capture
+                                        Live Transcript
                                     </button>
+                                    <button
+                                        className={`btn ${activeTab === "summary" ? "btn--primary" : ""}`}
+                                        style={activeTab !== "summary" ? { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db" } : {}}
+                                        onClick={() => setActiveTab("summary")}
+                                    >
+                                        Summary & Q/A
+                                    </button>
+                                </div>
+                                {activeSummary ? (
+                                    <div style={{ color: "#10b981", fontSize: "14px", fontWeight: 500 }}>
+                                        Meeting Completed
+                                    </div>
                                 ) : (
-                                    <button
-                                        className="btn btn--primary"
-                                        onClick={() => startRecording(activeMeetingId)}
-                                    >
-                                        Resume Capture
-                                    </button>
+                                    <div style={{ display: "flex", gap: "8px" }}>
+                                        {isGeneratingSummary ? (
+                                            <span style={{ color: "#3b82f6", fontSize: "14px", fontWeight: 500, marginRight: "1rem", alignSelf: "center" }}>
+                                                Generating AI Summary...
+                                            </span>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    className={`btn ${!isRecording ? "btn--primary" : ""}`}
+                                                    onClick={() => isRecording ? stopRecording() : startRecording(activeMeetingId)}
+                                                    style={isRecording ? { backgroundColor: "#f59e0b", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" } : { padding: "6px 12px" }}
+                                                >
+                                                    {isRecording ? "Pause" : "Resume"}
+                                                </button>
+                                                <button
+                                                    className="btn"
+                                                    onClick={async () => {
+                                                        if (isRecording) await stopRecording();
+                                                        await handleGenerateSummary();
+                                                    }}
+                                                    style={{ backgroundColor: "#ef4444", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" }}
+                                                >
+                                                    Complete
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
                                 )}
                             </div>
 
-                            <div
-                                ref={scrollRef}
-                                style={{
-                                    flex: 1,
-                                    overflowY: "auto",
-                                    backgroundColor: "#f9fafb",
-                                    padding: "1.5rem",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e5e7eb"
-                                }}
-                            >
-                                {liveSegments.length === 0 ? (
-                                    <p style={{ color: "#9ca3af", textAlign: "center", fontStyle: "italic", marginTop: "2rem" }}>
-                                        {isRecording ? "Listening for speech..." : "Click Resume Capture to start."}
-                                    </p>
-                                ) : null}
+                            {activeTab === "transcript" && (
+                                <div
+                                    ref={scrollRef}
+                                    style={{
+                                        flex: 1,
+                                        overflowY: "auto",
+                                        backgroundColor: "#f9fafb",
+                                        padding: "1.5rem",
+                                        borderRadius: "8px",
+                                        border: "1px solid #e5e7eb"
+                                    }}
+                                >
+                                    {liveSegments.length === 0 ? (
+                                        <p style={{ color: "#9ca3af", textAlign: "center", fontStyle: "italic", marginTop: "2rem" }}>
+                                            {isRecording ? "Listening for speech..." : "Click Resume Capture to start."}
+                                        </p>
+                                    ) : null}
 
-                                {liveSegments.map((seg, idx) => {
-                                    let timeString = "00:00:00";
-                                    try {
-                                        if (seg.start_time) {
-                                            const d = new Date(seg.start_time);
-                                            // Format as localized time depending on user OS preferences
-                                            timeString = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                                    {liveSegments.map((seg, idx) => {
+                                        let timeString = "00:00:00";
+                                        try {
+                                            if (seg.start_time) {
+                                                const d = new Date(seg.start_time);
+                                                // Format as localized time depending on user OS preferences
+                                                timeString = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                                            }
+                                        } catch (e) {
+                                            // Ignore parsing errors and fallback
                                         }
-                                    } catch (e) {
-                                        // Ignore parsing errors and fallback
-                                    }
 
-                                    return (
-                                        <div key={idx} style={{ marginBottom: "1rem", display: "flex", gap: "10px" }}>
-                                            <span style={{ fontSize: "12px", color: "#6b7280", marginTop: "3px", minWidth: "90px" }}>
-                                                [{timeString}]
-                                            </span>
-                                            <span style={{ fontSize: "15px", lineHeight: "1.6", color: "#111827" }}>
-                                                {seg.text}
-                                            </span>
+                                        return (
+                                            <div key={idx} style={{ marginBottom: "1rem", display: "flex", gap: "10px" }}>
+                                                <span style={{ fontSize: "12px", color: "#6b7280", marginTop: "3px", minWidth: "90px" }}>
+                                                    [{timeString}]
+                                                </span>
+                                                <span style={{ fontSize: "15px", lineHeight: "1.6", color: "#111827" }}>
+                                                    {seg.text}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {activeTab === "summary" && (
+                                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1rem", overflow: "hidden" }}>
+
+                                    {/* Top Half: Summary */}
+                                    <div style={{
+                                        flex: 1,
+                                        overflowY: "auto",
+                                        backgroundColor: "#ffffff",
+                                        padding: "1.5rem",
+                                        borderRadius: "8px",
+                                        border: "1px solid #e5e7eb",
+                                        display: "flex",
+                                        flexDirection: "column"
+                                    }}>
+                                        <h3 style={{ margin: "0 0 1rem 0", fontSize: "16px", color: "#111827" }}>AI Summary</h3>
+
+                                        {!activeSummary ? (
+                                            <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem", textAlign: "center" }}>
+                                                {isGeneratingSummary ? (
+                                                    <p style={{ color: "#3b82f6", margin: 0 }}>Generating AI Summary...</p>
+                                                ) : (
+                                                    <p style={{ color: "#6b7280", margin: 0 }}>
+                                                        No summary generated yet. Click "Complete" when the meeting is over to generate one.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div style={{ whiteSpace: "pre-wrap", color: "#374151", fontSize: "14px", lineHeight: "1.6" }}>
+                                                {activeSummary}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Bottom Half: Chat / Q&A */}
+                                    <div style={{
+                                        flex: 1,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        backgroundColor: "#f9fafb",
+                                        borderRadius: "8px",
+                                        border: "1px solid #e5e7eb",
+                                        overflow: "hidden"
+                                    }}>
+                                        <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", backgroundColor: "#f3f4f6" }}>
+                                            <h4 style={{ margin: 0, fontSize: "14px", color: "#374151" }}>Meeting Q&A</h4>
                                         </div>
-                                    );
-                                })}
-                            </div>
+
+                                        <div ref={chatScrollRef} style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                            {chatMessages.length === 0 ? (
+                                                <p style={{ color: "#9ca3af", textAlign: "center", fontSize: "14px", marginTop: "auto", marginBottom: "auto" }}>
+                                                    Ask questions about the meeting transcript here.
+                                                </p>
+                                            ) : (
+                                                chatMessages.map(msg => (
+                                                    <div
+                                                        key={msg.id}
+                                                        style={{
+                                                            alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                                                            backgroundColor: msg.role === "user" ? "#3b82f6" : "#e5e7eb",
+                                                            color: msg.role === "user" ? "white" : "#111827",
+                                                            padding: "8px 12px",
+                                                            borderRadius: "8px",
+                                                            maxWidth: "80%",
+                                                            fontSize: "14px",
+                                                            lineHeight: "1.5"
+                                                        }}
+                                                    >
+                                                        {msg.content}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        <form onSubmit={handleSendChatMessage} style={{ padding: "1rem", borderTop: "1px solid #e5e7eb", display: "flex", gap: "8px" }}>
+                                            <input
+                                                type="text"
+                                                value={chatInput}
+                                                onChange={e => setChatInput(e.target.value)}
+                                                placeholder="Ask a question..."
+                                                style={{ flex: 1, padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db" }}
+                                                disabled={isSendingChat}
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="btn btn--primary"
+                                                disabled={isSendingChat || !chatInput.trim()}
+                                            >
+                                                Send
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     ) : (
                         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}>
