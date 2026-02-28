@@ -29,14 +29,43 @@ export const MeetingsPage: React.FC = () => {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // 1. Fetch historical meetings
+    const fetchMeetings = async () => {
+        try {
+            const result = await invoke<Meeting[]>("list_meetings");
+            // The API returns an array of meetings
+            setMeetings(result);
+        } catch (error) {
+            console.error("Failed to fetch meetings:", error);
+        }
+    };
+
     useEffect(() => {
-        const fetchMeetings = async () => {
-            // NOTE: Normally use a fetch tool or axios configured with API_URL
-            // const res = await fetchClient.get(`/api/v1/meetings`);
-            // setMeetings(res.data);
+        if (tokens?.access_token) {
+            fetchMeetings();
+        }
+    }, [tokens]);
+
+    // Fetch transcripts when a meeting is selected
+    useEffect(() => {
+        const fetchMeetingDetails = async () => {
+            if (!activeMeetingId) return;
+            try {
+                const meetingDetails = await invoke<Meeting>("get_meeting_details", { meetingId: activeMeetingId });
+                if (meetingDetails.transcripts) {
+                    setLiveSegments(meetingDetails.transcripts);
+                } else {
+                    setLiveSegments([]);
+                }
+            } catch (error) {
+                console.error("Failed to fetch meeting details:", error);
+                setLiveSegments([]);
+            }
         };
-        fetchMeetings();
-    }, []);
+
+        if (activeMeetingId && !isRecording) {
+            fetchMeetingDetails();
+        }
+    }, [activeMeetingId, isRecording]);
 
     // 2. Real-time streaming logic via Tauri
     useEffect(() => {
@@ -63,6 +92,26 @@ export const MeetingsPage: React.FC = () => {
             if (unlistenFn) unlistenFn();
         };
     }, []);
+
+    const handleCreateAndStartMeeting = async () => {
+        if (!tokens?.access_token) return;
+
+        try {
+            const meetingName = `Meeting - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            const newMeeting = await invoke<Meeting>("create_meeting", {
+                name: meetingName,
+                platform: null
+            });
+
+            // Add to list immediately
+            setMeetings(prev => [newMeeting, ...prev]);
+
+            // Start recording automatically
+            await startRecording(newMeeting.id);
+        } catch (error) {
+            console.error("Failed to create new meeting:", error);
+        }
+    };
 
     const startRecording = async (meetingId: string) => {
         if (!tokens?.access_token) return;
@@ -93,73 +142,114 @@ export const MeetingsPage: React.FC = () => {
     };
 
     return (
-        <div className="meetings-page">
-            <header className="page-header">
-                <h1>Meetings</h1>
-                <p>Live Transcription</p>
-            </header>
+        <div className="page">
+            <h2 className="page__title">Meetings</h2>
 
             <div className="meetings-content" style={{ display: "flex", gap: "2rem", height: "calc(100vh - 120px)" }}>
 
                 {/* Left Side: Meetings List */}
-                <aside className="meetings-sidebar" style={{ width: "300px", borderRight: "1px solid #eee", overflowY: "auto" }}>
-                    <h2>Recent Meetings</h2>
-                    {meetings.length === 0 ? <p>No captured meetings yet.</p> : null}
-                    {meetings.map((m) => (
-                        <div
-                            key={m.id}
-                            className={`meeting-item ${activeMeetingId === m.id ? "active" : ""}`}
-                            onClick={() => setActiveMeetingId(m.id)}
-                            style={{ padding: "12px", cursor: "pointer", borderBottom: "1px solid #f0f0f0", background: activeMeetingId === m.id ? "#f5f5f5" : "transparent" }}
-                        >
-                            <h4>{m.name}</h4>
-                            <small>{m.platform || "Unknown"} • {new Date(m.created_at).toLocaleDateString()}</small>
-                        </div>
-                    ))}
+                <aside className="panel" style={{ width: "300px", display: "flex", flexDirection: "column", overflowY: "auto", padding: "16px" }}>
+                    <div className="panel__label">Recent Meetings</div>
+                    {meetings.length === 0 ? <p style={{ color: "#aaa", fontSize: "14px" }}>No captured meetings yet.</p> : null}
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", flex: 1 }}>
+                        {meetings.map((m) => {
+                            // Ensure date is valid before formatting
+                            let dateStr = "Unknown Date";
+                            try {
+                                if (m.created_at) {
+                                    dateStr = new Date(m.created_at).toLocaleDateString();
+                                }
+                            } catch (e) {
+                                // Ignore
+                            }
+                            return (
+                                <div
+                                    key={m.id}
+                                    className={`meeting-item ${activeMeetingId === m.id ? "active" : ""}`}
+                                    onClick={() => setActiveMeetingId(m.id)}
+                                    style={{
+                                        padding: "16px",
+                                        borderRadius: "8px",
+                                        cursor: "pointer",
+                                        border: activeMeetingId === m.id ? "1px solid #d1d5db" : "1px solid #e5e7eb",
+                                        backgroundColor: activeMeetingId === m.id ? "#f9fafb" : "#ffffff",
+                                        transition: "all 0.2s ease"
+                                    }}
+                                >
+                                    <div style={{ fontWeight: 500, color: "#111827", marginBottom: "4px" }}>{m.name || "Untitled Meeting"}</div>
+                                    <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                                        {m.platform || "Unknown Web"} • {dateStr}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
                     <button
-                        style={{ width: "100%", marginTop: "1rem" }}
-                        onClick={() => startRecording("new-uuid-here")} // Mocking
+                        className="btn btn--secondary"
+                        style={{ marginTop: "1rem", width: "100%" }}
+                        onClick={handleCreateAndStartMeeting}
                     >
-                        + Start Fake Meeting
+                        + Start New Meeting
                     </button>
                 </aside>
 
                 {/* Right Side: Live View */}
-                <main className="meeting-live-view" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                <main className="panel" style={{ flex: 1, display: "flex", flexDirection: "column", padding: "16px" }}>
                     {activeMeetingId ? (
                         <>
-                            <div className="live-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                                <h2>Live Transcript - {activeMeetingId}</h2>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                                <div className="panel__label" style={{ margin: 0 }}>Live Transcript - {activeMeetingId}</div>
                                 {isRecording ? (
-                                    <button onClick={stopRecording} style={{ background: "#ff4d4f", color: "white" }}>
+                                    <button
+                                        className="btn"
+                                        onClick={stopRecording}
+                                        style={{ backgroundColor: "#ef4444", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" }}
+                                    >
                                         Stop Capture
                                     </button>
                                 ) : (
-                                    <button onClick={() => startRecording(activeMeetingId)} style={{ background: "#52c41a", color: "white" }}>
+                                    <button
+                                        className="btn btn--primary"
+                                        onClick={() => startRecording(activeMeetingId)}
+                                    >
                                         Resume Capture
                                     </button>
                                 )}
                             </div>
 
-                            <div className="transcript-box" ref={scrollRef} style={{ flex: 1, overflowY: "auto", background: "#fafafa", padding: "1.5rem", borderRadius: "8px", border: "1px solid #e8e8e8" }}>
+                            <div
+                                ref={scrollRef}
+                                style={{
+                                    flex: 1,
+                                    overflowY: "auto",
+                                    backgroundColor: "#f9fafb",
+                                    padding: "1.5rem",
+                                    borderRadius: "8px",
+                                    border: "1px solid #e5e7eb"
+                                }}
+                            >
                                 {liveSegments.length === 0 ? (
-                                    <p style={{ color: "#aaa", textAlign: "center", fontStyle: "italic", marginTop: "2rem" }}>
+                                    <p style={{ color: "#9ca3af", textAlign: "center", fontStyle: "italic", marginTop: "2rem" }}>
                                         {isRecording ? "Listening for speech..." : "Click Resume Capture to start."}
                                     </p>
                                 ) : null}
 
                                 {liveSegments.map((seg, idx) => (
-                                    <div key={idx} className="transcript-segment" style={{ marginBottom: "1rem" }}>
-                                        <span style={{ fontSize: "0.8rem", color: "#888", marginRight: "8px" }}>
-                                            [{seg.start_time.split("T")[1].substring(0, 8)}]
+                                    <div key={idx} style={{ marginBottom: "1rem", display: "flex", gap: "10px" }}>
+                                        <span style={{ fontSize: "12px", color: "#6b7280", marginTop: "3px", minWidth: "80px" }}>
+                                            [{seg.start_time.split("T")[1]?.substring(0, 8) || '00:00:00'}]
                                         </span>
-                                        <span style={{ fontSize: "1rem", lineHeight: "1.5" }}>{seg.text}</span>
+                                        <span style={{ fontSize: "15px", lineHeight: "1.6", color: "#111827" }}>
+                                            {seg.text}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
                         </>
                     ) : (
-                        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa" }}>
+                        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}>
                             Select a meeting to view transcripts.
                         </div>
                     )}
