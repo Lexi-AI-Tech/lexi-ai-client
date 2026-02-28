@@ -331,3 +331,29 @@ pub async fn update_meeting(
 
     Ok(meeting)
 }
+
+/// Delete a meeting
+#[tauri::command]
+pub async fn delete_meeting(app: AppHandle, meeting_id: String) -> Result<(), String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let client = crate::utils::create_http_client();
+    let url = format!("{}/api/v1/meetings/{}", crate::config::api_base_url(), meeting_id);
+
+    utils::log_api_request("Delete meeting", "DELETE", &url);
+
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+
+    Ok(())
+}

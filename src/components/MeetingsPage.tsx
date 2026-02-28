@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Trash2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 
 interface TranscriptSegment {
@@ -28,6 +29,10 @@ export const MeetingsPage: React.FC = () => {
     const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Deletion state
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // 1. Fetch historical meetings
     const fetchMeetings = async () => {
@@ -142,6 +147,42 @@ export const MeetingsPage: React.FC = () => {
         }
     };
 
+    const openDeleteConfirm = (e: React.MouseEvent, meetingId: string) => {
+        e.stopPropagation();
+        setDeleteConfirmId(meetingId);
+    };
+
+    const closeDeleteConfirm = () => {
+        if (!deletingId) setDeleteConfirmId(null);
+    };
+
+    const handleConfirmDeleteMeeting = async () => {
+        if (!deleteConfirmId) return;
+
+        setDeletingId(deleteConfirmId);
+        try {
+            await invoke("delete_meeting", { meetingId: deleteConfirmId });
+
+            // Remove from list
+            setMeetings(prev => prev.filter(m => m.id !== deleteConfirmId));
+
+            // If we deleted the active meeting, clear the right pane
+            if (deleteConfirmId === activeMeetingId) {
+                setActiveMeetingId(null);
+                setLiveSegments([]);
+                if (isRecording) {
+                    await stopRecording();
+                }
+            }
+
+            setDeleteConfirmId(null);
+        } catch (error) {
+            console.error("Failed to delete meeting:", error);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     return (
         <div className="page">
             <h2 className="page__title">Meetings</h2>
@@ -176,6 +217,7 @@ export const MeetingsPage: React.FC = () => {
                                         padding: "16px",
                                         borderRadius: "8px",
                                         cursor: "pointer",
+                                        position: "relative",
                                         border: activeMeetingId === m.id ? "1px solid #d1d5db" : "1px solid #e5e7eb",
                                         backgroundColor: activeMeetingId === m.id ? "#f9fafb" : "#ffffff",
                                         transition: "all 0.2s ease"
@@ -185,6 +227,39 @@ export const MeetingsPage: React.FC = () => {
                                     <div style={{ fontSize: "12px", color: "#6b7280" }}>
                                         {m.platform || APP_PLATFORM_NAME} • {dateStr} {timeStr}
                                     </div>
+                                    <button
+                                        onClick={(e) => openDeleteConfirm(e, m.id)}
+                                        disabled={!!deletingId}
+                                        style={{
+                                            position: "absolute",
+                                            top: "12px",
+                                            right: "12px",
+                                            padding: "6px",
+                                            backgroundColor: "transparent",
+                                            border: "none",
+                                            borderRadius: "4px",
+                                            cursor: deletingId ? "not-allowed" : "pointer",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            color: "#ef4444",
+                                            transition: "all 0.2s ease",
+                                            opacity: deletingId ? 0.6 : 1,
+                                        }}
+                                        title="Delete meeting"
+                                        onMouseEnter={(e) => {
+                                            if (!deletingId) {
+                                                e.currentTarget.style.backgroundColor = "#fee2e2";
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!deletingId) {
+                                                e.currentTarget.style.backgroundColor = "transparent";
+                                            }
+                                        }}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
                                 </div>
                             );
                         })}
@@ -272,6 +347,39 @@ export const MeetingsPage: React.FC = () => {
                     )}
                 </main>
             </div>
+
+            {deleteConfirmId && (
+                <div className="delete-modal-overlay" onClick={closeDeleteConfirm}>
+                    <div
+                        className="delete-modal-content"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3>Delete meeting?</h3>
+                        <p>
+                            This action cannot be undone. The meeting and its entire transcript will be permanently
+                            removed.
+                        </p>
+                        <div className="delete-modal-actions">
+                            <button
+                                type="button"
+                                className="delete-modal-btn-cancel"
+                                onClick={closeDeleteConfirm}
+                                disabled={!!deletingId}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="delete-modal-btn-delete"
+                                onClick={handleConfirmDeleteMeeting}
+                                disabled={!!deletingId}
+                            >
+                                {deletingId ? "Deleting..." : "Delete"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
