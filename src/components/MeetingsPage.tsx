@@ -17,6 +17,7 @@ interface Meeting {
     created_at: string;
     transcripts?: TranscriptSegment[];
 }
+const APP_PLATFORM_NAME = "Lexi AI";
 
 export const MeetingsPage: React.FC = () => {
     const { tokens } = useAuthStore();
@@ -100,7 +101,7 @@ export const MeetingsPage: React.FC = () => {
             const meetingName = `Meeting - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
             const newMeeting = await invoke<Meeting>("create_meeting", {
                 name: meetingName,
-                platform: null
+                platform: APP_PLATFORM_NAME
             });
 
             // Add to list immediately
@@ -156,9 +157,12 @@ export const MeetingsPage: React.FC = () => {
                         {meetings.map((m) => {
                             // Ensure date is valid before formatting
                             let dateStr = "Unknown Date";
+                            let timeStr = "";
                             try {
                                 if (m.created_at) {
-                                    dateStr = new Date(m.created_at).toLocaleDateString();
+                                    const d = new Date(m.created_at);
+                                    dateStr = d.toLocaleDateString();
+                                    timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                 }
                             } catch (e) {
                                 // Ignore
@@ -179,7 +183,7 @@ export const MeetingsPage: React.FC = () => {
                                 >
                                     <div style={{ fontWeight: 500, color: "#111827", marginBottom: "4px" }}>{m.name || "Untitled Meeting"}</div>
                                     <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                                        {m.platform || "Unknown Web"} • {dateStr}
+                                        {m.platform || APP_PLATFORM_NAME} • {dateStr} {timeStr}
                                     </div>
                                 </div>
                             );
@@ -236,16 +240,29 @@ export const MeetingsPage: React.FC = () => {
                                     </p>
                                 ) : null}
 
-                                {liveSegments.map((seg, idx) => (
-                                    <div key={idx} style={{ marginBottom: "1rem", display: "flex", gap: "10px" }}>
-                                        <span style={{ fontSize: "12px", color: "#6b7280", marginTop: "3px", minWidth: "80px" }}>
-                                            [{seg.start_time.split("T")[1]?.substring(0, 8) || '00:00:00'}]
-                                        </span>
-                                        <span style={{ fontSize: "15px", lineHeight: "1.6", color: "#111827" }}>
-                                            {seg.text}
-                                        </span>
-                                    </div>
-                                ))}
+                                {liveSegments.map((seg, idx) => {
+                                    let timeString = "00:00:00";
+                                    try {
+                                        if (seg.start_time) {
+                                            const d = new Date(seg.start_time);
+                                            // Format as localized time depending on user OS preferences
+                                            timeString = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                                        }
+                                    } catch (e) {
+                                        // Ignore parsing errors and fallback
+                                    }
+
+                                    return (
+                                        <div key={idx} style={{ marginBottom: "1rem", display: "flex", gap: "10px" }}>
+                                            <span style={{ fontSize: "12px", color: "#6b7280", marginTop: "3px", minWidth: "90px" }}>
+                                                [{timeString}]
+                                            </span>
+                                            <span style={{ fontSize: "15px", lineHeight: "1.6", color: "#111827" }}>
+                                                {seg.text}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </>
                     ) : (
