@@ -267,7 +267,7 @@ pub(crate) fn start_listener(
         }
 
         // Use the raw pointer to create a borrowed reference since we consumed it above
-        let tap_ref = unsafe { &*(tap_ptr as *const CFMachPort) };
+        let tap_ref = &*(tap_ptr as *const CFMachPort);
 
         let current_loop = CFRunLoop::current().unwrap();
         current_loop.add_source(Some(&loop_source), kCFRunLoopCommonModes);
