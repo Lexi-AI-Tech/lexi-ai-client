@@ -120,6 +120,29 @@ function App() {
       .catch(() => { });
   }, [isCompleted]);
 
+  // Listen for "Start Meeting" from system tray
+  const [pendingTrayMeeting, setPendingTrayMeeting] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen("start-meeting-from-tray", () => {
+        if (!cancelled) {
+          setPendingTrayMeeting(true);
+          setCurrentPage("meetings");
+        }
+      });
+      if (cancelled) unlisten();
+      else return unlisten;
+    };
+    let unlistenFn: (() => void) | undefined;
+    setup().then((fn) => { unlistenFn = fn; });
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
+
   const showLoading =
     !authStore.isInitialized ||
     (authStore.isAuthenticated && !onboardingSyncDone) ||
@@ -193,7 +216,10 @@ function App() {
         )}
         {currentPage === "meetings" && (
           <div className="container">
-            <MeetingsPage />
+            <MeetingsPage
+              autoStart={pendingTrayMeeting}
+              onAutoStartConsumed={() => setPendingTrayMeeting(false)}
+            />
           </div>
         )}
       </div>

@@ -27,7 +27,12 @@ interface ChatMessage {
     created_at: string;
 }
 
-export const MeetingsPage: React.FC = () => {
+interface MeetingsPageProps {
+    autoStart?: boolean;
+    onAutoStartConsumed?: () => void;
+}
+
+export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoStartConsumed }) => {
     const { tokens } = useAuthStore();
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
@@ -162,6 +167,14 @@ export const MeetingsPage: React.FC = () => {
             console.error("Failed to create new meeting:", error);
         }
     };
+
+    // Auto-start meeting when triggered from system tray
+    useEffect(() => {
+        if (autoStart && !isRecording) {
+            handleCreateAndStartMeeting();
+            onAutoStartConsumed?.();
+        }
+    }, [autoStart]);
 
     const startRecording = async (meetingId: string) => {
         if (!tokens?.access_token) return;
