@@ -245,7 +245,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
 
         try {
             const apiHistory = chatMessages.map(msg => ({ role: msg.role, content: msg.content }));
-            const aiResponse = await invoke<ChatMessage>("send_meeting_message", {
+            const aiResponse = await invoke<ChatMessage>("send_meeting_chat", {
                 meetingId: activeMeetingId,
                 content: text,
                 history: apiHistory
@@ -510,7 +510,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                                     <p style={{ color: "#3b82f6", margin: 0 }}>Generating AI Summary...</p>
                                                 ) : (
                                                     <p style={{ color: "#6b7280", margin: 0 }}>
-                                                        No summary generated yet. Click "Complete" when the meeting is over to generate one.
+                                                        No summary generated yet. Click "End" when the meeting is over to generate one.
                                                     </p>
                                                 )}
                                             </div>
