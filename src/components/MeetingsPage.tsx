@@ -32,10 +32,20 @@ interface ChatMessage {
 
 interface MeetingsPageProps {
     autoStart?: boolean;
+    autoStartPlatform?: string | null;
     onAutoStartConsumed?: () => void;
+    /** When a meeting is started from the pill overlay, focus that meeting and show transcript tab. */
+    pillMeetingId?: string | null;
+    onPillMeetingConsumed?: () => void;
 }
 
-export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoStartConsumed }) => {
+export const MeetingsPage: React.FC<MeetingsPageProps> = ({
+    autoStart,
+    autoStartPlatform,
+    onAutoStartConsumed,
+    pillMeetingId,
+    onPillMeetingConsumed,
+}) => {
     const { tokens } = useAuthStore();
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
@@ -156,9 +166,15 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
         if (!tokens?.access_token) return;
 
         try {
+            const platform = autoStartPlatform ?? null;
+            const name =
+                typeof autoStartPlatform === "string" && autoStartPlatform.trim().length > 0
+                    ? `${autoStartPlatform} Meeting`
+                    : "Meeting Session";
+
             const newMeeting = await invoke<Meeting>("create_meeting", {
-                name: "Meeting Session",
-                platform: null
+                name,
+                platform
             });
 
             // Add to list immediately
@@ -178,6 +194,19 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
             onAutoStartConsumed?.();
         }
     }, [autoStart]);
+
+    // Focus an already-started meeting when triggered from the pill overlay
+    useEffect(() => {
+        if (!pillMeetingId) return;
+
+        // Refresh meetings so the newly created meeting appears in the sidebar
+        fetchMeetings();
+        setActiveMeetingId(pillMeetingId);
+        setActiveTab("transcript");
+        setIsRecording(true);
+
+        onPillMeetingConsumed?.();
+    }, [pillMeetingId]);
 
     const startRecording = async (meetingId: string) => {
         if (!tokens?.access_token) return;

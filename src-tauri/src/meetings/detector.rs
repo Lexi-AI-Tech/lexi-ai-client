@@ -119,6 +119,51 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
         Some(AppInfo { id, name })
     }
 
+    fn resolve_via_bundle_id(bundle_id: &str) -> Option<AppInfo> {
+        use objc2_app_kit::NSRunningApplication;
+        use objc2_foundation::NSString;
+
+        let ns_id = NSString::from_str(bundle_id);
+        let running = NSRunningApplication::runningApplicationsWithBundleIdentifier(&ns_id);
+        if running.count() == 0 {
+            return None;
+        }
+        let first = running.objectAtIndex(0);
+
+        if let Some(bundle_url) = first.bundleURL() {
+            if let Some(path_ns) = bundle_url.path() {
+                let path_str = path_ns.to_string();
+                if let Some(outer) = find_outermost_app(Path::new(&path_str)) {
+                    if let Some(info) = read_bundle_info(&outer) {
+                        return Some(info);
+                    }
+                }
+            }
+        }
+
+        let id = first.bundleIdentifier()?.to_string();
+        let name = first
+            .localizedName()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| id.clone());
+        Some(AppInfo { id, name })
+    }
+
+    fn resolve_parent_bundle(bundle_id: &str) -> Option<AppInfo> {
+        let parts: Vec<&str> = bundle_id.split('.').collect();
+        if parts.len() < 3 {
+            return None;
+        }
+
+        for i in (2..parts.len()).rev() {
+            let candidate = parts[..i].join(".");
+            if let Some(info) = resolve_via_bundle_id(&candidate) {
+                return Some(info);
+            }
+        }
+        None
+    }
+
     fn resolve_to_app(pid: i32) -> Option<AppInfo> {
         let via_ns = std::panic::catch_unwind(|| resolve_pid_to_app(pid))
             .ok()
@@ -133,11 +178,21 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
             let pid = p.pid().ok()? as i32;
             let bundle_id = p.bundle_id().ok().map(|b| b.to_string());
 
-            let info = resolve_to_app(pid).or_else(|| {
+            let mut info = resolve_to_app(pid).or_else(|| {
                 bundle_id
                     .clone()
                     .map(fallback_from_bundle_id)
             })?;
+
+            // If the mic-using process is a helper subprocess, try to resolve it back to the
+            // parent running app (e.g. com.google.Chrome.helper -> com.google.Chrome).
+            if let Some(bid) = bundle_id.as_deref() {
+                if info.name.eq_ignore_ascii_case("helper") || bid.contains(".helper") {
+                    if let Some(parent) = resolve_parent_bundle(bid) {
+                        info = parent;
+                    }
+                }
+            }
 
             if info.id.to_lowercase().contains("lexi") {
                 return None;
@@ -457,6 +512,7 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
                     confidence: 0.9,
                 };
                 println!("Meeting detected: app={}", context.platform);
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 let _ = app_handle.emit("meeting-detected", context);
                 in_cooldown_until = tokio::time::Instant::now() + cooldown_duration;
         }

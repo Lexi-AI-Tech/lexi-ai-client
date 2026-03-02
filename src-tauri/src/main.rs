@@ -118,7 +118,7 @@ use commands::rooms::{
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type};
-use commands::window::open_devtools;
+use commands::window::{open_devtools, show_main_window};
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
 /// Command to control recording state
@@ -235,6 +235,7 @@ pub fn main() {
             request_system_audio_permission,
             inject_text,
             open_devtools,
+            show_main_window,
             start_google_login,
             get_pkce_verifier,
             update_hotkey,

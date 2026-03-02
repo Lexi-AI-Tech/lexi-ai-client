@@ -8,7 +8,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom/client";
-import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 // import { playSound } from "./lib/soundUtils";
@@ -17,8 +18,10 @@ import { LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 // Window size constants — window matches pill exactly in each state (no extra space)
 const IDLE_SIZE = { width: 50, height: 6.6 };
 const RECORDING_SIZE = { width: 80, height: 36 };
+const MEETING_DETECTED_SIZE = { width: 130, height: 52 }; // Larger pill for meeting prompt
 const PROCESSING_SIZE = { width: 100, height: 36 };
 const SPEAKING_SIZE = { width: 90, height: 36 }; // Speaking/TTS state
+const MEETING_COUNTDOWN_SECONDS = 8;
 // Height difference for position adjustment (to make pill grow upward)
 const HEIGHT_DIFF = RECORDING_SIZE.height - IDLE_SIZE.height;
 
@@ -35,19 +38,28 @@ const HEIGHT_DIFF = RECORDING_SIZE.height - IDLE_SIZE.height;
  * to ensure it's positioned before becoming visible.
  * This prevents the visible repositioning issue.
  */
+interface MeetingDetectedPayload {
+  platform: string;
+  title?: string;
+  confidence?: number;
+}
+
 export const Pill: React.FC = () => {
   const [status, setStatus] = useState<
-    "idle" | "recording" | "processing" | "speaking"
+    "idle" | "recording" | "processing" | "speaking" | "meeting_detected"
   >("idle");
   const [isActionMode, setIsActionMode] = useState(false); // Track if action hotkey is active
   const [isHovered, setIsHovered] = useState(false);
   const [audioLevels, setAudioLevels] = useState<number[]>([]);
   const [smoothedLevels, setSmoothedLevels] = useState<number[]>([]);
+  const [meetingContext, setMeetingContext] = useState<MeetingDetectedPayload | null>(null);
+  const [meetingCountdown, setMeetingCountdown] = useState(0); // 0 = not in countdown, 1–5 = seconds left
   const isRecordingRef = useRef(false);
   const hasRealAudioRef = useRef(false); // Track if we're receiving real volume data
   const lastVolumeTimeRef = useRef(0); // Track when we last received volume data
   // Single source of truth for idle position - prevents position drift from accumulated rounding errors
   const idlePositionRef = useRef<{ x: number; y: number } | null>(null);
+  const startingMeetingRef = useRef(false);
 
   // Smooth audio levels for better visual experience
   useEffect(() => {
@@ -105,6 +117,48 @@ export const Pill: React.FC = () => {
       }
     };
   }, [status]);
+
+  // Reset pill to idle size and position (used for meeting_detected timeout or after start)
+  const resetPillToIdle = React.useCallback(async () => {
+    setStatus("idle");
+    setMeetingContext(null);
+    setMeetingCountdown(0);
+    const window = getCurrentWindow();
+    try {
+      if (!idlePositionRef.current) return;
+      await window.setSize(new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height));
+      await window.setPosition(
+        new LogicalPosition(idlePositionRef.current.x, idlePositionRef.current.y),
+      );
+    } catch (e) {
+      console.error("Failed to reset pill to idle:", e);
+    }
+  }, []);
+
+  // 5-second countdown when in meeting_detected: when it hits 0, return to idle
+  const meetingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (status !== "meeting_detected") return;
+    meetingIntervalRef.current = setInterval(() => {
+      setMeetingCountdown((prev) => {
+        if (prev <= 1) {
+          if (meetingIntervalRef.current) {
+            clearInterval(meetingIntervalRef.current);
+            meetingIntervalRef.current = null;
+          }
+          resetPillToIdle();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (meetingIntervalRef.current) {
+        clearInterval(meetingIntervalRef.current);
+        meetingIntervalRef.current = null;
+      }
+    };
+  }, [status, resetPillToIdle]);
 
   // Initialize idle position reference on mount
   useEffect(() => {
@@ -555,6 +609,32 @@ export const Pill: React.FC = () => {
           }
         });
 
+        // Listen for meeting detected — show pill with 5s countdown, click to start
+        const unlistenMeetingDetected = await listen(
+          "meeting-detected",
+          async (event: { payload: MeetingDetectedPayload }) => {
+            const payload = event.payload as MeetingDetectedPayload;
+            setMeetingContext(payload);
+            setMeetingCountdown(MEETING_COUNTDOWN_SECONDS);
+            setStatus("meeting_detected");
+
+            const window = getCurrentWindow();
+            try {
+              if (!idlePositionRef.current) return;
+              const idleX = idlePositionRef.current.x;
+              const idleY = idlePositionRef.current.y;
+              const w = MEETING_DETECTED_SIZE.width;
+              const h = MEETING_DETECTED_SIZE.height;
+              const meetingX = idleX - (w - IDLE_SIZE.width) / 2;
+              const meetingY = idleY - (h - IDLE_SIZE.height);
+              await window.setSize(new LogicalSize(w, h));
+              await window.setPosition(new LogicalPosition(meetingX, meetingY));
+            } catch (e) {
+              console.error("Failed to expand for meeting prompt:", e);
+            }
+          },
+        );
+
         // Cleanup function
         return () => {
           unlistenStarted();
@@ -574,6 +654,7 @@ export const Pill: React.FC = () => {
           unlistenTtsSpeaking();
           unlistenTtsSuccess();
           unlistenTtsError();
+          unlistenMeetingDetected();
         };
       } catch (error) {
         console.error("Failed to set up event listeners:", error);
@@ -583,14 +664,36 @@ export const Pill: React.FC = () => {
     setupListeners();
   }, []);
 
-  const handleMouseDown = async () => {
+  const startMeetingFromPill = async () => {
+    if (startingMeetingRef.current || !meetingContext) return;
+    startingMeetingRef.current = true;
+    try {
+      const meeting = await invoke<{ id: string }>("create_meeting", {
+        name: "Meeting",
+        platform: meetingContext.platform || null,
+      });
+      await invoke("start_meeting_recording", { meetingId: meeting.id });
+      await emit("meeting-recording-started", { meetingId: meeting.id });
+      await invoke("show_main_window");
+      // Backend hides pill on start; reset state so when pill is shown again we're idle
+      await resetPillToIdle();
+    } catch (e) {
+      console.error("Failed to start meeting from pill:", e);
+      await resetPillToIdle();
+    } finally {
+      startingMeetingRef.current = false;
+    }
+  };
+
+  const handleMouseDown = async (e: React.MouseEvent) => {
+    if (status === "meeting_detected") {
+      e.preventDefault();
+      await startMeetingFromPill();
+      return;
+    }
     // Start dragging the window when clicking on the pill
     try {
       const window = getCurrentWindow();
-
-      // Note: startDragging() is async but returns immediately,
-      // it doesn't wait for drag completion. We can't update position here.
-      // Instead, we'll update the reference when returning to idle state.
       await window.startDragging();
     } catch (error) {
       console.error("Failed to start dragging:", error);
@@ -761,6 +864,13 @@ export const Pill: React.FC = () => {
     baseStyle.borderRadius = "18px";
     baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
     baseStyle.boxShadow = "none";
+  } else if (status === "meeting_detected") {
+    baseStyle.width = "100%";
+    baseStyle.height = "100%";
+    baseStyle.borderRadius = "18px";
+    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
+    baseStyle.boxShadow = "none";
+    baseStyle.cursor = "pointer";
   }
 
   return (
@@ -775,7 +885,13 @@ export const Pill: React.FC = () => {
         (() => {
           // Pick colors based on state
           let color1: string, color2: string, color3: string, speed: string;
-          if (status === "speaking") {
+          if (status === "meeting_detected") {
+            // Meeting prompt: amber
+            color1 = "#f59e0b"; // Amber
+            color2 = "#fcd34d"; // Light amber
+            color3 = "rgba(245, 158, 11, 0.1)";
+            speed = "2s";
+          } else if (status === "speaking") {
             // Speaking/TTS: purple
             color1 = "#a855f7"; // Purple
             color2 = "#d8b4fe"; // Light purple
@@ -861,7 +977,62 @@ export const Pill: React.FC = () => {
             padding: "0 4px",
           }}
         >
-          {status === "speaking" ? (
+          {status === "meeting_detected" ? (
+            /* Meeting detected: reverse circular loader, click to start */
+            (() => {
+              const size = 30;
+              const stroke = 3;
+              const r = (size - stroke) / 2;
+              const circumference = 2 * Math.PI * r;
+              const secondsLeft = Math.max(0, meetingCountdown);
+              const progress = secondsLeft / MEETING_COUNTDOWN_SECONDS;
+              const offset = circumference * (1 - progress);
+              return (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 4,
+                  }}
+                >
+                  <div style={{ position: "relative", width: size, height: size }}>
+                    <svg
+                      width={size}
+                      height={size}
+                      viewBox={`0 0 ${size} ${size}`}
+                      style={{ transform: "rotate(-90deg)" }}
+                    >
+                      <circle
+                        cx={size / 2}
+                        cy={size / 2}
+                        r={r}
+                        fill="none"
+                        stroke="rgba(255,255,255,0.15)"
+                        strokeWidth={stroke}
+                      />
+                      <circle
+                        cx={size / 2}
+                        cy={size / 2}
+                        r={r}
+                        fill="none"
+                        stroke="rgba(255,255,255,0.95)"
+                        strokeWidth={stroke}
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                        style={{
+                          transition: "stroke-dashoffset 0.35s ease-out",
+                        }}
+                      />
+                    </svg>
+                  </div>
+                  <span style={{ fontSize: 10, opacity: 0.9 }}>Click to start</span>
+                </div>
+              );
+            })()
+          ) : status === "speaking" ? (
             /* Speaking: Lexi is talking — speaker icon with animated sound arcs */
             <>
               <style>
