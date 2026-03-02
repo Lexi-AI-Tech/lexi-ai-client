@@ -56,6 +56,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     // Real-time state
     const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
     const [isRecording, setIsRecording] = useState(false);
+    const [isInitializingMeeting, setIsInitializingMeeting] = useState(false);
     const [noteInput, setNoteInput] = useState("");
     const [isAddingNote, setIsAddingNote] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -220,15 +221,18 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
 
     const startRecording = async (meetingId: string) => {
         if (!tokens?.access_token) return;
-        setIsRecording(true);
+        setIsInitializingMeeting(true);
         setActiveMeetingId(meetingId);
         setActiveTab("transcript");
 
         try {
             await invoke("start_meeting_recording", { meetingId });
+            setIsRecording(true);
         } catch (error) {
             console.error("Failed to start meeting recording:", error);
             setIsRecording(false);
+        } finally {
+            setIsInitializingMeeting(false);
         }
     };
 
@@ -439,7 +443,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                                         Transcript
                                     </button>
                                 </div>
-                                {!activeSummary && !isGeneratingSummary && (
+                                {!activeSummary && !isGeneratingSummary && !isInitializingMeeting && (
                                     <div className="meetings-actions">
                                         <button
                                             type="button"
@@ -462,7 +466,12 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                             {activeTab === "transcript" && (
                                 <div className="meetings-transcript-wrap">
                                     <div ref={scrollRef} className="meetings-transcript">
-                                        {liveSegments.length === 0 ? (
+                                        {isInitializingMeeting ? (
+                                            <div className="meetings-transcript-initializing">
+                                                <div className="meetings-transcript-initializing__spinner" />
+                                                <p className="meetings-transcript-initializing__text">Getting ready…</p>
+                                            </div>
+                                        ) : liveSegments.length === 0 ? (
                                             <p className="meetings-transcript__empty">
                                                 {isRecording ? "Listening for speech..." : "Click Resume Capture to start."}
                                             </p>
@@ -503,12 +512,12 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                                             value={noteInput}
                                             onChange={(e) => setNoteInput(e.target.value)}
                                             placeholder="Add a note..."
-                                            disabled={isAddingNote || !activeMeetingId}
+                                            disabled={isAddingNote || !activeMeetingId || isInitializingMeeting}
                                         />
                                         <button
                                             type="submit"
                                             className="btn btn--primary meetings-transcript-notes__btn"
-                                            disabled={isAddingNote || !noteInput.trim() || !activeMeetingId}
+                                            disabled={isAddingNote || !noteInput.trim() || !activeMeetingId || isInitializingMeeting}
                                         >
                                             {isAddingNote ? "Adding…" : "Add note"}
                                         </button>

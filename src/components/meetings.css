@@ -170,6 +170,32 @@
   margin-top: 2rem;
 }
 
+.meetings-transcript-initializing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.meetings-transcript-initializing__spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.meetings-transcript-initializing__text {
+  font-size: 0.9375rem;
+  color: #6b7280;
+  margin: 0;
+}
+
 .meetings-transcript__segment {
   margin-bottom: 1rem;
   display: flex;
