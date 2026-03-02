@@ -40,8 +40,6 @@ const HEIGHT_DIFF = RECORDING_SIZE.height - IDLE_SIZE.height;
  */
 interface MeetingDetectedPayload {
   platform: string;
-  title?: string;
-  confidence?: number;
 }
 
 export const Pill: React.FC = () => {
@@ -668,9 +666,11 @@ export const Pill: React.FC = () => {
     if (startingMeetingRef.current || !meetingContext) return;
     startingMeetingRef.current = true;
     try {
+      const platform = meetingContext.platform?.trim() || "Lexi AI";
+      const name = platform ? `${platform} Meeting` : "Meeting";
       const meeting = await invoke<{ id: string }>("create_meeting", {
-        name: "Meeting",
-        platform: meetingContext.platform || null,
+        name,
+        platform,
       });
       await invoke("start_meeting_recording", { meetingId: meeting.id });
       await emit("meeting-recording-started", { meetingId: meeting.id });

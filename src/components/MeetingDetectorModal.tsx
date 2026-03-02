@@ -4,8 +4,6 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 interface MeetingContext {
     platform: string;
-    title: string;
-    confidence: number;
 }
 
 export function MeetingDetectorModal() {
@@ -47,7 +45,7 @@ export function MeetingDetectorModal() {
                     Record {meeting.platform === "slack" ? "Slack Huddle" : meeting.platform}?
                 </h3>
                 <p className="modal-content__desc" style={{ textAlign: "center", marginBottom: "1.5rem" }}>
-                    Lexi noticed you started a {meeting.title.includes("huddle") ? "Huddle" : "meeting"}. Want to record and transcribe it?
+                    Lexi noticed you started a {meeting.platform.toLowerCase().includes("slack") ? "Huddle" : "meeting"}. Want to record and transcribe it?
                 </p>
 
                 <div className="modal-actions" style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
@@ -62,7 +60,7 @@ export function MeetingDetectorModal() {
                     <button
                         type="button"
                         onClick={() => {
-                            console.log("User clicked Record for meeting:", meeting.title);
+                            console.log("User clicked Record for meeting:", meeting.platform);
                             // TODO: Wire up actual recording trigger.
                             setMeeting(null);
                         }}

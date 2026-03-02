@@ -134,7 +134,7 @@ function App() {
       const unlisten = await listen("start-meeting-from-tray", () => {
         if (!cancelled) {
           setPendingTrayMeeting(true);
-          setPendingTrayMeetingPlatform(null);
+          setPendingTrayMeetingPlatform("Lexi AI");
           setCurrentPage("meetings");
         }
       });

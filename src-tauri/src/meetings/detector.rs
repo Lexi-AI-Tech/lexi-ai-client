@@ -12,8 +12,6 @@ use crate::state::{MeetingState, RoomState};
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct MeetingContext {
     pub platform: String,
-    pub title: String,
-    pub confidence: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -513,8 +511,6 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
                 }
                 let context = MeetingContext {
                     platform: platform.clone(),
-                    title: String::new(),
-                    confidence: 0.9,
                 };
                 println!("Meeting detected: app={}", context.platform);
                 tokio::time::sleep(Duration::from_secs(1)).await;

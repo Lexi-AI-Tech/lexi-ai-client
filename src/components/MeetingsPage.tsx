@@ -177,15 +177,17 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
         if (!tokens?.access_token) return;
 
         try {
-            const platform = autoStartPlatform ?? null;
-            const name =
+            // Platform: only from detector (when autoStart has it, e.g. pill); else "Lexi AI"
+            const platform =
                 typeof autoStartPlatform === "string" && autoStartPlatform.trim().length > 0
-                    ? `${autoStartPlatform} Meeting`
-                    : "Meeting Session";
+                    ? autoStartPlatform
+                    : "Lexi AI";
+            const name =
+                platform.trim().length > 0 ? `${platform} Meeting` : "Meeting Session";
 
             const newMeeting = await invoke<Meeting>("create_meeting", {
                 name,
-                platform
+                platform,
             });
 
             // Add to list immediately
