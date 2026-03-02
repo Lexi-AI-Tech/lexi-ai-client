@@ -127,19 +127,33 @@ function App() {
   // Listen for "Start Meeting" from system tray
   const [pendingTrayMeeting, setPendingTrayMeeting] = useState(false);
   const [pendingTrayMeetingPlatform, setPendingTrayMeetingPlatform] = useState<string | null>(null);
+  const [triggerEndMeetingFromTray, setTriggerEndMeetingFromTray] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const setup = async () => {
       const { listen } = await import("@tauri-apps/api/event");
-      const unlisten = await listen("start-meeting-from-tray", () => {
+      const unlistenStart = await listen("start-meeting-from-tray", () => {
         if (!cancelled) {
           setPendingTrayMeeting(true);
           setPendingTrayMeetingPlatform("Lexi AI");
           setCurrentPage("meetings");
         }
       });
-      if (cancelled) unlisten();
-      else return unlisten;
+      const unlistenEnd = await listen("end-meeting-from-tray", () => {
+        if (!cancelled) {
+          setCurrentPage("meetings");
+          setTriggerEndMeetingFromTray(true);
+        }
+      });
+      if (cancelled) {
+        unlistenStart();
+        unlistenEnd();
+      } else {
+        return () => {
+          unlistenStart();
+          unlistenEnd();
+        };
+      }
     };
     let unlistenFn: (() => void) | undefined;
     setup().then((fn) => { unlistenFn = fn; });
@@ -261,6 +275,8 @@ function App() {
               onAutoStartConsumed={() => setPendingTrayMeeting(false)}
               pillMeetingId={pillMeetingId}
               onPillMeetingConsumed={() => setPillMeetingId(null)}
+              triggerEndMeetingFromTray={triggerEndMeetingFromTray}
+              onEndMeetingFromTrayConsumed={() => setTriggerEndMeetingFromTray(false)}
             />
           </div>
         )}

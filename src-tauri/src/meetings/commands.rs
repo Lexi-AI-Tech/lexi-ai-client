@@ -163,9 +163,9 @@ pub async fn start_meeting_recording(
         let _ = pill_window.hide();
     }
 
-    // Disable the tray "Start Meeting" item while recording
+    // Update tray to "Stop Meeting" while recording
     if let Some(ref item) = *state.tray_start_meeting.lock().unwrap() {
-        let _ = item.set_enabled(false);
+        let _ = item.set_text("Stop Meeting");
     }
 
     // Note: WebSocket connection is managed by spawned tasks in MeetingWebSocket::connect()
@@ -224,9 +224,9 @@ pub async fn stop_meeting_recording(
         let _ = pill_window.show();
     }
 
-    // Re-enable the tray "Start Meeting" item
+    // Restore tray to "Start Meeting"
     if let Some(ref item) = *state.tray_start_meeting.lock().unwrap() {
-        let _ = item.set_enabled(true);
+        let _ = item.set_text("Start Meeting");
     }
 
     Ok("Recording stopped".to_string())

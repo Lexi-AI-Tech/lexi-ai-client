@@ -37,6 +37,9 @@ interface MeetingsPageProps {
     /** When a meeting is started from the pill overlay, focus that meeting and show transcript tab. */
     pillMeetingId?: string | null;
     onPillMeetingConsumed?: () => void;
+    /** When true, open the end-meeting confirmation modal (e.g. from tray "Stop Meeting"). */
+    triggerEndMeetingFromTray?: boolean;
+    onEndMeetingFromTrayConsumed?: () => void;
 }
 
 export const MeetingsPage: React.FC<MeetingsPageProps> = ({
@@ -45,6 +48,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     onAutoStartConsumed,
     pillMeetingId,
     onPillMeetingConsumed,
+    triggerEndMeetingFromTray,
+    onEndMeetingFromTrayConsumed,
 }) => {
     const { tokens } = useAuthStore();
     const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -220,6 +225,13 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
 
         onPillMeetingConsumed?.();
     }, [pillMeetingId]);
+
+    useEffect(() => {
+        if (!triggerEndMeetingFromTray) return;
+        setActiveTab("summary");
+        setShowEndConfirm(true);
+        onEndMeetingFromTrayConsumed?.();
+    }, [triggerEndMeetingFromTray, onEndMeetingFromTrayConsumed]);
 
     const startRecording = async (meetingId: string) => {
         if (!tokens?.access_token) return;

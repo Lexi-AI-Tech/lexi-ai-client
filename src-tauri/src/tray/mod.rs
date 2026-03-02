@@ -107,25 +107,26 @@ fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             show_and_focus_main_window(app);
         }
         "start_meeting" => {
-            // Check if a meeting is already recording
             let is_recording = app
                 .try_state::<crate::state::MeetingState>()
                 .map(|state| *state.is_recording.lock().unwrap())
                 .unwrap_or(false);
 
-            if is_recording {
-                println!("⚠️  Meeting already in progress, ignoring tray Start Meeting click");
-                return;
-            }
-
-            // Focus the app window and emit event for frontend to navigate + start meeting
             show_and_focus_main_window(app);
             let app_clone = app.clone();
-            tauri::async_runtime::spawn(async move {
-                if let Err(e) = app_clone.emit("start-meeting-from-tray", ()) {
-                    eprintln!("Failed to emit start-meeting-from-tray event: {}", e);
-                }
-            });
+            if is_recording {
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = app_clone.emit("end-meeting-from-tray", ()) {
+                        eprintln!("Failed to emit end-meeting-from-tray event: {}", e);
+                    }
+                });
+            } else {
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = app_clone.emit("start-meeting-from-tray", ()) {
+                        eprintln!("Failed to emit start-meeting-from-tray event: {}", e);
+                    }
+                });
+            }
         }
         "paste_last_transcript" => {
             let app = app.clone();
