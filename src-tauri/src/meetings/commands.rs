@@ -6,9 +6,7 @@ use crate::commands::auth::get_auth_token_async;
 use crate::state::MeetingState;
 use crate::utils;
 use serde::{Deserialize, Serialize};
-use std::sync::mpsc;
-use std::thread;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Manager, State};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Meeting {
@@ -102,26 +100,11 @@ pub async fn start_meeting_recording(
         .await
         .map_err(|_| "Authentication required")?;
 
-    // Get language from app config
-    let app_config = crate::commands::app_config::get_app_config(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load app config: {}", e))?;
-
-    // Get first language from config, default to "auto"
-    let language_code = app_config
-        .languages
-        .and_then(|langs| langs.first().cloned())
-        .unwrap_or_else(|| "auto".to_string());
-
-    // Create channel for streaming audio data (std::mpsc for audio_recorder)
-    let (audio_tx, audio_rx) = mpsc::channel::<Vec<u8>>();
-
-    // Create WebSocket connection (async) - this will spawn tasks internally
+    // Create WebSocket connection (async) - language is resolved from app config on the server
     let mut websocket = crate::meetings::websocket::MeetingWebSocket::new(
         app.clone(),
         meeting_id.clone(),
         auth_token,
-        language_code,
     );
 
     websocket
@@ -153,58 +136,36 @@ pub async fn start_meeting_recording(
         return Err("Ready channel not initialized".to_string());
     }
 
-    // Get the audio_tx from websocket to forward chunks
-    let websocket_audio_tx = websocket.audio_tx.clone();
-
-    // Spawn thread to forward audio chunks from std::mpsc to WebSocket's tokio channel
-    // Use a blocking runtime handle to send to async channel from sync context
     let rt_handle =
         tokio::runtime::Handle::try_current().map_err(|_| "No tokio runtime available")?;
 
-    thread::spawn(move || {
-        while let Ok(chunk) = audio_rx.recv() {
-            let guard = websocket_audio_tx.lock().unwrap();
-            if let Some(ref tx) = *guard {
-                // Send to tokio channel using blocking send
-                let tx_clone = tx.clone();
-                if let Err(e) = rt_handle.block_on(tx_clone.send(chunk)) {
-                    eprintln!("Failed to send audio chunk to WebSocket: {}", e);
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-    });
+    // Start meeting audio: mic + system audio (macOS), mixed and sent to WebSocket for transcription
+    let handles = crate::audio::meeting::start_meeting_audio(
+        app.clone(),
+        websocket.audio_tx.clone(),
+        rt_handle,
+    )?;
 
-    // Start audio recorder in a dedicated thread (AudioRecorder is not Send+Sync)
-    let app_for_recorder = app.clone();
-    let (recorder_tx, recorder_rx) = mpsc::channel::<()>();
-
-    thread::spawn(move || {
-        let mut recorder = crate::audio::recorder::AudioRecorder::new();
-
-        if let Err(e) = recorder.start_recording(Some(audio_tx)) {
-            eprintln!("Failed to start recording: {}", e);
-            let _ =
-                app_for_recorder.emit("meeting-websocket-error", format!("Recording failed: {}", e));
-            return;
-        }
-
-        // Wait for stop signal
-        let _ = recorder_rx.recv();
-
-        // Stop recording
-        let _ = recorder.stop_recording();
-    });
-
-    // Store stop channel in state (this is Send+Sync)
-    *state.command_tx.lock().unwrap() = Some(recorder_tx);
+    *state.command_tx.lock().unwrap() = Some(handles.recorder_stop_tx);
+    *state.system_stop_tx.lock().unwrap() = handles.system_stop_tx;
+    if let Some(tx) = websocket.text_tx.lock().unwrap().take() {
+        *state.meeting_ws_text_tx.lock().unwrap() = Some(tx);
+    }
     *state.is_recording.lock().unwrap() = true;
 
-    // Disable the tray "Start Meeting" item while recording
+    // Broadcast so key listener disables assistant/action hotkeys while meeting is running
+    if let Ok(tx) = state.meeting_recording_tx.lock() {
+        let _ = tx.send(true);
+    }
+
+    // Hide pill overlay so it doesn't show during meeting recording
+    if let Some(pill_window) = app.get_webview_window("pill") {
+        let _ = pill_window.hide();
+    }
+
+    // Update tray to "Stop Meeting" while recording
     if let Some(ref item) = *state.tray_start_meeting.lock().unwrap() {
-        let _ = item.set_enabled(false);
+        let _ = item.set_text("Stop Meeting");
     }
 
     // Note: WebSocket connection is managed by spawned tasks in MeetingWebSocket::connect()
@@ -216,7 +177,7 @@ pub async fn start_meeting_recording(
 /// Stop recording and finalize the meeting
 #[tauri::command]
 pub async fn stop_meeting_recording(
-    _app: AppHandle,
+    app: AppHandle,
     state: State<'_, MeetingState>,
     _meeting_id: String,
 ) -> Result<String, String> {
@@ -234,12 +195,38 @@ pub async fn stop_meeting_recording(
             }
         }
 
+        // Stop system audio capture (macOS)
+        {
+            let mut guard = state.system_stop_tx.lock().unwrap();
+            if let Some(tx) = guard.take() {
+                let _ = tx.send(());
+            }
+        }
+
         *is_recording = false;
     }
 
-    // Re-enable the tray "Start Meeting" item
+    // Send end event so Lexi AI server can finalize and close the stream (no reliance on timeout)
+    let ws_tx = state.meeting_ws_text_tx.lock().unwrap().take();
+    if let Some(tx) = ws_tx {
+        let _ = tx
+            .send(r#"{"type":"end_recording"}"#.to_string())
+            .await;
+    }
+
+    // Broadcast so key listener re-enables assistant/action hotkeys
+    if let Ok(tx) = state.meeting_recording_tx.lock() {
+        let _ = tx.send(false);
+    }
+
+    // Show pill overlay again
+    if let Some(pill_window) = app.get_webview_window("pill") {
+        let _ = pill_window.show();
+    }
+
+    // Restore tray to "Start Meeting"
     if let Some(ref item) = *state.tray_start_meeting.lock().unwrap() {
-        let _ = item.set_enabled(true);
+        let _ = item.set_text("Start Meeting");
     }
 
     Ok("Recording stopped".to_string())
@@ -405,6 +392,51 @@ pub async fn summarize_meeting(app: AppHandle, meeting_id: String) -> Result<ser
     Ok(meeting)
 }
 
+
+/// Add a user note to the meeting transcript (typed during the meeting).
+#[tauri::command]
+pub async fn add_meeting_note(
+    app: AppHandle,
+    meeting_id: String,
+    text: String,
+) -> Result<serde_json::Value, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let client = crate::utils::create_http_client();
+    let url = format!(
+        "{}/api/v1/meetings/{}/notes",
+        crate::config::api_base_url(),
+        meeting_id
+    );
+
+    let body = serde_json::json!({ "text": text.trim() });
+    if text.trim().is_empty() {
+        return Err("Note text is required".to_string());
+    }
+
+    utils::log_api_request("Add meeting note", "POST", &url);
+
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+
+    let segment: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    Ok(segment)
+}
 
 /// Send a chat message to a meeting
 #[tauri::command]

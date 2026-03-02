@@ -20,6 +20,13 @@
 //!    - Triggered by: Using System Events or Accessibility API
 //!    - System Location: Privacy & Security → Accessibility
 //!
+//! 4. **System audio permission** (for capturing system audio in meetings)
+//!    - **macOS 14.4+**: Prefer "Audio Capture" (kTCCServiceAudioCapture) so the user can grant
+//!      system audio only without full Screen Recording. Checked via private TCC API; fallback below.
+//!    - **Older macOS or if TCC unavailable**: Screen Recording permission is used (same capability).
+//!    - Request: open Settings (Screen Recording pane; on 14.4+ user can choose "System Audio Recording Only").
+//!    - System Location: Privacy & Security → Screen Recording (or Audio Capture on 14.4+)
+//!
 //! ## Platform Support
 //!
 //! - **macOS**: Full permission checking and requesting support
@@ -112,6 +119,84 @@ pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
+// Screen Recording (macOS 10.15+): required for system audio when Audio Capture is not available.
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn CGPreflightScreenCaptureAccess() -> bool;
+    fn CGRequestScreenCaptureAccess() -> bool;
+}
+
+#[cfg(target_os = "macos")]
+#[link(name = "CoreFoundation", kind = "framework")]
+extern "C" {
+    fn CFStringCreateWithCString(
+        alloc: *mut std::ffi::c_void,
+        c_str: *const std::ffi::c_char,
+        encoding: u32,
+    ) -> *mut std::ffi::c_void;
+    fn CFRelease(cf: *mut std::ffi::c_void);
+}
+
+/// TCC status: 0 = granted, 1 = denied, 2 = not determined. -1 = error / API unavailable.
+#[allow(dead_code)]
+const TCC_STATUS_GRANTED: i32 = 0;
+
+/// kCFStringEncodingUTF8
+#[allow(dead_code)]
+const K_CF_STRING_ENCODING_UTF8: u32 = 0x0800_0100;
+
+/// Check "Audio Capture" permission via private TCC API (macOS 14.4+).
+/// Returns Some(true) if granted, Some(false) if denied/not determined, None if TCC API unavailable.
+#[cfg(target_os = "macos")]
+#[allow(dead_code)]
+fn check_audio_capture_permission_tcc() -> Option<bool> {
+    use std::ffi::CString;
+    const TCC_PATH: &str = "/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC";
+
+    let path_c = CString::new(TCC_PATH).ok()?;
+    let handle = unsafe { libc::dlopen(path_c.as_ptr(), libc::RTLD_NOW) };
+    let handle = std::ptr::NonNull::new(handle)?;
+
+    type PreflightFn = unsafe extern "C" fn(*mut std::ffi::c_void, *mut std::ffi::c_void) -> i32;
+    let sym = b"TCCAccessPreflight\0";
+    let preflight_ptr = unsafe { libc::dlsym(handle.as_ptr(), sym.as_ptr() as *const libc::c_char) };
+    if preflight_ptr.is_null() {
+        return None;
+    }
+    let preflight: PreflightFn = unsafe { std::mem::transmute(preflight_ptr) };
+
+    let service = CString::new("kTCCServiceAudioCapture").ok()?;
+    let cf_str = unsafe {
+        CFStringCreateWithCString(
+            std::ptr::null_mut(),
+            service.as_ptr(),
+            K_CF_STRING_ENCODING_UTF8,
+        )
+    };
+    if cf_str.is_null() {
+        return None;
+    }
+    let status = unsafe { preflight(cf_str as *mut std::ffi::c_void, std::ptr::null_mut()) };
+    unsafe { CFRelease(cf_str) };
+    Some(status == TCC_STATUS_GRANTED)
+}
+
+/// Check system audio permission: prefer "Audio Capture" only (macOS 14.4+) when available,
+/// otherwise fall back to Screen Recording (required for system audio on older macOS).
+#[tauri::command]
+#[cfg(target_os = "macos")]
+pub fn check_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
+    let granted = check_audio_capture_permission_tcc()
+        .unwrap_or_else(|| unsafe { CGPreflightScreenCaptureAccess() });
+    Ok(granted)
+}
+
+#[tauri::command]
+#[cfg(not(target_os = "macos"))]
+pub fn check_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
+    Ok(true)
+}
+
 /// Internal helper: open macOS System Settings to a specific privacy pane.
 #[cfg(target_os = "macos")]
 fn open_permission_pane_impl(pane: &str) -> Result<(), String> {
@@ -125,6 +210,9 @@ fn open_permission_pane_impl(pane: &str) -> Result<(), String> {
         }
         "input_monitoring" => {
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+        }
+        "screen_capture" => {
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
         }
         _ => return Err(format!("Unknown pane: {}", pane)),
     };
@@ -261,5 +349,21 @@ pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String>
 #[tauri::command]
 #[cfg(not(target_os = "macos"))]
 pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
+    Ok(true)
+}
+
+/// Request screen recording permission (needed for system audio in meetings).
+/// Call CGRequestScreenCaptureAccess() (macOS shows the popup at most once), then deep-link to Settings.
+#[tauri::command]
+#[cfg(target_os = "macos")]
+pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
+    let _ = open_permission_pane_impl("screen_capture");
+    let _ = unsafe { CGRequestScreenCaptureAccess() };
+    Ok(true)
+}
+
+#[tauri::command]
+#[cfg(not(target_os = "macos"))]
+pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }

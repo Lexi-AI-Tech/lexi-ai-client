@@ -21,7 +21,6 @@ import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { NotesPage } from "./components/NotesPage";
 import { MeetingsPage } from "./components/MeetingsPage";
-import { MeetingDetectorModal } from "./components/MeetingDetectorModal";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
 
@@ -46,6 +45,11 @@ function App() {
   const [onboardingSyncDone, setOnboardingSyncDone] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const prevCompletedRef = useRef(isCompleted);
+
+  // When a meeting is started from the pill overlay, we want to:
+  // 1. Switch to the Meetings page
+  // 2. Focus that specific meeting and show its transcript tab
+  const [pillMeetingId, setPillMeetingId] = useState<string | null>(null);
 
   // When not authenticated, reset sync flag so we sync again after next login
   useEffect(() => {
@@ -122,21 +126,71 @@ function App() {
 
   // Listen for "Start Meeting" from system tray
   const [pendingTrayMeeting, setPendingTrayMeeting] = useState(false);
+  const [pendingTrayMeetingPlatform, setPendingTrayMeetingPlatform] = useState<string | null>(null);
+  const [triggerEndMeetingFromTray, setTriggerEndMeetingFromTray] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const setup = async () => {
       const { listen } = await import("@tauri-apps/api/event");
-      const unlisten = await listen("start-meeting-from-tray", () => {
+      const unlistenStart = await listen("start-meeting-from-tray", () => {
         if (!cancelled) {
           setPendingTrayMeeting(true);
+          setPendingTrayMeetingPlatform("Lexi AI");
           setCurrentPage("meetings");
         }
       });
-      if (cancelled) unlisten();
-      else return unlisten;
+      const unlistenEnd = await listen("end-meeting-from-tray", () => {
+        if (!cancelled) {
+          setCurrentPage("meetings");
+          setTriggerEndMeetingFromTray(true);
+        }
+      });
+      if (cancelled) {
+        unlistenStart();
+        unlistenEnd();
+      } else {
+        return () => {
+          unlistenStart();
+          unlistenEnd();
+        };
+      }
     };
     let unlistenFn: (() => void) | undefined;
     setup().then((fn) => { unlistenFn = fn; });
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
+
+  // Listen for meeting started events (pill, tray, or elsewhere)
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenFn: (() => void) | undefined;
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen<{ meetingId: string }>(
+        "meeting-recording-started",
+        (event) => {
+          if (cancelled) return;
+          const payload = event.payload as any;
+          const id =
+            payload && typeof payload.meetingId === "string"
+              ? payload.meetingId
+              : null;
+          if (!id) return;
+          setPillMeetingId(id);
+          setCurrentPage("meetings");
+        },
+      );
+      unlistenFn = unlisten;
+    };
+
+    setup().catch((e) => {
+      console.error("Failed to set up meeting-recording-started listener:", e);
+    });
+
     return () => {
       cancelled = true;
       if (unlistenFn) unlistenFn();
@@ -176,7 +230,6 @@ function App() {
   // Render app with sidebar and page content
   return (
     <div className="app">
-      <MeetingDetectorModal />
       <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
       <div className="main-content">
         {currentPage === "home" && (
@@ -218,7 +271,12 @@ function App() {
           <div className="container">
             <MeetingsPage
               autoStart={pendingTrayMeeting}
+              autoStartPlatform={pendingTrayMeetingPlatform}
               onAutoStartConsumed={() => setPendingTrayMeeting(false)}
+              pillMeetingId={pillMeetingId}
+              onPillMeetingConsumed={() => setPillMeetingId(null)}
+              triggerEndMeetingFromTray={triggerEndMeetingFromTray}
+              onEndMeetingFromTrayConsumed={() => setTriggerEndMeetingFromTray(false)}
             />
           </div>
         )}

@@ -101,6 +101,7 @@ struct GlobalListenerState {
     config_rx: watch::Receiver<Vec<String>>,
     action_hotkey_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
+    meeting_recording_rx: watch::Receiver<bool>,
     tracker: Arc<Mutex<KeyStateTracker>>,
     tap_ptr: Option<*mut c_void>, // CFMachPort is !Send !Sync, so we use a raw pointer
 }
@@ -194,6 +195,17 @@ unsafe extern "C-unwind" fn raw_callback(
                 for cmd in cmds {
                     match cmd {
                         HotkeyCommandResult::SendNow(c) => {
+                            // When a meeting is recording, ignore assistant/action start commands
+                            let is_start_cmd = matches!(
+                                c,
+                                RecordingCommand::Start
+                                    | RecordingCommand::ActionStart
+                                    | RecordingCommand::SwitchToAction
+                                    | RecordingCommand::SwitchToAssistant
+                            );
+                            if is_start_cmd && *state.meeting_recording_rx.borrow() {
+                                continue; // Disable assistant and action mode while meeting is running
+                            }
                             if let Err(e) = state.recording_tx.send(c) {
                                 eprintln!("Failed to send command: {:?}", e);
                             }
@@ -229,6 +241,7 @@ pub(crate) fn start_listener(
     config_rx: watch::Receiver<Vec<String>>,
     action_hotkey_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
+    meeting_recording_rx: watch::Receiver<bool>,
 ) {
     *GLOBAL_STATE.lock().unwrap() = Some(GlobalListenerState {
         app: app.clone(),
@@ -236,6 +249,7 @@ pub(crate) fn start_listener(
         config_rx,
         action_hotkey_rx,
         recording_state,
+        meeting_recording_rx,
         tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
         tap_ptr: None,
     });

@@ -2,6 +2,7 @@
 //!
 //! This module provides Tauri commands for managing application windows.
 
+use crate::window::show_and_focus_main_window;
 use tauri::{AppHandle, Manager};
 
 /// Open DevTools for the specified window
@@ -33,5 +34,15 @@ pub async fn open_devtools(app: AppHandle, window_label: Option<String>) -> Resu
             "Window '{}' not found. Available windows: {:?}",
             label, available_windows
         ))
+    }
+}
+
+/// Show and focus the main window (e.g. when starting a meeting from the pill or tray).
+#[tauri::command]
+pub fn show_main_window(app: AppHandle) -> Result<(), String> {
+    if show_and_focus_main_window(&app) {
+        Ok(())
+    } else {
+        Err("Main window not found".to_string())
     }
 }

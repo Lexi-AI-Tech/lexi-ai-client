@@ -139,6 +139,7 @@ Changing these can affect responsiveness, robustness, and macOS mic indicator be
 - **`mod.rs`** — Module root; re-exports and high-level doc.
 - **`recorder.rs`** — `AudioRecorder`, device/config, stream lifecycle, buffer, `recording_active`, `release_stream()`, `stop_recording()`, WAV build.
 - **`thread.rs`** — Recording thread, state machine, command handling, volume forwarder spawn, calls into `recorder` and into `process_audio` / `process_action_audio`.
+- **`meeting.rs`** — Meeting audio: mic + system audio (macOS). `start_meeting_audio`, `MeetingAudioHandles`, tagged `(source, chunk)` flow; see §8.
 
 ---
 
@@ -150,3 +151,42 @@ Changing these can affect responsiveness, robustness, and macOS mic indicator be
 - **Upgrading cpal**: Check that `Stream::pause()` (or equivalent) still exists and is used in `release_stream()` and `stop_recording()`; keep the same logical teardown order.
 
 When in doubt, run through: start → record → stop → check orange mic clears on macOS; then start again and confirm no stuck indicator or overlapping sessions.
+
+---
+
+## 8. Meeting audio (`meeting.rs`)
+
+Meeting recording provides **microphone + system audio** (macOS only for system) and sends each chunk with a **source tag** so the UI/backend can attribute transcripts to **user** (mic) or **system** (system audio). All meeting capture logic lives in `meeting.rs`; it uses the same `AudioRecorder` from `recorder.rs` for the mic and, on macOS, a separate Core Audio process tap + cpal stream for system audio.
+
+### 8.1 Role
+
+- **Inputs**: Mic via `AudioRecorder` (same as push-to-talk path); system audio on macOS via Core Audio **process tap** and an **aggregate device** feeding a cpal input stream.
+- **Output**: Chunks sent as `(source, chunk)` where `source` is `"user"` or `"system"`. The meeting WebSocket/client sends these to the server so transcripts can be tagged by message type (e.g. user_audio / system_audio).
+
+### 8.2 Components
+
+| Item | Description |
+|------|-------------|
+| **`MeetingAudioHandles`** | Returned by `start_meeting_audio`. Holds `recorder_stop_tx` (signal to stop mic recording) and `system_stop_tx` (optional; on macOS, signal to stop system audio capture). |
+| **`send_tagged_chunks`** | Internal: reads from an `mpsc::Receiver<Vec<u8>>`, tags each chunk with a fixed `source` (`"user"` or `"system"`), and sends `(source, chunk)` on the shared `output_tx` (tokio mpsc). Runs on a dedicated thread per source. |
+| **`start_meeting_audio`** | Entry point. Creates mic channel and, on macOS, system-audio channel and stop channel. Spawns: (1) system audio capture thread (macOS only), (2) thread that runs `send_tagged_chunks` for mic, (3) thread that runs `send_tagged_chunks` for system (macOS only), (4) thread that creates an `AudioRecorder`, calls `start_recording(Some(mic_tx))`, and blocks on `recorder_stop_rx` then calls `stop_recording()`. Returns `MeetingAudioHandles`. |
+
+### 8.3 macOS system audio flow
+
+1. **Default output device** — Get Core Audio default output device and its UID.
+2. **Process tap** — Create a **global mono process tap** (excluding our process) via `TapDesc::with_mono_global_tap_excluding_processes` and `create_process_tap()`.
+3. **Aggregate device** — Build an aggregate device that stacks the tap as a sub-device and uses the default output as main; name it `SYSTEM_AUDIO_TAP_NAME` (`"lexi-audio-tap"`). This makes the tap visible to cpal as an input device.
+4. **Delay** — Sleep **300 ms** after creating the aggregate so Core Audio can register it and avoid a stale device list.
+5. **cpal stream** — Open the host’s input devices, find the device named `lexi-audio-tap`, get its default input config, and build an input stream. The callback converts f32 samples to 16-bit PCM and sends them on `mpsc` to the `send_tagged_chunks` thread (source `"system"`).
+6. **Teardown** — On `stop_rx` receive: set a `shutting_down` flag, call `stream.pause()`, drop the stream. The error callback checks `shutting_down` to avoid logging expected shutdown errors.
+
+### 8.4 Threading
+
+- **Mic**: One thread runs `AudioRecorder::start_recording(Some(mic_tx))` and blocks on `recorder_stop_rx`; when the stop signal is received it calls `stop_recording()`. Another thread runs `send_tagged_chunks(mic_rx, "user", ...)`.
+- **System (macOS)**: One thread runs `run_system_audio_capture(system_tx, system_stop_rx)` (tap + aggregate + cpal stream). Another runs `send_tagged_chunks(system_rx, "system", ...)`.
+- The same **teardown and delay rules** from the main README apply to the mic path (single `AudioRecorder` per meeting session, proper `stop_recording()` before dropping).
+
+### 8.5 Constants (`meeting.rs`)
+
+- **`SYSTEM_AUDIO_TAP_NAME`** (macOS) — `"lexi-audio-tap"`; name of the aggregate device so cpal can find it as an input device.
+- **Aggregate registration delay** — 300 ms after creating the aggregate device before enumerating cpal input devices.
