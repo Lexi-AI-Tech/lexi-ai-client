@@ -55,7 +55,7 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
     let paste_transcript_item = MenuItem::with_id(
         app,
         "paste_last_transcript",
-        "Paste last transcript",
+        "Paste Last Transcript",
         true,
         None::<&str>,
     )?;
