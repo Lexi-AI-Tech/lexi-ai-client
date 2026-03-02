@@ -39,8 +39,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
 
-    // Tab state (Transcript vs Summary/QA)
-    const [activeTab, setActiveTab] = useState<"transcript" | "summary">("transcript");
+    // Tab state: Summary & Q/A first (primary), Transcript second
+    const [activeTab, setActiveTab] = useState<"transcript" | "summary">("summary");
 
     // Real-time state
     const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
@@ -202,27 +202,6 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
             console.error("Failed to stop meeting recording:", error);
         } finally {
             setIsRecording(false);
-        }
-    };
-
-    const handleGenerateSummary = async () => {
-        if (!activeMeetingId || isGeneratingSummary) return;
-
-        setIsGeneratingSummary(true);
-        try {
-            const updatedMeeting = await invoke<Meeting>("summarize_meeting", { meetingId: activeMeetingId });
-
-            // Update the locally cached active Summary
-            setActiveSummary(updatedMeeting.summary || null);
-
-            // Update the meeting list item so it technically persists globally
-            setMeetings(prev => prev.map(m => m.id === updatedMeeting.id ? updatedMeeting : m));
-
-        } catch (error) {
-            console.error("Failed to generate meeting summary:", error);
-            alert("Failed to generate meeting summary.");
-        } finally {
-            setIsGeneratingSummary(false);
         }
     };
 
@@ -399,19 +378,19 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                                 <div style={{ display: "flex", gap: "12px" }}>
                                     <button
-                                        className={`btn ${activeTab === "transcript" ? "btn--primary" : ""}`}
-                                        style={activeTab !== "transcript" ? { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db" } : {}}
-                                        onClick={() => setActiveTab("transcript")}
-                                    >
-                                        Transcript
-                                    </button>
-                                    <button
                                         className={`btn ${activeTab === "summary" ? "btn--primary" : ""}`}
                                         style={activeTab !== "summary" ? { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db" } : {}}
                                         onClick={() => setActiveTab("summary")}
                                         disabled={isRecording}
                                     >
                                         Summary & Q/A
+                                    </button>
+                                    <button
+                                        className={`btn ${activeTab === "transcript" ? "btn--primary" : ""}`}
+                                        style={activeTab !== "transcript" ? { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db" } : {}}
+                                        onClick={() => setActiveTab("transcript")}
+                                    >
+                                        Transcript
                                     </button>
                                 </div>
                                 {activeSummary ? (
@@ -422,7 +401,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                     <div style={{ display: "flex", gap: "8px" }}>
                                         {isGeneratingSummary ? (
                                             <span style={{ color: "#3b82f6", fontSize: "14px", fontWeight: 500, marginRight: "1rem", alignSelf: "center" }}>
-                                                Generating AI Summary...
+                                                Generating summary...
                                             </span>
                                         ) : (
                                             <>
@@ -527,10 +506,10 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                         {!activeSummary ? (
                                             <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem", textAlign: "center" }}>
                                                 {isGeneratingSummary ? (
-                                                    <p style={{ color: "#3b82f6", margin: 0 }}>Generating AI Summary...</p>
+                                                    <p style={{ color: "#3b82f6", margin: 0 }}>Generating summary...</p>
                                                 ) : (
                                                     <p style={{ color: "#6b7280", margin: 0 }}>
-                                                        No summary generated yet. Click "End" when the meeting is over to generate one.
+                                                        End the meeting to generate a summary.
                                                     </p>
                                                 )}
                                             </div>
@@ -651,7 +630,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                     >
                         <h3>End meeting?</h3>
                         <p>
-                            The transcript will be finalized and AI will generate a title and summary automatically.
+                            The transcript will be finalized. Summary and title will generate in the background—you can keep using the app.
                             You won't be able to resume recording after this.
                         </p>
                         <div className="delete-modal-actions">
@@ -668,13 +647,24 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                 className="delete-modal-btn-delete"
                                 onClick={async () => {
                                     setIsEnding(true);
+                                    const meetingId = activeMeetingId;
                                     try {
                                         if (isRecording) await stopRecording();
-                                        await new Promise(r => setTimeout(r, 500));
-                                        await handleGenerateSummary();
+                                        setShowEndConfirm(false);
+                                        setIsEnding(false);
+                                        if (!meetingId) return;
+                                        setIsGeneratingSummary(true);
+                                        invoke<Meeting>("summarize_meeting", { meetingId })
+                                            .then((updatedMeeting) => {
+                                                setActiveSummary(updatedMeeting.summary || null);
+                                                setMeetings(prev => prev.map(m => m.id === updatedMeeting.id ? updatedMeeting : m));
+                                            })
+                                            .catch((error) => {
+                                                console.error("Failed to generate meeting summary:", error);
+                                            })
+                                            .finally(() => setIsGeneratingSummary(false));
                                     } catch (error) {
                                         console.error("Failed to end meeting:", error);
-                                    } finally {
                                         setIsEnding(false);
                                         setShowEndConfirm(false);
                                     }
