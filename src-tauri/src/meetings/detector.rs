@@ -506,8 +506,13 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
                 }
 
                 let platform = apps.first().map(|a| a.name.clone()).unwrap_or_else(|| "Meeting".to_string());
+                let normalized = platform.trim().to_lowercase().replace('-', " ");
+                if normalized.is_empty() || normalized == "lexi ai" {
+                    println!("[detector] skip: platform empty or Lexi AI (normalized: {:?})", normalized);
+                    continue;
+                }
                 let context = MeetingContext {
-                    platform,
+                    platform: platform.clone(),
                     title: String::new(),
                     confidence: 0.9,
                 };
