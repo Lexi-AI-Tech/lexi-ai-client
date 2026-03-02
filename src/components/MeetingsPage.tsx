@@ -236,6 +236,20 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
         }
     };
 
+    const handleGenerateSummary = async () => {
+        if (!activeMeetingId || isGeneratingSummary) return;
+        setIsGeneratingSummary(true);
+        try {
+            const updatedMeeting = await invoke<Meeting>("summarize_meeting", { meetingId: activeMeetingId });
+            setActiveSummary(updatedMeeting.summary || null);
+            setMeetings(prev => prev.map(m => m.id === updatedMeeting.id ? updatedMeeting : m));
+        } catch (error) {
+            console.error("Failed to generate meeting summary:", error);
+        } finally {
+            setIsGeneratingSummary(false);
+        }
+    };
+
     const handleSendChatMessage = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
@@ -454,11 +468,24 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                                         {!activeSummary ? (
                                             <div className="meetings-summary-empty">
                                                 {isGeneratingSummary ? (
-                                                    <p className="meetings-summary-empty__generating">Generating summary...</p>
+                                                    <div className="meetings-summary-generating">
+                                                        <div className="meetings-summary-generating__spinner" />
+                                                        <p className="meetings-summary-generating__text">Generating summary…</p>
+                                                    </div>
                                                 ) : (
-                                                    <p className="meetings-summary-empty__hint">
-                                                        End the meeting to generate a summary.
-                                                    </p>
+                                                    <div className="meetings-summary-empty__actions">
+                                                        <p className="meetings-summary-empty__hint">
+                                                            Generate an AI summary from the transcript.
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn--primary meetings-summary-empty__btn"
+                                                            onClick={handleGenerateSummary}
+                                                            disabled={!activeMeetingId || isGeneratingSummary}
+                                                        >
+                                                            Generate summary
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </div>
                                         ) : (
@@ -554,8 +581,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                     >
                         <h3>End meeting?</h3>
                         <p>
-                            The transcript will be finalized. Summary and title will generate in the background—you can keep using the app.
-                            You won't be able to resume recording after this.
+                            The transcript will be finalized. You won't be able to resume recording after this.
+                            You can generate a summary later from the Summary tab.
                         </p>
                         <div className="delete-modal-actions">
                             <button
@@ -571,26 +598,15 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                                 className="delete-modal-btn-delete"
                                 onClick={async () => {
                                     setIsEnding(true);
-                                    const meetingId = activeMeetingId;
                                     try {
                                         if (isRecording) await stopRecording();
                                         setShowEndConfirm(false);
-                                        setIsEnding(false);
-                                        if (!meetingId) return;
-                                        setIsGeneratingSummary(true);
-                                        invoke<Meeting>("summarize_meeting", { meetingId })
-                                            .then((updatedMeeting) => {
-                                                setActiveSummary(updatedMeeting.summary || null);
-                                                setMeetings(prev => prev.map(m => m.id === updatedMeeting.id ? updatedMeeting : m));
-                                            })
-                                            .catch((error) => {
-                                                console.error("Failed to generate meeting summary:", error);
-                                            })
-                                            .finally(() => setIsGeneratingSummary(false));
+                                        setActiveTab("summary");
                                     } catch (error) {
                                         console.error("Failed to end meeting:", error);
-                                        setIsEnding(false);
                                         setShowEndConfirm(false);
+                                    } finally {
+                                        setIsEnding(false);
                                     }
                                 }}
                                 disabled={isEnding}

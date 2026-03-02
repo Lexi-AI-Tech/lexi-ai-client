@@ -218,6 +218,32 @@
   line-height: 1.6;
 }
 
+/* Summary generating state (loader + message) */
+.meetings-summary-generating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.meetings-summary-generating__spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.meetings-summary-generating__text {
+  font-size: 0.9375rem;
+  color: #6b7280;
+  margin: 0;
+}
+
 /* Summary view */
 .meetings-summary-layout {
   flex: 1;
@@ -262,6 +288,17 @@
 .meetings-summary-empty__hint {
   color: #6b7280;
   margin: 0;
+}
+
+.meetings-summary-empty__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.meetings-summary-empty__btn {
+  margin-top: 0.25rem;
 }
 
 .meetings-summary-body {

@@ -148,6 +148,9 @@ pub async fn start_meeting_recording(
 
     *state.command_tx.lock().unwrap() = Some(handles.recorder_stop_tx);
     *state.system_stop_tx.lock().unwrap() = handles.system_stop_tx;
+    if let Some(tx) = websocket.text_tx.lock().unwrap().take() {
+        *state.meeting_ws_text_tx.lock().unwrap() = Some(tx);
+    }
     *state.is_recording.lock().unwrap() = true;
 
     // Broadcast so key listener disables assistant/action hotkeys while meeting is running
@@ -201,6 +204,14 @@ pub async fn stop_meeting_recording(
         }
 
         *is_recording = false;
+    }
+
+    // Send end event so Lexi AI server can finalize and close the stream (no reliance on timeout)
+    let ws_tx = state.meeting_ws_text_tx.lock().unwrap().take();
+    if let Some(tx) = ws_tx {
+        let _ = tx
+            .send(r#"{"type":"end_recording"}"#.to_string())
+            .await;
     }
 
     // Broadcast so key listener re-enables assistant/action hotkeys
