@@ -6,7 +6,7 @@
 //! Only runtime state that needs to be in-memory (like task handles, recording state) is stored here.
 
 use std::sync::{Arc, Mutex};
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 
 /// State for watch sender (to broadcast config changes)
 ///
@@ -33,4 +33,20 @@ pub struct HotkeyRecordingState {
 pub struct RoomState {
     pub is_recording: Mutex<bool>,
     pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
+}
+
+/// Meeting recording state
+///
+/// Note: AudioRecorder and MeetingWebSocket cannot be stored here for the same reasons as RoomState.
+pub struct MeetingState {
+    pub is_recording: Mutex<bool>,
+    pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
+    /// Signal to stop system audio capture (macOS; set by meeting audio module)
+    pub system_stop_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
+    /// Sender to send an end event to the meeting WebSocket so the server can finalize and close the stream
+    pub meeting_ws_text_tx: Mutex<Option<mpsc::Sender<String>>>,
+    /// Handle to the tray "Start Meeting" menu item for dynamic enable/disable
+    pub tray_start_meeting: Mutex<Option<tauri::menu::MenuItem<tauri::Wry>>>,
+    /// Broadcasts when meeting recording starts (true) or stops (false). Key listener uses this to disable assistant/action hotkeys.
+    pub meeting_recording_tx: Mutex<watch::Sender<bool>>,
 }

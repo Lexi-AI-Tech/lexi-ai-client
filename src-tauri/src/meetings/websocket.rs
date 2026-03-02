@@ -1,56 +1,33 @@
-//! Room WebSocket Streaming Module
+//! Meeting WebSocket Streaming Module
 //!
 //! Handles WebSocket connection to server for real-time transcription.
 //! Manages audio streaming and receives transcript updates.
 
 use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TranscriptMessage {
-    #[serde(rename = "type")]
-    pub msg_type: String,
-    pub text: Option<String>,
-    #[serde(rename = "start_time")]
-    pub start_time: Option<String>,
-    #[serde(rename = "end_time")]
-    pub end_time: Option<String>,
-    #[serde(rename = "speaker_id")]
-    pub speaker_id: Option<u32>,
-    /// message_type: "user_audio" (mic, right), "system_audio" (system, left), "user_note" (typed note).
-    #[serde(rename = "message_type")]
-    pub message_type: Option<String>,
-}
+use crate::room_websocket::{ServerMessage, TranscriptMessage};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ServerMessage {
-    #[serde(rename = "type")]
-    pub msg_type: String,
-    pub message: Option<String>,
-}
-
-pub struct RoomWebSocket {
+pub struct MeetingWebSocket {
     app: AppHandle,
-    room_id: String,
+    meeting_id: String,
     jwt_token: String,
-    language: String,
-    pub audio_tx: Arc<Mutex<Option<mpsc::Sender<Vec<u8>>>>>,
+    /// Sends (source, chunk) where source is "user" or "system"; server tags transcripts with message_type.
+    pub audio_tx: Arc<Mutex<Option<mpsc::Sender<(String, Vec<u8>)>>>>,
     pub text_tx: Arc<Mutex<Option<mpsc::Sender<String>>>>, // For sending text messages (like end_recording)
     is_connected: Arc<Mutex<bool>>,
     pub ready_rx: Arc<Mutex<Option<tokio::sync::oneshot::Receiver<()>>>>, // Receive signal when server is ready
 }
 
-impl RoomWebSocket {
-    pub fn new(app: AppHandle, room_id: String, jwt_token: String, language: String) -> Self {
+impl MeetingWebSocket {
+    pub fn new(app: AppHandle, meeting_id: String, jwt_token: String) -> Self {
         Self {
             app,
-            room_id,
+            meeting_id,
             jwt_token,
-            language,
             audio_tx: Arc::new(Mutex::new(None)),
             text_tx: Arc::new(Mutex::new(None)),
             is_connected: Arc::new(Mutex::new(false)),
@@ -66,11 +43,10 @@ impl RoomWebSocket {
             .replace("http://", "ws://")
             .replace("https://", "wss://");
         let ws_url = format!(
-            "{}/api/v1/rooms/{}/stream?token={}&language={}",
+            "{}/api/v1/meetings/{}/stream?token={}",
             ws_base_url,
-            self.room_id,
-            encode(&self.jwt_token),
-            encode(&self.language)
+            self.meeting_id,
+            encode(&self.jwt_token)
         );
 
         let url = ws_url
@@ -84,8 +60,8 @@ impl RoomWebSocket {
 
         let (mut write, mut read) = ws_stream.split();
 
-        // Create channels
-        let (audio_tx, mut audio_rx) = mpsc::channel::<Vec<u8>>(100);
+        // Create channels: audio as (source, chunk) so server can tag transcripts by speaker_type
+        let (audio_tx, mut audio_rx) = mpsc::channel::<(String, Vec<u8>)>(100);
         let (text_tx, mut text_rx) = mpsc::channel::<String>(10);
         *self.audio_tx.lock().unwrap() = Some(audio_tx);
         *self.text_tx.lock().unwrap() = Some(text_tx);
@@ -97,14 +73,23 @@ impl RoomWebSocket {
         let is_connected = Arc::clone(&self.is_connected);
         *is_connected.lock().unwrap() = true;
 
-        // Spawn task to send messages (audio chunks and text messages)
+        // Spawn task to send messages (audio_source when source changes, then binary chunks)
         let mut total_chunks = 0;
         let mut total_bytes = 0;
+        let mut current_source: Option<String> = None;
         tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    // Send audio chunks
-                    Some(chunk) = audio_rx.recv() => {
+                    // Send (source, chunk): send audio_source text when source changes, then binary
+                    Some((source, chunk)) = audio_rx.recv() => {
+                        if current_source.as_deref() != Some(source.as_str()) {
+                            current_source = Some(source.clone());
+                            let msg = serde_json::json!({ "type": "audio_source", "source": source });
+                            if let Err(e) = write.send(Message::Text(msg.to_string())).await {
+                                eprintln!("❌ Failed to send audio_source: {}", e);
+                                break;
+                            }
+                        }
                         total_chunks += 1;
                         total_bytes += chunk.len();
                         if total_chunks % 100 == 0 {
@@ -151,7 +136,7 @@ impl RoomWebSocket {
                                 // Emit event to frontend
                                 let app_clone = app.clone();
                                 tauri::async_runtime::spawn(async move {
-                                    let _ = app_clone.emit("room-websocket-ready", ());
+                                    let _ = app_clone.emit("meeting-websocket-ready", ());
                                 });
                                 continue;
                             }
@@ -161,22 +146,17 @@ impl RoomWebSocket {
                         if let Ok(msg) = serde_json::from_str::<TranscriptMessage>(&text) {
                             transcript_count += 1;
                             println!(
-                                "📝 Received transcript #{}: speaker={}, text={:?}",
+                                "📝 Received transcript #{}: message_type={:?}, text={:?}",
                                 transcript_count,
-                                msg.speaker_id.unwrap_or(0),
+                                msg.message_type,
                                 msg.text
                             );
 
-                            // Debug: Print what we're about to emit
-                            if let Ok(json_str) = serde_json::to_string(&msg) {
-                                println!("📤 Emitting to frontend: {}", json_str);
-                            }
-
                             let app_clone = app.clone();
                             tauri::async_runtime::spawn(async move {
-                                match app_clone.emit("room-transcript", &msg) {
+                                match app_clone.emit("meeting-transcript", &msg) {
                                     Ok(_) => {
-                                        println!("✅ Successfully emitted 'room-transcript' event to frontend");
+                                        println!("✅ Successfully emitted 'meeting-transcript' event to frontend");
                                     }
                                     Err(e) => {
                                         eprintln!("❌ Failed to emit transcript: {}", e);
@@ -195,7 +175,7 @@ impl RoomWebSocket {
                         let app_clone = app.clone();
                         let error_msg = format!("{}", e);
                         tauri::async_runtime::spawn(async move {
-                            let _ = app_clone.emit("room-websocket-error", error_msg);
+                            let _ = app_clone.emit("meeting-websocket-error", error_msg);
                         });
                         break;
                     }

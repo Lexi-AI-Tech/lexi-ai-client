@@ -385,6 +385,7 @@ pub fn start_listener(
     config_rx: watch::Receiver<Vec<String>>,
     action_hotkey_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
+    meeting_recording_rx: watch::Receiver<bool>,
 ) {
     #[cfg(target_os = "macos")]
     {
@@ -394,6 +395,7 @@ pub fn start_listener(
             config_rx,
             action_hotkey_rx,
             recording_state,
+            meeting_recording_rx,
         );
     }
 

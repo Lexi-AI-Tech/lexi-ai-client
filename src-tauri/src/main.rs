@@ -54,6 +54,7 @@ mod cursor_context; // Cursor context retrieval using macOS Accessibility API (A
 mod global_key_listener; // Unified hotkey management
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
+
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
@@ -62,6 +63,8 @@ mod shortcuts; // Voice command shortcuts that replace transcriptions with prede
 #[cfg(target_os = "macos")]
 mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
+mod meetings; // Meetings module
+
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod titlebar; // Title bar customization (hide title, match background on macOS)
 mod tray; // System tray icon creation and event handling
@@ -69,6 +72,7 @@ mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
+
 
 use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
@@ -79,8 +83,9 @@ use window::show_and_focus_main_window;
 
 use permissions::{
     check_accessibility_permission, check_input_monitoring_permission, check_microphone_permission,
-    open_permission_pane, request_accessibility_permission, request_input_monitoring_permission,
-    request_microphone_permission,
+    check_system_audio_permission, open_permission_pane, request_accessibility_permission,
+    request_input_monitoring_permission, request_microphone_permission,
+    request_system_audio_permission,
 };
 
 use actions::commands::{delete_action_history, get_action_history};
@@ -101,6 +106,11 @@ use commands::onboarding::{
     get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
     set_onboarding_step,
 };
+use meetings::commands::{
+    add_meeting_note, create_meeting, get_meeting_details, list_meetings, start_meeting_recording,
+    stop_meeting_recording, update_meeting, delete_meeting,
+    summarize_meeting, send_meeting_chat
+};
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
     stop_room_recording_and_process, update_room, update_speaker,
@@ -108,7 +118,7 @@ use commands::rooms::{
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type};
-use commands::window::open_devtools;
+use commands::window::{open_devtools, show_main_window};
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
 /// Command to control recording state
@@ -133,6 +143,7 @@ struct KeyListenerParams {
     config_rx: watch::Receiver<Vec<String>>,
     action_hotkey_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
+    meeting_recording_rx: watch::Receiver<bool>,
 }
 
 /// Start the global key listener if not already started. Called by the frontend when the user
@@ -152,6 +163,7 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
             params.config_rx,
             params.action_hotkey_rx,
             params.recording_state,
+            params.meeting_recording_rx,
         );
         println!("✅ Global key listener started (Input Monitoring will now be used)");
 
@@ -219,8 +231,11 @@ pub fn main() {
             check_microphone_permission,
             check_input_monitoring_permission,
             check_accessibility_permission,
+            check_system_audio_permission,
+            request_system_audio_permission,
             inject_text,
             open_devtools,
+            show_main_window,
             start_google_login,
             get_pkce_verifier,
             update_hotkey,
@@ -273,11 +288,21 @@ pub fn main() {
             stop_room_recording_and_process,
             update_room,
             update_speaker,
+            add_meeting_note,
+            create_meeting,
+            list_meetings,
+            get_meeting_details,
+            start_meeting_recording,
+            stop_meeting_recording,
+            update_meeting,
+            delete_meeting,
+            summarize_meeting,
+            send_meeting_chat,
             start_global_key_listener,
         ])
         .setup(move |app| {
             // Create system tray first to avoid borrow checker issues
-            tray::init_system_tray(app)?;
+            let start_meeting_menu_item = tray::init_system_tray(app)?;
 
             if let Some(window) = app.get_webview_window("main") {
                 titlebar::apply_to_window(&window);
@@ -328,6 +353,7 @@ pub fn main() {
             // Initialize hotkey channels with empty default states to avoid blocking startup.
             let (config_tx, config_rx) = watch::channel(Vec::new());
             let (action_hotkey_tx, action_hotkey_rx) = watch::channel(Vec::new());
+            let (meeting_recording_tx, meeting_recording_rx) = watch::channel(false);
 
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));
@@ -340,6 +366,15 @@ pub fn main() {
             app.manage(RoomState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
+            });
+
+            app.manage(crate::state::MeetingState {
+                is_recording: Mutex::new(false),
+                command_tx: Mutex::new(None),
+                system_stop_tx: Mutex::new(None),
+                meeting_ws_text_tx: Mutex::new(None),
+                tray_start_meeting: Mutex::new(Some(start_meeting_menu_item)),
+                meeting_recording_tx: Mutex::new(meeting_recording_tx),
             });
 
             // Fetch config in background after state is managed to ensure channels get updated
@@ -361,6 +396,7 @@ pub fn main() {
                     config_rx,
                     action_hotkey_rx,
                     recording_state: recording_state_arc,
+                    meeting_recording_rx,
                 })),
             });
 
@@ -368,6 +404,9 @@ pub fn main() {
             {
                 // Spawn the unified recording thread
                 spawn_recording_thread(app_handle.clone(), recording_rx);
+                
+                // Start background meeting detector
+                meetings::detector::start_meeting_detector(app_handle.clone());
             }
 
             Ok(())
