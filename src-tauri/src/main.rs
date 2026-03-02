@@ -363,6 +363,7 @@ pub fn main() {
             app.manage(crate::state::MeetingState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
+                system_stop_tx: Mutex::new(None),
                 tray_start_meeting: Mutex::new(Some(start_meeting_menu_item)),
             });
 
