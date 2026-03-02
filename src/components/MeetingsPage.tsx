@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Trash2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import "./meetings.css";
 
 interface TranscriptSegment {
     id: string;
@@ -182,6 +183,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
         if (!tokens?.access_token) return;
         setIsRecording(true);
         setActiveMeetingId(meetingId);
+        setActiveTab("transcript");
 
         try {
             await invoke("start_meeting_recording", { meetingId });
@@ -283,16 +285,15 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
         <div className="page">
             <h2 className="page__title">Meetings</h2>
 
-            <div className="meetings-content" style={{ display: "flex", gap: "2rem", height: "calc(100vh - 120px)" }}>
+            <div className="meetings-content">
 
                 {/* Left Side: Meetings List */}
-                <aside className="panel" style={{ width: "300px", display: "flex", flexDirection: "column", overflowY: "auto", padding: "16px" }}>
+                <aside className="panel meetings-sidebar">
                     <div className="panel__label">Recent Meetings</div>
-                    {meetings.length === 0 ? <p style={{ color: "#aaa", fontSize: "14px" }}>No captured meetings yet.</p> : null}
+                    {meetings.length === 0 ? <p className="meetings-sidebar__empty">No captured meetings yet.</p> : null}
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", flex: 1 }}>
+                    <div className="meetings-list">
                         {meetings.map((m) => {
-                            // Ensure date is valid before formatting
                             let dateStr = "Unknown Date";
                             let timeStr = "";
                             try {
@@ -309,50 +310,17 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                     key={m.id}
                                     className={`meeting-item ${activeMeetingId === m.id ? "active" : ""}`}
                                     onClick={() => setActiveMeetingId(m.id)}
-                                    style={{
-                                        padding: "16px",
-                                        borderRadius: "8px",
-                                        cursor: "pointer",
-                                        position: "relative",
-                                        border: activeMeetingId === m.id ? "1px solid #d1d5db" : "1px solid #e5e7eb",
-                                        backgroundColor: activeMeetingId === m.id ? "#f9fafb" : "#ffffff",
-                                        transition: "all 0.2s ease"
-                                    }}
                                 >
-                                    <div style={{ fontWeight: 500, color: "#111827", marginBottom: "4px" }}>{m.name || "Untitled Meeting"}</div>
-                                    <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                                    <div className="meeting-item__title">{m.name || "Untitled Meeting"}</div>
+                                    <div className="meeting-item__meta">
                                         {m.platform || "Lexi AI"} • {dateStr} {timeStr}
                                     </div>
                                     <button
+                                        type="button"
+                                        className="meeting-item__delete"
                                         onClick={(e) => openDeleteConfirm(e, m.id)}
                                         disabled={!!deletingId}
-                                        style={{
-                                            position: "absolute",
-                                            top: "12px",
-                                            right: "12px",
-                                            padding: "6px",
-                                            backgroundColor: "transparent",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            cursor: deletingId ? "not-allowed" : "pointer",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            color: "#ef4444",
-                                            transition: "all 0.2s ease",
-                                            opacity: deletingId ? 0.6 : 1,
-                                        }}
                                         title="Delete meeting"
-                                        onMouseEnter={(e) => {
-                                            if (!deletingId) {
-                                                e.currentTarget.style.backgroundColor = "#fee2e2";
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            if (!deletingId) {
-                                                e.currentTarget.style.backgroundColor = "transparent";
-                                            }
-                                        }}
                                     >
                                         <Trash2 size={16} />
                                     </button>
@@ -362,8 +330,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                     </div>
 
                     <button
-                        className="btn btn--secondary"
-                        style={{ marginTop: "1rem", width: "100%" }}
+                        type="button"
+                        className="btn btn--secondary meetings-sidebar__cta"
                         onClick={handleCreateAndStartMeeting}
                         disabled={isRecording || isGeneratingSummary}
                     >
@@ -372,40 +340,40 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                 </aside>
 
                 {/* Right Side: Live View */}
-                <main className="panel" style={{ flex: 1, display: "flex", flexDirection: "column", padding: "16px" }}>
+                <main className="panel meetings-main">
                     {activeMeetingId ? (
                         <>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                                <div style={{ display: "flex", gap: "12px" }}>
+                            <div className="meetings-toolbar">
+                                <div className="meetings-tabs">
                                     <button
-                                        className={`btn ${activeTab === "summary" ? "btn--primary" : ""}`}
-                                        style={activeTab !== "summary" ? { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db" } : {}}
+                                        type="button"
+                                        className={`btn meetings-tabs__btn ${activeTab === "summary" ? "btn--primary" : ""}`}
                                         onClick={() => setActiveTab("summary")}
                                         disabled={isRecording}
                                     >
                                         Summary
                                     </button>
                                     <button
-                                        className={`btn ${activeTab === "transcript" ? "btn--primary" : ""}`}
-                                        style={activeTab !== "transcript" ? { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db" } : {}}
+                                        type="button"
+                                        className={`btn meetings-tabs__btn ${activeTab === "transcript" ? "btn--primary" : ""}`}
                                         onClick={() => setActiveTab("transcript")}
                                     >
                                         Transcript
                                     </button>
                                 </div>
                                 {!activeSummary && (
-                                    <div style={{ display: "flex", gap: "8px" }}>
+                                    <div className="meetings-actions">
                                         <button
-                                            className={`btn ${!isRecording ? "btn--primary" : ""}`}
+                                            type="button"
+                                            className={`btn meetings-actions__resume ${isRecording ? "recording" : "btn--primary"}`}
                                             onClick={() => isRecording ? stopRecording() : startRecording(activeMeetingId)}
-                                            style={isRecording ? { backgroundColor: "#f59e0b", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" } : { padding: "6px 12px" }}
                                         >
                                             {isRecording ? "Pause" : "Resume"}
                                         </button>
                                         <button
-                                            className="btn"
+                                            type="button"
+                                            className="btn meetings-actions__end"
                                             onClick={() => setShowEndConfirm(true)}
-                                            style={{ backgroundColor: "#ef4444", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" }}
                                         >
                                             End
                                         </button>
@@ -414,19 +382,9 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                             </div>
 
                             {activeTab === "transcript" && (
-                                <div
-                                    ref={scrollRef}
-                                    style={{
-                                        flex: 1,
-                                        overflowY: "auto",
-                                        backgroundColor: "#f9fafb",
-                                        padding: "1.5rem",
-                                        borderRadius: "8px",
-                                        border: "1px solid #e5e7eb"
-                                    }}
-                                >
+                                <div ref={scrollRef} className="meetings-transcript">
                                     {liveSegments.length === 0 ? (
-                                        <p style={{ color: "#9ca3af", textAlign: "center", fontStyle: "italic", marginTop: "2rem" }}>
+                                        <p className="meetings-transcript__empty">
                                             {isRecording ? "Listening for speech..." : "Click Resume Capture to start."}
                                         </p>
                                     ) : null}
@@ -441,33 +399,18 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                         } catch (e) {
                                             // Ignore parsing errors
                                         }
-                                        const isSystem = seg.speaker_type === "system";
                                         const isUser = seg.speaker_type === "user";
+                                        const isSystem = seg.speaker_type === "system";
+                                        const segmentAlign = isUser ? "user" : isSystem ? "system" : "unknown";
+                                        const bubbleVariant = isUser ? "user" : isSystem ? "system" : "unknown";
                                         return (
                                             <div
                                                 key={seg.id ?? idx}
-                                                style={{
-                                                    marginBottom: "1rem",
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    alignItems: isUser ? "flex-end" : "flex-start"
-                                                }}
+                                                className={`meetings-transcript__segment meetings-transcript__segment--${segmentAlign}`}
                                             >
-                                                <div
-                                                    style={{
-                                                        maxWidth: "85%",
-                                                        padding: "8px 12px",
-                                                        borderRadius: "8px",
-                                                        backgroundColor: isUser ? "#3b82f6" : (isSystem ? "#e5e7eb" : "#f3f4f6"),
-                                                        color: isUser ? "#fff" : "#111827"
-                                                    }}
-                                                >
-                                                    <span style={{ fontSize: "11px", color: isUser ? "rgba(255,255,255,0.8)" : "#6b7280", display: "block", marginBottom: "4px" }}>
-                                                        [{timeString}]
-                                                    </span>
-                                                    <span style={{ fontSize: "15px", lineHeight: "1.6" }}>
-                                                        {seg.text}
-                                                    </span>
+                                                <div className={`meetings-transcript__bubble meetings-transcript__bubble--${bubbleVariant}`}>
+                                                    <span className="meetings-transcript__time">[{timeString}]</span>
+                                                    <span className="meetings-transcript__text">{seg.text}</span>
                                                 </div>
                                             </div>
                                         );
@@ -476,85 +419,49 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                             )}
 
                             {activeTab === "summary" && (
-                                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1rem", overflow: "hidden" }}>
-
-                                    {/* Top Half: Summary */}
-                                    <div style={{
-                                        flex: 1,
-                                        overflowY: "auto",
-                                        backgroundColor: "#ffffff",
-                                        padding: "1.5rem",
-                                        borderRadius: "8px",
-                                        border: "1px solid #e5e7eb",
-                                        display: "flex",
-                                        flexDirection: "column"
-                                    }}>
-                                        <h3 style={{ margin: "0 0 1rem 0", fontSize: "16px", color: "#111827" }}>AI Summary</h3>
-
+                                <div className="meetings-summary-layout">
+                                    <div className="meetings-summary-block">
+                                        <h3>AI Summary</h3>
                                         {!activeSummary ? (
-                                            <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem", textAlign: "center" }}>
+                                            <div className="meetings-summary-empty">
                                                 {isGeneratingSummary ? (
-                                                    <p style={{ color: "#3b82f6", margin: 0 }}>Generating summary...</p>
+                                                    <p className="meetings-summary-empty__generating">Generating summary...</p>
                                                 ) : (
-                                                    <p style={{ color: "#6b7280", margin: 0 }}>
+                                                    <p className="meetings-summary-empty__hint">
                                                         End the meeting to generate a summary.
                                                     </p>
                                                 )}
                                             </div>
                                         ) : (
-                                            <div style={{ whiteSpace: "pre-wrap", color: "#374151", fontSize: "14px", lineHeight: "1.6" }}>
-                                                {activeSummary}
-                                            </div>
+                                            <div className="meetings-summary-body">{activeSummary}</div>
                                         )}
                                     </div>
 
-                                    {/* Bottom Half: Chat / Q&A */}
-                                    <div style={{
-                                        flex: 1,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        backgroundColor: "#f9fafb",
-                                        borderRadius: "8px",
-                                        border: "1px solid #e5e7eb",
-                                        overflow: "hidden"
-                                    }}>
-                                        <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", backgroundColor: "#f3f4f6" }}>
-                                            <h4 style={{ margin: 0, fontSize: "14px", color: "#374151" }}>Q&A</h4>
+                                    <div className="meetings-qa-block">
+                                        <div className="meetings-qa-header">
+                                            <h4>Q&A</h4>
                                         </div>
-
-                                        <div ref={chatScrollRef} style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                        <div ref={chatScrollRef} className="meetings-qa-messages">
                                             {chatMessages.length === 0 ? (
-                                                <p style={{ color: "#9ca3af", textAlign: "center", fontSize: "14px", marginTop: "auto", marginBottom: "auto" }}>
-                                                    Ask questions about the meeting here.
-                                                </p>
+                                                <p className="meetings-qa-messages__empty">Ask questions about the meeting here.</p>
                                             ) : (
                                                 chatMessages.map(msg => (
                                                     <div
                                                         key={msg.id}
-                                                        style={{
-                                                            alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                                                            backgroundColor: msg.role === "user" ? "#3b82f6" : "#e5e7eb",
-                                                            color: msg.role === "user" ? "white" : "#111827",
-                                                            padding: "8px 12px",
-                                                            borderRadius: "8px",
-                                                            maxWidth: "80%",
-                                                            fontSize: "14px",
-                                                            lineHeight: "1.5"
-                                                        }}
+                                                        className={`meetings-qa-msg meetings-qa-msg--${msg.role}`}
                                                     >
                                                         {msg.content}
                                                     </div>
                                                 ))
                                             )}
                                         </div>
-
-                                        <form onSubmit={handleSendChatMessage} style={{ padding: "1rem", borderTop: "1px solid #e5e7eb", display: "flex", gap: "8px" }}>
+                                        <form onSubmit={handleSendChatMessage} className="meetings-qa-form">
                                             <input
                                                 type="text"
+                                                className="meetings-qa-form__input"
                                                 value={chatInput}
                                                 onChange={e => setChatInput(e.target.value)}
                                                 placeholder="Ask a question..."
-                                                style={{ flex: 1, padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db" }}
                                                 disabled={isSendingChat || isRecording}
                                             />
                                             <button
@@ -570,7 +477,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                             )}
                         </>
                     ) : (
-                        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}>
+                        <div className="meetings-empty-state">
                             Select a meeting to view transcripts.
                         </div>
                     )}
