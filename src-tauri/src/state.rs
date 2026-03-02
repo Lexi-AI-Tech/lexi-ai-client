@@ -41,7 +41,7 @@ pub struct RoomState {
 pub struct MeetingState {
     pub is_recording: Mutex<bool>,
     pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
-    /// Signal to stop system audio capture thread (macOS only)
+    /// Signal to stop system audio capture (macOS; set by meeting audio module)
     pub system_stop_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
     /// Handle to the tray "Start Meeting" menu item for dynamic enable/disable
     pub tray_start_meeting: Mutex<Option<tauri::menu::MenuItem<tauri::Wry>>>,

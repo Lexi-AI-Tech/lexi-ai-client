@@ -53,10 +53,9 @@ keyring = "2.3"  # OS keychain/credential manager for secure token storage
 tempfile = "3.8"  # Temporary file handling for TTS audio
 tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 futures-util = "0.3"
-ringbuf = "0.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel" }  # macOS NSPanel for advanced window behaviors
 macos-accessibility-client = "0.0"
 objc2-foundation = "0.3.2"
-cidre = { git = "https://github.com/yury/cidre", rev = "a9587fa", features = ["av"] }
+cidre = { git = "https://github.com/yury/cidre", rev = "a9587fa", features = ["av"] }  # meeting system audio (process tap)

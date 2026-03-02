@@ -6,11 +6,7 @@ use crate::commands::auth::get_auth_token_async;
 use crate::state::MeetingState;
 use crate::utils;
 use serde::{Deserialize, Serialize};
-use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Meeting {
@@ -48,57 +44,6 @@ pub struct MeetingUpdate {
 pub struct MeetingChatRequest {
     pub content: String,
     pub history: Vec<serde_json::Value>,
-}
-
-/// Mixes mic and optional system audio (i16 PCM) and sends to WebSocket.
-/// When system_rx is None (non-macOS), forwards mic only.
-fn mix_and_send_audio(
-    mic_rx: mpsc::Receiver<Vec<u8>>,
-    system_rx: Option<mpsc::Receiver<Vec<u8>>>,
-    websocket_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<Vec<u8>>>>>,
-    rt_handle: tokio::runtime::Handle,
-) {
-    let mut system_buffer: Vec<u8> = Vec::new();
-    while let Ok(mic_chunk) = mic_rx.recv() {
-        let to_send = if let Some(ref sys_rx) = system_rx {
-            while system_buffer.len() < mic_chunk.len() {
-                match sys_rx.recv_timeout(Duration::from_millis(5)) {
-                    Ok(s) => system_buffer.extend(s),
-                    Err(_) => break,
-                }
-            }
-            let take = mic_chunk.len().min(system_buffer.len());
-            let system_part: Vec<u8> = system_buffer.drain(..take).collect();
-            let mut mixed = Vec::with_capacity(mic_chunk.len());
-            for i in (0..mic_chunk.len()).step_by(2) {
-                let m = if i + 1 < mic_chunk.len() {
-                    i16::from_le_bytes([mic_chunk[i], mic_chunk[i + 1]])
-                } else {
-                    0i16
-                };
-                let s = if i < system_part.len() && i + 1 < system_part.len() {
-                    i16::from_le_bytes([system_part[i], system_part[i + 1]])
-                } else {
-                    0i16
-                };
-                let mixed_sample = ((m as i32 + s as i32) / 2).clamp(i16::MIN as i32, i16::MAX as i32) as i16;
-                mixed.extend_from_slice(&mixed_sample.to_le_bytes());
-            }
-            mixed
-        } else {
-            mic_chunk
-        };
-        let guard = websocket_tx.lock().unwrap();
-        if let Some(ref tx) = *guard {
-            let tx_clone = tx.clone();
-            drop(guard);
-            if rt_handle.block_on(tx_clone.send(to_send)).is_err() {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
 }
 
 /// Create a new meeting
@@ -166,12 +111,6 @@ pub async fn start_meeting_recording(
         .and_then(|langs| langs.first().cloned())
         .unwrap_or_else(|| "auto".to_string());
 
-    // Mic and (on macOS) system audio channels; mixer will combine and send to WebSocket
-    let (mic_tx, mic_rx) = mpsc::channel::<Vec<u8>>();
-
-    #[cfg(target_os = "macos")]
-    let (system_tx, system_rx) = mpsc::channel::<Vec<u8>>();
-
     // Create WebSocket connection (async) - this will spawn tasks internally
     let mut websocket = crate::meetings::websocket::MeetingWebSocket::new(
         app.clone(),
@@ -209,61 +148,18 @@ pub async fn start_meeting_recording(
         return Err("Ready channel not initialized".to_string());
     }
 
-    let websocket_audio_tx = websocket.audio_tx.clone();
     let rt_handle =
         tokio::runtime::Handle::try_current().map_err(|_| "No tokio runtime available")?;
 
-    // Spawn system audio capture on macOS (process tap); keep stop sender for stop_meeting_recording
-    #[cfg(target_os = "macos")]
-    {
-        let (system_stop_tx, system_stop_rx) = mpsc::channel::<()>();
-        let system_tx_capture = system_tx.clone();
-        thread::spawn(move || {
-            match crate::audio::system_audio_macos::SystemAudioCapture::new(system_tx_capture) {
-                Ok(capture) => {
-                    let _ = system_stop_rx.recv();
-                    drop(capture);
-                }
-                Err(e) => eprintln!("System audio capture failed: {}", e),
-            }
-        });
-        *state.system_stop_tx.lock().unwrap() = Some(system_stop_tx);
-    }
+    // Start meeting audio: mic + system audio (macOS), mixed and sent to WebSocket for transcription
+    let handles = crate::audio::meeting::start_meeting_audio(
+        app.clone(),
+        websocket.audio_tx.clone(),
+        rt_handle,
+    )?;
 
-    // Mixer: combine mic + system audio (macOS) and send to WebSocket
-    #[cfg(target_os = "macos")]
-    let system_rx_for_mixer = Some(system_rx);
-    #[cfg(not(target_os = "macos"))]
-    let system_rx_for_mixer: Option<mpsc::Receiver<Vec<u8>>> = None;
-
-    let websocket_audio_tx_mixer = websocket_audio_tx.clone();
-    thread::spawn(move || {
-        mix_and_send_audio(mic_rx, system_rx_for_mixer, websocket_audio_tx_mixer, rt_handle);
-    });
-
-    // Start microphone recorder in a dedicated thread (AudioRecorder is not Send+Sync)
-    let app_for_recorder = app.clone();
-    let (recorder_tx, recorder_rx) = mpsc::channel::<()>();
-
-    thread::spawn(move || {
-        let mut recorder = crate::audio::recorder::AudioRecorder::new();
-
-        if let Err(e) = recorder.start_recording(Some(mic_tx)) {
-            eprintln!("Failed to start recording: {}", e);
-            let _ =
-                app_for_recorder.emit("meeting-websocket-error", format!("Recording failed: {}", e));
-            return;
-        }
-
-        // Wait for stop signal
-        let _ = recorder_rx.recv();
-
-        // Stop recording
-        let _ = recorder.stop_recording();
-    });
-
-    // Store stop channel in state (this is Send+Sync)
-    *state.command_tx.lock().unwrap() = Some(recorder_tx);
+    *state.command_tx.lock().unwrap() = Some(handles.recorder_stop_tx);
+    *state.system_stop_tx.lock().unwrap() = handles.system_stop_tx;
     *state.is_recording.lock().unwrap() = true;
 
     // Disable the tray "Start Meeting" item while recording
@@ -298,10 +194,10 @@ pub async fn stop_meeting_recording(
             }
         }
 
-        // Stop system audio capture thread (macOS)
+        // Stop system audio capture (macOS)
         {
-            let mut system_stop_guard = state.system_stop_tx.lock().unwrap();
-            if let Some(tx) = system_stop_guard.take() {
+            let mut guard = state.system_stop_tx.lock().unwrap();
+            if let Some(tx) = guard.take() {
                 let _ = tx.send(());
             }
         }
