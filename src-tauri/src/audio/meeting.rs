@@ -48,8 +48,12 @@ const SYSTEM_AUDIO_TAP_NAME: &str = "lexi-audio-tap";
 
 #[cfg(target_os = "macos")]
 fn run_system_audio_capture(sender: mpsc::Sender<Vec<u8>>, stop_rx: mpsc::Receiver<()>) {
+    use std::sync::atomic::{AtomicBool, Ordering};
     use cidre::{cf, core_audio as ca, ns};
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+    let shutting_down = Arc::new(AtomicBool::new(false));
+    let shutting_down_cb = Arc::clone(&shutting_down);
 
     let output_device = match ca::System::default_output_device() {
         Ok(d) => d,
@@ -109,7 +113,9 @@ fn run_system_audio_capture(sender: mpsc::Sender<Vec<u8>>, stop_rx: mpsc::Receiv
         }
     };
 
-    thread::sleep(Duration::from_millis(50));
+    // Give Core Audio time to register the aggregate; use a longer delay when
+    // starting a new meeting after a previous one (avoids stale "lexi-audio-tap" in device list).
+    thread::sleep(Duration::from_millis(300));
 
     let host = cpal::default_host();
     let device = match host.input_devices().ok().and_then(|mut devs| {
@@ -141,7 +147,11 @@ fn run_system_audio_capture(sender: mpsc::Sender<Vec<u8>>, stop_rx: mpsc::Receiv
             }
             let _ = sender.send(bytes);
         },
-        move |err| eprintln!("System audio stream error: {}", err),
+        move |err| {
+            if !shutting_down_cb.load(Ordering::Relaxed) {
+                eprintln!("System audio stream error: {}", err);
+            }
+        },
         None,
     ) {
         Ok(s) => s,
@@ -157,6 +167,7 @@ fn run_system_audio_capture(sender: mpsc::Sender<Vec<u8>>, stop_rx: mpsc::Receiv
     }
 
     let _ = stop_rx.recv();
+    shutting_down.store(true, Ordering::Relaxed);
     let _ = stream.pause();
     drop(stream);
 }
