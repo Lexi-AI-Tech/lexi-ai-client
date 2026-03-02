@@ -358,15 +358,17 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                                     <div className="meeting-item__meta">
                                         {m.platform || "Lexi AI"} • {dateStr} {timeStr}
                                     </div>
-                                    <button
-                                        type="button"
-                                        className="meeting-item__delete"
-                                        onClick={(e) => openDeleteConfirm(e, m.id)}
-                                        disabled={!!deletingId}
-                                        title="Delete meeting"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+                                    {!(activeMeetingId === m.id && isRecording) && (
+                                        <button
+                                            type="button"
+                                            className="meeting-item__delete"
+                                            onClick={(e) => openDeleteConfirm(e, m.id)}
+                                            disabled={!!deletingId}
+                                            title="Delete meeting"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
                                 </div>
                             );
                         })}
@@ -404,7 +406,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                                         Transcript
                                     </button>
                                 </div>
-                                {!activeSummary && (
+                                {!activeSummary && !isGeneratingSummary && (
                                     <div className="meetings-actions">
                                         <button
                                             type="button"
@@ -581,8 +583,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                     >
                         <h3>End meeting?</h3>
                         <p>
-                            The transcript will be finalized. You won't be able to resume recording after this.
-                            You can generate a summary later from the Summary tab.
+                            The transcript will be finalized and a summary will be generated. You won't be able to resume recording after this.
                         </p>
                         <div className="delete-modal-actions">
                             <button
@@ -598,13 +599,29 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                                 className="delete-modal-btn-delete"
                                 onClick={async () => {
                                     setIsEnding(true);
+                                    const meetingId = activeMeetingId;
                                     try {
                                         if (isRecording) await stopRecording();
                                         setShowEndConfirm(false);
                                         setActiveTab("summary");
+                                        setIsGeneratingSummary(true);
+                                        if (meetingId) {
+                                            try {
+                                                const updatedMeeting = await invoke<Meeting>("summarize_meeting", { meetingId });
+                                                setActiveSummary(updatedMeeting.summary || null);
+                                                setMeetings(prev => prev.map(m => m.id === updatedMeeting.id ? updatedMeeting : m));
+                                            } catch (error) {
+                                                console.error("Failed to generate meeting summary:", error);
+                                            } finally {
+                                                setIsGeneratingSummary(false);
+                                            }
+                                        } else {
+                                            setIsGeneratingSummary(false);
+                                        }
                                     } catch (error) {
                                         console.error("Failed to end meeting:", error);
                                         setShowEndConfirm(false);
+                                        setIsGeneratingSummary(false);
                                     } finally {
                                         setIsEnding(false);
                                     }
