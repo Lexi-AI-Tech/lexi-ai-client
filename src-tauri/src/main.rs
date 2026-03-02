@@ -143,6 +143,7 @@ struct KeyListenerParams {
     config_rx: watch::Receiver<Vec<String>>,
     action_hotkey_rx: watch::Receiver<Vec<String>>,
     recording_state: Arc<Mutex<bool>>,
+    meeting_recording_rx: watch::Receiver<bool>,
 }
 
 /// Start the global key listener if not already started. Called by the frontend when the user
@@ -162,6 +163,7 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
             params.config_rx,
             params.action_hotkey_rx,
             params.recording_state,
+            params.meeting_recording_rx,
         );
         println!("✅ Global key listener started (Input Monitoring will now be used)");
 
@@ -349,6 +351,7 @@ pub fn main() {
             // Initialize hotkey channels with empty default states to avoid blocking startup.
             let (config_tx, config_rx) = watch::channel(Vec::new());
             let (action_hotkey_tx, action_hotkey_rx) = watch::channel(Vec::new());
+            let (meeting_recording_tx, meeting_recording_rx) = watch::channel(false);
 
             // Create recording state and manage it
             let recording_state_arc = Arc::new(Mutex::new(false));
@@ -368,6 +371,7 @@ pub fn main() {
                 command_tx: Mutex::new(None),
                 system_stop_tx: Mutex::new(None),
                 tray_start_meeting: Mutex::new(Some(start_meeting_menu_item)),
+                meeting_recording_tx: Mutex::new(meeting_recording_tx),
             });
 
             // Fetch config in background after state is managed to ensure channels get updated
@@ -389,6 +393,7 @@ pub fn main() {
                     config_rx,
                     action_hotkey_rx,
                     recording_state: recording_state_arc,
+                    meeting_recording_rx,
                 })),
             });
 

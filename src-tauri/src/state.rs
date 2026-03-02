@@ -45,4 +45,6 @@ pub struct MeetingState {
     pub system_stop_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
     /// Handle to the tray "Start Meeting" menu item for dynamic enable/disable
     pub tray_start_meeting: Mutex<Option<tauri::menu::MenuItem<tauri::Wry>>>,
+    /// Broadcasts when meeting recording starts (true) or stops (false). Key listener uses this to disable assistant/action hotkeys.
+    pub meeting_recording_tx: Mutex<watch::Sender<bool>>,
 }

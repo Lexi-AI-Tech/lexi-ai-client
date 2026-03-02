@@ -6,7 +6,7 @@ use crate::commands::auth::get_auth_token_async;
 use crate::state::MeetingState;
 use crate::utils;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Meeting {
@@ -150,6 +150,16 @@ pub async fn start_meeting_recording(
     *state.system_stop_tx.lock().unwrap() = handles.system_stop_tx;
     *state.is_recording.lock().unwrap() = true;
 
+    // Broadcast so key listener disables assistant/action hotkeys while meeting is running
+    if let Ok(tx) = state.meeting_recording_tx.lock() {
+        let _ = tx.send(true);
+    }
+
+    // Hide pill overlay so it doesn't show during meeting recording
+    if let Some(pill_window) = app.get_webview_window("pill") {
+        let _ = pill_window.hide();
+    }
+
     // Disable the tray "Start Meeting" item while recording
     if let Some(ref item) = *state.tray_start_meeting.lock().unwrap() {
         let _ = item.set_enabled(false);
@@ -164,7 +174,7 @@ pub async fn start_meeting_recording(
 /// Stop recording and finalize the meeting
 #[tauri::command]
 pub async fn stop_meeting_recording(
-    _app: AppHandle,
+    app: AppHandle,
     state: State<'_, MeetingState>,
     _meeting_id: String,
 ) -> Result<String, String> {
@@ -191,6 +201,16 @@ pub async fn stop_meeting_recording(
         }
 
         *is_recording = false;
+    }
+
+    // Broadcast so key listener re-enables assistant/action hotkeys
+    if let Ok(tx) = state.meeting_recording_tx.lock() {
+        let _ = tx.send(false);
+    }
+
+    // Show pill overlay again
+    if let Some(pill_window) = app.get_webview_window("pill") {
+        let _ = pill_window.show();
     }
 
     // Re-enable the tray "Start Meeting" item
