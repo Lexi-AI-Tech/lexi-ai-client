@@ -383,7 +383,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                         onClick={() => setActiveTab("summary")}
                                         disabled={isRecording}
                                     >
-                                        Summary & Q/A
+                                        Summary
                                     </button>
                                     <button
                                         className={`btn ${activeTab === "transcript" ? "btn--primary" : ""}`}
@@ -393,34 +393,22 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                         Transcript
                                     </button>
                                 </div>
-                                {activeSummary ? (
-                                    <div style={{ color: "#10b981", fontSize: "14px", fontWeight: 500 }}>
-                                        Meeting Completed
-                                    </div>
-                                ) : (
+                                {!activeSummary && (
                                     <div style={{ display: "flex", gap: "8px" }}>
-                                        {isGeneratingSummary ? (
-                                            <span style={{ color: "#3b82f6", fontSize: "14px", fontWeight: 500, marginRight: "1rem", alignSelf: "center" }}>
-                                                Generating summary...
-                                            </span>
-                                        ) : (
-                                            <>
-                                                <button
-                                                    className={`btn ${!isRecording ? "btn--primary" : ""}`}
-                                                    onClick={() => isRecording ? stopRecording() : startRecording(activeMeetingId)}
-                                                    style={isRecording ? { backgroundColor: "#f59e0b", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" } : { padding: "6px 12px" }}
-                                                >
-                                                    {isRecording ? "Pause" : "Resume"}
-                                                </button>
-                                                <button
-                                                    className="btn"
-                                                    onClick={() => setShowEndConfirm(true)}
-                                                    style={{ backgroundColor: "#ef4444", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" }}
-                                                >
-                                                    End
-                                                </button>
-                                            </>
-                                        )}
+                                        <button
+                                            className={`btn ${!isRecording ? "btn--primary" : ""}`}
+                                            onClick={() => isRecording ? stopRecording() : startRecording(activeMeetingId)}
+                                            style={isRecording ? { backgroundColor: "#f59e0b", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" } : { padding: "6px 12px" }}
+                                        >
+                                            {isRecording ? "Pause" : "Resume"}
+                                        </button>
+                                        <button
+                                            className="btn"
+                                            onClick={() => setShowEndConfirm(true)}
+                                            style={{ backgroundColor: "#ef4444", color: "white", padding: "6px 12px", border: "none", borderRadius: "6px" }}
+                                        >
+                                            End
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -531,13 +519,13 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                         overflow: "hidden"
                                     }}>
                                         <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", backgroundColor: "#f3f4f6" }}>
-                                            <h4 style={{ margin: 0, fontSize: "14px", color: "#374151" }}>Meeting Q&A</h4>
+                                            <h4 style={{ margin: 0, fontSize: "14px", color: "#374151" }}>Q&A</h4>
                                         </div>
 
                                         <div ref={chatScrollRef} style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
                                             {chatMessages.length === 0 ? (
                                                 <p style={{ color: "#9ca3af", textAlign: "center", fontSize: "14px", marginTop: "auto", marginBottom: "auto" }}>
-                                                    Ask questions about the meeting transcript here.
+                                                    Ask questions about the meeting here.
                                                 </p>
                                             ) : (
                                                 chatMessages.map(msg => (
