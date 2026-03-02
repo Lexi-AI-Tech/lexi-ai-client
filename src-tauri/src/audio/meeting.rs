@@ -1,7 +1,8 @@
-//! Meeting audio: microphone + system audio (macOS), mixed and sent for transcription.
+//! Meeting audio: microphone + system audio (macOS), sent with source tag for transcription.
 //!
 //! All meeting recording logic lives here: mic capture, system audio capture on macOS
-//! (Core Audio process tap + cpal stream), and mixing both into one stream for the WebSocket.
+//! (Core Audio process tap + cpal stream). Audio is sent as (source, chunk) so the UI/backend
+//! can attribute transcripts to "user" (mic) or "system" (system audio).
 
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -16,49 +17,22 @@ pub struct MeetingAudioHandles {
     pub system_stop_tx: Option<mpsc::Sender<()>>,
 }
 
-/// Mixes mic and optional system audio (i16 PCM) and sends to output.
-fn mix_and_send(
-    mic_rx: mpsc::Receiver<Vec<u8>>,
-    system_rx: Option<mpsc::Receiver<Vec<u8>>>,
-    output_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<Vec<u8>>>>>,
+/// Sends (source, chunk) to output; used for mic (source "user") and system (source "system").
+fn send_tagged_chunks(
+    rx: mpsc::Receiver<Vec<u8>>,
+    source: &'static str,
+    output_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<(String, Vec<u8>)>>>>,
     rt_handle: tokio::runtime::Handle,
 ) {
-    let mut system_buffer: Vec<u8> = Vec::new();
-    while let Ok(mic_chunk) = mic_rx.recv() {
-        let to_send = if let Some(ref sys_rx) = system_rx {
-            while system_buffer.len() < mic_chunk.len() {
-                match sys_rx.recv_timeout(Duration::from_millis(5)) {
-                    Ok(s) => system_buffer.extend(s),
-                    Err(_) => break,
-                }
-            }
-            let take = mic_chunk.len().min(system_buffer.len());
-            let system_part: Vec<u8> = system_buffer.drain(..take).collect();
-            let mut mixed = Vec::with_capacity(mic_chunk.len());
-            for i in (0..mic_chunk.len()).step_by(2) {
-                let m = if i + 1 < mic_chunk.len() {
-                    i16::from_le_bytes([mic_chunk[i], mic_chunk[i + 1]])
-                } else {
-                    0i16
-                };
-                let s = if i < system_part.len() && i + 1 < system_part.len() {
-                    i16::from_le_bytes([system_part[i], system_part[i + 1]])
-                } else {
-                    0i16
-                };
-                let mixed_sample =
-                    ((m as i32 + s as i32) / 2).clamp(i16::MIN as i32, i16::MAX as i32) as i16;
-                mixed.extend_from_slice(&mixed_sample.to_le_bytes());
-            }
-            mixed
-        } else {
-            mic_chunk
-        };
+    while let Ok(chunk) = rx.recv() {
         let guard = output_tx.lock().unwrap();
         if let Some(ref tx) = *guard {
             let tx_clone = tx.clone();
             drop(guard);
-            if rt_handle.block_on(tx_clone.send(to_send)).is_err() {
+            if rt_handle
+                .block_on(tx_clone.send((source.to_string(), chunk)))
+                .is_err()
+            {
                 break;
             }
         } else {
@@ -187,10 +161,10 @@ fn run_system_audio_capture(sender: mpsc::Sender<Vec<u8>>, stop_rx: mpsc::Receiv
     drop(stream);
 }
 
-/// Starts meeting audio: mic + system audio (macOS), mixed to `output_tx`.
+/// Starts meeting audio: mic ("user") + system ("system") on macOS; sends (source, chunk) to `output_tx`.
 pub fn start_meeting_audio(
     app: AppHandle,
-    output_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<Vec<u8>>>>>,
+    output_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<(String, Vec<u8>)>>>>,
     rt_handle: tokio::runtime::Handle,
 ) -> Result<MeetingAudioHandles, String> {
     let (mic_tx, mic_rx) = mpsc::channel::<Vec<u8>>();
@@ -205,15 +179,16 @@ pub fn start_meeting_audio(
         thread::spawn(move || run_system_audio_capture(system_tx_c, system_stop_rx));
     }
 
-    #[cfg(target_os = "macos")]
-    let system_rx_for_mixer = Some(system_rx);
-    #[cfg(not(target_os = "macos"))]
-    let system_rx_for_mixer: Option<mpsc::Receiver<Vec<u8>>> = None;
+    let output_mic = output_tx.clone();
+    let rt_mic = rt_handle.clone();
+    thread::spawn(move || send_tagged_chunks(mic_rx, "user", output_mic, rt_mic));
 
-    let output_tx_mixer = output_tx.clone();
-    thread::spawn(move || {
-        mix_and_send(mic_rx, system_rx_for_mixer, output_tx_mixer, rt_handle);
-    });
+    #[cfg(target_os = "macos")]
+    {
+        let output_sys = output_tx.clone();
+        let rt_sys = rt_handle.clone();
+        thread::spawn(move || send_tagged_chunks(system_rx, "system", output_sys, rt_sys));
+    }
 
     let (recorder_stop_tx, recorder_stop_rx) = mpsc::channel::<()>();
     let app_recorder = app.clone();

@@ -21,6 +21,9 @@ pub struct TranscriptMessage {
     pub end_time: Option<String>,
     #[serde(rename = "speaker_id")]
     pub speaker_id: Option<u32>,
+    /// From UI/backend: "user" (mic, render right) or "system" (system audio, render left).
+    #[serde(rename = "speaker_type")]
+    pub speaker_type: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

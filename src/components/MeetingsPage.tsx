@@ -9,6 +9,8 @@ interface TranscriptSegment {
     start_time: string;
     end_time: string;
     text: string;
+    /** "user" (mic) = render right; "system" (system audio) = render left; from UI/backend only */
+    speaker_type: string;
 }
 
 interface Meeting {
@@ -467,21 +469,39 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ autoStart, onAutoSta
                                         try {
                                             if (seg.start_time) {
                                                 const d = new Date(seg.start_time);
-                                                // Format as localized time depending on user OS preferences
                                                 timeString = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                                             }
                                         } catch (e) {
-                                            // Ignore parsing errors and fallback
+                                            // Ignore parsing errors
                                         }
-
+                                        const isSystem = seg.speaker_type === "system";
+                                        const isUser = seg.speaker_type === "user";
                                         return (
-                                            <div key={idx} style={{ marginBottom: "1rem", display: "flex", gap: "10px" }}>
-                                                <span style={{ fontSize: "12px", color: "#6b7280", marginTop: "3px", minWidth: "90px" }}>
-                                                    [{timeString}]
-                                                </span>
-                                                <span style={{ fontSize: "15px", lineHeight: "1.6", color: "#111827" }}>
-                                                    {seg.text}
-                                                </span>
+                                            <div
+                                                key={seg.id ?? idx}
+                                                style={{
+                                                    marginBottom: "1rem",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    alignItems: isUser ? "flex-end" : "flex-start"
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        maxWidth: "85%",
+                                                        padding: "8px 12px",
+                                                        borderRadius: "8px",
+                                                        backgroundColor: isUser ? "#3b82f6" : (isSystem ? "#e5e7eb" : "#f3f4f6"),
+                                                        color: isUser ? "#fff" : "#111827"
+                                                    }}
+                                                >
+                                                    <span style={{ fontSize: "11px", color: isUser ? "rgba(255,255,255,0.8)" : "#6b7280", display: "block", marginBottom: "4px" }}>
+                                                        [{timeString}]
+                                                    </span>
+                                                    <span style={{ fontSize: "15px", lineHeight: "1.6" }}>
+                                                        {seg.text}
+                                                    </span>
+                                                </div>
                                             </div>
                                         );
                                     })}
