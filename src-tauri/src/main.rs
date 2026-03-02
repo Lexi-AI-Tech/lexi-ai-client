@@ -83,8 +83,9 @@ use window::show_and_focus_main_window;
 
 use permissions::{
     check_accessibility_permission, check_input_monitoring_permission, check_microphone_permission,
-    open_permission_pane, request_accessibility_permission, request_input_monitoring_permission,
-    request_microphone_permission,
+    check_system_audio_permission, open_permission_pane, request_accessibility_permission,
+    request_input_monitoring_permission, request_microphone_permission,
+    request_system_audio_permission,
 };
 
 use actions::commands::{delete_action_history, get_action_history};
@@ -228,6 +229,8 @@ pub fn main() {
             check_microphone_permission,
             check_input_monitoring_permission,
             check_accessibility_permission,
+            check_system_audio_permission,
+            request_system_audio_permission,
             inject_text,
             open_devtools,
             start_google_login,

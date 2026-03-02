@@ -10,6 +10,8 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Lexi AI needs access to your microphone to record audio for speech-to-text transcription.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Lexi AI needs permission to capture system audio so it can transcribe meeting and call audio when you start a meeting.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Lexi AI needs Apple Events permission to paste transcribed text at your cursor position.</string>
     <key>NSAccessibilityUsageDescription</key>

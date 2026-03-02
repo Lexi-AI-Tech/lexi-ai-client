@@ -7,6 +7,7 @@ import {
   Check,
   Monitor,
   ChevronLeft,
+  Volume2,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -123,6 +124,10 @@ export function PermissionsStep({
     granted: false,
     checking: false,
   });
+  const [systemAudio, setSystemAudio] = useState<PermissionState>({
+    granted: false,
+    checking: false,
+  });
 
   useEffect(() => {
     checkPermissions();
@@ -139,10 +144,14 @@ export function PermissionsStep({
       const inputGranted = await invoke<boolean>(
         "check_input_monitoring_permission",
       );
+      const systemAudioGranted = await invoke<boolean>(
+        "check_system_audio_permission",
+      );
 
       setMicrophone((prev) => ({ ...prev, granted: micGranted }));
       setAccessibility((prev) => ({ ...prev, granted: accGranted }));
       setInputMonitoring((prev) => ({ ...prev, granted: inputGranted }));
+      setSystemAudio((prev) => ({ ...prev, granted: systemAudioGranted }));
     } catch (error) {
       console.error("Failed to check permissions:", error);
     }
@@ -184,8 +193,23 @@ export function PermissionsStep({
     }
   };
 
+  const requestSystemAudio = async () => {
+    setSystemAudio((prev) => ({ ...prev, checking: true }));
+    try {
+      await invoke<boolean>("request_system_audio_permission");
+      setTimeout(checkPermissions, 1000);
+    } catch (error) {
+      console.error("Failed to request system audio permission:", error);
+    } finally {
+      setSystemAudio((prev) => ({ ...prev, checking: false }));
+    }
+  };
+
   const allGranted =
-    microphone.granted && accessibility.granted && inputMonitoring.granted;
+    microphone.granted &&
+    accessibility.granted &&
+    inputMonitoring.granted &&
+    systemAudio.granted;
 
   const permissions = [
     {
@@ -198,7 +222,7 @@ export function PermissionsStep({
     {
       icon: Keyboard,
       title: "Input Monitoring",
-      desc: "For detecting Fn key",
+      desc: "For detecting hotkeys",
       state: inputMonitoring,
       request: requestInputMonitoring,
     },
@@ -208,6 +232,13 @@ export function PermissionsStep({
       desc: "For typing into apps",
       state: accessibility,
       request: requestAccessibility,
+    },
+    {
+      icon: Volume2,
+      title: "System Audio",
+      desc: "For capturing participant audio in meetings",
+      state: systemAudio,
+      request: requestSystemAudio,
     },
   ];
 

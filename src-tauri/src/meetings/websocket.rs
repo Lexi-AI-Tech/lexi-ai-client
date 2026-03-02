@@ -15,7 +15,6 @@ pub struct MeetingWebSocket {
     app: AppHandle,
     meeting_id: String,
     jwt_token: String,
-    language: String,
     /// Sends (source, chunk) where source is "user" or "system"; server uses it for speaker_type.
     pub audio_tx: Arc<Mutex<Option<mpsc::Sender<(String, Vec<u8>)>>>>,
     pub text_tx: Arc<Mutex<Option<mpsc::Sender<String>>>>, // For sending text messages (like end_recording)
@@ -24,12 +23,11 @@ pub struct MeetingWebSocket {
 }
 
 impl MeetingWebSocket {
-    pub fn new(app: AppHandle, meeting_id: String, jwt_token: String, language: String) -> Self {
+    pub fn new(app: AppHandle, meeting_id: String, jwt_token: String) -> Self {
         Self {
             app,
             meeting_id,
             jwt_token,
-            language,
             audio_tx: Arc::new(Mutex::new(None)),
             text_tx: Arc::new(Mutex::new(None)),
             is_connected: Arc::new(Mutex::new(false)),
@@ -45,11 +43,10 @@ impl MeetingWebSocket {
             .replace("http://", "ws://")
             .replace("https://", "wss://");
         let ws_url = format!(
-            "{}/api/v1/meetings/{}/stream?token={}&language={}",
+            "{}/api/v1/meetings/{}/stream?token={}",
             ws_base_url,
             self.meeting_id,
-            encode(&self.jwt_token),
-            encode(&self.language)
+            encode(&self.jwt_token)
         );
 
         let url = ws_url

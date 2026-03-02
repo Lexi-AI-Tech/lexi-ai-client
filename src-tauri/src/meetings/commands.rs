@@ -100,23 +100,11 @@ pub async fn start_meeting_recording(
         .await
         .map_err(|_| "Authentication required")?;
 
-    // Get language from app config
-    let app_config = crate::commands::app_config::get_app_config(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load app config: {}", e))?;
-
-    // Get first language from config, default to "auto"
-    let language_code = app_config
-        .languages
-        .and_then(|langs| langs.first().cloned())
-        .unwrap_or_else(|| "auto".to_string());
-
-    // Create WebSocket connection (async) - this will spawn tasks internally
+    // Create WebSocket connection (async) - language is resolved from app config on the server
     let mut websocket = crate::meetings::websocket::MeetingWebSocket::new(
         app.clone(),
         meeting_id.clone(),
         auth_token,
-        language_code,
     );
 
     websocket

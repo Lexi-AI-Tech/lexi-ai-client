@@ -59,3 +59,4 @@ tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel" }  # macOS NSP
 macos-accessibility-client = "0.0"
 objc2-foundation = "0.3.2"
 cidre = { git = "https://github.com/yury/cidre", rev = "a9587fa", features = ["av"] }  # meeting system audio (process tap)
+libc = "0.2"
