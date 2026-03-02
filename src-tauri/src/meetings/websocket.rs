@@ -15,7 +15,7 @@ pub struct MeetingWebSocket {
     app: AppHandle,
     meeting_id: String,
     jwt_token: String,
-    /// Sends (source, chunk) where source is "user" or "system"; server uses it for speaker_type.
+    /// Sends (source, chunk) where source is "user" or "system"; server tags transcripts with message_type.
     pub audio_tx: Arc<Mutex<Option<mpsc::Sender<(String, Vec<u8>)>>>>,
     pub text_tx: Arc<Mutex<Option<mpsc::Sender<String>>>>, // For sending text messages (like end_recording)
     is_connected: Arc<Mutex<bool>>,
@@ -146,9 +146,9 @@ impl MeetingWebSocket {
                         if let Ok(msg) = serde_json::from_str::<TranscriptMessage>(&text) {
                             transcript_count += 1;
                             println!(
-                                "📝 Received transcript #{}: speaker_type={:?}, text={:?}",
+                                "📝 Received transcript #{}: message_type={:?}, text={:?}",
                                 transcript_count,
-                                msg.speaker_type,
+                                msg.message_type,
                                 msg.text
                             );
 

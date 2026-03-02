@@ -10,8 +10,8 @@ interface TranscriptSegment {
     start_time: string;
     end_time: string;
     text: string;
-    /** "user" (mic) = render right; "system" (system audio) = render left; from UI/backend only */
-    speaker_type: string;
+    /** user_audio (mic, right), system_audio (system, left), user_note (typed note) */
+    message_type: string;
 }
 
 interface Meeting {
@@ -56,6 +56,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     // Real-time state
     const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
     const [isRecording, setIsRecording] = useState(false);
+    const [noteInput, setNoteInput] = useState("");
+    const [isAddingNote, setIsAddingNote] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Summary & Chat state
@@ -143,10 +145,18 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
 
         const setupListener = async () => {
             const { listen } = await import('@tauri-apps/api/event');
-            const unlisten = await listen<TranscriptSegment>("meeting-transcript", (event) => {
+            const unlisten = await listen<TranscriptSegment & { type?: string }>("meeting-transcript", (event) => {
                 if (!isMounted) return;
-                setLiveSegments((prev) => [...prev, event.payload]);
-                // Auto-scroll to bottom
+                const payload = event.payload;
+                const segment: TranscriptSegment = {
+                    id: payload.id || `live-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    segment_index: payload.segment_index ?? 0,
+                    start_time: payload.start_time ?? "",
+                    end_time: payload.end_time ?? "",
+                    text: payload.text ?? "",
+                    message_type: payload.message_type ?? "user_audio",
+                };
+                setLiveSegments((prev) => [...prev, segment]);
                 if (scrollRef.current) {
                     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
                 }
@@ -285,6 +295,29 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
             setChatInput(text); // Give them their text back
         } finally {
             setIsSendingChat(false);
+        }
+    };
+
+    const handleAddNote = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const text = noteInput.trim();
+        if (!activeMeetingId || !text || isAddingNote) return;
+
+        setIsAddingNote(true);
+        try {
+            const segment = await invoke<TranscriptSegment>("add_meeting_note", {
+                meetingId: activeMeetingId,
+                text,
+            });
+            setLiveSegments((prev) => [...prev, segment]);
+            setNoteInput("");
+            if (scrollRef.current) {
+                scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }
+        } catch (error) {
+            console.error("Failed to add meeting note:", error);
+        } finally {
+            setIsAddingNote(false);
         }
     };
 
@@ -427,39 +460,59 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                             </div>
 
                             {activeTab === "transcript" && (
-                                <div ref={scrollRef} className="meetings-transcript">
-                                    {liveSegments.length === 0 ? (
-                                        <p className="meetings-transcript__empty">
-                                            {isRecording ? "Listening for speech..." : "Click Resume Capture to start."}
-                                        </p>
-                                    ) : null}
+                                <div className="meetings-transcript-wrap">
+                                    <div ref={scrollRef} className="meetings-transcript">
+                                        {liveSegments.length === 0 ? (
+                                            <p className="meetings-transcript__empty">
+                                                {isRecording ? "Listening for speech..." : "Click Resume Capture to start."}
+                                            </p>
+                                        ) : null}
 
-                                    {liveSegments.map((seg, idx) => {
-                                        let timeString = "00:00:00";
-                                        try {
-                                            if (seg.start_time) {
-                                                const d = new Date(seg.start_time);
-                                                timeString = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                                        {liveSegments.map((seg, idx) => {
+                                            let timeString = "00:00:00";
+                                            try {
+                                                if (seg.start_time) {
+                                                    const d = new Date(seg.start_time);
+                                                    timeString = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                                                }
+                                            } catch (e) {
+                                                // Ignore parsing errors
                                             }
-                                        } catch (e) {
-                                            // Ignore parsing errors
-                                        }
-                                        const isUser = seg.speaker_type === "user";
-                                        const isSystem = seg.speaker_type === "system";
-                                        const segmentAlign = isUser ? "user" : isSystem ? "system" : "unknown";
-                                        const bubbleVariant = isUser ? "user" : isSystem ? "system" : "unknown";
-                                        return (
-                                            <div
-                                                key={seg.id ?? idx}
-                                                className={`meetings-transcript__segment meetings-transcript__segment--${segmentAlign}`}
-                                            >
-                                                <div className={`meetings-transcript__bubble meetings-transcript__bubble--${bubbleVariant}`}>
-                                                    <span className="meetings-transcript__time">[{timeString}]</span>
-                                                    <span className="meetings-transcript__text">{seg.text}</span>
+                                            const msgType = seg.message_type;
+                                            const isUser = msgType === "user_audio" || msgType === "user_note";
+                                            const isSystem = msgType === "system_audio";
+                                            const segmentAlign = isUser ? "user" : isSystem ? "system" : "unknown";
+                                            const bubbleVariant = isUser ? "user" : isSystem ? "system" : "unknown";
+                                            return (
+                                                <div
+                                                    key={seg.id ?? idx}
+                                                    className={`meetings-transcript__segment meetings-transcript__segment--${segmentAlign}`}
+                                                >
+                                                    <div className={`meetings-transcript__bubble meetings-transcript__bubble--${bubbleVariant}`}>
+                                                        <span className="meetings-transcript__time">[{timeString}]</span>
+                                                        <span className="meetings-transcript__text">{seg.text}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
+                                    <form onSubmit={handleAddNote} className="meetings-transcript-notes">
+                                        <input
+                                            type="text"
+                                            className="meetings-transcript-notes__input"
+                                            value={noteInput}
+                                            onChange={(e) => setNoteInput(e.target.value)}
+                                            placeholder="Add a note..."
+                                            disabled={isAddingNote || !activeMeetingId}
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="btn btn--primary meetings-transcript-notes__btn"
+                                            disabled={isAddingNote || !noteInput.trim() || !activeMeetingId}
+                                        >
+                                            {isAddingNote ? "Adding…" : "Add note"}
+                                        </button>
+                                    </form>
                                 </div>
                             )}
 

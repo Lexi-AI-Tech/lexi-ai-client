@@ -147,6 +147,13 @@
 }
 
 /* Transcript view */
+.meetings-transcript-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .meetings-transcript {
   flex: 1;
   overflow-y: auto;
@@ -196,6 +203,32 @@
 .meetings-transcript__bubble--unknown {
   background-color: #f3f4f6;
   color: #111827;
+}
+
+.meetings-transcript-notes {
+  display: flex;
+  gap: 8px;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.meetings-transcript-notes__input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.meetings-transcript-notes__input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.meetings-transcript-notes__btn {
+  padding: 8px 16px;
+  white-space: nowrap;
 }
 
 .meetings-transcript__time {

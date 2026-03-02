@@ -107,7 +107,7 @@ use commands::onboarding::{
     set_onboarding_step,
 };
 use meetings::commands::{
-    create_meeting, get_meeting_details, list_meetings, start_meeting_recording, 
+    add_meeting_note, create_meeting, get_meeting_details, list_meetings, start_meeting_recording,
     stop_meeting_recording, update_meeting, delete_meeting,
     summarize_meeting, send_meeting_chat
 };
@@ -288,6 +288,7 @@ pub fn main() {
             stop_room_recording_and_process,
             update_room,
             update_speaker,
+            add_meeting_note,
             create_meeting,
             list_meetings,
             get_meeting_details,
