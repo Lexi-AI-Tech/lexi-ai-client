@@ -15,9 +15,9 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             upload_to_server: true    # Upload macOS release immediately
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            upload_to_server: false   # Windows builds but doesn't hit webhook yet
+#          - os: windows-latest
+#            target: x86_64-pc-windows-msvc
+#            upload_to_server: false   # Windows builds but doesn't hit webhook yet
 
     runs-on: ${{ matrix.os }}
     
@@ -29,6 +29,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Check if tag already exists (Fail Fast)
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Checking if tag v$VERSION already exists on remote..."
+          if [ -n "$(git ls-remote --tags origin "refs/tags/v$VERSION")" ]; then
+            echo "❌ Error: Tag v$VERSION already exists! Please bump the version to trigger a new release."
+            exit 1
+          fi
+          echo "✅ Version v$VERSION is new. Proceeding..."
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -95,31 +105,31 @@ jobs:
           fi
           echo "✅ Versions match: $PKG_VERSION"
 
-      # 📦 Check Version Consistency (PowerShell approach for Windows)
-      - name: Check version match (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          $pkgVersion = (Get-Content package.json | ConvertFrom-Json).version
-          $tauriVersion = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
-          $cargoContent = Get-Content src-tauri/Cargo.toml
-          $cargoVersion = ($cargoContent | Select-String -Pattern '^version\s*=\s*"([^"]+)"').Matches.Groups[1].Value
-
-          Write-Host "package.json version:    $pkgVersion"
-          Write-Host "tauri.conf.json version: $tauriVersion"
-          Write-Host "Cargo.toml version:      $cargoVersion"
-
-          if ($pkgVersion -ne $tauriVersion -or $pkgVersion -ne $cargoVersion) {
-            Write-Host ""
-            Write-Host "❌ Version mismatch!"
-            Write-Host "   package.json:    $pkgVersion"
-            Write-Host "   tauri.conf.json: $tauriVersion"
-            Write-Host "   Cargo.toml:      $cargoVersion"
-            Write-Host ""
-            Write-Host "All three files must have the same version. Please update them to match."
-            exit 1
-          }
-          Write-Host "✅ Versions match: $pkgVersion"
+#      # 📦 Check Version Consistency (PowerShell approach for Windows)
+#      - name: Check version match (Windows)
+#        if: matrix.os == 'windows-latest'
+#        shell: pwsh
+#        run: |
+#          $pkgVersion = (Get-Content package.json | ConvertFrom-Json).version
+#          $tauriVersion = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+#          $cargoContent = Get-Content src-tauri/Cargo.toml
+#          $cargoVersion = ($cargoContent | Select-String -Pattern '^version\s*=\s*"([^"]+)"').Matches.Groups[1].Value
+#
+#          Write-Host "package.json version:    $pkgVersion"
+#          Write-Host "tauri.conf.json version: $tauriVersion"
+#          Write-Host "Cargo.toml version:      $cargoVersion"
+#
+#          if ($pkgVersion -ne $tauriVersion -or $pkgVersion -ne $cargoVersion) {
+#            Write-Host ""
+#            Write-Host "❌ Version mismatch!"
+#            Write-Host "   package.json:    $pkgVersion"
+#            Write-Host "   tauri.conf.json: $tauriVersion"
+#            Write-Host "   Cargo.toml:      $cargoVersion"
+#            Write-Host ""
+#            Write-Host "All three files must have the same version. Please update them to match."
+#            exit 1
+#          }
+#          Write-Host "✅ Versions match: $pkgVersion"
 
       # 📦 Extract Version from package.json
       - name: Get Version
@@ -197,8 +207,7 @@ jobs:
                
           echo "Successfully notified Lexi AI Server of the new release!"
         shell: bash
-
-      # 🪧 Placeholder log for Windows
-      - name: Placeholder - Skip Windows API Upload
-        if: success() && matrix.upload_to_server == false
-        run: echo "Windows build succeeded, but API upload is disabled via matrix configuration."
+#      # 🪧 Placeholder log for Windows
+#      - name: Placeholder - Skip Windows API Upload
+#        if: success() && matrix.upload_to_server == false
+#        run: echo "Windows build succeeded, but API upload is disabled via matrix configuration."
