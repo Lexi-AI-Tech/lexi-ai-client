@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useUpdaterStore } from "../store/updaterStore";
+import ReactMarkdown from "react-markdown";
 
 import type { SidebarProps } from "../types";
 
@@ -237,6 +238,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="sidebar-update-banner__title">Update v{update.version}</span>
             {sizeMb && <span className="sidebar-update-banner__size">{sizeMb} MB</span>}
           </div>
+          {(updateDetails?.notes || update.body) && (
+            <div className="sidebar-update-notes">
+              <strong style={{ display: 'block', marginBottom: '8px', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Release Notes</strong>
+              <div className="sidebar-update-notes-content">
+                <ReactMarkdown>
+                  {updateDetails?.notes || update.body || "A new update is available to install."}
+                </ReactMarkdown>
+              </div>
+            </div>
+          )}
         </button>
       )}
 
@@ -244,8 +255,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {appVersion && (
         <span className="sidebar-version">
           {patchReady ? (
-            <span style={{ color: "#059669" }} title="Please quit the app completely and restart to apply the changes">
-              v{appVersion} (Action required: Quit to update)
+            <span style={{ color: "#374151", fontWeight: 500 }} title="Please quit the app completely and restart to apply the changes">
+              v{appVersion}
             </span>
           ) : (
             `v${appVersion}`

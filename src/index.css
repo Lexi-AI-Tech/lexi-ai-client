@@ -150,28 +150,93 @@ body {
   gap: 10px;
   margin: 8px 8px 8px 8px;
   padding: 10px 14px;
-  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-  border: 1px solid #a7f3d0;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #065f46;
+  color: #111827;
   font-size: 13px;
   font-weight: 500;
   text-align: left;
-  animation: sidebar-update-pulse 2s ease-in-out infinite;
+  position: relative;
 }
 
 .sidebar-update-banner:hover {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  border-color: #6ee7b7;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
-  transform: translateY(-1px);
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .sidebar-update-banner svg {
   flex-shrink: 0;
-  color: #059669;
+  color: #111827;
+  animation: sidebar-update-bounce 2s infinite;
+}
+
+@keyframes sidebar-update-bounce {
+
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+
+  40% {
+    transform: translateY(-3px);
+  }
+
+  60% {
+    transform: translateY(-1.5px);
+  }
+}
+
+/* Tooltip for release notes on hover */
+.sidebar-update-notes {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  width: 240px;
+  background: #111827;
+  color: #f9fafb;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: all 0.2s ease;
+  z-index: 50;
+  pointer-events: none;
+  font-weight: 400;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Tooltip arrow */
+.sidebar-update-notes::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 20px;
+  width: 8px;
+  height: 8px;
+  background: #111827;
+  transform: rotate(45deg);
+}
+
+.sidebar-update-banner:hover .sidebar-update-notes {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .sidebar-update-banner__text {
@@ -184,7 +249,7 @@ body {
 .sidebar-update-banner__title {
   font-weight: 600;
   font-size: 13px;
-  color: #065f46;
+  color: #111827;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -192,20 +257,7 @@ body {
 
 .sidebar-update-banner__size {
   font-size: 11px;
-  color: #047857;
-  opacity: 0.8;
-}
-
-@keyframes sidebar-update-pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.85;
-  }
+  color: #6b7280;
 }
 
 .sidebar-version {
@@ -649,6 +701,30 @@ textarea.form-input {
 
 .dropdown-chevron.open {
   transform: rotate(180deg);
+}
+
+/* Markdown Content Styling for the Tooltip */
+.sidebar-update-notes-content {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #f9fafb;
+}
+
+.sidebar-update-notes-content p {
+  margin-bottom: 8px;
+}
+
+.sidebar-update-notes-content p:last-child {
+  margin-bottom: 0;
+}
+
+.sidebar-update-notes-content ul {
+  padding-left: 16px;
+  margin-bottom: 8px;
+}
+
+.sidebar-update-notes-content li {
+  margin-bottom: 4px;
 }
 
 .spinner-small {
@@ -1724,7 +1800,6 @@ textarea.form-input {
 }
 
 /* Table-style transcripts view */
-.transcripts-table {}
 
 .transcripts-table-header {
   display: grid;
