@@ -37,7 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
           </svg>
         </div>
-        <span className="sidebar-logo-text">Speak Lexi AI version 0.5</span>
+        <span className="sidebar-logo-text">Lexi AI</span>
       </div>
       <nav className="sidebar-nav">
         {/* === Section 1: Primary Workflow === */}
