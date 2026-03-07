@@ -191,10 +191,10 @@ jobs:
           TARGET="darwin"
           
           # This specifically assumes macOS since we gated it with matrix.upload_to_server == true
-          BUNDLE_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/lexi-ai_${VERSION}_aarch64.app.tar.gz"
+          BUNDLE_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Lexi AI.app.tar.gz"
           
           # Read the Minisign signature string
-          SIG_CONTENT=$(cat "${BUNDLE_PATH}.sig")
+          SIG_CONTENT=$(cat "$BUNDLE_PATH.sig")
           
           echo "Uploading $BUNDLE_PATH to Lexi AI Server..."
           
