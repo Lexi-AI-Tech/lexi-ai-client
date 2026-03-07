@@ -8,7 +8,6 @@ import {
   Keyboard,
   ChevronDown,
   Check,
-  Download,
   RefreshCw,
 } from "lucide-react";
 
@@ -61,8 +60,8 @@ export const SettingsPage: React.FC = () => {
       hotkeys: [],
     });
   const [activeSection, setActiveSection] = useState<
-    "account" | "transcription" | "general" | "hotkeys"
-  >("account");
+    "general" | "account" | "transcription" | "hotkeys"
+  >("general");
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -462,9 +461,9 @@ export const SettingsPage: React.FC = () => {
 
       <div className="section-tabs">
         {[
+          { id: "general" as const, label: "General", icon: Power },
           { id: "account" as const, label: "Account", icon: Monitor },
           { id: "transcription" as const, label: "Transcription", icon: Mic },
-          { id: "general" as const, label: "General", icon: Power },
           { id: "hotkeys" as const, label: "Hotkeys", icon: Keyboard },
         ].map(({ id, label, icon: Icon }) => (
           <button
@@ -643,15 +642,23 @@ export const SettingsPage: React.FC = () => {
                   type="button"
                   onClick={handleCheckUpdate}
                   disabled={isCheckingUpdate || isLoading}
-                  className="btn-secondary"
-                  style={{ display: "flex", gap: "8px", alignItems: "center" }}
+                  className="sidebar-update-banner"
+                  style={{ margin: 0, padding: "8px 14px", width: "fit-content" }}
                 >
                   {isCheckingUpdate ? (
                     <RefreshCw size={16} className="spinner-small" />
                   ) : (
-                    <Download size={16} />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
                   )}
-                  {isCheckingUpdate ? "Checking..." : "Check for Updates"}
+                  <div className="sidebar-update-banner__text">
+                    <span className="sidebar-update-banner__title">
+                      {isCheckingUpdate ? "Checking..." : "Check for Updates"}
+                    </span>
+                  </div>
                 </button>
               </div>
             </div>
