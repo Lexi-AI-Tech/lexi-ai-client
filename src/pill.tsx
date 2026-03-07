@@ -12,6 +12,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
+import { useUpdaterStore } from "./store/updaterStore";
+import { relaunch } from "@tauri-apps/plugin-process";
 // import { playSound } from "./lib/soundUtils";
 // Note: Do NOT import index.css here - it adds opaque backgrounds that break transparency
 
@@ -75,9 +77,21 @@ export const Pill: React.FC = () => {
     });
   }, [audioLevels]);
 
-  // Reset audio levels when not recording
+  // Reset audio levels when not recording, and sync idle status to the global updater
   useEffect(() => {
     isRecordingRef.current = status === "recording";
+
+    // Tell the global updater whether the app is currently in use (so it doesn't forcefully restart)
+    useUpdaterStore.getState().setIsAppBusy(status !== "idle");
+
+    if (status === "idle") {
+      // If we just became idle and a patch update finished downloading in the background, reboot now!
+      if (useUpdaterStore.getState().isPatchRebootPending) {
+        console.log("🔄 App has returned to idle and a patch update is waiting. Restarting now...");
+        setTimeout(() => relaunch(), 1500); // 1.5s visual delay before jarring restart so animations have time to settle
+      }
+    }
+
     if (status !== "recording") {
       setAudioLevels([]);
       setSmoothedLevels([]);
@@ -724,13 +738,13 @@ export const Pill: React.FC = () => {
     const resampledLevels =
       audioLevels.length > 0
         ? Array(numBars)
-            .fill(0)
-            .map((_, i) => {
-              const sourceIndex = Math.floor(
-                (i / numBars) * audioLevels.length,
-              );
-              return audioLevels[sourceIndex] || 0.3;
-            })
+          .fill(0)
+          .map((_, i) => {
+            const sourceIndex = Math.floor(
+              (i / numBars) * audioLevels.length,
+            );
+            return audioLevels[sourceIndex] || 0.3;
+          })
         : Array(numBars).fill(0.35);
 
     const barHeights = resampledLevels.map((level, i) => {

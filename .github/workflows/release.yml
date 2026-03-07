@@ -1,16 +1,26 @@
-name: Build & Sign macOS App
+name: Build & Release App
 
-# Disabled: no automatic trigger. Uncomment below to run on tag push, or run manually from Actions tab.
+# Automatically trigger on pushes to the main branch, or manually run from Actions tab.
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
-#  push:
-#    tags:
-#      - "v*"
 
 jobs:
-  build-macos:
-    runs-on: macos-latest
+  build-and-release:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            upload_to_server: true    # Upload macOS release immediately
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            upload_to_server: false   # Windows builds but doesn't hit webhook yet
 
+    runs-on: ${{ matrix.os }}
+    
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -26,15 +36,16 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 🔐 Import Apple Certificate (keychain set so codesign can run non-interactively)
+      # 🔐 Import Apple Certificate (macOS only)
       - name: Import Apple Certificate
+        if: matrix.os == 'macos-latest'
         run: |
           set -e
           echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
 
           KEYCHAIN_PASSWORD="${KEYCHAIN_PASSWORD:-temp-build-keychain}"
 
-          # Create and unlock keychain (no lock timeout so it stays open during build)
+          # Create and unlock keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
           security default-keychain -s build.keychain
@@ -47,7 +58,7 @@ jobs:
             -T /usr/bin/codesign \
             -T /usr/bin/security
 
-          # Required: allow codesign to use the key without GUI (prevents hang at "replacing existing signature")
+          # Required: allow codesign to use the key without GUI
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
           # Ensure our keychain is in the search list
@@ -55,16 +66,139 @@ jobs:
 
           echo "Imported identity:"
           security find-identity -v -p codesigning build.keychain
-
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
 
-      # 🚀 Build & Sign Tauri App (signingIdentity is in tauri.conf.json)
-      - name: Build Tauri App
-        run: npm run tauri build
+      # 📦 Check Version Consistency (Bash approach for macOS)
+      - name: Check version match (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          CARGO_VERSION=$(grep '^version =' src-tauri/Cargo.toml | head -n 1 | awk -F '"' '{print $2}')
+
+          echo "package.json version:    $PKG_VERSION"
+          echo "tauri.conf.json version: $TAURI_VERSION"
+          echo "Cargo.toml version:      $CARGO_VERSION"
+
+          if [ "$PKG_VERSION" != "$TAURI_VERSION" ] || [ "$PKG_VERSION" != "$CARGO_VERSION" ]; then
+            echo ""
+            echo "❌ Version mismatch!"
+            echo "   package.json:    $PKG_VERSION"
+            echo "   tauri.conf.json: $TAURI_VERSION"
+            echo "   Cargo.toml:      $CARGO_VERSION"
+            echo ""
+            echo "All three files must have the same version. Please update them to match."
+            exit 1
+          fi
+          echo "✅ Versions match: $PKG_VERSION"
+
+      # 📦 Check Version Consistency (PowerShell approach for Windows)
+      - name: Check version match (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $pkgVersion = (Get-Content package.json | ConvertFrom-Json).version
+          $tauriVersion = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $cargoContent = Get-Content src-tauri/Cargo.toml
+          $cargoVersion = ($cargoContent | Select-String -Pattern '^version\s*=\s*"([^"]+)"').Matches.Groups[1].Value
+
+          Write-Host "package.json version:    $pkgVersion"
+          Write-Host "tauri.conf.json version: $tauriVersion"
+          Write-Host "Cargo.toml version:      $cargoVersion"
+
+          if ($pkgVersion -ne $tauriVersion -or $pkgVersion -ne $cargoVersion) {
+            Write-Host ""
+            Write-Host "❌ Version mismatch!"
+            Write-Host "   package.json:    $pkgVersion"
+            Write-Host "   tauri.conf.json: $tauriVersion"
+            Write-Host "   Cargo.toml:      $cargoVersion"
+            Write-Host ""
+            Write-Host "All three files must have the same version. Please update them to match."
+            exit 1
+          }
+          Write-Host "✅ Versions match: $pkgVersion"
+
+      # 📦 Extract Version from package.json
+      - name: Get Version
+        id: get_version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Building version $VERSION"
+
+      # 📝 Read Changelog
+      - name: Read Release Notes
+        id: read_changelog
+        shell: bash
+        run: |
+          CHANGELOG_PATH="changelog/${{ env.VERSION }}.md"
+          if [ -f "$CHANGELOG_PATH" ]; then
+            echo "Found changelog at $CHANGELOG_PATH"
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "RELEASE_NOTES<<$EOF" >> $GITHUB_ENV
+            cat "$CHANGELOG_PATH" >> $GITHUB_ENV
+            echo "$EOF" >> $GITHUB_ENV
+          else
+            echo "❌ Error: No changelog found for version ${{ env.VERSION }} at $CHANGELOG_PATH"
+            echo "Please create a changelog file before publishing a release."
+            exit 1
+          fi
+
+      # 🚀 Build & Sign Tauri App
+      # tauri-action will build for the target specified in the matrix
+      - name: Build Tauri App and Publish Release
+        uses: tauri-apps/tauri-action@v0
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: v${{ env.VERSION }}
+          releaseName: "Lexi AI Client v${{ env.VERSION }}"
+          releaseBody: ${{ env.RELEASE_NOTES }}
+          releaseDraft: false
+          prerelease: false
+          args: --target ${{ matrix.target }}
+          
+      # 🌐 Publish to Lexi API (macOS ONLY for now)
+      - name: Publish update manifest to Lexi AI Server
+        if: success() && matrix.upload_to_server == true
+        env:
+          UPDATE_POST_URL: "https://dev-server.speaklexi.com/api/v1/updates" # Replace with your actual production domain
+          APP_RELEASES_API_KEY: ${{ secrets.APP_RELEASES_API_KEY }}
+        run: |
+          VERSION="${{ env.VERSION }}"
+          TARGET="darwin"
+          
+          # This specifically assumes macOS since we gated it with matrix.upload_to_server == true
+          BUNDLE_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/lexi-ai_${VERSION}_aarch64.app.tar.gz"
+          
+          # Read the Minisign signature string
+          SIG_CONTENT=$(cat "${BUNDLE_PATH}.sig")
+          
+          echo "Uploading $BUNDLE_PATH to Lexi AI Server..."
+          
+          # Send POST request to securely upload the artifact
+          curl -X POST "$UPDATE_POST_URL" \
+               -H "X-API-Key: $APP_RELEASES_API_KEY" \
+               -F "version=$VERSION" \
+               -F "target=$TARGET" \
+               -F "notes=$RELEASE_NOTES" \
+               -F "signature=$SIG_CONTENT" \
+               -F "file=@$BUNDLE_PATH" \
+               --fail --show-error
+               
+          echo "Successfully notified Lexi AI Server of the new release!"
+        shell: bash
+
+      # 🪧 Placeholder log for Windows
+      - name: Placeholder - Skip Windows API Upload
+        if: success() && matrix.upload_to_server == false
+        run: echo "Windows build succeeded, but API upload is disabled via matrix configuration."

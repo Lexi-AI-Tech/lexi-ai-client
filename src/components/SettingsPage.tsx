@@ -8,6 +8,7 @@ import {
   Keyboard,
   ChevronDown,
   Check,
+  RefreshCw,
 } from "lucide-react";
 
 import {
@@ -18,6 +19,7 @@ import {
 import type { TauriAppConfig, HotkeyConfig } from "../types";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useAuthStore } from "../store/authStore";
+import { useUpdaterStore } from "../store/updaterStore";
 import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
 import { PageLoader } from "./ui/PageLoader";
@@ -45,6 +47,10 @@ export const SettingsPage: React.FC = () => {
   );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Updater state
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string>("");
   // Hotkey state
   const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
     hotkeys: [],
@@ -54,8 +60,8 @@ export const SettingsPage: React.FC = () => {
       hotkeys: [],
     });
   const [activeSection, setActiveSection] = useState<
-    "account" | "transcription" | "general" | "hotkeys"
-  >("account");
+    "general" | "account" | "transcription" | "hotkeys"
+  >("general");
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -374,6 +380,34 @@ export const SettingsPage: React.FC = () => {
     setSelectedShowIcon(!currentValue);
   };
 
+  const handleCheckUpdate = async () => {
+    try {
+      setIsCheckingUpdate(true);
+      setUpdateStatus("Checking for updates...");
+
+      const { check } = await import('@tauri-apps/plugin-updater');
+      const { checkUpdateDetails } = await import('../hooks/useAutoUpdater');
+      const update = await check();
+
+      if (update) {
+        const details = await checkUpdateDetails();
+        useUpdaterStore.getState().setUpdate(update, details);
+        useUpdaterStore.getState().openModal();
+        setUpdateStatus(""); // Reset text
+      } else {
+        setUpdateStatus("You are on the latest version.");
+        toast.info("Lexi AI is up to date");
+        setTimeout(() => setUpdateStatus(""), 3000);
+      }
+    } catch (error: any) {
+      console.error("Update failed:", error);
+      setUpdateStatus("");
+      toast.error(`Update failed: ${error?.message || "Unknown error"}`);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
   const ToggleSwitch: React.FC<{
     enabled: boolean;
     onToggle: () => void;
@@ -427,9 +461,9 @@ export const SettingsPage: React.FC = () => {
 
       <div className="section-tabs">
         {[
+          { id: "general" as const, label: "General", icon: Power },
           { id: "account" as const, label: "Account", icon: Monitor },
           { id: "transcription" as const, label: "Transcription", icon: Mic },
-          { id: "general" as const, label: "General", icon: Power },
           { id: "hotkeys" as const, label: "Hotkeys", icon: Keyboard },
         ].map(({ id, label, icon: Icon }) => (
           <button
@@ -595,6 +629,40 @@ export const SettingsPage: React.FC = () => {
                 </div>
               </div>
             )}
+
+            <div className="panel panel--lg mb-24">
+              <div className="settings-row">
+                <div className="settings-row__content">
+                  <div className="settings-row__title">Updates</div>
+                  <div className="settings-row__desc">
+                    {updateStatus || "Check if a newer version of Lexi AI is available."}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCheckUpdate}
+                  disabled={isCheckingUpdate || isLoading}
+                  className="sidebar-update-banner"
+                  style={{ margin: 0, padding: "8px 14px", width: "fit-content" }}
+                >
+                  {isCheckingUpdate ? (
+                    <RefreshCw size={16} className="spinner-small" />
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                  )}
+                  <div className="sidebar-update-banner__text">
+                    <span className="sidebar-update-banner__title">
+                      {isCheckingUpdate ? "Checking..." : "Check for Updates"}
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
           </div>
         )}
 

@@ -11,6 +11,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -49,7 +50,7 @@
         "decorations": true,
         "transparent": false,
         "url": "index.html",
-        "devtools": false,
+        "devtools": true,
         "visible": true,
         "titleBarStyle": "Transparent"
       }
@@ -58,7 +59,15 @@
   },
   "plugins": {
     "deep-link": {
-      "schemes": ["lexi-ai"]
+      "schemes": [
+        "lexi-ai"
+      ]
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM2ODlFRTZFRTYzMTQyRjgKUldUNFFqSG1idTZKTm1aVTEvbjRYL2ZjdWNoMU1lNEM3MFFOb3hXeFZpbzNISk1TSVlvL0trUTMK",
+      "endpoints": [
+        "https://dev-server.speaklexi.com/api/v1/updates/latest?version={{current_version}}&target={{target}}"
+      ]
     }
   }
 }
