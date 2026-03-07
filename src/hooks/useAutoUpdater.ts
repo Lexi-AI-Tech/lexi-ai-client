@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { useUpdaterStore, type UpdateDetails } from "../store/updaterStore";
 import { useToast } from "../components/toast/useToast";
@@ -47,7 +48,7 @@ function isPatchUpdate(currentVersion: string, newVersion: string): boolean {
 export function useAutoUpdater() {
     const setUpdate = useUpdaterStore((state) => state.setUpdate);
     const setIsChecking = useUpdaterStore((state) => state.setIsChecking);
-    const setPatchReady = useUpdaterStore((state) => state.setPatchReady);
+    const setPatchRebootPending = useUpdaterStore((state) => state.setPatchRebootPending);
     const updateChecked = useRef(false);
     const toast = useToast();
 
@@ -73,9 +74,18 @@ export function useAutoUpdater() {
                         // Patch: auto-download silently in the background
                         console.log(`🔄 Auto-downloading patch v${update.version}...`);
                         await update.downloadAndInstall();
-                        console.log(`✅ Patch v${update.version} installed — ready for next launch.`);
-                        setPatchReady(true);
-                        toast.info(`Patch update v${update.version} installed. Please quit the app completely and restart to apply the changes.`, { duration: 4000 });
+
+                        // Check if the app is currently busy (recording, speaking, in a meeting)
+                        const isAppBusy = useUpdaterStore.getState().isAppBusy;
+
+                        if (isAppBusy) {
+                            console.log(`⏳ Patch v${update.version} installed — app is busy, deferring restart...`);
+                            setPatchRebootPending(true);
+                            toast.info(`Patch update v${update.version} installed. It will apply automatically when your current activity is finished.`, { duration: 6000 });
+                        } else {
+                            console.log(`✅ Patch v${update.version} installed — restarting...`);
+                            await relaunch();
+                        }
                     } else {
                         // Minor/Major: store for sidebar banner, user decides
                         setUpdate(update, details);
@@ -97,5 +107,5 @@ export function useAutoUpdater() {
         }
 
         return () => clearInterval(intervalId);
-    }, [setUpdate, setIsChecking, setPatchReady, toast]);
+    }, [setUpdate, setIsChecking, setPatchRebootPending, toast]);
 }

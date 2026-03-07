@@ -13,10 +13,12 @@ interface UpdaterState {
     updateDetails: UpdateDetails | null;
     isChecking: boolean;
     showModal: boolean;
-    patchReady: boolean;
+    isAppBusy: boolean;
+    isPatchRebootPending: boolean;
     setUpdate: (update: Update | null, details?: UpdateDetails | null) => void;
     setIsChecking: (isChecking: boolean) => void;
-    setPatchReady: (patchReady: boolean) => void;
+    setIsAppBusy: (isAppBusy: boolean) => void;
+    setPatchRebootPending: (isPending: boolean) => void;
     openModal: () => void;
     closeModal: () => void;
 }
@@ -26,10 +28,12 @@ export const useUpdaterStore = create<UpdaterState>((set) => ({
     updateDetails: null,
     isChecking: false,
     showModal: false,
-    patchReady: false,
+    isAppBusy: false,
+    isPatchRebootPending: false,
     setUpdate: (update, details = null) => set({ update, updateDetails: details }),
     setIsChecking: (isChecking) => set({ isChecking }),
-    setPatchReady: (patchReady) => set({ patchReady }),
+    setIsAppBusy: (isAppBusy) => set({ isAppBusy }),
+    setPatchRebootPending: (isPatchRebootPending) => set({ isPatchRebootPending }),
     openModal: () => set({ showModal: true }),
     closeModal: () => set({ showModal: false }),
 }));

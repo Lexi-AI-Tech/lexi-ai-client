@@ -12,7 +12,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const update = useUpdaterStore((state) => state.update);
   const updateDetails = useUpdaterStore((state) => state.updateDetails);
   const openModal = useUpdaterStore((state) => state.openModal);
-  const patchReady = useUpdaterStore((state) => state.patchReady);
 
   const [appVersion, setAppVersion] = useState<string>("");
   useEffect(() => {
@@ -254,13 +253,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Current version label */}
       {appVersion && (
         <span className="sidebar-version">
-          {patchReady ? (
-            <span style={{ color: "#374151", fontWeight: 500 }} title="Please quit the app completely and restart to apply the changes">
-              v{appVersion}
-            </span>
-          ) : (
-            `v${appVersion}`
-          )}
+          v{appVersion}
         </span>
       )}
     </div>
