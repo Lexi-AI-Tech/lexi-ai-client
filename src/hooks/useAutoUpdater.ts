@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { useUpdaterStore, type UpdateDetails } from "../store/updaterStore";
+import { useToast } from "../components/toast/useToast";
 
 // Check for updates every 4 hours
 const UPDATE_INTERVAL_MS = 4 * 60 * 60 * 1000;
@@ -47,7 +47,9 @@ function isPatchUpdate(currentVersion: string, newVersion: string): boolean {
 export function useAutoUpdater() {
     const setUpdate = useUpdaterStore((state) => state.setUpdate);
     const setIsChecking = useUpdaterStore((state) => state.setIsChecking);
+    const setPatchReady = useUpdaterStore((state) => state.setPatchReady);
     const updateChecked = useRef(false);
+    const toast = useToast();
 
     useEffect(() => {
         // Skip auto-updates in dev mode — no installed bundle to update
@@ -71,8 +73,9 @@ export function useAutoUpdater() {
                         // Patch: auto-download silently in the background
                         console.log(`🔄 Auto-downloading patch v${update.version}...`);
                         await update.downloadAndInstall();
-                        console.log(`✅ Patch v${update.version} installed — restarting...`);
-                        await relaunch();
+                        console.log(`✅ Patch v${update.version} installed — ready for next launch.`);
+                        setPatchReady(true);
+                        toast.info(`Patch update v${update.version} installed. Please quit the app completely and restart to apply the changes.`, { duration: 4000 });
                     } else {
                         // Minor/Major: store for sidebar banner, user decides
                         setUpdate(update, details);
@@ -94,5 +97,5 @@ export function useAutoUpdater() {
         }
 
         return () => clearInterval(intervalId);
-    }, [setUpdate, setIsChecking]);
+    }, [setUpdate, setIsChecking, setPatchReady, toast]);
 }

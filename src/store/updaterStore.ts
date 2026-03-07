@@ -13,8 +13,10 @@ interface UpdaterState {
     updateDetails: UpdateDetails | null;
     isChecking: boolean;
     showModal: boolean;
+    patchReady: boolean;
     setUpdate: (update: Update | null, details?: UpdateDetails | null) => void;
     setIsChecking: (isChecking: boolean) => void;
+    setPatchReady: (patchReady: boolean) => void;
     openModal: () => void;
     closeModal: () => void;
 }
@@ -24,8 +26,10 @@ export const useUpdaterStore = create<UpdaterState>((set) => ({
     updateDetails: null,
     isChecking: false,
     showModal: false,
+    patchReady: false,
     setUpdate: (update, details = null) => set({ update, updateDetails: details }),
     setIsChecking: (isChecking) => set({ isChecking }),
+    setPatchReady: (patchReady) => set({ patchReady }),
     openModal: () => set({ showModal: true }),
     closeModal: () => set({ showModal: false }),
 }));
