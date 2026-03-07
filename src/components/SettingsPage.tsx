@@ -8,6 +8,8 @@ import {
   Keyboard,
   ChevronDown,
   Check,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 
 import {
@@ -18,6 +20,7 @@ import {
 import type { TauriAppConfig, HotkeyConfig } from "../types";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useAuthStore } from "../store/authStore";
+import { useUpdaterStore } from "../store/updaterStore";
 import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
 import { PageLoader } from "./ui/PageLoader";
@@ -45,6 +48,10 @@ export const SettingsPage: React.FC = () => {
   );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Updater state
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string>("");
   // Hotkey state
   const [currentHotkeys, setCurrentHotkeys] = useState<HotkeyConfig>({
     hotkeys: [],
@@ -374,6 +381,34 @@ export const SettingsPage: React.FC = () => {
     setSelectedShowIcon(!currentValue);
   };
 
+  const handleCheckUpdate = async () => {
+    try {
+      setIsCheckingUpdate(true);
+      setUpdateStatus("Checking for updates...");
+
+      const { check } = await import('@tauri-apps/plugin-updater');
+      const { checkUpdateDetails } = await import('../hooks/useAutoUpdater');
+      const update = await check();
+
+      if (update) {
+        const details = await checkUpdateDetails();
+        useUpdaterStore.getState().setUpdate(update, details);
+        useUpdaterStore.getState().openModal();
+        setUpdateStatus(""); // Reset text
+      } else {
+        setUpdateStatus("You are on the latest version.");
+        toast.info("Lexi AI is up to date");
+        setTimeout(() => setUpdateStatus(""), 3000);
+      }
+    } catch (error: any) {
+      console.error("Update failed:", error);
+      setUpdateStatus("");
+      toast.error(`Update failed: ${error?.message || "Unknown error"}`);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
   const ToggleSwitch: React.FC<{
     enabled: boolean;
     onToggle: () => void;
@@ -595,6 +630,32 @@ export const SettingsPage: React.FC = () => {
                 </div>
               </div>
             )}
+
+            <div className="panel panel--lg mb-24">
+              <div className="settings-row">
+                <div className="settings-row__content">
+                  <div className="settings-row__title">Updates</div>
+                  <div className="settings-row__desc">
+                    {updateStatus || "Check if a newer version of Lexi AI is available."}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCheckUpdate}
+                  disabled={isCheckingUpdate || isLoading}
+                  className="btn-secondary"
+                  style={{ display: "flex", gap: "8px", alignItems: "center" }}
+                >
+                  {isCheckingUpdate ? (
+                    <RefreshCw size={16} className="spinner-small" />
+                  ) : (
+                    <Download size={16} />
+                  )}
+                  {isCheckingUpdate ? "Checking..." : "Check for Updates"}
+                </button>
+              </div>
+            </div>
+
           </div>
         )}
 

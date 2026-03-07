@@ -1,11 +1,11 @@
 name: Build & Sign macOS App
 
-# Disabled: no automatic trigger. Uncomment below to run on tag push, or run manually from Actions tab.
+# Automatically trigger on pushes to the main branch, or manually run from Actions tab.
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
-#  push:
-#    tags:
-#      - "v*"
 
 jobs:
   build-macos:
@@ -61,10 +61,101 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
 
+      # 📦 Check Version Consistency
+      - name: Check package.json, tauri.conf.json, and Cargo.toml versions match
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          CARGO_VERSION=$(grep '^version =' src-tauri/Cargo.toml | head -n 1 | awk -F '"' '{print $2}')
+
+          echo "package.json version:    $PKG_VERSION"
+          echo "tauri.conf.json version: $TAURI_VERSION"
+          echo "Cargo.toml version:      $CARGO_VERSION"
+
+          if [ "$PKG_VERSION" != "$TAURI_VERSION" ] || [ "$PKG_VERSION" != "$CARGO_VERSION" ]; then
+            echo ""
+            echo "❌ Version mismatch!"
+            echo "   package.json:    $PKG_VERSION"
+            echo "   tauri.conf.json: $TAURI_VERSION"
+            echo "   Cargo.toml:      $CARGO_VERSION"
+            echo ""
+            echo "All three files must have the same version. Please update them to match."
+            exit 1
+          fi
+
+          echo "✅ Versions match: $PKG_VERSION"
+
+      # 📦 Extract Version from package.json
+      - name: Get Version
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Building version $VERSION"
+
+      # 📝 Read Changelog
+      - name: Read Release Notes
+        id: read_changelog
+        run: |
+          CHANGELOG_PATH="changelog/${{ env.VERSION }}.md"
+          if [ -f "$CHANGELOG_PATH" ]; then
+            echo "Found changelog at $CHANGELOG_PATH"
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "RELEASE_NOTES<<$EOF" >> $GITHUB_ENV
+            cat "$CHANGELOG_PATH" >> $GITHUB_ENV
+            echo "$EOF" >> $GITHUB_ENV
+          else
+            echo "❌ Error: No changelog found for version ${{ env.VERSION }} at $CHANGELOG_PATH"
+            echo "Please create a changelog file before publishing a release."
+            exit 1
+          fi
+
       # 🚀 Build & Sign Tauri App (signingIdentity is in tauri.conf.json)
-      - name: Build Tauri App
-        run: npm run tauri build
+      # We use tauri-action here to automatically create the GitHub Release and upload the .tar.gz / .sig files
+      - name: Build Tauri App and Publish Release
+        uses: tauri-apps/tauri-action@v0
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: v${{ env.VERSION }}
+          releaseName: "Lexi AI Client v${{ env.VERSION }}"
+          releaseBody: ${{ env.RELEASE_NOTES }}
+          releaseDraft: false
+          prerelease: false
+          args: --target aarch64-apple-darwin
+          
+      # Since tauri-action automatically uploads the assets (.app.tar.gz and .sig) to the GitHub release, 
+      # we can simply fetch the signature content and hit our POST endpoint.
+      - name: Publish update manifest to Lexi AI Server
+        if: success()
+        env:
+          UPDATE_POST_URL: "https://api.your-lexi-server.com/api/v1/updates" # Replace with your actual production domain
+          APP_RELEASES_API_KEY: ${{ secrets.APP_RELEASES_API_KEY }}
+          # Build the JSON payload expected by the FastAPI server
+        run: |
+          VERSION="${{ env.VERSION }}"
+          TARGET="darwin"
+          BUNDLE_PATH="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/lexi-ai_${VERSION}_aarch64.app.tar.gz"
+          
+          # Read the Minisign signature string
+          SIG_CONTENT=$(cat "${BUNDLE_PATH}.sig")
+          
+          echo "Uploading $BUNDLE_PATH to Lexi AI Server..."
+          
+          # Send POST request to securely upload the artifact to GCS and register it in PostgreSQL
+          curl -X POST "$UPDATE_POST_URL" \
+               -H "X-API-Key: $APP_RELEASES_API_KEY" \
+               -F "version=$VERSION" \
+               -F "target=$TARGET" \
+               -F "notes=$RELEASE_NOTES" \
+               -F "signature=$SIG_CONTENT" \
+               -F "file=@$BUNDLE_PATH" \
+               --fail --show-error
+               
+          echo "Successfully notified Lexi AI Server of the new release!"
+        shell: bash

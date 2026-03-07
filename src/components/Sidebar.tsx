@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { useUpdaterStore } from "../store/updaterStore";
 
 import type { SidebarProps } from "../types";
 
@@ -6,6 +8,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentPage,
   onNavigate,
 }) => {
+  const update = useUpdaterStore((state) => state.update);
+  const updateDetails = useUpdaterStore((state) => state.updateDetails);
+  const openModal = useUpdaterStore((state) => state.openModal);
+
+  const [appVersion, setAppVersion] = useState<string>("");
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => { });
+  }, []);
+
+  const sizeMb = updateDetails?.size_mb
+    ? updateDetails.size_mb.toFixed(1)
+    : null;
+
   return (
     <div className="sidebar">
       <div className="sidebar-logo" onClick={() => onNavigate("home")}>
@@ -20,7 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
           </svg>
         </div>
-        <span className="sidebar-logo-text">Lexi AI</span>
+        <span className="sidebar-logo-text">Speak Lexi AI version 0.5</span>
       </div>
       <nav className="sidebar-nav">
         {/* === Section 1: Primary Workflow === */}
@@ -208,6 +223,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Settings</span>
         </button>
       </nav>
+
+      {/* Update Available Banner */}
+      {update && (
+        <button className="sidebar-update-banner" onClick={openModal}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <div className="sidebar-update-banner__text">
+            <span className="sidebar-update-banner__title">Update v{update.version}</span>
+            {sizeMb && <span className="sidebar-update-banner__size">{sizeMb} MB</span>}
+          </div>
+        </button>
+      )}
+
+      {/* Current version label */}
+      {appVersion && (
+        <span className="sidebar-version">v{appVersion}</span>
+      )}
     </div>
   );
 };

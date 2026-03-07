@@ -23,6 +23,7 @@ import { NotesPage } from "./components/NotesPage";
 import { MeetingsPage } from "./components/MeetingsPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
+import { useAutoUpdater } from "./hooks/useAutoUpdater";
 
 const ONBOARDING_VERSION = 1;
 
@@ -45,6 +46,9 @@ function App() {
   const [onboardingSyncDone, setOnboardingSyncDone] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const prevCompletedRef = useRef(isCompleted);
+
+  // Initialize auto-updating background worker
+  useAutoUpdater();
 
   // When a meeting is started from the pill overlay, we want to:
   // 1. Switch to the Meetings page
