@@ -192,7 +192,11 @@ jobs:
 
           # This specifically assumes macOS since we gated it with matrix.upload_to_server == true
           BUNDLE_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Lexi AI.app.tar.gz"
-          DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Lexi AI_${VERSION}_aarch64.dmg"
+          DMG_ORIGINAL="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Lexi AI_${VERSION}_aarch64.dmg"
+          DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/LexiAI-Installer.dmg"
+
+          # Rename DMG to a clean distributable name
+          cp "$DMG_ORIGINAL" "$DMG_PATH"
 
           # Read the Minisign signature string
           SIG_CONTENT=$(cat "$BUNDLE_PATH.sig")
