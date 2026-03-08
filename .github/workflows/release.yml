@@ -174,7 +174,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: v${{ env.VERSION }}
-          releaseName: "Lexi AI Client v${{ env.VERSION }}"
           releaseBody: ${{ env.RELEASE_NOTES }}
           releaseDraft: false
           prerelease: false
