@@ -201,30 +201,51 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
     Vec::new()
 }
 
+/// Emit meeting-detected only after this many consecutive seconds of mic use (1 poll/sec).
+#[cfg(target_os = "macos")]
+const SUSTAINED_POLL_SECS: u32 = 3;
+
 #[cfg(target_os = "macos")]
 fn spawn_polling_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
     use std::collections::HashSet;
     std::thread::spawn(move || {
         let mut last_ids: HashSet<String> = HashSet::new();
+        let mut consecutive_same: u32 = 0;
+        let mut last_sent_ids: Option<HashSet<String>> = None;
         loop {
             std::thread::sleep(Duration::from_secs(1));
             let apps = list_mic_using_apps();
             let ids: HashSet<String> = apps.iter().map(|a| a.id.clone()).collect();
 
-            if ids == last_ids {
+            if ids.is_empty() {
+                last_sent_ids = None;
+                last_ids.clear();
+                consecutive_same = 0;
                 continue;
             }
-            last_ids = ids;
+
+            if ids != last_ids {
+                last_ids = ids.clone();
+                consecutive_same = 0;
+            }
+            consecutive_same += 1;
+
+            // Already sent for this app set (cooldown is handled by async handler).
+            if last_sent_ids.as_ref() == Some(&ids) {
+                continue;
+            }
+            if consecutive_same < SUSTAINED_POLL_SECS {
+                continue;
+            }
 
             println!(
-                "[detector] polling saw {} app(s): {:?}",
+                "[detector] polling: {} app(s) for {}s — emitting: {:?}",
                 apps.len(),
+                consecutive_same,
                 apps.iter().map(|a| &a.name).collect::<Vec<_>>()
             );
-
-            if !apps.is_empty() {
-                let _ = tx.send(apps);
-            }
+            let _ = tx.send(apps);
+            last_sent_ids = Some(ids);
         }
     });
 }
@@ -269,6 +290,7 @@ impl DetectorState {
 
 #[cfg(target_os = "macos")]
 struct ListenerData {
+    #[allow(dead_code)] // Only polling thread sends; listeners just update state
     tx: mpsc::Sender<Vec<AppInfo>>,
     state: Arc<Mutex<DetectorState>>,
     current_device: Arc<Mutex<Option<cidre::core_audio::Device>>>,
@@ -297,14 +319,15 @@ extern "C-unwind" fn device_listener(
             );
             if let Ok(mut st) = data.state.lock() {
                 let trigger = st.should_trigger(mic_in_use);
+                // Don't send here — only polling emits, after SUSTAINED_POLL_SECS of continuous use.
                 if trigger && mic_in_use {
                     let apps = list_mic_using_apps();
                     println!(
-                        "[detector] device_listener sending {} app(s): {:?}",
+                        "[detector] device_listener mic on ({} app(s)); will emit after {}s sustained: {:?}",
                         apps.len(),
+                        SUSTAINED_POLL_SECS,
                         apps.iter().map(|a| &a.name).collect::<Vec<_>>()
                     );
-                    let _ = data.tx.send(apps);
                 }
             }
         }
@@ -356,11 +379,9 @@ extern "C-unwind" fn system_listener(
                 if let Ok(device_guard) = data.current_device.lock() {
                     if let Some(ref dev) = *device_guard {
                         let mic_in_use = is_mic_running(dev);
+                        // Don't send here — only polling emits after sustained use.
                         if let Ok(mut st) = data.state.lock() {
-                            if st.should_trigger(mic_in_use) && mic_in_use {
-                                let apps = list_mic_using_apps();
-                                let _ = data.tx.send(apps);
-                            }
+                            st.should_trigger(mic_in_use);
                         }
                     }
                 }
@@ -443,16 +464,9 @@ fn run_listener_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
                     "[detector] listener thread: initial mic_in_use={}",
                     mic_in_use
                 );
+                // Don't send on initial state — only polling emits after SUSTAINED_POLL_SECS.
                 if let Ok(mut st) = data.state.lock() {
-                    if st.should_trigger(mic_in_use) && mic_in_use {
-                        let apps = list_mic_using_apps();
-                        println!(
-                            "[detector] listener thread: initial send {} app(s): {:?}",
-                            apps.len(),
-                            apps.iter().map(|a| &a.name).collect::<Vec<_>>()
-                        );
-                        let _ = data.tx.send(apps);
-                    }
+                    st.should_trigger(mic_in_use);
                 }
             } else {
                 eprintln!("[detector] listener thread: failed to add device listener");
