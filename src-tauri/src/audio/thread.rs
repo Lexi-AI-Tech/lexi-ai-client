@@ -186,7 +186,9 @@ pub fn spawn_recording_thread(
                             tauri::async_runtime::spawn(async move {
                                 match mode {
                                     RecordingMode::Assistant => {
-                                        app_handle_clone.emit("recording_started", ()).unwrap_or_default();
+                                        app_handle_clone
+                                            .emit("recording_started", ())
+                                            .unwrap_or_default();
                                     }
                                     RecordingMode::Action => {
                                         app_handle_clone
@@ -266,7 +268,9 @@ pub fn spawn_recording_thread(
                                     );
                                     let app_handle_clone = app_handle.clone();
                                     tauri::async_runtime::spawn(async move {
-                                        app_handle_clone.emit("recording_skipped", ()).unwrap_or_default();
+                                        app_handle_clone
+                                            .emit("recording_skipped", ())
+                                            .unwrap_or_default();
                                     });
                                 } else {
                                     // Process the audio based on mode
@@ -325,7 +329,9 @@ pub fn spawn_recording_thread(
                         ctx.mode = RecordingMode::Action;
                         let app_handle_clone = app_handle.clone();
                         tauri::async_runtime::spawn(async move {
-                            app_handle_clone.emit("recording_stopped", ()).unwrap_or_default();
+                            app_handle_clone
+                                .emit("recording_stopped", ())
+                                .unwrap_or_default();
                             app_handle_clone
                                 .emit("action_recording_started", ())
                                 .unwrap_or_default();
@@ -345,7 +351,9 @@ pub fn spawn_recording_thread(
                             app_handle_clone
                                 .emit("action_recording_stopped", ())
                                 .unwrap_or_default();
-                            app_handle_clone.emit("recording_started", ()).unwrap_or_default();
+                            app_handle_clone
+                                .emit("recording_started", ())
+                                .unwrap_or_default();
                         });
                     }
                 }

@@ -59,9 +59,7 @@
   },
   "plugins": {
     "deep-link": {
-      "schemes": [
-        "lexi-ai"
-      ]
+      "schemes": ["lexi-ai"]
     },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM2ODlFRTZFRTYzMTQyRjgKUldUNFFqSG1idTZKTm1aVTEvbjRYL2ZjdWNoMU1lNEM3MFFOb3hXeFZpbzNISk1TSVlvL0trUTMK",

@@ -51,7 +51,8 @@ use crate::window::show_and_focus_main_window;
 pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Error> {
     // Create system tray menu items
     let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
-    let start_meeting_item = MenuItem::with_id(app, "start_meeting", "Start Meeting", true, None::<&str>)?;
+    let start_meeting_item =
+        MenuItem::with_id(app, "start_meeting", "Start Meeting", true, None::<&str>)?;
     let paste_transcript_item = MenuItem::with_id(
         app,
         "paste_last_transcript",
@@ -60,7 +61,15 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
         None::<&str>,
     )?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let tray_menu = Menu::with_items(app, &[&show_item, &start_meeting_item, &paste_transcript_item, &quit_item])?;
+    let tray_menu = Menu::with_items(
+        app,
+        &[
+            &show_item,
+            &start_meeting_item,
+            &paste_transcript_item,
+            &quit_item,
+        ],
+    )?;
 
     // Get the default window icon for the tray
     let tray_icon = app.default_window_icon().ok_or_else(|| {

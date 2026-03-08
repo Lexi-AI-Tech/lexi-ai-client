@@ -385,8 +385,8 @@ export const SettingsPage: React.FC = () => {
       setIsCheckingUpdate(true);
       setUpdateStatus("Checking for updates...");
 
-      const { check } = await import('@tauri-apps/plugin-updater');
-      const { checkUpdateDetails } = await import('../hooks/useAutoUpdater');
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const { checkUpdateDetails } = await import("../hooks/useAutoUpdater");
       const update = await check();
 
       if (update) {
@@ -441,7 +441,7 @@ export const SettingsPage: React.FC = () => {
         <h2 className="page__title">Settings</h2>
         <div className="panel panel--center">
           <p className="panel__message">Sign in to access your settings</p>
-          <GoogleLoginButton onSuccess={() => { }} onError={() => { }} />
+          <GoogleLoginButton onSuccess={() => {}} onError={() => {}} />
         </div>
       </div>
     );
@@ -507,8 +507,8 @@ export const SettingsPage: React.FC = () => {
                   <span>
                     {selectedLanguage
                       ? SUPPORTED_LANGUAGES.find(
-                        (l) => l.value === selectedLanguage,
-                      )?.label || "Select language"
+                          (l) => l.value === selectedLanguage,
+                        )?.label || "Select language"
                       : "Auto Detect Language"}
                   </span>
                   <ChevronDown
@@ -635,7 +635,8 @@ export const SettingsPage: React.FC = () => {
                 <div className="settings-row__content">
                   <div className="settings-row__title">Updates</div>
                   <div className="settings-row__desc">
-                    {updateStatus || "Check if a newer version of Lexi AI is available."}
+                    {updateStatus ||
+                      "Check if a newer version of Lexi AI is available."}
                   </div>
                 </div>
                 <button
@@ -643,12 +644,25 @@ export const SettingsPage: React.FC = () => {
                   onClick={handleCheckUpdate}
                   disabled={isCheckingUpdate || isLoading}
                   className="sidebar-update-banner"
-                  style={{ margin: 0, padding: "8px 14px", width: "fit-content" }}
+                  style={{
+                    margin: 0,
+                    padding: "8px 14px",
+                    width: "fit-content",
+                  }}
                 >
                   {isCheckingUpdate ? (
                     <RefreshCw size={16} className="spinner-small" />
                   ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                       <polyline points="7 10 12 15 17 10" />
                       <line x1="12" y1="15" x2="12" y2="3" />
@@ -662,7 +676,6 @@ export const SettingsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-
           </div>
         )}
 

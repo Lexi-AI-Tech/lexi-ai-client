@@ -255,14 +255,14 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-  | "home"
-  | "transcripts"
-  | "settings"
-  | "vocabulary"
-  | "actions"
-  | "shortcuts"
-  | "notes"
-  | "meetings";
+    | "home"
+    | "transcripts"
+    | "settings"
+    | "vocabulary"
+    | "actions"
+    | "shortcuts"
+    | "notes"
+    | "meetings";
   onNavigate: (
     page:
       | "home"

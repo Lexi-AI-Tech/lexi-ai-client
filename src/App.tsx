@@ -122,16 +122,19 @@ function App() {
     invoke<boolean>("check_input_monitoring_permission")
       .then((granted) => {
         if (granted) {
-          invoke("start_global_key_listener").catch(() => { });
+          invoke("start_global_key_listener").catch(() => {});
         }
       })
-      .catch(() => { });
+      .catch(() => {});
   }, [isCompleted]);
 
   // Listen for "Start Meeting" from system tray
   const [pendingTrayMeeting, setPendingTrayMeeting] = useState(false);
-  const [pendingTrayMeetingPlatform, setPendingTrayMeetingPlatform] = useState<string | null>(null);
-  const [triggerEndMeetingFromTray, setTriggerEndMeetingFromTray] = useState(false);
+  const [pendingTrayMeetingPlatform, setPendingTrayMeetingPlatform] = useState<
+    string | null
+  >(null);
+  const [triggerEndMeetingFromTray, setTriggerEndMeetingFromTray] =
+    useState(false);
   useEffect(() => {
     let cancelled = false;
     const setup = async () => {
@@ -160,7 +163,9 @@ function App() {
       }
     };
     let unlistenFn: (() => void) | undefined;
-    setup().then((fn) => { unlistenFn = fn; });
+    setup().then((fn) => {
+      unlistenFn = fn;
+    });
     return () => {
       cancelled = true;
       if (unlistenFn) unlistenFn();
@@ -280,7 +285,9 @@ function App() {
               pillMeetingId={pillMeetingId}
               onPillMeetingConsumed={() => setPillMeetingId(null)}
               triggerEndMeetingFromTray={triggerEndMeetingFromTray}
-              onEndMeetingFromTrayConsumed={() => setTriggerEndMeetingFromTray(false)}
+              onEndMeetingFromTrayConsumed={() =>
+                setTriggerEndMeetingFromTray(false)
+              }
             />
           </div>
         )}
