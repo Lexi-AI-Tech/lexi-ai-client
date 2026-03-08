@@ -31,11 +31,7 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
     };
 
     fn fallback_from_bundle_id(id: String) -> AppInfo {
-        let name = id
-            .rsplit('.')
-            .next()
-            .unwrap_or(&id)
-            .to_string();
+        let name = id.rsplit('.').next().unwrap_or(&id).to_string();
         AppInfo { id, name }
     }
 
@@ -53,7 +49,9 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
         let mut outermost: Option<&Path> = None;
         let mut cur = Some(path);
         while let Some(p) = cur {
-            if p.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("app"))
+            if p.extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| e.eq_ignore_ascii_case("app"))
             {
                 outermost = Some(p);
             }
@@ -176,11 +174,8 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
             let pid = p.pid().ok()? as i32;
             let bundle_id = p.bundle_id().ok().map(|b| b.to_string());
 
-            let mut info = resolve_to_app(pid).or_else(|| {
-                bundle_id
-                    .clone()
-                    .map(fallback_from_bundle_id)
-            })?;
+            let mut info =
+                resolve_to_app(pid).or_else(|| bundle_id.clone().map(fallback_from_bundle_id))?;
 
             // If the mic-using process is a helper subprocess, try to resolve it back to the
             // parent running app (e.g. com.google.Chrome.helper -> com.google.Chrome).
@@ -296,12 +291,19 @@ extern "C-unwind" fn device_listener(
         }
         if let Ok(device) = ca::System::default_input_device() {
             let mic_in_use = is_mic_running(&device);
-            println!("[detector] device_listener called mic_in_use={}", mic_in_use);
+            println!(
+                "[detector] device_listener called mic_in_use={}",
+                mic_in_use
+            );
             if let Ok(mut st) = data.state.lock() {
                 let trigger = st.should_trigger(mic_in_use);
                 if trigger && mic_in_use {
                     let apps = list_mic_using_apps();
-                    println!("[detector] device_listener sending {} app(s): {:?}", apps.len(), apps.iter().map(|a| &a.name).collect::<Vec<_>>());
+                    println!(
+                        "[detector] device_listener sending {} app(s): {:?}",
+                        apps.len(),
+                        apps.iter().map(|a| &a.name).collect::<Vec<_>>()
+                    );
                     let _ = data.tx.send(apps);
                 }
             }
@@ -431,12 +433,24 @@ fn run_listener_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
                     *guard = Some(device);
                 }
                 let data = unsafe { &*(system_listener_ptr as *const ListenerData) };
-                let mic_in_use = data.current_device.lock().ok().and_then(|g| g.as_ref().map(is_mic_running)).unwrap_or(false);
-                println!("[detector] listener thread: initial mic_in_use={}", mic_in_use);
+                let mic_in_use = data
+                    .current_device
+                    .lock()
+                    .ok()
+                    .and_then(|g| g.as_ref().map(is_mic_running))
+                    .unwrap_or(false);
+                println!(
+                    "[detector] listener thread: initial mic_in_use={}",
+                    mic_in_use
+                );
                 if let Ok(mut st) = data.state.lock() {
                     if st.should_trigger(mic_in_use) && mic_in_use {
                         let apps = list_mic_using_apps();
-                        println!("[detector] listener thread: initial send {} app(s): {:?}", apps.len(), apps.iter().map(|a| &a.name).collect::<Vec<_>>());
+                        println!(
+                            "[detector] listener thread: initial send {} app(s): {:?}",
+                            apps.len(),
+                            apps.iter().map(|a| &a.name).collect::<Vec<_>>()
+                        );
                         let _ = data.tx.send(apps);
                     }
                 }
@@ -444,7 +458,10 @@ fn run_listener_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
                 eprintln!("[detector] listener thread: failed to add device listener");
             }
         }
-        Err(e) => eprintln!("[detector] listener thread: no default input device: {:?}", e),
+        Err(e) => eprintln!(
+            "[detector] listener thread: no default input device: {:?}",
+            e
+        ),
     }
 
     println!("[detector] listener thread: parked (listeners active)");
@@ -472,50 +489,56 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
         let cooldown_duration = Duration::from_secs(5 * 60);
 
         while let Some(apps) = rx_tokio.recv().await {
-                println!("[detector] async received {} app(s)", apps.len());
-                if apps.is_empty() {
-                    continue;
-                }
+            println!("[detector] async received {} app(s)", apps.len());
+            if apps.is_empty() {
+                continue;
+            }
 
-                let mut skip = false;
-                if let Some(room_state) = app_handle.try_state::<RoomState>() {
-                    if let Ok(guard) = room_state.is_recording.try_lock() {
+            let mut skip = false;
+            if let Some(room_state) = app_handle.try_state::<RoomState>() {
+                if let Ok(guard) = room_state.is_recording.try_lock() {
+                    if *guard {
+                        skip = true;
+                    }
+                }
+            }
+            if !skip {
+                if let Some(meeting_state) = app_handle.try_state::<MeetingState>() {
+                    if let Ok(guard) = meeting_state.is_recording.try_lock() {
                         if *guard {
                             skip = true;
                         }
                     }
                 }
-                if !skip {
-                    if let Some(meeting_state) = app_handle.try_state::<MeetingState>() {
-                        if let Ok(guard) = meeting_state.is_recording.try_lock() {
-                            if *guard {
-                                skip = true;
-                            }
-                        }
-                    }
-                }
-                if skip {
-                    println!("[detector] skip: already recording");
-                    continue;
-                }
-                if tokio::time::Instant::now() < in_cooldown_until {
-                    println!("[detector] skip: cooldown");
-                    continue;
-                }
+            }
+            if skip {
+                println!("[detector] skip: already recording");
+                continue;
+            }
+            if tokio::time::Instant::now() < in_cooldown_until {
+                println!("[detector] skip: cooldown");
+                continue;
+            }
 
-                let platform = apps.first().map(|a| a.name.clone()).unwrap_or_else(|| "Meeting".to_string());
-                let normalized = platform.trim().to_lowercase().replace('-', " ");
-                if normalized.is_empty() || normalized == "lexi ai" {
-                    println!("[detector] skip: platform empty or Lexi AI (normalized: {:?})", normalized);
-                    continue;
-                }
-                let context = MeetingContext {
-                    platform: platform.clone(),
-                };
-                println!("Meeting detected: app={}", context.platform);
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                let _ = app_handle.emit("meeting-detected", context);
-                in_cooldown_until = tokio::time::Instant::now() + cooldown_duration;
+            let platform = apps
+                .first()
+                .map(|a| a.name.clone())
+                .unwrap_or_else(|| "Meeting".to_string());
+            let normalized = platform.trim().to_lowercase().replace('-', " ");
+            if normalized.is_empty() || normalized == "lexi ai" {
+                println!(
+                    "[detector] skip: platform empty or Lexi AI (normalized: {:?})",
+                    normalized
+                );
+                continue;
+            }
+            let context = MeetingContext {
+                platform: platform.clone(),
+            };
+            println!("Meeting detected: app={}", context.platform);
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let _ = app_handle.emit("meeting-detected", context);
+            in_cooldown_until = tokio::time::Instant::now() + cooldown_duration;
         }
     });
 }

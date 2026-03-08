@@ -55,6 +55,7 @@ mod global_key_listener; // Unified hotkey management
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 
+mod meetings;
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
@@ -62,8 +63,7 @@ mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 #[cfg(target_os = "macos")]
 mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
-mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
-mod meetings; // Meetings module
+mod state; // Application state management (auth tokens, transcription tasks, hotkey config) // Meetings module
 
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod titlebar; // Title bar customization (hide title, match background on macOS)
@@ -72,7 +72,6 @@ mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
-
 
 use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
@@ -106,11 +105,6 @@ use commands::onboarding::{
     get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
     set_onboarding_step,
 };
-use meetings::commands::{
-    add_meeting_note, create_meeting, get_meeting_details, list_meetings, start_meeting_recording,
-    stop_meeting_recording, update_meeting, delete_meeting,
-    summarize_meeting, send_meeting_chat
-};
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
     stop_room_recording_and_process, update_room, update_speaker,
@@ -119,6 +113,11 @@ use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, updat
 use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type};
 use commands::window::{open_devtools, show_main_window};
+use meetings::commands::{
+    add_meeting_note, create_meeting, delete_meeting, get_meeting_details, list_meetings,
+    send_meeting_chat, start_meeting_recording, stop_meeting_recording, summarize_meeting,
+    update_meeting,
+};
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
 /// Command to control recording state
@@ -408,7 +407,6 @@ pub fn main() {
             {
                 // Spawn the unified recording thread
                 spawn_recording_thread(app_handle.clone(), recording_rx);
-                
                 // Start background meeting detector
                 meetings::detector::start_meeting_detector(app_handle.clone());
             }

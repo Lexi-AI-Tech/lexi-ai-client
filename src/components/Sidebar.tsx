@@ -15,7 +15,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const [appVersion, setAppVersion] = useState<string>("");
   useEffect(() => {
-    getVersion().then(setAppVersion).catch(() => { });
+    getVersion()
+      .then(setAppVersion)
+      .catch(() => {});
   }, []);
 
   const sizeMb = updateDetails?.size_mb
@@ -64,8 +66,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Actions */}
         <button
-          className={`sidebar-item ${currentPage === "actions" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "actions" ? "active" : ""
+          }`}
           onClick={() => onNavigate("actions")}
         >
           <svg
@@ -108,8 +111,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Transcripts */}
         <button
-          className={`sidebar-item ${currentPage === "transcripts" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "transcripts" ? "active" : ""
+          }`}
           onClick={() => onNavigate("transcripts")}
         >
           <svg
@@ -133,8 +137,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Shortcuts */}
         <button
-          className={`sidebar-item ${currentPage === "shortcuts" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "shortcuts" ? "active" : ""
+          }`}
           onClick={() => onNavigate("shortcuts")}
         >
           <svg
@@ -179,8 +184,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Vocabulary */}
         <button
-          className={`sidebar-item ${currentPage === "vocabulary" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "vocabulary" ? "active" : ""
+          }`}
           onClick={() => onNavigate("vocabulary")}
         >
           <svg
@@ -204,8 +210,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Settings */}
         <button
-          className={`sidebar-item ${currentPage === "settings" ? "active" : ""
-            }`}
+          className={`sidebar-item ${
+            currentPage === "settings" ? "active" : ""
+          }`}
           onClick={() => onNavigate("settings")}
         >
           <svg
@@ -228,21 +235,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Update Available Banner */}
       {update && (
         <button className="sidebar-update-banner" onClick={openModal}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
           <div className="sidebar-update-banner__text">
-            <span className="sidebar-update-banner__title">Update v{update.version}</span>
-            {sizeMb && <span className="sidebar-update-banner__size">{sizeMb} MB</span>}
+            <span className="sidebar-update-banner__title">
+              Update v{update.version}
+            </span>
+            {sizeMb && (
+              <span className="sidebar-update-banner__size">{sizeMb} MB</span>
+            )}
           </div>
           {(updateDetails?.notes || update.body) && (
             <div className="sidebar-update-notes">
-              <strong style={{ display: 'block', marginBottom: '8px', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Release Notes</strong>
+              <strong
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontSize: "11px",
+                  color: "#9ca3af",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Release Notes
+              </strong>
               <div className="sidebar-update-notes-content">
                 <ReactMarkdown>
-                  {updateDetails?.notes || update.body || "A new update is available to install."}
+                  {updateDetails?.notes ||
+                    update.body ||
+                    "A new update is available to install."}
                 </ReactMarkdown>
               </div>
             </div>
@@ -251,11 +284,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Current version label */}
-      {appVersion && (
-        <span className="sidebar-version">
-          v{appVersion}
-        </span>
-      )}
+      {appVersion && <span className="sidebar-version">v{appVersion}</span>}
     </div>
   );
 };

@@ -157,17 +157,17 @@ unsafe extern "C-unwind" fn raw_callback(
             let is_recording_mode = state.recording_state.lock().map(|g| *g).unwrap_or(false);
 
             if is_recording_mode {
-                    let app_clone = state.app.clone();
-                    let internal_key_str = key_to_string(&internal_key);
-                    tauri::async_runtime::spawn(async move {
-                        let _ = app_clone.emit(
-                            "hotkey-recorded",
-                            serde_json::json!({
-                                "key": internal_key_str,
-                                "modifiers": []
-                            }),
-                        );
-                    });
+                let app_clone = state.app.clone();
+                let internal_key_str = key_to_string(&internal_key);
+                tauri::async_runtime::spawn(async move {
+                    let _ = app_clone.emit(
+                        "hotkey-recorded",
+                        serde_json::json!({
+                            "key": internal_key_str,
+                            "modifiers": []
+                        }),
+                    );
+                });
                 let event_str = if is_actual_press {
                     format!("key_press: {:?}", key_to_string(&internal_key))
                 } else {

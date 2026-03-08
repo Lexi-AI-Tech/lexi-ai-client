@@ -147,9 +147,7 @@ impl MeetingWebSocket {
                             transcript_count += 1;
                             println!(
                                 "📝 Received transcript #{}: message_type={:?}, text={:?}",
-                                transcript_count,
-                                msg.message_type,
-                                msg.text
+                                transcript_count, msg.message_type, msg.text
                             );
 
                             let app_clone = app.clone();

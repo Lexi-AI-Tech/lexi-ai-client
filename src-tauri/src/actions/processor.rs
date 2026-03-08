@@ -20,7 +20,9 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
     let app_handle_clone = app_handle.clone();
     tauri::async_runtime::spawn(async move {
-        app_handle_clone.emit("processing_start", ()).unwrap_or_default();
+        app_handle_clone
+            .emit("processing_start", ())
+            .unwrap_or_default();
     });
 
     let cursor_context = get_cursor_context();
@@ -40,7 +42,9 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                     println!("🔊 Voice action - playing audio from server");
                     let app_handle_clone = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        app_handle_clone.emit("tts_speaking", ()).unwrap_or_default();
+                        app_handle_clone
+                            .emit("tts_speaking", ())
+                            .unwrap_or_default();
                     });
 
                     let tts_service = TtsService::new(app_handle.clone());
@@ -55,7 +59,9 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                                     );
                                     let app_handle_clone = app_handle.clone();
                                     tauri::async_runtime::spawn(async move {
-                                        app_handle_clone.emit("tts_success", ()).unwrap_or_default();
+                                        app_handle_clone
+                                            .emit("tts_success", ())
+                                            .unwrap_or_default();
                                     });
                                 }
                                 Err(e) => {
@@ -88,7 +94,9 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                         Ok(_) => {
                             let app_handle_clone = app_handle.clone();
                             tauri::async_runtime::spawn(async move {
-                                app_handle_clone.emit("injection_success", ()).unwrap_or_default();
+                                app_handle_clone
+                                    .emit("injection_success", ())
+                                    .unwrap_or_default();
                             });
                         }
                         Err(e) => {

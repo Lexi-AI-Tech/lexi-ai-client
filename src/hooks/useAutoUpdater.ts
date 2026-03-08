@@ -13,31 +13,31 @@ const UPDATE_INTERVAL_MS = 4 * 60 * 60 * 1000;
  * This is a lightweight DB query - no signed URL generation.
  */
 export async function checkUpdateDetails(): Promise<UpdateDetails | null> {
-    try {
-        const version = await getVersion();
-        const baseUrl = import.meta.env.VITE_API_BASE_URL;
-        const url = `${baseUrl}/api/v1/updates/check?version=${version}&target=darwin`;
+  try {
+    const version = await getVersion();
+    const baseUrl = import.meta.env.VITE_API_BASE_URL;
+    const url = `${baseUrl}/api/v1/updates/check?version=${version}&target=darwin`;
 
-        const response = await fetch(url);
+    const response = await fetch(url);
 
-        if (response.status === 204 || !response.ok) {
-            return null;
-        }
-
-        return (await response.json()) as UpdateDetails;
-    } catch (e) {
-        console.error("Failed to fetch update details:", e);
-        return null;
+    if (response.status === 204 || !response.ok) {
+      return null;
     }
+
+    return (await response.json()) as UpdateDetails;
+  } catch (e) {
+    console.error("Failed to fetch update details:", e);
+    return null;
+  }
 }
 
 /**
  * Returns true if the version bump is only a patch (e.g. 0.1.4 → 0.1.5).
  */
 function isPatchUpdate(currentVersion: string, newVersion: string): boolean {
-    const cur = currentVersion.split(".").map(Number);
-    const next = newVersion.split(".").map(Number);
-    return cur[0] === next[0] && cur[1] === next[1] && next[2] > cur[2];
+  const cur = currentVersion.split(".").map(Number);
+  const next = newVersion.split(".").map(Number);
+  return cur[0] === next[0] && cur[1] === next[1] && next[2] > cur[2];
 }
 
 /**
@@ -46,66 +46,75 @@ function isPatchUpdate(currentVersion: string, newVersion: string): boolean {
  * - Minor/Major updates (0.1.x → 0.2.0): show sidebar banner, user decides
  */
 export function useAutoUpdater() {
-    const setUpdate = useUpdaterStore((state) => state.setUpdate);
-    const setIsChecking = useUpdaterStore((state) => state.setIsChecking);
-    const setPatchRebootPending = useUpdaterStore((state) => state.setPatchRebootPending);
-    const updateChecked = useRef(false);
-    const toast = useToast();
+  const setUpdate = useUpdaterStore((state) => state.setUpdate);
+  const setIsChecking = useUpdaterStore((state) => state.setIsChecking);
+  const setPatchRebootPending = useUpdaterStore(
+    (state) => state.setPatchRebootPending,
+  );
+  const updateChecked = useRef(false);
+  const toast = useToast();
 
-    useEffect(() => {
-        // Skip auto-updates in dev mode — no installed bundle to update
-        if (import.meta.env.DEV) {
-            console.log("⏭️ Auto-updater skipped (dev mode)");
-            return;
-        }
+  useEffect(() => {
+    // Skip auto-updates in dev mode — no installed bundle to update
+    if (import.meta.env.DEV) {
+      console.log("⏭️ Auto-updater skipped (dev mode)");
+      return;
+    }
 
-        let intervalId: ReturnType<typeof setInterval>;
+    let intervalId: ReturnType<typeof setInterval>;
 
-        const checkForUpdates = async () => {
-            try {
-                setIsChecking(true);
-                const update = await check();
+    const checkForUpdates = async () => {
+      try {
+        setIsChecking(true);
+        const update = await check();
 
-                if (update) {
-                    const currentVersion = await getVersion();
-                    const details = await checkUpdateDetails();
+        if (update) {
+          const currentVersion = await getVersion();
+          const details = await checkUpdateDetails();
 
-                    if (isPatchUpdate(currentVersion, update.version)) {
-                        // Patch: auto-download silently in the background
-                        console.log(`🔄 Auto-downloading patch v${update.version}...`);
-                        await update.downloadAndInstall();
+          if (isPatchUpdate(currentVersion, update.version)) {
+            // Patch: auto-download silently in the background
+            console.log(`🔄 Auto-downloading patch v${update.version}...`);
+            await update.downloadAndInstall();
 
-                        // Check if the app is currently busy (recording, speaking, in a meeting)
-                        const isAppBusy = useUpdaterStore.getState().isAppBusy;
+            // Check if the app is currently busy (recording, speaking, in a meeting)
+            const isAppBusy = useUpdaterStore.getState().isAppBusy;
 
-                        if (isAppBusy) {
-                            console.log(`⏳ Patch v${update.version} installed — app is busy, deferring restart...`);
-                            setPatchRebootPending(true);
-                            toast.info(`Patch update v${update.version} installed. It will apply automatically when your current activity is finished.`, { duration: 6000 });
-                        } else {
-                            console.log(`✅ Patch v${update.version} installed — restarting...`);
-                            await relaunch();
-                        }
-                    } else {
-                        // Minor/Major: store for sidebar banner, user decides
-                        setUpdate(update, details);
-                    }
-                }
-            } catch (error) {
-                console.error("Background auto-updater failed:", error);
-            } finally {
-                setIsChecking(false);
+            if (isAppBusy) {
+              console.log(
+                `⏳ Patch v${update.version} installed — app is busy, deferring restart...`,
+              );
+              setPatchRebootPending(true);
+              toast.info(
+                `Patch update v${update.version} installed. It will apply automatically when your current activity is finished.`,
+                { duration: 6000 },
+              );
+            } else {
+              console.log(
+                `✅ Patch v${update.version} installed — restarting...`,
+              );
+              await relaunch();
             }
-        };
-
-        if (!updateChecked.current) {
-            updateChecked.current = true;
-            setTimeout(() => {
-                checkForUpdates();
-                intervalId = setInterval(checkForUpdates, UPDATE_INTERVAL_MS);
-            }, 5000);
+          } else {
+            // Minor/Major: store for sidebar banner, user decides
+            setUpdate(update, details);
+          }
         }
+      } catch (error) {
+        console.error("Background auto-updater failed:", error);
+      } finally {
+        setIsChecking(false);
+      }
+    };
 
-        return () => clearInterval(intervalId);
-    }, [setUpdate, setIsChecking, setPatchRebootPending, toast]);
+    if (!updateChecked.current) {
+      updateChecked.current = true;
+      setTimeout(() => {
+        checkForUpdates();
+        intervalId = setInterval(checkForUpdates, UPDATE_INTERVAL_MS);
+      }, 5000);
+    }
+
+    return () => clearInterval(intervalId);
+  }, [setUpdate, setIsChecking, setPatchRebootPending, toast]);
 }
