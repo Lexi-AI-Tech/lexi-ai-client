@@ -213,7 +213,7 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
 
 /// Emit meeting-detected only after this many consecutive seconds of mic use (1 poll/sec).
 #[cfg(target_os = "macos")]
-const SUSTAINED_POLL_SECS: u32 = 3;
+const SUSTAINED_POLL_SECS: u32 = 5;
 
 #[cfg(target_os = "macos")]
 fn spawn_polling_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
