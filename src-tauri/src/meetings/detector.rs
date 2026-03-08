@@ -31,14 +31,114 @@ fn is_system_app_for_display(app: &AppInfo) -> bool {
         || name.contains("corespeechd")
 }
 
+/// Score how "meeting-like" an app is; higher = more likely a real meeting app.
+fn score_app_for_meeting(app: &AppInfo) -> i32 {
+    let name = app.name.to_lowercase();
+    let id = app.id.to_lowercase();
+    if id.contains("zoom") || name.contains("zoom") {
+        return 10;
+    }
+    if id.contains("microsoft.teams") || name.contains("teams") {
+        return 10;
+    }
+    if id.contains("tinyspeck.slack") || name.contains("slack") {
+        return 8;
+    }
+    if id.contains("cisco.webex") || name.contains("webex") {
+        return 8;
+    }
+    if id.contains("bluejeans") || name.contains("bluejeans") {
+        return 7;
+    }
+    if id.contains("gotomeeting") || name.contains("go to meeting") {
+        return 7;
+    }
+    if id.contains("discord") || name.contains("discord") {
+        return 6;
+    }
+    // Chrome/Safari with Meet or similar: often just "Google Chrome" when in Meet
+    if (id.contains("google.chrome") || id.contains("apple.safari")) && (name.contains("chrome") || name.contains("safari")) {
+        return 3;
+    }
+    // Generic browser with no meeting hints: low score so known meeting apps win
+    if name.contains("chrome") || name.contains("safari") || name.contains("firefox") || name.contains("edge") {
+        return 1;
+    }
+    // Unknown app: neutral
+    5
+}
+
+/// Map a resolved app to a canonical platform name for display. None if we don't recognize it.
+fn map_to_canonical_platform(app: &AppInfo) -> Option<String> {
+    let name = app.name.to_lowercase();
+    let id = app.id.to_lowercase();
+    if id.contains("zoom") {
+        return Some("Zoom".to_string());
+    }
+    if id.contains("microsoft.teams") {
+        return Some("Microsoft Teams".to_string());
+    }
+    if id.contains("tinyspeck.slackmacgap") {
+        return Some("Slack".to_string());
+    }
+    if id.contains("cisco.webex") {
+        return Some("Webex".to_string());
+    }
+    if id.contains("bluejeans") {
+        return Some("BlueJeans".to_string());
+    }
+    if id.contains("gotomeeting") {
+        return Some("GoToMeeting".to_string());
+    }
+    if id.contains("discord") {
+        return Some("Discord".to_string());
+    }
+    if id.contains("google.chrome") && (name.contains("chrome") || name.contains("meet")) {
+        return Some("Google Meet".to_string());
+    }
+    if id.contains("apple.safari") {
+        return Some("Safari".to_string());
+    }
+    None
+}
+
+/// True if bundle id or name looks like a helper/plugin subprocess (not the main app).
+fn looks_like_helper(bundle_id: &str, name: &str) -> bool {
+    let id = bundle_id.to_lowercase();
+    let n = name.to_lowercase();
+    n == "helper"
+        || n.contains("renderer")
+        || id.contains(".helper")
+        || id.contains(".plugin")
+        || id.ends_with(".renderer")
+}
+
 #[cfg(target_os = "macos")]
 fn list_mic_using_apps() -> Vec<AppInfo> {
     use std::path::{Path, PathBuf};
 
     use cidre::core_audio as ca;
     let Ok(processes) = ca::System::processes() else {
+        eprintln!("[detector] Failed to get Core Audio processes");
         return Vec::new();
     };
+
+    let mic_processes: Vec<(i32, Option<String>)> = processes
+        .into_iter()
+        .filter(|p| p.is_running_input().unwrap_or(false))
+        .filter_map(|p| {
+            let pid = p.pid().ok()? as i32;
+            let bundle_id = p.bundle_id().ok().map(|b| b.to_string());
+            Some((pid, bundle_id))
+        })
+        .collect();
+
+    if mic_processes.is_empty() {
+        return Vec::new();
+    }
+
+    // One sysinfo refresh so we can walk parent process tree for all PIDs.
+    let sys = sysinfo::System::new_all();
 
     fn fallback_from_bundle_id(id: String) -> AppInfo {
         let name = id.rsplit('.').next().unwrap_or(&id).to_string();
@@ -177,21 +277,36 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
         via_ns.or_else(|| resolve_via_sysinfo(pid))
     }
 
-    processes
+    // Walk process tree upward via sysinfo; return first parent that resolves to a non-helper app.
+    fn resolve_via_parent_process(pid: i32, sys: &sysinfo::System) -> Option<AppInfo> {
+        use sysinfo::Pid;
+        let mut current = Pid::from_u32(pid as u32);
+        for _ in 0..15 {
+            let proc = sys.process(current)?;
+            let parent_pid = proc.parent()?;
+            let parent_i32 = parent_pid.as_u32() as i32;
+            if let Some(app) = resolve_pid_to_app(parent_i32) {
+                if !looks_like_helper(&app.id, &app.name) {
+                    return Some(app);
+                }
+            }
+            current = parent_pid;
+        }
+        None
+    }
+
+    let mut apps: Vec<AppInfo> = mic_processes
         .into_iter()
-        .filter(|p| p.is_running_input().unwrap_or(false))
-        .filter_map(|p| {
-            let pid = p.pid().ok()? as i32;
-            let bundle_id = p.bundle_id().ok().map(|b| b.to_string());
+        .filter_map(|(pid, bundle_id)| {
+            let mut info = resolve_to_app(pid)
+                .or_else(|| bundle_id.as_ref().map(|b| fallback_from_bundle_id(b.clone())))?;
 
-            let mut info =
-                resolve_to_app(pid).or_else(|| bundle_id.clone().map(fallback_from_bundle_id))?;
-
-            // If the mic-using process is a helper subprocess, try to resolve it back to the
-            // parent running app (e.g. com.google.Chrome.helper -> com.google.Chrome).
-            if let Some(bid) = bundle_id.as_deref() {
-                if info.name.eq_ignore_ascii_case("helper") || bid.contains(".helper") {
-                    if let Some(parent) = resolve_parent_bundle(bid) {
+            // If this process looks like a helper, try parent process walk first, then bundle truncation.
+            if let Some(ref bid) = bundle_id {
+                if looks_like_helper(bid, &info.name) {
+                    if let Some(parent) = resolve_via_parent_process(pid, &sys) {
+                        info = parent;
+                    } else if let Some(parent) = resolve_parent_bundle(bid) {
                         info = parent;
                     }
                 }
@@ -201,9 +316,16 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
                 return None;
             }
 
+            println!("[detector] resolved PID {} -> {} ({})", pid, info.name, info.id);
             Some(info)
         })
-        .collect()
+        .collect();
+
+    // Dedupe by bundle id (same app from multiple PIDs), then sort by meeting relevance (best first).
+    let mut seen = std::collections::HashSet::new();
+    apps.retain(|a| seen.insert(a.id.clone()));
+    apps.sort_by(|a, b| score_app_for_meeting(b).cmp(&score_app_for_meeting(a)));
+    apps
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -540,24 +662,23 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
                 continue;
             }
 
-            // Prefer a user app (e.g. Chrome, Zoom) over system processes (e.g. Core Speech).
-            let platform_app = apps
+            // Exclude system processes (e.g. Core Speech), then pick the most meeting-like app by score.
+            let candidate_apps: Vec<&AppInfo> = apps
                 .iter()
-                .find(|a| !is_system_app_for_display(a))
-                .or(apps.first());
-            let Some(platform_app) = platform_app else {
+                .filter(|a| !is_system_app_for_display(a))
+                .collect();
+            let Some(best_app) = candidate_apps
+                .into_iter()
+                .max_by_key(|a| score_app_for_meeting(a))
+            else {
                 continue;
             };
-            let app_id = platform_app.id.clone();
-            let platform = platform_app.name.clone();
-            let normalized = platform.trim().to_lowercase().replace('-', " ");
-            if normalized.is_empty() || normalized == "lexi ai" {
-                println!(
-                    "[detector] skip: platform empty or Lexi AI (normalized: {:?})",
-                    normalized
-                );
+            if best_app.id.to_lowercase().contains("lexi") {
+                println!("[detector] skip: best app is Lexi");
                 continue;
             }
+            let app_id = best_app.id.clone();
+            let platform = map_to_canonical_platform(best_app).unwrap_or_else(|| "Lexi".to_string());
 
             // Per-app cooldown: only skip if this app was recently shown.
             let now = tokio::time::Instant::now();
