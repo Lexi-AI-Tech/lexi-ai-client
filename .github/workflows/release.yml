@@ -192,20 +192,22 @@ jobs:
           
           # This specifically assumes macOS since we gated it with matrix.upload_to_server == true
           BUNDLE_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Lexi AI.app.tar.gz"
+          DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Lexi AI_${VERSION}_aarch64.dmg"
           
           # Read the Minisign signature string
           SIG_CONTENT=$(cat "$BUNDLE_PATH.sig")
           
-          echo "Uploading $BUNDLE_PATH to Lexi AI Server..."
+          echo "Uploading $BUNDLE_PATH and $DMG_PATH to Lexi AI Server..."
           
-          # Send POST request to securely upload the artifact
+          # Send POST request to securely upload the artifacts
           curl -X POST "$UPDATE_POST_URL" \
                -H "X-API-Key: $APP_RELEASES_API_KEY" \
                -F "version=$VERSION" \
                -F "target=$TARGET" \
                -F "notes=$RELEASE_NOTES" \
-               -F "signature=$SIG_CONTENT" \
-               -F "file=@$BUNDLE_PATH" \
+               -F "updater_signature=$SIG_CONTENT" \
+               -F "updater_file=@$BUNDLE_PATH" \
+               -F "installer_file=@$DMG_PATH" \
                --fail --show-error
                
           echo "Successfully notified Lexi AI Server of the new release!"

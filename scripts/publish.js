@@ -69,14 +69,22 @@ try {
 }
 
 // 3. Locate Artifacts
-const bundleDir = path.join(TAURI_DIR, 'target/aarch64-apple-darwin/release/bundle/macos');
+const bundleDir = path.join(TAURI_DIR, 'target/aarch64-apple-darwin/release/bundle');
+const macosDir = path.join(bundleDir, 'macos');
+const dmgDir = path.join(bundleDir, 'dmg');
+
 const tarGzFilename = `Lexi AI.app.tar.gz`;
-const tarGzPath = path.join(bundleDir, tarGzFilename);
+const tarGzPath = path.join(macosDir, tarGzFilename);
 const sigPath = `${tarGzPath}.sig`;
 
-if (!fs.existsSync(tarGzPath) || !fs.existsSync(sigPath)) {
-    console.error(`❌ Cannot find build artifacts at ${bundleDir}`);
-    console.error(`Expected: ${tarGzFilename} and .sig file`);
+const dmgFilename = `Lexi AI_${version}_aarch64.dmg`;
+const dmgPath = path.join(dmgDir, dmgFilename);
+
+if (!fs.existsSync(tarGzPath) || !fs.existsSync(sigPath) || !fs.existsSync(dmgPath)) {
+    console.error(`❌ Cannot find build artifacts.`);
+    console.error(`Expected: ${tarGzPath}`);
+    console.error(`Expected: ${sigPath}`);
+    console.error(`Expected: ${dmgPath}`);
     process.exit(1);
 }
 
@@ -86,9 +94,6 @@ console.log(`✅ Loaded Minisign signature.`);
 
 // 5. Create FormData payload
 console.log(`🌐 Uploading bundle to Lexi AI Server: ${API_URL}`);
-
-const fileBuffer = fs.readFileSync(tarGzPath);
-const blob = new Blob([fileBuffer], { type: 'application/gzip' });
 
 // Read changelog (Required)
 let notes = '';
@@ -106,8 +111,13 @@ const formData = new FormData();
 formData.append('version', version);
 formData.append('target', TARGET);
 formData.append('notes', notes);
-formData.append('signature', signatureText);
-formData.append('file', blob, tarGzFilename);
+formData.append('updater_signature', signatureText);
+
+const tarGzBuffer = fs.readFileSync(tarGzPath);
+formData.append('updater_file', new Blob([tarGzBuffer], { type: 'application/gzip' }), tarGzFilename);
+
+const dmgBuffer = fs.readFileSync(dmgPath);
+formData.append('installer_file', new Blob([dmgBuffer], { type: 'application/octet-stream' }), dmgFilename);
 
 // 6. Push to Server
 async function uploadRelease() {
