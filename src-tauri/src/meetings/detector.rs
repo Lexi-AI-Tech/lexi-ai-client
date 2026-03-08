@@ -2,6 +2,7 @@
 // we list which apps are using it and emit an event. Uses Core Audio property
 // listeners; app list is resolved from processes with active input.
 
+use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -19,6 +20,15 @@ pub struct MeetingContext {
 struct AppInfo {
     id: String,
     name: String,
+}
+
+/// True if this app should be treated as system/OS for display (e.g. Core Speech when Chrome uses mic).
+fn is_system_app_for_display(app: &AppInfo) -> bool {
+    let id = app.id.to_lowercase();
+    let name = app.name.to_lowercase();
+    id.starts_with("com.apple.")
+        || name.contains("core speech")
+        || name.contains("corespeechd")
 }
 
 #[cfg(target_os = "macos")]
@@ -499,8 +509,8 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
     std::thread::spawn(move || run_listener_thread(tx_std));
 
     tauri::async_runtime::spawn(async move {
-        let mut in_cooldown_until = tokio::time::Instant::now();
-        let cooldown_duration = Duration::from_secs(5 * 60);
+        let mut cooldown_until_by_app: HashMap<String, tokio::time::Instant> = HashMap::new();
+        let cooldown_duration = Duration::from_secs(10 * 60); // 10 minutes per app
 
         while let Some(apps) = rx_tokio.recv().await {
             println!("[detector] async received {} app(s)", apps.len());
@@ -529,15 +539,17 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
                 println!("[detector] skip: already recording");
                 continue;
             }
-            if tokio::time::Instant::now() < in_cooldown_until {
-                println!("[detector] skip: cooldown");
-                continue;
-            }
 
-            let platform = apps
-                .first()
-                .map(|a| a.name.clone())
-                .unwrap_or_else(|| "Meeting".to_string());
+            // Prefer a user app (e.g. Chrome, Zoom) over system processes (e.g. Core Speech).
+            let platform_app = apps
+                .iter()
+                .find(|a| !is_system_app_for_display(a))
+                .or(apps.first());
+            let Some(platform_app) = platform_app else {
+                continue;
+            };
+            let app_id = platform_app.id.clone();
+            let platform = platform_app.name.clone();
             let normalized = platform.trim().to_lowercase().replace('-', " ");
             if normalized.is_empty() || normalized == "lexi ai" {
                 println!(
@@ -546,13 +558,24 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
                 );
                 continue;
             }
+
+            // Per-app cooldown: only skip if this app was recently shown.
+            let now = tokio::time::Instant::now();
+            if let Some(&until) = cooldown_until_by_app.get(&app_id) {
+                if now < until {
+                    println!("[detector] skip: cooldown for app {}", app_id);
+                    continue;
+                }
+                cooldown_until_by_app.remove(&app_id);
+            }
+
             let context = MeetingContext {
                 platform: platform.clone(),
             };
             println!("Meeting detected: app={}", context.platform);
             tokio::time::sleep(Duration::from_secs(1)).await;
             let _ = app_handle.emit("meeting-detected", context);
-            in_cooldown_until = tokio::time::Instant::now() + cooldown_duration;
+            cooldown_until_by_app.insert(app_id, now + cooldown_duration);
         }
     });
 }
