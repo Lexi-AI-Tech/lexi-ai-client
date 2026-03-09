@@ -68,40 +68,6 @@ fn score_app_for_meeting(app: &AppInfo) -> i32 {
     5
 }
 
-/// Map a resolved app to a canonical platform name for display. None if we don't recognize it.
-fn map_to_canonical_platform(app: &AppInfo) -> Option<String> {
-    let name = app.name.to_lowercase();
-    let id = app.id.to_lowercase();
-    if id.contains("zoom") {
-        return Some("Zoom".to_string());
-    }
-    if id.contains("microsoft.teams") {
-        return Some("Microsoft Teams".to_string());
-    }
-    if id.contains("tinyspeck.slackmacgap") {
-        return Some("Slack".to_string());
-    }
-    if id.contains("cisco.webex") {
-        return Some("Webex".to_string());
-    }
-    if id.contains("bluejeans") {
-        return Some("BlueJeans".to_string());
-    }
-    if id.contains("gotomeeting") {
-        return Some("GoToMeeting".to_string());
-    }
-    if id.contains("discord") {
-        return Some("Discord".to_string());
-    }
-    if id.contains("google.chrome") && (name.contains("chrome") || name.contains("meet")) {
-        return Some("Google Meet".to_string());
-    }
-    if id.contains("apple.safari") {
-        return Some("Safari".to_string());
-    }
-    None
-}
-
 /// True if bundle id or name looks like a helper/plugin subprocess (not the main app).
 fn looks_like_helper(bundle_id: &str, name: &str) -> bool {
     let id = bundle_id.to_lowercase();
@@ -335,7 +301,7 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
 
 /// Emit meeting-detected only after this many consecutive seconds of mic use (1 poll/sec).
 #[cfg(target_os = "macos")]
-const SUSTAINED_POLL_SECS: u32 = 5;
+const SUSTAINED_POLL_SECS: u32 = 2;
 
 #[cfg(target_os = "macos")]
 fn spawn_polling_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
@@ -662,14 +628,23 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
                 continue;
             }
 
-            // Exclude system processes (e.g. Core Speech), then pick the most meeting-like app by score.
+            // Exclude system processes (e.g. Core Speech).
             let candidate_apps: Vec<&AppInfo> = apps
                 .iter()
                 .filter(|a| !is_system_app_for_display(a))
                 .collect();
+            // Use only the frontmost app to decide where the meeting is: emit only if the focused
+            // app is in the mic-using list.
+            #[cfg(target_os = "macos")]
+            let frontmost_name = crate::cursor_context::get_cursor_context()
+                .and_then(|c| c.app_name)
+                .unwrap_or_default();
+            #[cfg(not(target_os = "macos"))]
+            let frontmost_name = String::new();
             let Some(best_app) = candidate_apps
-                .into_iter()
-                .max_by_key(|a| score_app_for_meeting(a))
+                .iter()
+                .find(|a| a.name.eq_ignore_ascii_case(&frontmost_name))
+                .copied()
             else {
                 continue;
             };
@@ -678,7 +653,8 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
                 continue;
             }
             let app_id = best_app.id.clone();
-            let platform = map_to_canonical_platform(best_app).unwrap_or_else(|| "Lexi".to_string());
+            // Use the app's display name (from plist, same kind of source as cursor context).
+            let platform = best_app.name.clone();
 
             // Per-app cooldown: only skip if this app was recently shown.
             let now = tokio::time::Instant::now();
