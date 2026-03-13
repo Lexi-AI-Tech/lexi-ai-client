@@ -2,6 +2,8 @@
 //!
 //! Plays base64 audio from the action response (TTS is done on the server).
 
+#![allow(dead_code)] // Reserved for voice actions; not wired yet.
+
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::error::Error;
 use std::fs;
