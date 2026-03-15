@@ -1,7 +1,7 @@
 [package]
 name = "lexi-ai"
 version = "0.1.0"
-description = "Speech-to-text overlay app for macOS"
+description = "AI Productivity tool"
 authors = ["anadi45"]
 license = ""
 repository = ""
@@ -53,6 +53,10 @@ keyring = "2.3"  # OS keychain/credential manager for secure token storage
 tempfile = "3.8"  # Temporary file handling for TTS audio
 tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 futures-util = "0.3"
+tauri-plugin-updater = "2.10.0"
+tauri-plugin-process = "2.3.1"
+tauri-plugin-os = "2.3.2"
+tauri-plugin-http = "2.5.7"
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel" }  # macOS NSPanel for advanced window behaviors
 macos-accessibility-client = "0.0"

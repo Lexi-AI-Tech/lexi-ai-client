@@ -185,6 +185,131 @@ body {
   flex-direction: column;
   gap: 4px;
   padding: 0 8px;
+  flex: 1;
+}
+
+/* Update available banner — pinned to bottom of sidebar */
+.sidebar-update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 8px 8px 8px;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  position: relative;
+}
+
+.sidebar-update-banner:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-update-banner svg {
+  flex-shrink: 0;
+  color: #111827;
+  animation: sidebar-update-bounce 2s infinite;
+}
+
+@keyframes sidebar-update-bounce {
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+
+  40% {
+    transform: translateY(-3px);
+  }
+
+  60% {
+    transform: translateY(-1.5px);
+  }
+}
+
+/* Tooltip for release notes on hover */
+.sidebar-update-notes {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  width: 240px;
+  background: #111827;
+  color: #f9fafb;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: all 0.2s ease;
+  z-index: 50;
+  pointer-events: none;
+  font-weight: 400;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Tooltip arrow */
+.sidebar-update-notes::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 20px;
+  width: 8px;
+  height: 8px;
+  background: #111827;
+  transform: rotate(45deg);
+}
+
+.sidebar-update-banner:hover .sidebar-update-notes {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.sidebar-update-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sidebar-update-banner__title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-update-banner__size {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.sidebar-version {
+  padding: 6px 16px 8px;
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+  letter-spacing: 0.02em;
 }
 
 .sidebar-item {
@@ -637,6 +762,30 @@ textarea.form-input {
   transform: rotate(180deg);
 }
 
+/* Markdown Content Styling for the Tooltip */
+.sidebar-update-notes-content {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #f9fafb;
+}
+
+.sidebar-update-notes-content p {
+  margin-bottom: 8px;
+}
+
+.sidebar-update-notes-content p:last-child {
+  margin-bottom: 0;
+}
+
+.sidebar-update-notes-content ul {
+  padding-left: 16px;
+  margin-bottom: 8px;
+}
+
+.sidebar-update-notes-content li {
+  margin-bottom: 4px;
+}
+
 .spinner-small {
   width: 16px;
   height: 16px;
@@ -878,27 +1027,35 @@ textarea.form-input {
 .mb-12 {
   margin-bottom: 12px;
 }
+
 .mb-16 {
   margin-bottom: 16px;
 }
+
 .mb-24 {
   margin-bottom: 24px;
 }
+
 .mb-32 {
   margin-bottom: 32px;
 }
+
 .flex-1 {
   flex: 1;
 }
+
 .text-capitalize {
   text-transform: capitalize;
 }
+
 .color-muted {
   color: var(--lexi-text);
 }
+
 .color-muted .flex-shrink-0 {
   flex-shrink: 0;
 }
+
 .flex-shrink-0 {
   flex-shrink: 0;
 }
@@ -1108,6 +1265,7 @@ textarea.form-input {
     transform: scale(1);
     opacity: 1;
   }
+
   100% {
     transform: scale(1.5);
     opacity: 0;
@@ -1120,6 +1278,7 @@ textarea.form-input {
     opacity: 0.35;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.5;
     transform: scale(1.05);
@@ -1132,6 +1291,7 @@ textarea.form-input {
     transform: scaleY(0.4);
     opacity: 0.7;
   }
+
   50% {
     transform: scaleY(1.2);
     opacity: 1;
@@ -1710,14 +1870,13 @@ textarea.form-input {
   font-size: 14px;
   color: var(--lexi-text);
 }
+
 .transcript-item-date {
   font-size: 11px;
   color: var(--lexi-text-faint);
 }
 
 /* Table-style transcripts view */
-.transcripts-table {
-}
 
 .transcripts-table-header {
   display: grid;
@@ -1989,16 +2148,19 @@ textarea.form-input {
   color: #065f46 !important;
   border-color: #a7f3d0 !important;
 }
+
 .sonner-toast-error {
   background: var(--lexi-danger-muted) !important;
   color: #991b1b !important;
   border-color: #fecaca !important;
 }
+
 .sonner-toast-warning {
   background: #fffbeb !important;
   color: #92400e !important;
   border-color: #fde68a !important;
 }
+
 .sonner-toast-info {
   background: #eff6ff !important;
   color: #1e40af !important;

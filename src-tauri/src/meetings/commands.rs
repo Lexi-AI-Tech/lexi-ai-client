@@ -57,7 +57,11 @@ pub struct CreateMeetingDocRequest {
 
 /// Create a new meeting
 #[tauri::command]
-pub async fn create_meeting(app: AppHandle, name: String, platform: Option<String>) -> Result<Meeting, String> {
+pub async fn create_meeting(
+    app: AppHandle,
+    name: String,
+    platform: Option<String>,
+) -> Result<Meeting, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .map_err(|_| "Authentication required")?;
@@ -218,9 +222,7 @@ pub async fn stop_meeting_recording(
     // Send end event so Lexi AI server can finalize and close the stream (no reliance on timeout)
     let ws_tx = state.meeting_ws_text_tx.lock().unwrap().take();
     if let Some(tx) = ws_tx {
-        let _ = tx
-            .send(r#"{"type":"end_recording"}"#.to_string())
-            .await;
+        let _ = tx.send(r#"{"type":"end_recording"}"#.to_string()).await;
     }
 
     // Broadcast so key listener re-enables assistant/action hotkeys
@@ -283,7 +285,11 @@ pub async fn get_meeting_details(
         .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client();
-    let url = format!("{}/api/v1/meetings/{}", crate::config::api_base_url(), meeting_id);
+    let url = format!(
+        "{}/api/v1/meetings/{}",
+        crate::config::api_base_url(),
+        meeting_id
+    );
 
     utils::log_api_request("Get meeting details", "GET", &url);
 
@@ -318,7 +324,11 @@ pub async fn update_meeting(
         .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client();
-    let url = format!("{}/api/v1/meetings/{}", crate::config::api_base_url(), meeting_id);
+    let url = format!(
+        "{}/api/v1/meetings/{}",
+        crate::config::api_base_url(),
+        meeting_id
+    );
 
     let payload = MeetingUpdate { name };
 
@@ -352,7 +362,11 @@ pub async fn delete_meeting(app: AppHandle, meeting_id: String) -> Result<(), St
         .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client();
-    let url = format!("{}/api/v1/meetings/{}", crate::config::api_base_url(), meeting_id);
+    let url = format!(
+        "{}/api/v1/meetings/{}",
+        crate::config::api_base_url(),
+        meeting_id
+    );
 
     utils::log_api_request("Delete meeting", "DELETE", &url);
 
@@ -372,13 +386,20 @@ pub async fn delete_meeting(app: AppHandle, meeting_id: String) -> Result<(), St
 
 /// Summarize a meeting
 #[tauri::command]
-pub async fn summarize_meeting(app: AppHandle, meeting_id: String) -> Result<serde_json::Value, String> {
+pub async fn summarize_meeting(
+    app: AppHandle,
+    meeting_id: String,
+) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client();
-    let url = format!("{}/api/v1/meetings/{}/summarize", crate::config::api_base_url(), meeting_id);
+    let url = format!(
+        "{}/api/v1/meetings/{}/summarize",
+        crate::config::api_base_url(),
+        meeting_id
+    );
 
     utils::log_api_request("Summarize meeting", "POST", &url);
 
@@ -400,7 +421,6 @@ pub async fn summarize_meeting(app: AppHandle, meeting_id: String) -> Result<ser
 
     Ok(meeting)
 }
-
 
 /// Add a user note to the meeting transcript (typed during the meeting).
 #[tauri::command]

@@ -2,6 +2,7 @@
 // we list which apps are using it and emit an event. Uses Core Audio property
 // listeners; app list is resolved from processes with active input.
 
+use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -21,21 +22,92 @@ struct AppInfo {
     name: String,
 }
 
+/// True if this app should be treated as system/OS for display (e.g. Core Speech when Chrome uses mic).
+fn is_system_app_for_display(app: &AppInfo) -> bool {
+    let id = app.id.to_lowercase();
+    let name = app.name.to_lowercase();
+    id.starts_with("com.apple.")
+        || name.contains("core speech")
+        || name.contains("corespeechd")
+}
+
+/// Score how "meeting-like" an app is; higher = more likely a real meeting app.
+fn score_app_for_meeting(app: &AppInfo) -> i32 {
+    let name = app.name.to_lowercase();
+    let id = app.id.to_lowercase();
+    if id.contains("zoom") || name.contains("zoom") {
+        return 10;
+    }
+    if id.contains("microsoft.teams") || name.contains("teams") {
+        return 10;
+    }
+    if id.contains("tinyspeck.slack") || name.contains("slack") {
+        return 8;
+    }
+    if id.contains("cisco.webex") || name.contains("webex") {
+        return 8;
+    }
+    if id.contains("bluejeans") || name.contains("bluejeans") {
+        return 7;
+    }
+    if id.contains("gotomeeting") || name.contains("go to meeting") {
+        return 7;
+    }
+    if id.contains("discord") || name.contains("discord") {
+        return 6;
+    }
+    // Chrome/Safari with Meet or similar: often just "Google Chrome" when in Meet
+    if (id.contains("google.chrome") || id.contains("apple.safari")) && (name.contains("chrome") || name.contains("safari")) {
+        return 3;
+    }
+    // Generic browser with no meeting hints: low score so known meeting apps win
+    if name.contains("chrome") || name.contains("safari") || name.contains("firefox") || name.contains("edge") {
+        return 1;
+    }
+    // Unknown app: neutral
+    5
+}
+
+/// True if bundle id or name looks like a helper/plugin subprocess (not the main app).
+fn looks_like_helper(bundle_id: &str, name: &str) -> bool {
+    let id = bundle_id.to_lowercase();
+    let n = name.to_lowercase();
+    n == "helper"
+        || n.contains("renderer")
+        || id.contains(".helper")
+        || id.contains(".plugin")
+        || id.ends_with(".renderer")
+}
+
 #[cfg(target_os = "macos")]
 fn list_mic_using_apps() -> Vec<AppInfo> {
     use std::path::{Path, PathBuf};
 
     use cidre::core_audio as ca;
     let Ok(processes) = ca::System::processes() else {
+        eprintln!("[detector] Failed to get Core Audio processes");
         return Vec::new();
     };
 
+    let mic_processes: Vec<(i32, Option<String>)> = processes
+        .into_iter()
+        .filter(|p| p.is_running_input().unwrap_or(false))
+        .filter_map(|p| {
+            let pid = p.pid().ok()? as i32;
+            let bundle_id = p.bundle_id().ok().map(|b| b.to_string());
+            Some((pid, bundle_id))
+        })
+        .collect();
+
+    if mic_processes.is_empty() {
+        return Vec::new();
+    }
+
+    // One sysinfo refresh so we can walk parent process tree for all PIDs.
+    let sys = sysinfo::System::new_all();
+
     fn fallback_from_bundle_id(id: String) -> AppInfo {
-        let name = id
-            .rsplit('.')
-            .next()
-            .unwrap_or(&id)
-            .to_string();
+        let name = id.rsplit('.').next().unwrap_or(&id).to_string();
         AppInfo { id, name }
     }
 
@@ -53,7 +125,9 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
         let mut outermost: Option<&Path> = None;
         let mut cur = Some(path);
         while let Some(p) = cur {
-            if p.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("app"))
+            if p.extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| e.eq_ignore_ascii_case("app"))
             {
                 outermost = Some(p);
             }
@@ -169,24 +243,36 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
         via_ns.or_else(|| resolve_via_sysinfo(pid))
     }
 
-    processes
+    // Walk process tree upward via sysinfo; return first parent that resolves to a non-helper app.
+    fn resolve_via_parent_process(pid: i32, sys: &sysinfo::System) -> Option<AppInfo> {
+        use sysinfo::Pid;
+        let mut current = Pid::from_u32(pid as u32);
+        for _ in 0..15 {
+            let proc = sys.process(current)?;
+            let parent_pid = proc.parent()?;
+            let parent_i32 = parent_pid.as_u32() as i32;
+            if let Some(app) = resolve_pid_to_app(parent_i32) {
+                if !looks_like_helper(&app.id, &app.name) {
+                    return Some(app);
+                }
+            }
+            current = parent_pid;
+        }
+        None
+    }
+
+    let mut apps: Vec<AppInfo> = mic_processes
         .into_iter()
-        .filter(|p| p.is_running_input().unwrap_or(false))
-        .filter_map(|p| {
-            let pid = p.pid().ok()? as i32;
-            let bundle_id = p.bundle_id().ok().map(|b| b.to_string());
+        .filter_map(|(pid, bundle_id)| {
+            let mut info = resolve_to_app(pid)
+                .or_else(|| bundle_id.as_ref().map(|b| fallback_from_bundle_id(b.clone())))?;
 
-            let mut info = resolve_to_app(pid).or_else(|| {
-                bundle_id
-                    .clone()
-                    .map(fallback_from_bundle_id)
-            })?;
-
-            // If the mic-using process is a helper subprocess, try to resolve it back to the
-            // parent running app (e.g. com.google.Chrome.helper -> com.google.Chrome).
-            if let Some(bid) = bundle_id.as_deref() {
-                if info.name.eq_ignore_ascii_case("helper") || bid.contains(".helper") {
-                    if let Some(parent) = resolve_parent_bundle(bid) {
+            // If this process looks like a helper, try parent process walk first, then bundle truncation.
+            if let Some(ref bid) = bundle_id {
+                if looks_like_helper(bid, &info.name) {
+                    if let Some(parent) = resolve_via_parent_process(pid, &sys) {
+                        info = parent;
+                    } else if let Some(parent) = resolve_parent_bundle(bid) {
                         info = parent;
                     }
                 }
@@ -196,9 +282,16 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
                 return None;
             }
 
+            println!("[detector] resolved PID {} -> {} ({})", pid, info.name, info.id);
             Some(info)
         })
-        .collect()
+        .collect();
+
+    // Dedupe by bundle id (same app from multiple PIDs), then sort by meeting relevance (best first).
+    let mut seen = std::collections::HashSet::new();
+    apps.retain(|a| seen.insert(a.id.clone()));
+    apps.sort_by(|a, b| score_app_for_meeting(b).cmp(&score_app_for_meeting(a)));
+    apps
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -206,30 +299,51 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
     Vec::new()
 }
 
+/// Emit meeting-detected only after this many consecutive seconds of mic use (1 poll/sec).
+#[cfg(target_os = "macos")]
+const SUSTAINED_POLL_SECS: u32 = 2;
+
 #[cfg(target_os = "macos")]
 fn spawn_polling_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
     use std::collections::HashSet;
     std::thread::spawn(move || {
         let mut last_ids: HashSet<String> = HashSet::new();
+        let mut consecutive_same: u32 = 0;
+        let mut last_sent_ids: Option<HashSet<String>> = None;
         loop {
             std::thread::sleep(Duration::from_secs(1));
             let apps = list_mic_using_apps();
             let ids: HashSet<String> = apps.iter().map(|a| a.id.clone()).collect();
 
-            if ids == last_ids {
+            if ids.is_empty() {
+                last_sent_ids = None;
+                last_ids.clear();
+                consecutive_same = 0;
                 continue;
             }
-            last_ids = ids;
+
+            if ids != last_ids {
+                last_ids = ids.clone();
+                consecutive_same = 0;
+            }
+            consecutive_same += 1;
+
+            // Already sent for this app set (cooldown is handled by async handler).
+            if last_sent_ids.as_ref() == Some(&ids) {
+                continue;
+            }
+            if consecutive_same < SUSTAINED_POLL_SECS {
+                continue;
+            }
 
             println!(
-                "[detector] polling saw {} app(s): {:?}",
+                "[detector] polling: {} app(s) for {}s — emitting: {:?}",
                 apps.len(),
+                consecutive_same,
                 apps.iter().map(|a| &a.name).collect::<Vec<_>>()
             );
-
-            if !apps.is_empty() {
-                let _ = tx.send(apps);
-            }
+            let _ = tx.send(apps);
+            last_sent_ids = Some(ids);
         }
     });
 }
@@ -274,6 +388,7 @@ impl DetectorState {
 
 #[cfg(target_os = "macos")]
 struct ListenerData {
+    #[allow(dead_code)] // Only polling thread sends; listeners just update state
     tx: mpsc::Sender<Vec<AppInfo>>,
     state: Arc<Mutex<DetectorState>>,
     current_device: Arc<Mutex<Option<cidre::core_audio::Device>>>,
@@ -296,13 +411,21 @@ extern "C-unwind" fn device_listener(
         }
         if let Ok(device) = ca::System::default_input_device() {
             let mic_in_use = is_mic_running(&device);
-            println!("[detector] device_listener called mic_in_use={}", mic_in_use);
+            println!(
+                "[detector] device_listener called mic_in_use={}",
+                mic_in_use
+            );
             if let Ok(mut st) = data.state.lock() {
                 let trigger = st.should_trigger(mic_in_use);
+                // Don't send here — only polling emits, after SUSTAINED_POLL_SECS of continuous use.
                 if trigger && mic_in_use {
                     let apps = list_mic_using_apps();
-                    println!("[detector] device_listener sending {} app(s): {:?}", apps.len(), apps.iter().map(|a| &a.name).collect::<Vec<_>>());
-                    let _ = data.tx.send(apps);
+                    println!(
+                        "[detector] device_listener mic on ({} app(s)); will emit after {}s sustained: {:?}",
+                        apps.len(),
+                        SUSTAINED_POLL_SECS,
+                        apps.iter().map(|a| &a.name).collect::<Vec<_>>()
+                    );
                 }
             }
         }
@@ -354,11 +477,9 @@ extern "C-unwind" fn system_listener(
                 if let Ok(device_guard) = data.current_device.lock() {
                     if let Some(ref dev) = *device_guard {
                         let mic_in_use = is_mic_running(dev);
+                        // Don't send here — only polling emits after sustained use.
                         if let Ok(mut st) = data.state.lock() {
-                            if st.should_trigger(mic_in_use) && mic_in_use {
-                                let apps = list_mic_using_apps();
-                                let _ = data.tx.send(apps);
-                            }
+                            st.should_trigger(mic_in_use);
                         }
                     }
                 }
@@ -431,20 +552,28 @@ fn run_listener_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
                     *guard = Some(device);
                 }
                 let data = unsafe { &*(system_listener_ptr as *const ListenerData) };
-                let mic_in_use = data.current_device.lock().ok().and_then(|g| g.as_ref().map(is_mic_running)).unwrap_or(false);
-                println!("[detector] listener thread: initial mic_in_use={}", mic_in_use);
+                let mic_in_use = data
+                    .current_device
+                    .lock()
+                    .ok()
+                    .and_then(|g| g.as_ref().map(is_mic_running))
+                    .unwrap_or(false);
+                println!(
+                    "[detector] listener thread: initial mic_in_use={}",
+                    mic_in_use
+                );
+                // Don't send on initial state — only polling emits after SUSTAINED_POLL_SECS.
                 if let Ok(mut st) = data.state.lock() {
-                    if st.should_trigger(mic_in_use) && mic_in_use {
-                        let apps = list_mic_using_apps();
-                        println!("[detector] listener thread: initial send {} app(s): {:?}", apps.len(), apps.iter().map(|a| &a.name).collect::<Vec<_>>());
-                        let _ = data.tx.send(apps);
-                    }
+                    st.should_trigger(mic_in_use);
                 }
             } else {
                 eprintln!("[detector] listener thread: failed to add device listener");
             }
         }
-        Err(e) => eprintln!("[detector] listener thread: no default input device: {:?}", e),
+        Err(e) => eprintln!(
+            "[detector] listener thread: no default input device: {:?}",
+            e
+        ),
     }
 
     println!("[detector] listener thread: parked (listeners active)");
@@ -468,54 +597,82 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
     std::thread::spawn(move || run_listener_thread(tx_std));
 
     tauri::async_runtime::spawn(async move {
-        let mut in_cooldown_until = tokio::time::Instant::now();
-        let cooldown_duration = Duration::from_secs(5 * 60);
+        let mut cooldown_until_by_app: HashMap<String, tokio::time::Instant> = HashMap::new();
+        let cooldown_duration = Duration::from_secs(10 * 60); // 10 minutes per app
 
         while let Some(apps) = rx_tokio.recv().await {
-                println!("[detector] async received {} app(s)", apps.len());
-                if apps.is_empty() {
-                    continue;
-                }
+            println!("[detector] async received {} app(s)", apps.len());
+            if apps.is_empty() {
+                continue;
+            }
 
-                let mut skip = false;
-                if let Some(room_state) = app_handle.try_state::<RoomState>() {
-                    if let Ok(guard) = room_state.is_recording.try_lock() {
+            let mut skip = false;
+            if let Some(room_state) = app_handle.try_state::<RoomState>() {
+                if let Ok(guard) = room_state.is_recording.try_lock() {
+                    if *guard {
+                        skip = true;
+                    }
+                }
+            }
+            if !skip {
+                if let Some(meeting_state) = app_handle.try_state::<MeetingState>() {
+                    if let Ok(guard) = meeting_state.is_recording.try_lock() {
                         if *guard {
                             skip = true;
                         }
                     }
                 }
-                if !skip {
-                    if let Some(meeting_state) = app_handle.try_state::<MeetingState>() {
-                        if let Ok(guard) = meeting_state.is_recording.try_lock() {
-                            if *guard {
-                                skip = true;
-                            }
-                        }
-                    }
-                }
-                if skip {
-                    println!("[detector] skip: already recording");
-                    continue;
-                }
-                if tokio::time::Instant::now() < in_cooldown_until {
-                    println!("[detector] skip: cooldown");
-                    continue;
-                }
+            }
+            if skip {
+                println!("[detector] skip: already recording");
+                continue;
+            }
 
-                let platform = apps.first().map(|a| a.name.clone()).unwrap_or_else(|| "Meeting".to_string());
-                let normalized = platform.trim().to_lowercase().replace('-', " ");
-                if normalized.is_empty() || normalized == "lexi ai" {
-                    println!("[detector] skip: platform empty or Lexi AI (normalized: {:?})", normalized);
+            // Exclude system processes (e.g. Core Speech).
+            let candidate_apps: Vec<&AppInfo> = apps
+                .iter()
+                .filter(|a| !is_system_app_for_display(a))
+                .collect();
+            // Use only the frontmost app to decide where the meeting is: emit only if the focused
+            // app is in the mic-using list.
+            #[cfg(target_os = "macos")]
+            let frontmost_name = crate::cursor_context::get_cursor_context()
+                .and_then(|c| c.app_name)
+                .unwrap_or_default();
+            #[cfg(not(target_os = "macos"))]
+            let frontmost_name = String::new();
+            let Some(best_app) = candidate_apps
+                .iter()
+                .find(|a| a.name.eq_ignore_ascii_case(&frontmost_name))
+                .copied()
+            else {
+                continue;
+            };
+            if best_app.id.to_lowercase().contains("lexi") {
+                println!("[detector] skip: best app is Lexi");
+                continue;
+            }
+            let app_id = best_app.id.clone();
+            // Use the app's display name (from plist, same kind of source as cursor context).
+            let platform = best_app.name.clone();
+
+            // Per-app cooldown: only skip if this app was recently shown.
+            let now = tokio::time::Instant::now();
+            if let Some(&until) = cooldown_until_by_app.get(&app_id) {
+                if now < until {
+                    println!("[detector] skip: cooldown for app {}", app_id);
                     continue;
                 }
-                let context = MeetingContext {
-                    platform: platform.clone(),
-                };
-                println!("Meeting detected: app={}", context.platform);
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                let _ = app_handle.emit("meeting-detected", context);
-                in_cooldown_until = tokio::time::Instant::now() + cooldown_duration;
+                cooldown_until_by_app.remove(&app_id);
+            }
+
+            let context = MeetingContext {
+                platform: platform.clone(),
+            };
+            println!("Meeting detected: app={}", context.platform);
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let _ = app_handle.emit("meeting-detected", context);
+            cooldown_until_by_app.insert(app_id, now + cooldown_duration);
         }
     });
 }

@@ -56,6 +56,7 @@ mod global_key_listener; // Unified hotkey management
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 
+mod meetings;
 mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
@@ -63,8 +64,7 @@ mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 #[cfg(target_os = "macos")]
 mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
-mod state; // Application state management (auth tokens, transcription tasks, hotkey config)
-mod meetings; // Meetings module
+mod state; // Application state management (auth tokens, transcription tasks, hotkey config) // Meetings module
 
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
 mod titlebar; // Title bar customization (hide title, match background on macOS)
@@ -73,7 +73,6 @@ mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
 mod websocket; // WebSocket connections for OAuth flow
 mod window; // Window management utilities (show, focus, activate) // Tauri commands organized by functionality
-
 
 use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
@@ -125,6 +124,11 @@ use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, updat
 use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type};
 use commands::window::{open_devtools, show_main_window};
+use meetings::commands::{
+    add_meeting_note, create_meeting, delete_meeting, get_meeting_details, list_meetings,
+    send_meeting_chat, start_meeting_recording, stop_meeting_recording, summarize_meeting,
+    update_meeting,
+};
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
 /// Command to control recording state
@@ -212,8 +216,12 @@ pub fn main() {
     }
 
     let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
@@ -428,7 +436,6 @@ pub fn main() {
             {
                 // Spawn the unified recording thread
                 spawn_recording_thread(app_handle.clone(), recording_rx);
-                
                 // Start background meeting detector
                 meetings::detector::start_meeting_detector(app_handle.clone());
             }

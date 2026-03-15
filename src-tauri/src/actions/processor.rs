@@ -6,13 +6,13 @@
 use crate::actions::service::ActionService;
 use crate::cursor_context::get_cursor_context;
 use crate::text_injector::TextInjector;
-use crate::tts_service::TtsService;
-use std::time::Instant;
+// use crate::tts_service::TtsService;
+// use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
 /// Process recorded action audio: send to server, then handle response by action type.
 pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
-    let action_start = Instant::now();
+    // let action_start = Instant::now();
     println!(
         "🎯 Processing action audio, size: {} bytes",
         audio_data.len()
@@ -20,7 +20,9 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
     let app_handle_clone = app_handle.clone();
     tauri::async_runtime::spawn(async move {
-        app_handle_clone.emit("processing_start", ()).unwrap_or_default();
+        app_handle_clone
+            .emit("processing_start", ())
+            .unwrap_or_default();
     });
 
     let cursor_context = get_cursor_context();
@@ -36,11 +38,14 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
             // Handle the response based on action type
             match action_response.action_type.as_str() {
+                /*
                 "voice" => {
                     println!("🔊 Voice action - playing audio from server");
                     let app_handle_clone = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        app_handle_clone.emit("tts_speaking", ()).unwrap_or_default();
+                        app_handle_clone
+                            .emit("tts_speaking", ())
+                            .unwrap_or_default();
                     });
 
                     let tts_service = TtsService::new(app_handle.clone());
@@ -55,7 +60,9 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                                     );
                                     let app_handle_clone = app_handle.clone();
                                     tauri::async_runtime::spawn(async move {
-                                        app_handle_clone.emit("tts_success", ()).unwrap_or_default();
+                                        app_handle_clone
+                                            .emit("tts_success", ())
+                                            .unwrap_or_default();
                                     });
                                 }
                                 Err(e) => {
@@ -81,6 +88,7 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                         }
                     }
                 }
+                */
                 "text" => {
                     println!("📝 Text action - injecting text");
                     let injector = TextInjector::new();
@@ -88,7 +96,9 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                         Ok(_) => {
                             let app_handle_clone = app_handle.clone();
                             tauri::async_runtime::spawn(async move {
-                                app_handle_clone.emit("injection_success", ()).unwrap_or_default();
+                                app_handle_clone
+                                    .emit("injection_success", ())
+                                    .unwrap_or_default();
                             });
                         }
                         Err(e) => {

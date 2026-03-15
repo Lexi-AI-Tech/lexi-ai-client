@@ -100,7 +100,10 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
     let auth_token = match get_auth_token_async(app).await {
         Ok(token) => token,
         Err(e) if e == "network_error" => {
-            return Err("Network error while trying to authenticate. Please check your connection.".to_string());
+            return Err(
+                "Network error while trying to authenticate. Please check your connection."
+                    .to_string(),
+            );
         }
         Err(_) => {
             crate::commands::auth::handle_auth_expired(app);
@@ -208,10 +211,10 @@ pub(crate) fn sync_autostart_status(app: &AppHandle, config: &mut AppConfig) {
 pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
     // Default to true (icon is visible) if not set
     let show_icon = config.show_icon.unwrap_or(true);
-    
+
     // Tauri's set_dock_visibility under the hood calls macOS TransformProcessType
     let _ = app.set_dock_visibility(show_icon);
-    
+
     println!("✅ Synced: app icon shown = {}", show_icon);
 }
 

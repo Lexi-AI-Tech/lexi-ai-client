@@ -159,7 +159,8 @@ fn check_audio_capture_permission_tcc() -> Option<bool> {
 
     type PreflightFn = unsafe extern "C" fn(*mut std::ffi::c_void, *mut std::ffi::c_void) -> i32;
     let sym = b"TCCAccessPreflight\0";
-    let preflight_ptr = unsafe { libc::dlsym(handle.as_ptr(), sym.as_ptr() as *const libc::c_char) };
+    let preflight_ptr =
+        unsafe { libc::dlsym(handle.as_ptr(), sym.as_ptr() as *const libc::c_char) };
     if preflight_ptr.is_null() {
         return None;
     }

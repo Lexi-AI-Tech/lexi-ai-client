@@ -463,7 +463,9 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Result<String, String> {
                     return Ok(new_token);
                 }
                 Ok(None) => {
-                    eprintln!("⚠️  Token refresh rejected by auth server, user needs to re-authenticate");
+                    eprintln!(
+                        "⚠️  Token refresh rejected by auth server, user needs to re-authenticate"
+                    );
                     // Reset flag
                     if let Ok(mut flag) = refresh_flag_clone.lock() {
                         *flag = false;

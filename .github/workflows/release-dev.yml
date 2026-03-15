@@ -1,0 +1,136 @@
+# Dev release: comment "deploy dev" on a PR → build + upload to dev server (no formal GitHub release).
+name: Release Lexi AI Client (dev)
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: read
+  issues: read
+
+jobs:
+  build-and-release-dev:
+    if: github.event.issue.pull_request && contains(github.event.comment.body, 'deploy dev')
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repo (PR head)
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Import Apple Certificate
+        if: matrix.os == 'macos-latest'
+        run: |
+          set -e
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          KEYCHAIN_PASSWORD="${KEYCHAIN_PASSWORD:-temp-build-keychain}"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 \
+            -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security list-keychains -d user -s build.keychain
+          security find-identity -v -p codesigning build.keychain
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+
+      - name: Check version match (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          CARGO_VERSION=$(grep '^version =' src-tauri/Cargo.toml | head -n 1 | awk -F '"' '{print $2}')
+          if [ "$PKG_VERSION" != "$TAURI_VERSION" ] || [ "$PKG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "❌ Version mismatch! package.json: $PKG_VERSION tauri: $TAURI_VERSION cargo: $CARGO_VERSION"
+            exit 1
+          fi
+          echo "VERSION=$PKG_VERSION" >> $GITHUB_ENV
+          echo "✅ Versions match: $PKG_VERSION"
+
+      - name: Get Version
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Building dev version $VERSION"
+
+      - name: Read Release Notes (dev)
+        id: read_changelog
+        run: |
+          CHANGELOG_PATH="changelog/${{ env.VERSION }}.md"
+          if [ -f "$CHANGELOG_PATH" ]; then
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "RELEASE_NOTES<<$EOF" >> $GITHUB_ENV
+            cat "$CHANGELOG_PATH" >> $GITHUB_ENV
+            echo "$EOF" >> $GITHUB_ENV
+          else
+            echo "RELEASE_NOTES=Dev build from PR #${{ github.event.issue.number }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build Tauri App (dev, draft release)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: "dev-${{ github.run_id }}"
+          releaseName: "Lexi AI Dev (PR #${{ github.event.issue.number }})"
+          releaseBody: ${{ env.RELEASE_NOTES }}
+          releaseDraft: true
+          prerelease: true
+          args: --target ${{ matrix.target }}
+
+      - name: Publish update manifest to Lexi AI Dev Server
+        if: success() && matrix.os == 'macos-latest'
+        env:
+          UPDATE_POST_URL: "https://dev-server.speaklexi.com/api/v1/updates"
+          APP_RELEASES_API_KEY: ${{ secrets.APP_RELEASES_API_KEY }}
+        run: |
+          VERSION="${{ env.VERSION }}"
+          TARGET="darwin"
+          BUNDLE_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Lexi AI.app.tar.gz"
+          DMG_ORIGINAL="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Lexi AI_${VERSION}_aarch64.dmg"
+          DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/LexiAI-Installer.dmg"
+          cp "$DMG_ORIGINAL" "$DMG_PATH"
+          SIG_CONTENT=$(cat "$BUNDLE_PATH.sig")
+          echo "Uploading to dev server..."
+          curl -X POST "$UPDATE_POST_URL" \
+               -H "X-API-Key: $APP_RELEASES_API_KEY" \
+               -F "version=$VERSION" \
+               -F "target=$TARGET" \
+               -F "notes=$RELEASE_NOTES" \
+               -F "updater_signature=$SIG_CONTENT" \
+               -F "updater_file=@$BUNDLE_PATH" \
+               -F "installer_file=@$DMG_PATH" \
+               --fail --show-error
+          echo "Successfully uploaded to Lexi AI Dev Server!"
