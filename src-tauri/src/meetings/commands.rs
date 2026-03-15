@@ -3,6 +3,7 @@
 //! Tauri commands for managing meetings and meeting recording.
 
 use crate::commands::auth::get_auth_token_async;
+use crate::commands::docs::{create_doc as create_local_doc, Doc as LocalDoc};
 use crate::state::MeetingState;
 use crate::utils;
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,8 @@ pub struct Meeting {
     pub platform: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub summary: Option<String>,
     pub transcripts: Option<Vec<MeetingTranscriptSegment>>,
 }
 
@@ -44,6 +47,12 @@ pub struct MeetingUpdate {
 pub struct MeetingChatRequest {
     pub content: String,
     pub history: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateMeetingDocRequest {
+    pub doc_kind: String,
+    pub title: Option<String>,
 }
 
 /// Create a new meeting
@@ -450,7 +459,7 @@ pub async fn send_meeting_chat(
         .await
         .map_err(|_| "Authentication required")?;
 
-    let client = crate::utils::create_http_client();
+    let client = crate::utils::create_http_client_long_timeout();
     let url = format!("{}/api/v1/meetings/{}/chat", crate::config::api_base_url(), meeting_id);
 
     let payload = MeetingChatRequest { content, history };
@@ -466,7 +475,14 @@ pub async fn send_meeting_chat(
         .map_err(|e| format!("Request failed: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        let err_msg = if body.is_empty() {
+            format!("Server error: {}", status)
+        } else {
+            format!("Server error {}: {}", status, body)
+        };
+        return Err(err_msg);
     }
 
     let message: serde_json::Value = response
@@ -475,4 +491,125 @@ pub async fn send_meeting_chat(
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
     Ok(message)
+}
+
+/// Get suggested Q&A questions for a meeting (generated from summary content).
+#[tauri::command]
+pub async fn get_meeting_suggested_questions(
+    app: AppHandle,
+    meeting_id: String,
+) -> Result<Vec<String>, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let client = crate::utils::create_http_client();
+    let url = format!(
+        "{}/api/v1/meetings/{}/suggested-questions",
+        crate::config::api_base_url(),
+        meeting_id
+    );
+
+    utils::log_api_request("Get meeting suggested questions", "GET", &url);
+
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Server error: {} - {}", status, body));
+    }
+
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let questions = data
+        .get("questions")
+        .and_then(|q| q.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Ok(questions)
+}
+
+/// Create a rich-text doc from a meeting (using server-side AI + meeting summary/transcript).
+#[tauri::command]
+pub async fn create_doc_from_meeting(
+    app: AppHandle,
+    meeting_id: String,
+    title: String,
+    instructions: String,
+) -> Result<LocalDoc, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let client = crate::utils::create_http_client();
+    let url = format!(
+        "{}/api/v1/meetings/{}/create-doc",
+        crate::config::api_base_url(),
+        meeting_id
+    );
+
+    let payload = serde_json::json!({
+        "title": title.trim(),
+        "instructions": instructions.trim(),
+    });
+
+    utils::log_api_request("Create doc from meeting", "POST", &url);
+
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Server error: {} - {}", status, body));
+    }
+
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let content = data
+        .get("content")
+        .or_else(|| data.get("data").and_then(|d| d.get("content")))
+        .and_then(|c| c.as_str())
+        .ok_or_else(|| "Missing content in response".to_string())?
+        .to_string();
+
+    let resolved_title = data
+        .get("title")
+        .and_then(|t| t.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| {
+            let t = title.trim().to_string();
+            if t.is_empty() {
+                "Meeting Document".to_string()
+            } else {
+                t
+            }
+        });
+
+    // Store doc locally using existing docs store
+    let doc = create_local_doc(app, Some(resolved_title), Some(content))?;
+    Ok(doc)
 }

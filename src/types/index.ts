@@ -207,6 +207,19 @@ export interface PaginatedNotesResponse {
 }
 
 // ============================================================================
+// Docs Types (rich-text, Notion-style)
+// ============================================================================
+
+export interface Doc {
+  id: string;
+  title: string;
+  /** TipTap/ProseMirror JSON document as string */
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
 // UI Component Types
 // ============================================================================
 
@@ -262,7 +275,8 @@ export interface SidebarProps {
   | "actions"
   | "shortcuts"
   | "notes"
-  | "meetings";
+  | "meetings"
+  | "docs";
   onNavigate: (
     page:
       | "home"
@@ -272,7 +286,8 @@ export interface SidebarProps {
       | "actions"
       | "shortcuts"
       | "notes"
-      | "meetings",
+      | "meetings"
+      | "docs",
   ) => void;
 }
 

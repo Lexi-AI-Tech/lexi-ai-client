@@ -7,7 +7,7 @@
 
 use super::recorder::AudioRecorder;
 use crate::actions::processor::process_action_audio;
-use crate::assistant::processor::process_audio;
+use crate::assistant::processor::{process_audio, process_audio_for_doc};
 use crate::RecordingCommand;
 use std::sync::mpsc;
 use std::thread;
@@ -36,6 +36,7 @@ enum RecordingError {
 enum RecordingMode {
     Assistant,
     Action,
+    Doc,
 }
 
 /// Recording context with state machine
@@ -135,10 +136,15 @@ pub fn spawn_recording_thread(
                 | (
                     RecordingCommand::ActionStart,
                     RecordingPhase::Idle | RecordingPhase::Error(_),
+                )
+                | (
+                    RecordingCommand::DocStart,
+                    RecordingPhase::Idle | RecordingPhase::Error(_),
                 ) => {
                     // distinct mode setup
                     ctx.mode = match command {
                         RecordingCommand::ActionStart => RecordingMode::Action,
+                        RecordingCommand::DocStart => RecordingMode::Doc,
                         _ => RecordingMode::Assistant,
                     };
 
@@ -193,6 +199,11 @@ pub fn spawn_recording_thread(
                                             .emit("action_recording_started", ())
                                             .unwrap_or_default();
                                     }
+                                    RecordingMode::Doc => {
+                                        app_handle_clone
+                                            .emit("doc_recording_started", ())
+                                            .unwrap_or_default();
+                                    }
                                 }
                             });
                         }
@@ -221,6 +232,10 @@ pub fn spawn_recording_thread(
                 (RecordingCommand::Stop, RecordingPhase::Recording | RecordingPhase::Starting)
                 | (
                     RecordingCommand::ActionStop,
+                    RecordingPhase::Recording | RecordingPhase::Starting,
+                )
+                | (
+                    RecordingCommand::DocStop,
                     RecordingPhase::Recording | RecordingPhase::Starting,
                 ) => {
                     // Verify command matches mode?
@@ -255,6 +270,11 @@ pub fn spawn_recording_thread(
                                                 .emit("action_recording_stopped", ())
                                                 .unwrap_or_default();
                                         }
+                                        RecordingMode::Doc => {
+                                            app_handle_clone
+                                                .emit("doc_recording_stopped", ())
+                                                .unwrap_or_default();
+                                        }
                                     }
                                 });
 
@@ -265,8 +285,13 @@ pub fn spawn_recording_thread(
                                         MIN_RECORDING_DURATION.as_secs_f64()
                                     );
                                     let app_handle_clone = app_handle.clone();
+                                    let mode_skip = ctx.mode;
                                     tauri::async_runtime::spawn(async move {
-                                        app_handle_clone.emit("recording_skipped", ()).unwrap_or_default();
+                                        if mode_skip == RecordingMode::Doc {
+                                            let _ = app_handle_clone.emit("doc_transcription_error", "Recording too short");
+                                        } else {
+                                            app_handle_clone.emit("recording_skipped", ()).unwrap_or_default();
+                                        }
                                     });
                                 } else {
                                     // Process the audio based on mode
@@ -275,12 +300,14 @@ pub fn spawn_recording_thread(
                                             process_audio(audio_data, app_handle.clone());
                                         }
                                         RecordingMode::Action => {
-                                            // Process action asynchronously embedded or in processor
                                             let app_handle_clone = app_handle.clone();
                                             tauri::async_runtime::spawn(async move {
                                                 process_action_audio(audio_data, app_handle_clone)
                                                     .await;
                                             });
+                                        }
+                                        RecordingMode::Doc => {
+                                            process_audio_for_doc(audio_data, app_handle.clone());
                                         }
                                     }
                                 }
@@ -355,12 +382,15 @@ pub fn spawn_recording_thread(
                 // Ignoring duplicates and mid-state switches
                 (RecordingCommand::Start, _)
                 | (RecordingCommand::ActionStart, _)
+                | (RecordingCommand::DocStart, _)
                 | (RecordingCommand::SwitchToAction, _)
                 | (RecordingCommand::SwitchToAssistant, _) => {
                     // Already recording/starting/stopping or switch invalid
                 }
 
-                (RecordingCommand::Stop, _) | (RecordingCommand::ActionStop, _) => {
+                (RecordingCommand::Stop, _)
+                | (RecordingCommand::ActionStop, _)
+                | (RecordingCommand::DocStop, _) => {
                     // Not recording, nothing to stop
                 }
             }

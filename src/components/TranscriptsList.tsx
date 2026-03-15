@@ -33,6 +33,10 @@ export const TranscriptsList: React.FC = () => {
   const [audioProgress, setAudioProgress] = useState<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // App icons for the App column (macOS: data URLs from get_app_icon)
+  const [appIcons, setAppIcons] = useState<Record<string, string | null>>({});
+  const appIconsRequestedRef = useRef<Set<string>>(new Set());
+
   // Infinite scrolling observer
   const observer = useRef<IntersectionObserver | null>(null);
   const lastElementRef = useCallback(
@@ -98,6 +102,22 @@ export const TranscriptsList: React.FC = () => {
     authStore.tokens?.access_token,
     page,
   ]);
+
+  // Fetch app icons for unique focused_app names (macOS only; Tauri returns data URL or null)
+  useEffect(() => {
+    transcripts.forEach((t) => {
+      const name = (t.focused_app || "").trim();
+      if (!name || appIconsRequestedRef.current.has(name)) return;
+      appIconsRequestedRef.current.add(name);
+      invoke<string | null>("get_app_icon", { appName: name })
+        .then((url) => {
+          setAppIcons((prev) => ({ ...prev, [name]: url ?? null }));
+        })
+        .catch(() => {
+          setAppIcons((prev) => ({ ...prev, [name]: null }));
+        });
+    });
+  }, [transcripts]);
 
   const openDeleteConfirm = (transcriptId: string) => {
     setDeleteConfirmId(transcriptId);
@@ -322,7 +342,25 @@ export const TranscriptsList: React.FC = () => {
                   })()}
                 </div>
                 <div className="transcript-cell transcript-cell-app">
-                  {transcript.focused_app || "—"}
+                  {(() => {
+                    const appName = transcript.focused_app || "";
+                    const iconUrl = appName ? appIcons[appName] ?? undefined : undefined;
+                    return (
+                      <div className="transcript-cell-app__content">
+                        {iconUrl ? (
+                          <img
+                            src={iconUrl}
+                            alt=""
+                            className="transcript-cell-app__icon"
+                            title={appName || undefined}
+                          />
+                        ) : null}
+                        <span className="transcript-cell-app__name">
+                          {appName || "—"}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="transcript-cell transcript-cell-meta">
                   <div className="transcript-actions-cell">
