@@ -370,22 +370,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         }
     };
 
-    const formatMeetingDate = (createdAt: string) => {
-        try {
-            if (!createdAt) return "";
-            const d = new Date(createdAt);
-            return d.toLocaleDateString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-        } catch {
-            return "";
-        }
-    };
-
     const PAGE_VARIANTS = {
         hidden: { opacity: 0 },
         visible: {
