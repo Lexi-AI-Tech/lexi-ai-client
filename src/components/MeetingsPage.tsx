@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../store/authStore";
 import { MeetingsBreadcrumbs } from "./meetings/MeetingsBreadcrumbs";
@@ -7,32 +7,44 @@ import { MeetingDetailPage } from "./meetings/MeetingDetailPage";
 import "./meetings.css";
 
 interface TranscriptSegment {
-    id: string;
-    segment_index: number;
-    start_time: string;
-    end_time: string;
-    text: string;
-    message_type: string;
+  id: string;
+  segment_index: number;
+  start_time: string;
+  end_time: string;
+  text: string;
+  /** user_audio (mic, right), system_audio (system, left), user_note (typed note) */
+  message_type: string;
+}
+
+interface Meeting {
+  id: string;
+  name: string;
+  platform: string | null;
+  created_at: string;
+  summary?: string | null;
+  transcripts?: TranscriptSegment[];
 }
 
 interface MeetingsPageProps {
-    autoStart?: boolean;
-    autoStartPlatform?: string | null;
-    onAutoStartConsumed?: () => void;
-    pillMeetingId?: string | null;
-    onPillMeetingConsumed?: () => void;
-    triggerEndMeetingFromTray?: boolean;
-    onEndMeetingFromTrayConsumed?: () => void;
+  autoStart?: boolean;
+  autoStartPlatform?: string | null;
+  onAutoStartConsumed?: () => void;
+  /** When a meeting is started from the pill overlay, focus that meeting and show transcript tab. */
+  pillMeetingId?: string | null;
+  onPillMeetingConsumed?: () => void;
+  /** When true, open the end-meeting confirmation modal (e.g. from tray "Stop Meeting"). */
+  triggerEndMeetingFromTray?: boolean;
+  onEndMeetingFromTrayConsumed?: () => void;
 }
 
 export const MeetingsPage: React.FC<MeetingsPageProps> = ({
-    autoStart,
-    autoStartPlatform,
-    onAutoStartConsumed,
-    pillMeetingId,
-    onPillMeetingConsumed,
-    triggerEndMeetingFromTray,
-    onEndMeetingFromTrayConsumed,
+  autoStart,
+  autoStartPlatform,
+  onAutoStartConsumed,
+  pillMeetingId,
+  onPillMeetingConsumed,
+  triggerEndMeetingFromTray,
+  onEndMeetingFromTrayConsumed,
 }) => {
     const { tokens } = useAuthStore();
     const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -209,9 +221,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                         )}
                     </div>
                 )}
-            </div>
 
-            {selectedMeetingId ? (
+                {selectedMeetingId ? (
                 <MeetingDetailPage
                     meetingId={selectedMeetingId}
                     meeting={selectedMeeting}
@@ -253,6 +264,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                     isGeneratingSummary={false}
                 />
             )}
+            </div>
         </div>
     );
 };

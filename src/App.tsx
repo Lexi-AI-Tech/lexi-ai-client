@@ -24,6 +24,7 @@ import { MeetingsPage } from "./components/MeetingsPage";
 import { DocsPage } from "./components/docs/DocsPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
+import { useAutoUpdater } from "./hooks/useAutoUpdater";
 
 const ONBOARDING_VERSION = 1;
 
@@ -47,6 +48,9 @@ function App() {
   const [onboardingSyncDone, setOnboardingSyncDone] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const prevCompletedRef = useRef(isCompleted);
+
+  // Initialize auto-updating background worker
+  useAutoUpdater();
 
   // When a meeting is started from the pill overlay, we want to:
   // 1. Switch to the Meetings page
@@ -120,16 +124,19 @@ function App() {
     invoke<boolean>("check_input_monitoring_permission")
       .then((granted) => {
         if (granted) {
-          invoke("start_global_key_listener").catch(() => { });
+          invoke("start_global_key_listener").catch(() => {});
         }
       })
-      .catch(() => { });
+      .catch(() => {});
   }, [isCompleted]);
 
   // Listen for "Start Meeting" from system tray
   const [pendingTrayMeeting, setPendingTrayMeeting] = useState(false);
-  const [pendingTrayMeetingPlatform, setPendingTrayMeetingPlatform] = useState<string | null>(null);
-  const [triggerEndMeetingFromTray, setTriggerEndMeetingFromTray] = useState(false);
+  const [pendingTrayMeetingPlatform, setPendingTrayMeetingPlatform] = useState<
+    string | null
+  >(null);
+  const [triggerEndMeetingFromTray, setTriggerEndMeetingFromTray] =
+    useState(false);
   useEffect(() => {
     let cancelled = false;
     const setup = async () => {
@@ -158,7 +165,9 @@ function App() {
       }
     };
     let unlistenFn: (() => void) | undefined;
-    setup().then((fn) => { unlistenFn = fn; });
+    setup().then((fn) => {
+      unlistenFn = fn;
+    });
     return () => {
       cancelled = true;
       if (unlistenFn) unlistenFn();

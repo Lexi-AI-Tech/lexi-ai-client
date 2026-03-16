@@ -48,9 +48,9 @@ const SYSTEM_AUDIO_TAP_NAME: &str = "lexi-audio-tap";
 
 #[cfg(target_os = "macos")]
 fn run_system_audio_capture(sender: mpsc::Sender<Vec<u8>>, stop_rx: mpsc::Receiver<()>) {
-    use std::sync::atomic::{AtomicBool, Ordering};
     use cidre::{cf, core_audio as ca, ns};
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     let shutting_down = Arc::new(AtomicBool::new(false));
     let shutting_down_cb = Arc::clone(&shutting_down);
@@ -119,7 +119,11 @@ fn run_system_audio_capture(sender: mpsc::Sender<Vec<u8>>, stop_rx: mpsc::Receiv
 
     let host = cpal::default_host();
     let device = match host.input_devices().ok().and_then(|mut devs| {
-        devs.find(|d| d.name().map(|n| n == SYSTEM_AUDIO_TAP_NAME).unwrap_or(false))
+        devs.find(|d| {
+            d.name()
+                .map(|n| n == SYSTEM_AUDIO_TAP_NAME)
+                .unwrap_or(false)
+        })
     }) {
         Some(d) => d,
         None => {
@@ -207,7 +211,10 @@ pub fn start_meeting_audio(
         let mut recorder = super::recorder::AudioRecorder::new();
         if let Err(e) = recorder.start_recording(Some(mic_tx)) {
             eprintln!("Meeting mic recording failed: {}", e);
-            let _ = app_recorder.emit("meeting-websocket-error", format!("Recording failed: {}", e));
+            let _ = app_recorder.emit(
+                "meeting-websocket-error",
+                format!("Recording failed: {}", e),
+            );
             return;
         }
         let _ = recorder_stop_rx.recv();

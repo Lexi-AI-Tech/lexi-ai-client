@@ -12,6 +12,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
+import { useUpdaterStore } from "./store/updaterStore";
+import { relaunch } from "@tauri-apps/plugin-process";
 // import { playSound } from "./lib/soundUtils";
 // Note: Do NOT import index.css here - it adds opaque backgrounds that break transparency
 
@@ -50,7 +52,8 @@ export const Pill: React.FC = () => {
   const [isHovered, setIsHovered] = useState(false);
   const [audioLevels, setAudioLevels] = useState<number[]>([]);
   const [smoothedLevels, setSmoothedLevels] = useState<number[]>([]);
-  const [meetingContext, setMeetingContext] = useState<MeetingDetectedPayload | null>(null);
+  const [meetingContext, setMeetingContext] =
+    useState<MeetingDetectedPayload | null>(null);
   const [meetingCountdown, setMeetingCountdown] = useState(0); // 0 = not in countdown, 1–5 = seconds left
   const isRecordingRef = useRef(false);
   const hasRealAudioRef = useRef(false); // Track if we're receiving real volume data
@@ -75,9 +78,23 @@ export const Pill: React.FC = () => {
     });
   }, [audioLevels]);
 
-  // Reset audio levels when not recording
+  // Reset audio levels when not recording, and sync idle status to the global updater
   useEffect(() => {
     isRecordingRef.current = status === "recording";
+
+    // Tell the global updater whether the app is currently in use (so it doesn't forcefully restart)
+    useUpdaterStore.getState().setIsAppBusy(status !== "idle");
+
+    if (status === "idle") {
+      // If we just became idle and a patch update finished downloading in the background, reboot now!
+      if (useUpdaterStore.getState().isPatchRebootPending) {
+        console.log(
+          "🔄 App has returned to idle and a patch update is waiting. Restarting now...",
+        );
+        setTimeout(() => relaunch(), 1500); // 1.5s visual delay before jarring restart so animations have time to settle
+      }
+    }
+
     if (status !== "recording") {
       setAudioLevels([]);
       setSmoothedLevels([]);
@@ -126,7 +143,10 @@ export const Pill: React.FC = () => {
       if (!idlePositionRef.current) return;
       await window.setSize(new LogicalSize(IDLE_SIZE.width, IDLE_SIZE.height));
       await window.setPosition(
-        new LogicalPosition(idlePositionRef.current.x, idlePositionRef.current.y),
+        new LogicalPosition(
+          idlePositionRef.current.x,
+          idlePositionRef.current.y,
+        ),
       );
     } catch (e) {
       console.error("Failed to reset pill to idle:", e);
@@ -134,7 +154,9 @@ export const Pill: React.FC = () => {
   }, []);
 
   // 5-second countdown when in meeting_detected: when it hits 0, return to idle
-  const meetingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const meetingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   useEffect(() => {
     if (status !== "meeting_detected") return;
     meetingIntervalRef.current = setInterval(() => {
@@ -1031,7 +1053,9 @@ export const Pill: React.FC = () => {
                     gap: 4,
                   }}
                 >
-                  <div style={{ position: "relative", width: size, height: size }}>
+                  <div
+                    style={{ position: "relative", width: size, height: size }}
+                  >
                     <svg
                       width={size}
                       height={size}
@@ -1062,7 +1086,9 @@ export const Pill: React.FC = () => {
                       />
                     </svg>
                   </div>
-                  <span style={{ fontSize: 10, opacity: 0.9 }}>Click to start</span>
+                  <span style={{ fontSize: 10, opacity: 0.9 }}>
+                    Click to start
+                  </span>
                 </div>
               );
             })()
