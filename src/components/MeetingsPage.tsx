@@ -181,15 +181,11 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
 
     return (
         <div className={`page ${selectedMeetingId ? "page--meetings-detail" : ""}`}>
-            <div className="meetings-page-header">
-                {selectedMeeting ? (
+            {selectedMeetingId && selectedMeeting && (
+                <div className="meetings-page-header">
                     <div className="meetings-page-header__title">
                         {selectedMeeting.name || "Untitled Meeting"}
                     </div>
-                ) : (
-                    <div className="meetings-page-header__title">Meetings</div>
-                )}
-                {selectedMeeting && (
                     <div className="meetings-page-header__meta">
                         {recordingMeetingId === selectedMeetingId && (
                             <span className="meetings-page-header__badge meetings-page-header__badge--live">
@@ -203,8 +199,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                             </span>
                         )}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
             {selectedMeetingId ? (
                 <MeetingDetailPage
