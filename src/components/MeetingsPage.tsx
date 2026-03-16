@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../store/authStore";
-import { MeetingsBreadcrumbs } from "./meetings/MeetingsBreadcrumbs";
 import { MeetingsListPage, type Meeting } from "./meetings/MeetingsListPage";
 import { MeetingDetailPage } from "./meetings/MeetingDetailPage";
 import "./meetings.css";
@@ -178,14 +177,6 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
         setLiveSegments((prev) => [...prev, segment]);
     }, []);
 
-    const breadcrumbItems =
-        selectedMeetingId && selectedMeeting
-            ? [
-                  { label: "Meetings", onClick: () => setSelectedMeetingId(null) },
-                  { label: selectedMeeting.name || "Untitled Meeting" },
-              ]
-            : [{ label: "Meetings" }];
-
     const formatMeetingDate = (m: Meeting | null) => {
         if (!m?.created_at) return null;
         try {
@@ -205,7 +196,13 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     return (
         <div className={`page ${selectedMeetingId ? "page--meetings-detail" : ""}`}>
             <div className="meetings-page-header">
-                <MeetingsBreadcrumbs items={breadcrumbItems} />
+                {selectedMeeting ? (
+                    <div className="meetings-page-header__title">
+                        {selectedMeeting.name || "Untitled Meeting"}
+                    </div>
+                ) : (
+                    <div className="meetings-page-header__title">Meetings</div>
+                )}
                 {selectedMeeting && (
                     <div className="meetings-page-header__meta">
                         {recordingMeetingId === selectedMeetingId && (

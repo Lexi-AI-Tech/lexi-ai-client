@@ -190,7 +190,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                             }
                             streamingForMeetingIdRef.current = null;
                             setIsGeneratingSummary(false);
-                            return [];
+                            // Keep `streamingLines` as the rendered source of truth so the UI
+                            // doesn't "jump" from streaming → full re-render on completion.
+                            return prev;
                         });
                         setSuggestedQuestions(null);
                         return;
@@ -246,8 +248,11 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         } catch (error) {
             console.error("Failed to generate meeting summary:", error);
             streamingForMeetingIdRef.current = null;
-        } finally {
             setIsGeneratingSummary(false);
+        } finally {
+            // Don't flip `isGeneratingSummary` here.
+            // We rely on the `meeting-summary-stream` { done: true } event so the UI
+            // doesn't enter a brief "done but still rendering" state.
         }
     };
 

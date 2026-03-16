@@ -77,6 +77,14 @@
   margin-bottom: 1rem;
 }
 
+.meetings-page-header__title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: #111827;
+  line-height: 1.1;
+}
+
 .meetings-breadcrumbs {
   display: flex;
   align-items: center;
@@ -544,13 +552,20 @@
   color: #4b5563;
 }
 
+.meetings-summary-stream {
+  position: relative;
+}
+
 .meetings-summary-stream__cursor {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   display: inline-block;
-  margin-top: 0.25rem;
   font-size: 1rem;
   color: #3b82f6;
   font-family: ui-monospace, monospace;
   animation: meetings-summary-cursor-blink 1s ease-in-out infinite;
+  pointer-events: none;
 }
 
 @keyframes meetings-summary-cursor-blink {
