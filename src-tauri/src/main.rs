@@ -124,11 +124,6 @@ use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, updat
 use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type};
 use commands::window::{open_devtools, show_main_window};
-use meetings::commands::{
-    add_meeting_note, create_meeting, delete_meeting, get_meeting_details, list_meetings,
-    send_meeting_chat, start_meeting_recording, stop_meeting_recording, summarize_meeting,
-    update_meeting,
-};
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
 /// Command to control recording state
