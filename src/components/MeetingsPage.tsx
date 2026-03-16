@@ -11,17 +11,7 @@ interface TranscriptSegment {
   start_time: string;
   end_time: string;
   text: string;
-  /** user_audio (mic, right), system_audio (system, left), user_note (typed note) */
   message_type: string;
-}
-
-interface Meeting {
-  id: string;
-  name: string;
-  platform: string | null;
-  created_at: string;
-  summary?: string | null;
-  transcripts?: TranscriptSegment[];
 }
 
 interface MeetingsPageProps {
@@ -51,7 +41,6 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     const [openToSummaryTab, setOpenToSummaryTab] = useState(false);
     const [recordingMeetingId, setRecordingMeetingId] = useState<string | null>(null);
     const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
-    const [isInitializingMeeting, setIsInitializingMeeting] = useState(false);
 
     const selectedMeeting = selectedMeetingId
         ? meetings.find((m) => m.id === selectedMeetingId) ?? null
@@ -125,15 +114,12 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
             setMeetings((prev) => [newMeeting, ...prev]);
             setSelectedMeetingId(newMeeting.id);
             setRecordingMeetingId(newMeeting.id);
-            setIsInitializingMeeting(true);
 
             try {
                 await invoke("start_meeting_recording", { meetingId: newMeeting.id });
             } catch (error) {
                 console.error("Failed to start meeting recording:", error);
                 setRecordingMeetingId(null);
-            } finally {
-                setIsInitializingMeeting(false);
             }
         } catch (error) {
             console.error("Failed to create new meeting:", error);
