@@ -4,6 +4,28 @@ import { ChevronRight, FileText, Plus, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
 import "./docs-list.css";
 
+const PREVIEW_MAX_LENGTH = 140;
+
+/** Extract plain text only from TipTap JSON (no formatting). */
+function docContentToPlainText(contentJson: string | undefined): string {
+  if (!contentJson?.trim()) return "";
+  try {
+    const doc = JSON.parse(contentJson) as { text?: string; content?: unknown[] };
+    const parts: string[] = [];
+    function visit(n: { text?: string; content?: unknown[] } | undefined): void {
+      if (!n) return;
+      if (typeof n.text === "string") parts.push(n.text);
+      if (Array.isArray(n.content)) n.content.forEach((c) => visit(c as { text?: string; content?: unknown[] }));
+    }
+    visit(doc);
+    const raw = parts.join(" ").replace(/\s+/g, " ").trim();
+    if (raw.length <= PREVIEW_MAX_LENGTH) return raw;
+    return raw.slice(0, PREVIEW_MAX_LENGTH).trim() + "…";
+  } catch {
+    return "";
+  }
+}
+
 interface DocsListPageProps {
   docs: Doc[];
   onRefreshDocs: () => void;
@@ -125,7 +147,9 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
               initial="hidden"
               animate="visible"
             >
-              {docs.map((doc) => (
+              {docs.map((doc) => {
+                const previewText = docContentToPlainText(doc.content);
+                return (
                 <motion.div
                   key={doc.id}
                   className="docs-list-page__card"
@@ -151,9 +175,11 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
                     <h3 className="docs-list-page__card-title">
                       {doc.title || "Untitled"}
                     </h3>
-                    <p className="docs-list-page__card-summary docs-list-page__card-summary--muted">
-                      Rich text document
-                    </p>
+                    {previewText ? (
+                      <p className="docs-list-page__card-summary">
+                        {previewText}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="docs-list-page__card-actions">
                     <span className="docs-list-page__card-link">
@@ -175,7 +201,8 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
                     </button>
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </motion.div>
           </>
         )}
