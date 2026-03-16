@@ -172,17 +172,18 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     }
   };
 
+  const initial =
+    user?.name?.trim().charAt(0)?.toUpperCase() ||
+    user?.email?.trim().charAt(0)?.toUpperCase() ||
+    "?";
+
   if (isAuthenticated && user) {
     return (
       <div className="auth-user-info">
         <div className="auth-user-details">
-          {user.picture && (
-            <img
-              src={user.picture}
-              alt="Profile"
-              className="auth-user-avatar"
-            />
-          )}
+          <div className="auth-user-initial" aria-hidden="true">
+            {initial}
+          </div>
           <div className="auth-user-text">
             <p className="auth-user-name">{user.name}</p>
             <p className="auth-user-email">{user.email}</p>

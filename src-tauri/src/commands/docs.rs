@@ -1,18 +1,13 @@
 //! Docs Commands
 //!
 //! Tauri commands for managing rich-text documents (Notion-style docs).
-//! Stored locally via Tauri Store; content is TipTap/ProseMirror JSON as string.
+//! All doc data is stored on the backend; these commands call the API.
 
 use crate::commands::auth::get_auth_token_async;
 use crate::RecordingCommand;
 use crate::RecordingCommandTx;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
-use tauri_plugin_store::StoreExt;
-use uuid::Uuid;
-
-const STORE_FILE: &str = ".docs.dat";
-const DOCS_KEY: &str = "docs";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Doc {
@@ -32,113 +27,124 @@ pub struct CreateDocRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateDocRequest {
+    #[serde(rename = "docId")]
+    pub doc_id: String,
     pub title: Option<String>,
     pub content: Option<String>,
 }
 
-fn now_iso() -> String {
-    chrono::Utc::now().to_rfc3339()
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeleteDocRequest {
+    #[serde(rename = "docId")]
+    pub doc_id: String,
 }
 
-fn load_docs(app: &AppHandle) -> Result<Vec<Doc>, String> {
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|e| format!("Failed to access docs storage: {}", e))?;
-    match store.get(DOCS_KEY) {
-        Some(v) => serde_json::from_value(v.clone()).map_err(|e| format!("Invalid docs data: {}", e)),
-        None => Ok(Vec::new()),
+/// Parse API doc response into Doc (pub for use from meeting commands).
+pub fn parse_doc_from_value(v: &serde_json::Value) -> Result<Doc, String> {
+    let id = v.get("id").and_then(|x| x.as_str()).ok_or("Missing id")?.to_string();
+    let title = v.get("title").and_then(|x| x.as_str()).unwrap_or("Untitled").to_string();
+    let content = v.get("content").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let created_at = v.get("created_at").and_then(|x| x.as_str()).ok_or("Missing created_at")?.to_string();
+    let updated_at = v.get("updated_at").and_then(|x| x.as_str()).ok_or("Missing updated_at")?.to_string();
+    Ok(Doc { id, title, content, created_at, updated_at })
+}
+
+fn parse_doc_list(value: serde_json::Value) -> Result<Vec<Doc>, String> {
+    let arr = value.as_array().ok_or("Expected array")?;
+    let mut docs = Vec::with_capacity(arr.len());
+    for v in arr {
+        docs.push(parse_doc_from_value(v)?);
     }
-}
-
-fn save_docs(app: &AppHandle, docs: &[Doc]) -> Result<(), String> {
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|e| format!("Failed to access docs storage: {}", e))?;
-    let value = serde_json::to_value(docs).map_err(|e| e.to_string())?;
-    store.set(DOCS_KEY, value);
-    store.save().map_err(|e| format!("Failed to save docs store: {}", e))?;
-    Ok(())
-}
-
-/// List all docs (newest first)
-#[tauri::command]
-pub fn get_docs(app: AppHandle) -> Result<Vec<Doc>, String> {
-    let mut docs = load_docs(&app)?;
-    docs.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
     Ok(docs)
 }
 
-/// Get a single doc by id
-#[tauri::command]
-pub fn get_doc(app: AppHandle, doc_id: String) -> Result<Option<Doc>, String> {
-    let docs = load_docs(&app)?;
-    Ok(docs.into_iter().find(|d| d.id == doc_id))
-}
-
-/// Create a new doc
-#[tauri::command]
-pub fn create_doc(
-    app: AppHandle,
-    title: Option<String>,
-    content: Option<String>,
-) -> Result<Doc, String> {
-    let mut docs = load_docs(&app)?;
-    let now = now_iso();
-    let doc = Doc {
-        id: Uuid::new_v4().to_string(),
-        title: title.unwrap_or_else(|| "Untitled".to_string()),
-        content: content.unwrap_or_else(|| default_content()),
-        created_at: now.clone(),
-        updated_at: now,
+async fn docs_request(
+    app: &AppHandle,
+    method: &str,
+    url: &str,
+    body: Option<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    let auth_token = get_auth_token_async(app).await.map_err(|_| "Authentication required")?;
+    let client = crate::utils::create_http_client();
+    let mut req = match method {
+        "GET" => client.get(url),
+        "POST" => client.post(url),
+        "PATCH" => client.patch(url),
+        "DELETE" => client.delete(url),
+        _ => return Err("Unsupported method".to_string()),
     };
-    docs.push(doc.clone());
-    save_docs(&app, &docs)?;
-    Ok(doc)
-}
-
-/// Update an existing doc
-#[tauri::command]
-pub fn update_doc(
-    app: AppHandle,
-    doc_id: String,
-    title: Option<String>,
-    content: Option<String>,
-) -> Result<Doc, String> {
-    let mut docs = load_docs(&app)?;
-    let pos = docs.iter().position(|d| d.id == doc_id);
-    let doc = match pos {
-        Some(i) => {
-            let d = &mut docs[i];
-            if let Some(t) = title {
-                d.title = t;
-            }
-            if let Some(c) = content {
-                d.content = c;
-            }
-            d.updated_at = now_iso();
-            d.clone()
-        }
-        None => return Err("Doc not found".to_string()),
-    };
-    save_docs(&app, &docs)?;
-    Ok(doc)
-}
-
-/// Delete a doc
-#[tauri::command]
-pub fn delete_doc(app: AppHandle, doc_id: String) -> Result<(), String> {
-    let mut docs = load_docs(&app)?;
-    let len_before = docs.len();
-    docs.retain(|d| d.id != doc_id);
-    if docs.len() == len_before {
-        return Err("Doc not found".to_string());
+    req = req.header("Authorization", format!("Bearer {}", auth_token));
+    if let Some(b) = body {
+        req = req.header("Content-Type", "application/json").json(&b);
     }
-    save_docs(&app, &docs)?;
-    Ok(())
+    let response = req.send().await.map_err(|e| format!("Request failed: {}", e))?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Server error: {} - {}", status, body));
+    }
+    if response.status().as_u16() == 204 {
+        return Ok(serde_json::Value::Null);
+    }
+    response.json().await.map_err(|e| format!("Invalid response: {}", e))
 }
 
-fn default_content() -> String {
-    r#"{"type":"doc","content":[{"type":"paragraph"}]}"#.to_string()
+/// List all docs (newest first) from the backend.
+#[tauri::command]
+pub async fn get_docs(app: AppHandle) -> Result<Vec<Doc>, String> {
+    let url = crate::api_endpoints::docs::list_url();
+    let value = docs_request(&app, "GET", &url, None).await?;
+    parse_doc_list(value)
+}
+
+/// Get a single doc by id from the backend.
+#[tauri::command]
+pub async fn get_doc(app: AppHandle, doc_id: String) -> Result<Option<Doc>, String> {
+    let url = crate::api_endpoints::docs::doc_url(&doc_id);
+    let value = docs_request(&app, "GET", &url, None).await?;
+    if value.is_null() {
+        return Ok(None);
+    }
+    parse_doc_from_value(&value).map(Some)
+}
+
+/// Create a new doc on the backend.
+#[tauri::command]
+pub async fn create_doc(
+    app: AppHandle,
+    title: Option<String>,
+    content: Option<String>,
+) -> Result<Doc, String> {
+    let url = crate::api_endpoints::docs::list_url();
+    let body = serde_json::json!({
+        "title": title.unwrap_or_else(|| "Untitled".to_string()),
+        "content": content
+    });
+    let value = docs_request(&app, "POST", &url, Some(body)).await?;
+    parse_doc_from_value(&value)
+}
+
+/// Update an existing doc on the backend.
+#[tauri::command]
+pub async fn update_doc(app: AppHandle, payload: UpdateDocRequest) -> Result<Doc, String> {
+    let url = crate::api_endpoints::docs::doc_url(&payload.doc_id);
+    let mut body = serde_json::Map::new();
+    if let Some(t) = payload.title {
+        body.insert("title".to_string(), serde_json::Value::String(t));
+    }
+    if let Some(c) = payload.content {
+        body.insert("content".to_string(), serde_json::Value::String(c));
+    }
+    let value = docs_request(&app, "PATCH", &url, Some(serde_json::Value::Object(body))).await?;
+    parse_doc_from_value(&value)
+}
+
+/// Delete a doc on the backend.
+#[tauri::command]
+pub async fn delete_doc(app: AppHandle, payload: DeleteDocRequest) -> Result<(), String> {
+    let url = crate::api_endpoints::docs::doc_url(&payload.doc_id);
+    docs_request(&app, "DELETE", &url, None).await?;
+    Ok(())
 }
 
 /// Start recording for doc (Docs UI mic button). Emits doc_recording_started; when user stops, transcript is emitted as doc_transcription_ready.

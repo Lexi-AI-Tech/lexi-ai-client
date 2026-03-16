@@ -1,14 +1,48 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { FileText, Mic, Plus, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, Mic, Square, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
 import { useToast } from "../toast/useToast";
 import { PageLoader } from "../ui/PageLoader";
+import { DocsListPage } from "./DocsListPage";
 import { RichTextEditor, type RichTextEditorRef } from "./RichTextEditor";
 import "./docs.css";
 
 const SAVE_DEBOUNCE_MS = 600;
+const SAVE_INDICATOR_MIN_MS = 400;
+
+/** Isolated save indicator so parent doesn't re-render on saving state change */
+export interface SaveIndicatorRef {
+  setSaving: (saving: boolean) => void;
+}
+
+const SaveIndicator = React.forwardRef<
+  SaveIndicatorRef,
+  { isStructuring?: boolean }
+>(function SaveIndicator({ isStructuring }, ref) {
+  const [saving, setSaving] = useState(false);
+  useImperativeHandle(ref, () => ({ setSaving }), []);
+  return (
+    <div className="docs-editor-toolbar-meta docs-editor-toolbar-meta--save-only">
+      {saving && (
+        <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted">
+          Saving…
+        </span>
+      )}
+      {!saving && (
+        <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted">
+          Saved
+        </span>
+      )}
+      {isStructuring && (
+        <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--ai">
+          Structuring from voice…
+        </span>
+      )}
+    </div>
+  );
+});
 
 interface DocsPageProps {
   /** When set, open this doc (e.g. after creating from meeting). Cleared via onInitialDocConsumed. */
@@ -24,17 +58,26 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedContentRef = useRef<string | null>(null);
   const lastSavedTitleRef = useRef<string | null>(null);
+  const lastSavedDocIdRef = useRef<string | null>(null);
   const editorRef = useRef<RichTextEditorRef>(null);
+  const saveIndicatorRef = useRef<SaveIndicatorRef>(null);
   const [isDocRecording, setIsDocRecording] = useState(false);
   const [isStructuring, setIsStructuring] = useState(false);
+  /** Local title for the current doc to avoid setDocs on every keystroke */
+  const [editingTitle, setEditingTitle] = useState("");
 
   const selectedDoc = docs.find((d) => d.id === selectedId);
+
+  // Sync editing title when switching docs
+  useEffect(() => {
+    if (selectedDoc) setEditingTitle(selectedDoc.title || "");
+    else setEditingTitle("");
+  }, [selectedId, selectedDoc?.id, selectedDoc?.title]);
 
   // Listen for doc recording and transcription events
   useEffect(() => {
@@ -132,29 +175,55 @@ export const DocsPage: React.FC<DocsPageProps> = ({
 
   const saveDoc = useCallback(
     async (docId: string, title: string, content: string) => {
+      const startedAt = Date.now();
+      saveIndicatorRef.current?.setSaving(true);
       try {
-        setSaving(true);
         await invoke("update_doc", {
-          docId,
-          title,
-          content,
+          payload: { docId, title, content },
         });
-        setDocs((prev) =>
-          prev.map((d) =>
-            d.id === docId ? { ...d, title, content, updated_at: new Date().toISOString() } : d
-          )
-        );
+        lastSavedDocIdRef.current = docId;
         lastSavedContentRef.current = content;
         lastSavedTitleRef.current = title;
+        // Don't setDocs here — avoids re-rendering the whole page. We'll flush
+        // into docs when the user navigates away (see effect below).
       } catch (err) {
         console.error("Failed to save doc:", err);
         toast.error("Failed to save");
       } finally {
-        setSaving(false);
+        // Show "Saving…" for at least a moment so the user sees feedback even when save is instant
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < SAVE_INDICATOR_MIN_MS) {
+          await new Promise((r) => setTimeout(r, SAVE_INDICATOR_MIN_MS - elapsed));
+        }
+        saveIndicatorRef.current?.setSaving(false);
       }
     },
     [toast]
   );
+
+  // When leaving the current doc, flush last-saved state into docs so the list stays in sync
+  const prevSelectedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevSelectedIdRef.current;
+    prevSelectedIdRef.current = selectedId;
+    if (prev != null && prev !== selectedId && lastSavedDocIdRef.current === prev) {
+      const title = lastSavedTitleRef.current;
+      const content = lastSavedContentRef.current;
+      setDocs((p) =>
+        p.map((d) =>
+          d.id === prev
+            ? {
+                ...d,
+                ...(title != null && { title }),
+                ...(content != null && { content }),
+                updated_at: new Date().toISOString(),
+              }
+            : d
+        )
+      );
+      lastSavedDocIdRef.current = null;
+    }
+  }, [selectedId]);
 
   const debouncedSave = useCallback(
     (docId: string, title: string, content: string) => {
@@ -183,11 +252,6 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     [selectedDoc, debouncedSave]
   );
 
-  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setDeleteConfirmId(id);
-  };
-
   const handleMicClick = async () => {
     if (isDocRecording) {
       try {
@@ -209,7 +273,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     if (!deleteConfirmId) return;
     setDeletingId(deleteConfirmId);
     try {
-      await invoke("delete_doc", { docId: deleteConfirmId });
+      await invoke("delete_doc", { payload: { docId: deleteConfirmId } });
       setDocs((prev) => prev.filter((d) => d.id !== deleteConfirmId));
       if (selectedId === deleteConfirmId) setSelectedId(null);
       setDeleteConfirmId(null);
@@ -221,6 +285,16 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     }
   };
 
+  const handleDeleteDoc = useCallback(
+    async (docId: string) => {
+      await invoke("delete_doc", { payload: { docId } });
+      setDocs((prev) => prev.filter((d) => d.id !== docId));
+      if (selectedId === docId) setSelectedId(null);
+      toast.success("Doc deleted");
+    },
+    [selectedId, toast]
+  );
+
   if (loading) {
     return (
       <div className="docs-page">
@@ -230,210 +304,142 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     );
   }
 
+  const showListView = selectedId === null;
+  const showDetailView = !showListView && selectedDoc;
+
   return (
-    <div className="docs-page">
-      <div className="docs-page__header">
-        <h2 className="docs-page__title">Docs</h2>
-        <button
-          type="button"
-          onClick={handleCreateDoc}
-          className="docs-btn-new"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "10px 16px",
-            background: "#111827",
-            color: "#fff",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "14px",
-            fontWeight: 500,
-            cursor: "pointer",
+    <div className={`docs-page ${showDetailView ? "docs-page--detail" : ""}`}>
+      {showDetailView && selectedDoc && (
+        <div className="docs-page-header">
+          <button
+            type="button"
+            className="docs-page-header__back"
+            onClick={() => setSelectedId(null)}
+            aria-label="Back to docs list"
+          >
+            <ArrowLeft size={20} strokeWidth={2} />
+            <span>Docs</span>
+          </button>
+        </div>
+      )}
+
+      {showListView ? (
+        <DocsListPage
+          docs={docs}
+          onRefreshDocs={fetchDocs}
+          onSelectDoc={setSelectedId}
+          onCreateDoc={handleCreateDoc}
+          onDeleteDoc={async (docId) => {
+            setDeletingId(docId);
+            try {
+              await handleDeleteDoc(docId);
+            } finally {
+              setDeletingId(null);
+            }
           }}
-        >
-          <Plus size={18} />
-          New doc
-        </button>
-      </div>
-
-      <div className="docs-layout">
-        <aside className="docs-sidebar">
-          <div className="docs-sidebar__label">Documents</div>
-          <ul className="docs-list">
-            {docs.length === 0 ? (
-              <li style={{ color: "#9ca3af", fontSize: "14px", padding: "8px 0" }}>
-                No docs yet. Create one to get started.
-              </li>
-            ) : (
-              docs.map((doc) => (
-                <li key={doc.id} className="docs-list__item">
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                    <button
-                      type="button"
-                      className={`docs-list__btn ${selectedId === doc.id ? "is-active" : ""}`}
-                      onClick={() => setSelectedId(doc.id)}
-                    >
-                      <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <FileText size={16} style={{ flexShrink: 0 }} />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {doc.title || "Untitled"}
-                        </span>
-                      </span>
-                      <div className="docs-list__meta">
-                        {new Date(doc.updated_at).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDeleteClick(e, doc.id)}
-                      disabled={!!deletingId}
-                      title="Delete"
-                      style={{
-                        padding: "6px",
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: "6px",
-                        color: "#9ca3af",
-                        cursor: deletingId ? "not-allowed" : "pointer",
-                        opacity: deletingId ? 0.5 : 1,
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </li>
-              ))
-            )}
-          </ul>
-        </aside>
-
-        <div className="docs-editor-pane">
-          {!selectedDoc ? (
-            <div className="docs-editor-pane__empty">
-              <div className="docs-editor-pane__empty-inner">
-                <p>Select a doc from the list or create a new one.</p>
-                <p style={{ fontSize: "13px", marginTop: "8px" }}>
-                  Rich text: headings, lists, bold, italic, quotes, code, and more.
+          deletingId={deletingId}
+        />
+      ) : showDetailView && selectedDoc ? (
+        <div className="docs-detail-layout">
+          <div className="docs-editor-shell">
+            <div className="docs-editor-main">
+              <div className="docs-editor-pane__toolbar docs-editor-pane__toolbar--premium docs-editor-pane__toolbar--detail">
+                <input
+                  type="text"
+                  className="docs-editor-toolbar-title-input"
+                  value={editingTitle}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setEditingTitle(v);
+                    debouncedSave(selectedDoc.id, v, selectedDoc.content);
+                  }}
+                  placeholder="Untitled"
+                  aria-label="Document title"
+                />
+                <SaveIndicator ref={saveIndicatorRef} isStructuring={isStructuring} />
+                <button
+                  type="button"
+                  onClick={handleMicClick}
+                  disabled={isStructuring}
+                  className={`docs-mic-btn ${isDocRecording ? "docs-mic-btn--recording" : ""}`}
+                  title={
+                    isDocRecording
+                      ? "Stop recording"
+                      : "Record voice to add structured content"
+                  }
+                >
+                  {isDocRecording ? (
+                    <Square size={18} fill="currentColor" />
+                  ) : (
+                    <Mic size={18} />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="docs-editor-toolbar-delete"
+                  onClick={() => setDeleteConfirmId(selectedDoc.id)}
+                  disabled={!!deletingId}
+                  title="Delete doc"
+                >
+                  <Trash2 size={18} strokeWidth={1.5} />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                <RichTextEditor
+                  ref={editorRef}
+                  key={selectedDoc.id}
+                  content={selectedDoc.content}
+                  title={selectedDoc.title}
+                  onTitleChange={handleTitleChange}
+                  onUpdate={handleContentUpdate}
+                  placeholder="Start writing…"
+                  editable
+                  showTitle={false}
+                />
+              </div>
+            </div>
+            <aside className="docs-ask-lexi-rail">
+              <div className="docs-ask-lexi-rail__header">
+                <span className="docs-ask-lexi-rail__label">Ask Lexi</span>
+                <p className="docs-ask-lexi-rail__hint">
+                  Turn this doc into briefs, checklists, and summaries with one click.
                 </p>
               </div>
-            </div>
-          ) : (
-            <div className="docs-editor-shell">
-              <div className="docs-editor-main">
-                <div
-                  className="docs-editor-pane__toolbar docs-editor-pane__toolbar--premium"
-                  style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 16px", borderBottom: "1px solid #e5e7eb" }}
+              <div className="docs-ask-lexi-rail__section">
+                <div className="docs-ask-lexi-rail__section-title">Quick transforms</div>
+                <button
+                  type="button"
+                  className="docs-ask-lexi-rail__chip"
+                  disabled={!selectedDoc}
                 >
-                  <div className="docs-editor-toolbar-title">
-                    <span className="docs-editor-toolbar-label">Document</span>
-                    <span className="docs-editor-toolbar-name">
-                      {selectedDoc.title || "Untitled"}
-                    </span>
-                  </div>
-                  <div className="docs-editor-toolbar-meta">
-                    {saving && (
-                      <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted">
-                        Saving…
-                      </span>
-                    )}
-                    {!saving && (
-                      <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted">
-                        Saved
-                      </span>
-                    )}
-                    {isStructuring && (
-                      <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--ai">
-                        Structuring from voice…
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleMicClick}
-                    disabled={isStructuring}
-                    className={`docs-mic-btn ${isDocRecording ? "docs-mic-btn--recording" : ""}`}
-                    title={isDocRecording ? "Stop recording" : "Record voice to add structured content"}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: isDocRecording ? "#fef2f2" : "#f3f4f6",
-                      color: isDocRecording ? "#dc2626" : "#374151",
-                      cursor: isStructuring ? "not-allowed" : "pointer",
-                      opacity: isStructuring ? 0.7 : 1,
-                    }}
-                  >
-                    {isDocRecording ? (
-                      <Square size={18} fill="currentColor" />
-                    ) : (
-                      <Mic size={18} />
-                    )}
-                  </button>
-                </div>
-                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                  <RichTextEditor
-                    ref={editorRef}
-                    key={selectedDoc.id}
-                    content={selectedDoc.content}
-                    title={selectedDoc.title}
-                    onUpdate={handleContentUpdate}
-                    onTitleChange={handleTitleChange}
-                    placeholder="Start writing…"
-                    editable
-                  />
-                </div>
+                  Summarize this doc
+                </button>
+                <button
+                  type="button"
+                  className="docs-ask-lexi-rail__chip"
+                  disabled={!selectedDoc}
+                >
+                  Turn into action list
+                </button>
+                <button
+                  type="button"
+                  className="docs-ask-lexi-rail__chip"
+                  disabled={!selectedDoc}
+                >
+                  Create exec brief
+                </button>
               </div>
-              <aside className="docs-ask-lexi-rail">
-                <div className="docs-ask-lexi-rail__header">
-                  <span className="docs-ask-lexi-rail__label">Ask Lexi</span>
-                  <p className="docs-ask-lexi-rail__hint">
-                    Turn this doc into briefs, checklists, and summaries with one click.
-                  </p>
-                </div>
-                <div className="docs-ask-lexi-rail__section">
-                  <div className="docs-ask-lexi-rail__section-title">Quick transforms</div>
-                  <button
-                    type="button"
-                    className="docs-ask-lexi-rail__chip"
-                    disabled={!selectedDoc}
-                  >
-                    Summarize this doc
-                  </button>
-                  <button
-                    type="button"
-                    className="docs-ask-lexi-rail__chip"
-                    disabled={!selectedDoc}
-                  >
-                    Turn into action list
-                  </button>
-                  <button
-                    type="button"
-                    className="docs-ask-lexi-rail__chip"
-                    disabled={!selectedDoc}
-                  >
-                    Create exec brief
-                  </button>
-                </div>
-                <div className="docs-ask-lexi-rail__section docs-ask-lexi-rail__section--subtle">
-                  <div className="docs-ask-lexi-rail__section-title">From meetings</div>
-                  <p className="docs-ask-lexi-rail__small">
-                    Docs created from meetings stay linked to their original session, so you can always jump back to the transcript and AI summary.
-                  </p>
-                </div>
-              </aside>
-            </div>
-          )}
+              <div className="docs-ask-lexi-rail__section docs-ask-lexi-rail__section--subtle">
+                <div className="docs-ask-lexi-rail__section-title">From meetings</div>
+                <p className="docs-ask-lexi-rail__small">
+                  Docs created from meetings stay linked to their original session, so you can
+                  always jump back to the transcript and AI summary.
+                </p>
+              </div>
+            </aside>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {deleteConfirmId && (
         <div

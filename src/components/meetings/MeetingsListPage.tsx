@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight, Mic, Trash2 } from "lucide-react";
 import "./meetings-list.css";
@@ -165,10 +166,11 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                                             {m.name || "Untitled Meeting"}
                                         </h3>
                                         {m.summary ? (
-                                            <p className="meetings-list-page__card-summary">
-                                                {m.summary.slice(0, 140)}
-                                                {m.summary.length > 140 ? "…" : ""}
-                                            </p>
+                                            <div className="meetings-list-page__card-summary meetings-list-page__card-summary--preview">
+                                                <div className="meetings-list-page__card-summary-markdown">
+                                                    <ReactMarkdown>{m.summary}</ReactMarkdown>
+                                                </div>
+                                            </div>
                                         ) : (
                                             <p className="meetings-list-page__card-summary meetings-list-page__card-summary--muted">
                                                 No summary yet

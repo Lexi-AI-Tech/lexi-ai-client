@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { MeetingsListPage, type Meeting } from "./meetings/MeetingsListPage";
 import { MeetingDetailPage } from "./meetings/MeetingDetailPage";
@@ -183,6 +184,18 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
         <div className={`page ${selectedMeetingId ? "page--meetings-detail" : ""}`}>
             {selectedMeetingId && selectedMeeting && (
                 <div className="meetings-page-header">
+                    <button
+                        type="button"
+                        className="meetings-page-header__back"
+                        onClick={() => {
+                            setSelectedMeetingId(null);
+                            setOpenToSummaryTab(false);
+                        }}
+                        aria-label="Back to meetings list"
+                    >
+                        <ArrowLeft size={20} strokeWidth={2} />
+                        <span>Meetings</span>
+                    </button>
                     <div className="meetings-page-header__title">
                         {selectedMeeting.name || "Untitled Meeting"}
                     </div>

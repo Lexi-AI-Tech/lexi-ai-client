@@ -95,6 +95,8 @@ export interface RichTextEditorProps {
   onSelectionChange?: (selection: DocSelection | null) => void;
   /** If provided, show title input above editor */
   title?: string;
+  /** When false, hide the title input (e.g. when title is shown in a parent toolbar). Default true */
+  showTitle?: boolean;
   /** Optional class for the wrapper */
   className?: string;
 }
@@ -117,6 +119,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     onTitleChange,
     onSelectionChange,
     title: initialTitle,
+    showTitle = true,
     className = "",
   },
   ref,
@@ -132,6 +135,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
   const [askLexiSelection, setAskLexiSelection] = useState<DocSelection | null>(
     null,
   );
+  /** Bump to force toolbar re-render so isActive() reflects current selection/marks. */
+  const [, setToolbarVersion] = useState(0);
 
   const editor = useEditor({
     extensions: [
@@ -205,8 +210,10 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     onUpdate: ({ editor }) => {
       const json = JSON.stringify(editor.getJSON());
       onUpdate?.(json);
+      setToolbarVersion((v) => v + 1);
     },
     onSelectionUpdate: ({ editor }) => {
+      setToolbarVersion((v) => v + 1);
       const cb = onSelectionChangeRef.current;
       if (!cb) return;
       const { from, to } = editor.state.selection;
@@ -325,7 +332,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
   return (
     <div className={`docs-editor-wrap ${className}`}>
-      {onTitleChange && (
+      {onTitleChange && showTitle && (
         <input
           className="docs-editor-title"
           value={title}
