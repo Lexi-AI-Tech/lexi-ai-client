@@ -3,7 +3,7 @@
 //! Tauri commands for managing meetings and meeting recording.
 
 use crate::commands::auth::get_auth_token_async;
-use crate::commands::docs::{create_doc as create_local_doc, Doc as LocalDoc};
+use crate::commands::docs::Doc;
 use crate::state::MeetingState;
 use crate::utils;
 use futures_util::StreamExt;
@@ -628,14 +628,14 @@ pub async fn get_meeting_suggested_questions(
     Ok(questions)
 }
 
-/// Create a rich-text doc from a meeting (using server-side AI + meeting summary/transcript).
+/// Create a rich-text doc from a meeting (server generates content and stores the doc).
 #[tauri::command]
 pub async fn create_doc_from_meeting(
     app: AppHandle,
     meeting_id: String,
     title: String,
     instructions: String,
-) -> Result<LocalDoc, String> {
+) -> Result<Doc, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .map_err(|_| "Authentication required")?;
@@ -673,28 +673,7 @@ pub async fn create_doc_from_meeting(
         .await
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    let content = data
-        .get("content")
-        .or_else(|| data.get("data").and_then(|d| d.get("content")))
-        .and_then(|c| c.as_str())
-        .ok_or_else(|| "Missing content in response".to_string())?
-        .to_string();
-
-    let resolved_title = data
-        .get("title")
-        .and_then(|t| t.as_str())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| {
-            let t = title.trim().to_string();
-            if t.is_empty() {
-                "Meeting Document".to_string()
-            } else {
-                t
-            }
-        });
-
-    // Store doc locally using existing docs store
-    let doc = create_local_doc(app, Some(resolved_title), Some(content))?;
+    let doc = crate::commands::docs::parse_doc_from_value(&data)
+        .map_err(|e| format!("Invalid doc response: {}", e))?;
     Ok(doc)
 }
