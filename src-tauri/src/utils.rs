@@ -38,3 +38,13 @@ pub fn create_http_client() -> reqwest::Client {
         .build()
         .unwrap_or_else(|_| reqwest::Client::new())
 }
+
+/// Creates a reqwest client with a long timeout for endpoints that call the LLM
+/// (e.g. meeting Q&A), which can take 30–120+ seconds.
+pub fn create_http_client_long_timeout() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+}

@@ -254,7 +254,8 @@ export const Pill: React.FC = () => {
               const idleX = idlePositionRef.current.x;
               const idleY = idlePositionRef.current.y;
 
-              const recX = idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
+              const recX =
+                idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
               const recY = idleY - HEIGHT_DIFF;
 
               await window.setSize(
@@ -275,7 +276,8 @@ export const Pill: React.FC = () => {
             if (!idlePositionRef.current) return;
             const idleX = idlePositionRef.current.x;
             const idleY = idlePositionRef.current.y;
-            const procX = idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
+            const procX =
+              idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
             const procY = idleY - HEIGHT_DIFF;
             await window.setSize(
               new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
@@ -902,80 +904,112 @@ export const Pill: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
       style={baseStyle}
     >
-      {/* Chasing border light — color changes based on state */}
+      {/* Chasing border — high-contrast stroke that works on light backgrounds */}
       {status !== "idle" &&
         (() => {
-          // Pick colors based on state
-          let color1: string, color2: string, color3: string, speed: string;
+          let accent: string;
+          let speed: string;
           if (status === "meeting_detected") {
             // Meeting prompt: amber
-            color1 = "#f59e0b"; // Amber
-            color2 = "#fcd34d"; // Light amber
-            color3 = "rgba(245, 158, 11, 0.1)";
+            accent = "#f59e0b";
             speed = "2s";
           } else if (status === "speaking") {
             // Speaking/TTS: purple
-            color1 = "#a855f7"; // Purple
-            color2 = "#d8b4fe"; // Light purple
-            color3 = "rgba(168, 85, 247, 0.1)";
+            accent = "#a855f7";
             speed = "1.8s";
           } else if (status === "processing") {
-            // Processing: cool blue/cyan
-            color1 = "#3b82f6"; // Blue
-            color2 = "#93c5fd"; // Light blue
-            color3 = "rgba(59, 130, 246, 0.1)";
+            accent = "#3b82f6";
             speed = "1.5s";
           } else if (isActionMode) {
-            // Smart actions: warm orange
-            color1 = "#f97316"; // Orange
-            color2 = "#fdba74"; // Light orange
-            color3 = "rgba(249, 115, 22, 0.1)";
+            accent = "#f97316";
             speed = "2s";
           } else {
-            // Normal recording: green
-            color1 = "#22c55e"; // Green
-            color2 = "#86efac"; // Light green
-            color3 = "rgba(34, 197, 94, 0.1)";
+            accent = "#22c55e";
             speed = "2s";
           }
+
+          // Use a single fixed viewBox so the ring is consistent across status changes.
+          // (Window size can lag behind status, causing letterboxing if viewBox varies.)
+          const VIEW_W = 100;
+          const VIEW_H = 36;
+
+          const stroke = 3;
+          const x = stroke / 2;
+          const y = stroke / 2;
+          const rw = VIEW_W - stroke;
+          const rh = VIEW_H - stroke;
 
           return (
             <>
               <style>
                 {`
-                @keyframes borderFlow {
-                  0% { transform: rotate(0deg); }
-                  100% { transform: rotate(360deg); }
+                @keyframes dashFlow {
+                  to { stroke-dashoffset: -100; }
                 }
               `}
               </style>
-              {/* Outer glow container */}
-              <div
+
+              {/* Dual-outline base ring (dark + light) + animated comet segment */}
+              <svg
+                width="100%"
+                height="100%"
+                viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+                preserveAspectRatio="none"
+                fill="none"
                 style={{
                   position: "absolute",
-                  inset: "-2px",
-                  borderRadius: "20px",
-                  overflow: "hidden",
+                  inset: 0,
                   pointerEvents: "none",
                 }}
               >
-                {/* Rotating gradient that creates the chasing effect */}
-                <div
+                <rect
+                  x={x}
+                  y={y}
+                  width={rw}
+                  height={rh}
+                  rx={18}
+                  ry={18}
+                  pathLength={100}
+                  stroke="rgba(0, 0, 0, 0.45)"
+                  strokeWidth={stroke + 1}
+                />
+                <rect
+                  x={x}
+                  y={y}
+                  width={rw}
+                  height={rh}
+                  rx={18}
+                  ry={18}
+                  pathLength={100}
+                  stroke="rgba(255, 255, 255, 0.18)"
+                  strokeWidth={stroke}
+                />
+                <rect
+                  x={x}
+                  y={y}
+                  width={rw}
+                  height={rh}
+                  rx={18}
+                  ry={18}
+                  pathLength={100}
+                  stroke={accent}
+                  strokeWidth={stroke}
+                  strokeLinecap="round"
+                  strokeDasharray="12 88"
                   style={{
-                    position: "absolute",
-                    inset: "-50%",
-                    background: `conic-gradient(from 0deg, transparent 0deg, transparent 30deg, ${color3} 80deg, ${color1} 150deg, ${color2} 180deg, ${color1} 210deg, ${color3} 280deg, transparent 330deg, transparent 360deg)`,
-                    animation: `borderFlow ${speed} linear infinite`,
+                    animation: `dashFlow ${speed} linear infinite`,
+                    filter: `drop-shadow(0 0 2px ${accent}) drop-shadow(0 0 6px ${accent})`,
                   }}
                 />
-              </div>
-              {/* Inner black fill to mask center, creating border effect */}
+              </svg>
+
+              {/* Inner fill to create a clear ring */}
               <div
                 style={{
                   position: "absolute",
-                  inset: "0",
-                  borderRadius: "18px",
-                  backgroundColor: "rgba(0, 0, 0, 0.9)",
+                  inset: "4px",
+                  borderRadius: "14px",
+                  backgroundColor: getBackgroundColor(),
                   pointerEvents: "none",
                 }}
               />

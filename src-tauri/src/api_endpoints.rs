@@ -85,6 +85,32 @@ pub mod app_config {
     }
 }
 
+/// Docs endpoints (structure transcript → rich content for Notion-style docs)
+pub mod docs {
+    use super::*;
+
+    pub const STRUCTURE_CONTENT: &str = "/docs/structure-content";
+    pub const REWRITE_SECTION: &str = "/docs/rewrite-section";
+
+    pub fn structure_content_url() -> String {
+        format!(
+            "{}{}{}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            STRUCTURE_CONTENT
+        )
+    }
+
+    pub fn rewrite_section_url() -> String {
+        format!(
+            "{}{}{}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            REWRITE_SECTION
+        )
+    }
+}
+
 /// Action endpoints
 pub mod action {
     use super::*;

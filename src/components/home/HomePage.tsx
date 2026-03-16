@@ -69,13 +69,14 @@ const getGreeting = (): string => {
   return "Good evening";
 };
 
-// Stats card component
+// Stats card component – accentColor = icon/badge tint; iconColor = icon stroke (theme-aligned)
 interface StatCardProps {
   icon: React.ElementType;
   label: string;
   value: string | number;
   subValue?: string;
   accentColor: string;
+  iconColor?: string;
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -84,11 +85,15 @@ const StatCard: React.FC<StatCardProps> = ({
   value,
   subValue,
   accentColor,
+  iconColor,
 }) => (
   <motion.div
     className="stat-card"
     variants={itemVariants}
-    style={{ ["--stat-accent" as string]: accentColor }}
+    style={{
+      ["--stat-accent" as string]: accentColor,
+      ["--stat-icon-color" as string]: iconColor ?? "var(--lexi-primary)",
+    }}
   >
     <div className="stat-card-icon">
       <Icon size={20} />
@@ -307,21 +312,24 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
             label="Words Typed"
             value={resolvedStats.words_typed_this_week.toLocaleString()}
             subValue="this week"
-            accentColor="rgba(99, 102, 241, 0.15)"
+            accentColor="var(--lexi-primary-muted)"
+            iconColor="var(--lexi-primary)"
           />
           <StatCard
             icon={Clock}
             label="Time Saved"
             value={`${resolvedStats.time_saved_minutes}m`}
             subValue="vs typing"
-            accentColor="rgba(16, 185, 129, 0.15)"
+            accentColor="var(--lexi-primary-muted)"
+            iconColor="var(--lexi-primary)"
           />
           <StatCard
             icon={Flame}
             label="Streak"
             value={`${resolvedStats.current_streak}`}
             subValue="days"
-            accentColor="rgba(245, 158, 11, 0.15)"
+            accentColor="rgba(245, 158, 11, 0.2)"
+            iconColor="#d97706"
           />
         </div>
       </motion.section>

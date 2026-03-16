@@ -2,6 +2,150 @@
    MEETINGS PAGE
    ============================================ */
 
+/* When showing meeting detail: fill viewport, no page scroll – only Summary & Q&A scroll internally */
+.container--meetings {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* List view: container scrolls. Detail view: no scroll, panels scroll internally */
+.container--meetings:not(:has(.page--meetings-detail)) {
+  overflow-y: auto;
+}
+
+.container--meetings:has(.page--meetings-detail) {
+  overflow: hidden;
+}
+
+.page.page--meetings-detail {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0; /* override .page min-height: 100vh so we fit viewport */
+  overflow: hidden;
+  padding: 1rem 1.5rem;
+}
+
+.page.page--meetings-detail .meetings-page-header {
+  flex-shrink: 0;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.meetings-page-header__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #9ca3af;
+}
+
+.meetings-page-header__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-radius: 9999px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #92400e;
+}
+
+.meetings-page-header__badge--live .meetings-page-header__badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: meeting-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.page.page--meetings-detail .meeting-detail-product {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Breadcrumbs */
+.meetings-page-header {
+  margin-bottom: 1rem;
+}
+
+.meetings-page-header__title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: #111827;
+  line-height: 1.1;
+}
+
+.meetings-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.meetings-breadcrumbs__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meetings-breadcrumbs__separator {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.meetings-breadcrumbs__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: #1c1c1c;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.meetings-breadcrumbs__link:hover {
+  text-decoration: underline;
+}
+
+.meetings-breadcrumbs__current {
+  color: #111827;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+/* Detail page layout */
+.meetings-detail-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.meetings-detail-actions {
+  margin-left: auto;
+}
+
+.meetings-detail__delete {
+  color: #ef4444;
+}
+
+.meetings-detail__delete:hover {
+  background-color: #fee2e2;
+}
+
 .meetings-content {
   display: flex;
   gap: 2rem;
@@ -365,6 +509,68 @@
   color: #374151;
   font-size: 14px;
   line-height: 1.6;
+}
+
+/* Streaming summary – rich document layout */
+.meetings-summary-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.meetings-summary-stream__h2 {
+  margin: 1.25rem 0 0.5rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  letter-spacing: -0.01em;
+}
+
+.meetings-summary-stream__h2:first-child {
+  margin-top: 0;
+}
+
+.meetings-summary-stream__h3 {
+  margin: 0.875rem 0 0.35rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.meetings-summary-stream__paragraph {
+  margin: 0 0 0.25rem 0;
+  color: #4b5563;
+}
+
+.meetings-summary-stream__bullet {
+  margin: 0.15rem 0 0.15rem 1.25rem;
+  padding-left: 0.25rem;
+  list-style: disc;
+  color: #4b5563;
+}
+
+.meetings-summary-stream {
+  position: relative;
+}
+
+.meetings-summary-stream__cursor {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-block;
+  font-size: 1rem;
+  color: #3b82f6;
+  font-family: ui-monospace, monospace;
+  animation: meetings-summary-cursor-blink 1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes meetings-summary-cursor-blink {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 /* Q&A block */
