@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { ArrowLeft, FileText, FilePlus, MessageCircle, Mic, MicOff, RefreshCw } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import type { Doc } from "../../types";
@@ -185,70 +186,70 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     };
 
     const handleGenerateSummary = async () => {
-        if (!meetingId || isGeneratingSummary || !tokens?.access_token) return;
+        if (!meetingId || isGeneratingSummary) return;
         const isRegenerate = !!activeSummary; // capture before clearing state
         setIsGeneratingSummary(true);
         setStreamingLines([]);
         setActiveSummary(null);
         setSuggestedQuestions(null); // refetch after new summary is saved
+
+        let unlistenLine: UnlistenFn | null = null;
+        let unlistenDone: UnlistenFn | null = null;
+        const allLines: string[] = [];
+
         try {
-            const baseUrl = await invoke<string>("get_api_base_url");
-            const url = `${baseUrl}/api/v1/meetings/${meetingId}/summarize/stream${isRegenerate ? "?regenerate=true" : ""}`;
-            const res = await fetch(url, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${tokens.access_token}` },
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const reader = res.body?.getReader();
-            if (!reader) throw new Error("No response body");
-            const decoder = new TextDecoder();
-            let buffer = "";
-            const allLines: string[] = [];
+            unlistenLine = await listen<{ meetingId: string; line: string }>(
+                "meeting-summary-line",
+                (event) => {
+                    if (event.payload.meetingId !== meetingId) return;
+                    const text = event.payload.line;
+                    allLines.push(text);
+                    setStreamingLines((prev) => [
+                        ...prev,
+                        createSummaryLine(text, prev.length),
+                    ]);
+                },
+            );
 
-            const processBuffer = () => {
-                const parts = buffer.split("\n");
-                buffer = parts.pop() ?? "";
-                for (const part of parts) {
-                    if (!part.trim()) continue;
-                    try {
-                        const obj = JSON.parse(part) as { line?: string; done?: boolean; error?: string };
-                        if (obj.error) throw new Error(obj.error);
-                        if (obj.done) return true;
-                        if (obj.line) {
-                            allLines.push(obj.line);
-                            setStreamingLines((prev) => [
-                                ...prev,
-                                createSummaryLine(obj.line!, prev.length),
-                            ]);
-                        }
-                    } catch (e) {
-                        if (e instanceof SyntaxError) continue;
-                        throw e;
+            unlistenDone = await listen<{ meetingId: string; summary?: string; error?: string }>(
+                "meeting-summary-done",
+                (event) => {
+                    if (event.payload.meetingId !== meetingId) return;
+                    if (event.payload.error) {
+                        console.error("Failed to generate meeting summary:", event.payload.error);
+                        setIsGeneratingSummary(false);
+                        setStreamingLines([]);
+                        return;
                     }
-                }
-                return false;
-            };
+                    const fullSummary = event.payload.summary ?? allLines.join("\n");
+                    setActiveSummary(fullSummary || null);
+                    setStreamingLines([]);
+                    if (fullSummary && meeting) {
+                        onMeetingsUpdated((prev) =>
+                            prev.map((m) =>
+                                m.id === meetingId ? { ...m, summary: fullSummary } : m,
+                            ),
+                        );
+                    }
+                    setIsGeneratingSummary(false);
+                },
+            );
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (value) buffer += decoder.decode(value, { stream: true });
-                if (processBuffer()) break;
-                if (done) break;
-            }
-            const fullSummary = allLines.join("\n");
-            setActiveSummary(fullSummary || null);
-            setStreamingLines([]);
-            if (fullSummary && meeting) {
-                onMeetingsUpdated((prev) =>
-                    prev.map((m) =>
-                        m.id === meetingId ? { ...m, summary: fullSummary } : m
-                    )
-                );
-            }
+            await invoke("stream_meeting_summary", {
+                meetingId,
+                regenerate: isRegenerate,
+            });
         } catch (error) {
-            console.error("Failed to generate meeting summary:", error);
-        } finally {
+            console.error("Failed to start streaming meeting summary:", error);
             setIsGeneratingSummary(false);
+            setStreamingLines([]);
+        } finally {
+            // listeners are cleaned up when "done" event fires; this is a safety net
+            const cleanup = async () => {
+                if (unlistenLine) await unlistenLine();
+                if (unlistenDone) await unlistenDone();
+            };
+            cleanup().catch(() => undefined);
         }
     };
 

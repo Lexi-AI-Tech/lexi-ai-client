@@ -114,7 +114,7 @@ use commands::onboarding::{
 use meetings::commands::{
     add_meeting_note, create_meeting, get_meeting_details, get_meeting_suggested_questions,
     list_meetings, start_meeting_recording, stop_meeting_recording, update_meeting, delete_meeting,
-    summarize_meeting, send_meeting_chat, create_doc_from_meeting,
+    send_meeting_chat, create_doc_from_meeting, stream_meeting_summary,
 };
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
@@ -126,8 +126,7 @@ use commands::utils::{copy_to_clipboard, get_system_type};
 use commands::window::{open_devtools, show_main_window};
 use meetings::commands::{
     add_meeting_note, create_meeting, delete_meeting, get_meeting_details, list_meetings,
-    send_meeting_chat, start_meeting_recording, stop_meeting_recording, summarize_meeting,
-    update_meeting,
+    send_meeting_chat, start_meeting_recording, stop_meeting_recording, update_meeting,
 };
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
