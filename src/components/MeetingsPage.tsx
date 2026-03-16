@@ -221,8 +221,9 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                         )}
                     </div>
                 )}
+            </div>
 
-                {selectedMeetingId ? (
+            {selectedMeetingId ? (
                 <MeetingDetailPage
                     meetingId={selectedMeetingId}
                     meeting={selectedMeeting}
@@ -264,7 +265,6 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                     isGeneratingSummary={false}
                 />
             )}
-            </div>
         </div>
     );
 };
