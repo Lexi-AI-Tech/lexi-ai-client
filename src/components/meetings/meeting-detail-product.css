@@ -249,8 +249,10 @@
 }
 
 .meeting-detail-toolbar__delete {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
   color: #9ca3af;
   background: transparent;
   border: none;

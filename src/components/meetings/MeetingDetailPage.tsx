@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, FileText, FilePlus, MessageCircle, Mic, MicOff, RefreshCw } from "lucide-react";
+import { ArrowLeft, FileText, FilePlus, MessageCircle, Mic, MicOff, RefreshCw, Trash2 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import type { Doc } from "../../types";
 import type { Meeting } from "./MeetingsListPage";
@@ -466,8 +466,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         className="meeting-detail-toolbar__delete"
                         onClick={() => setDeleteConfirmId(meetingId)}
                         disabled={!!deletingId}
+                        title="Delete meeting"
                     >
-                        Delete
+                        <Trash2 size={18} strokeWidth={1.5} />
                     </button>
                 </div>
             </motion.div>
