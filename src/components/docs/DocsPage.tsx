@@ -287,7 +287,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
 
   const handleDeleteDoc = useCallback(
     async (docId: string) => {
-      await invoke("delete_doc", { docId });
+      await invoke("delete_doc", { payload: { docId } });
       setDocs((prev) => prev.filter((d) => d.id !== docId));
       if (selectedId === docId) setSelectedId(null);
       toast.success("Doc deleted");
