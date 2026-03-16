@@ -6,9 +6,8 @@ use crate::commands::auth::get_auth_token_async;
 use crate::commands::docs::{create_doc as create_local_doc, Doc as LocalDoc};
 use crate::state::MeetingState;
 use crate::utils;
-use tauri::Emitter;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Meeting {
@@ -561,67 +560,55 @@ pub async fn stream_meeting_summary(
         return Err(format!("Server error: {}", response.status()));
     }
 
-    let mut stream = response.bytes_stream();
-    let mut buffer = String::new();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response body: {}", e))?;
+
     let mut all_lines: Vec<String> = Vec::new();
 
-    use futures::StreamExt;
+    for raw_line in body.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let parsed: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
 
-    while let Some(chunk) = stream.next().await {
-        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        buffer.push_str(
-            &String::from_utf8(bytes.to_vec()).map_err(|e| format!("UTF-8 error: {}", e))?,
-        );
+        if let Some(err) = parsed.get("error").and_then(|e| e.as_str()) {
+            let _ = app.emit(
+                "meeting-summary-done",
+                serde_json::json!({ "meetingId": meeting_id, "error": err }),
+            );
+            return Err(err.to_string());
+        }
 
-        let mut parts = buffer.split('\n').peekable();
-        buffer = String::new();
+        if parsed
+            .get("done")
+            .and_then(|d| d.as_bool())
+            .unwrap_or(false)
+        {
+            let full = all_lines.join("\n");
+            let _ = app.emit(
+                "meeting-summary-done",
+                serde_json::json!({ "meetingId": meeting_id, "summary": full }),
+            );
+            return Ok(());
+        }
 
-        while let Some(part) = parts.next() {
-            let line = part.trim();
-            // Keep the last incomplete chunk in buffer
-            if parts.peek().is_none() && !buffer.is_empty() {
-                buffer.push_str(part);
-                break;
-            }
-            if line.is_empty() {
-                continue;
-            }
-            let parsed: serde_json::Value =
-                match serde_json::from_str(line) {
-                    Ok(v) => v,
-                    Err(_) => continue,
-                };
-            if let Some(err) = parsed.get("error").and_then(|e| e.as_str()) {
-                let _ = app.emit_all(
-                    "meeting-summary-done",
-                    serde_json::json!({ "meetingId": meeting_id, "error": err }),
-                );
-                return Err(err.to_string());
-            }
-            if parsed
-                .get("done")
-                .and_then(|d| d.as_bool())
-                .unwrap_or(false)
-            {
-                let full = all_lines.join("\n");
-                let _ = app.emit_all(
-                    "meeting-summary-done",
-                    serde_json::json!({ "meetingId": meeting_id, "summary": full }),
-                );
-                return Ok(());
-            }
-            if let Some(text) = parsed.get("line").and_then(|l| l.as_str()) {
-                all_lines.push(text.to_string());
-                let _ = app.emit_all(
-                    "meeting-summary-line",
-                    serde_json::json!({ "meetingId": meeting_id, "line": text }),
-                );
-            }
+        if let Some(text) = parsed.get("line").and_then(|l| l.as_str()) {
+            all_lines.push(text.to_string());
+            let _ = app.emit(
+                "meeting-summary-line",
+                serde_json::json!({ "meetingId": meeting_id, "line": text }),
+            );
         }
     }
 
     let full = all_lines.join("\n");
-    let _ = app.emit_all(
+    let _ = app.emit(
         "meeting-summary-done",
         serde_json::json!({ "meetingId": meeting_id, "summary": full }),
     );
