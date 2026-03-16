@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Trash2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import "./meetings.css";
+import { Trash2 } from "lucide-react";
 
 interface TranscriptSegment {
   id: string;
