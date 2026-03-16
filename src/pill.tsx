@@ -827,8 +827,15 @@ export const Pill: React.FC = () => {
     </svg>
   );
 
-  // Get background color - black background for all states
+  // Grey used for the pill border in recording (and ring stroke) — use as idle background
+  const PILL_IDLE_GREY = "rgba(0, 0, 0, 0.45)";
+  const PILL_IDLE_GREY_HOVER = "rgba(0, 0, 0, 0.35)";
+
+  // Idle: grey background (same grey as recording border). Other states: black.
   const getBackgroundColor = () => {
+    if (status === "idle") {
+      return isHovered ? PILL_IDLE_GREY_HOVER : PILL_IDLE_GREY;
+    }
     if (isHovered) {
       return "rgba(0, 0, 0, 0.95)";
     }
@@ -868,7 +875,7 @@ export const Pill: React.FC = () => {
     baseStyle.width = "50px";
     baseStyle.height = "6.6px";
     baseStyle.borderRadius = "3.3px";
-    baseStyle.border = "none";
+    baseStyle.border = "1.5px solid rgba(255, 255, 255, 0.25)";
     baseStyle.boxShadow = "none";
   } else if (status === "recording") {
     baseStyle.width = "100%";
