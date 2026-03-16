@@ -6,8 +6,9 @@ use crate::commands::auth::get_auth_token_async;
 use crate::commands::docs::{create_doc as create_local_doc, Doc as LocalDoc};
 use crate::state::MeetingState;
 use crate::utils;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Meeting {
@@ -384,25 +385,40 @@ pub async fn delete_meeting(app: AppHandle, meeting_id: String) -> Result<(), St
     Ok(())
 }
 
-/// Summarize a meeting
+/// Payload emitted for each meeting summary stream event (NDJSON line from server).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeetingSummaryStreamPayload {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub done: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Stream meeting summary from server and emit chunks via `meeting-summary-stream` events.
+/// Server saves the full summary when done; frontend should refresh meeting details for final summary.
 #[tauri::command]
-pub async fn summarize_meeting(
+pub async fn stream_meeting_summary(
     app: AppHandle,
     meeting_id: String,
-) -> Result<serde_json::Value, String> {
+    regenerate: bool,
+) -> Result<(), String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .map_err(|_| "Authentication required")?;
 
-    let client = crate::utils::create_http_client();
+    let base = crate::config::api_base_url();
     let url = format!(
-        "{}/api/v1/meetings/{}/summarize",
-        crate::config::api_base_url(),
-        meeting_id
+        "{}/api/v1/meetings/{}/summarize/stream{}",
+        base,
+        meeting_id,
+        if regenerate { "?regenerate=true" } else { "" }
     );
 
-    utils::log_api_request("Summarize meeting", "POST", &url);
+    utils::log_api_request("Stream meeting summary", "POST", &url);
 
+    let client = crate::utils::create_http_client_long_timeout();
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -411,15 +427,64 @@ pub async fn summarize_meeting(
         .map_err(|e| format!("Request failed: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
+        let status = response.status();
+        return Err(format!("Server error: {}", status));
     }
 
-    let meeting: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    let mut stream = response.bytes_stream();
+    let mut buffer = Vec::<u8>::new();
 
-    Ok(meeting)
+    while let Some(chunk_result) = stream.next().await {
+        let chunk = chunk_result.map_err(|e| format!("Stream read error: {}", e))?;
+        buffer.extend_from_slice(&chunk);
+
+        // Process complete lines (NDJSON)
+        while let Some(idx) = buffer.iter().position(|&b| b == b'\n') {
+            let line_bytes: Vec<u8> = buffer.drain(..=idx).collect();
+            let line = String::from_utf8_lossy(&line_bytes[..line_bytes.len().saturating_sub(1)]);
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let parsed: Result<MeetingSummaryStreamPayload, _> = serde_json::from_str(line);
+            match parsed {
+                Ok(payload) => {
+                    if let Some(err) = payload.error.as_ref() {
+                        let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
+                            line: None,
+                            done: None,
+                            error: Some(err.clone()),
+                        });
+                        return Err(err.clone());
+                    }
+                    if payload.done == Some(true) {
+                        let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
+                            line: None,
+                            done: Some(true),
+                            error: None,
+                        });
+                        return Ok(());
+                    }
+                    if let Some(l) = payload.line.as_ref() {
+                        let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
+                            line: Some(l.clone()),
+                            done: None,
+                            error: None,
+                        });
+                    }
+                }
+                Err(_) => {}
+            }
+        }
+    }
+
+    // Stream ended without {"done": true}; emit done anyway so frontend can finalize
+    let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
+        line: None,
+        done: Some(true),
+        error: None,
+    });
+    Ok(())
 }
 
 /// Add a user note to the meeting transcript (typed during the meeting).

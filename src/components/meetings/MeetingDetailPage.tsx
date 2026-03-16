@@ -87,6 +87,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     const [isLoadingSuggestedQuestions, setIsLoadingSuggestedQuestions] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const chatScrollRef = useRef<HTMLDivElement>(null);
+    const streamingForMeetingIdRef = useRef<string | null>(null);
 
     const DEFAULT_SUGGESTED_QUESTIONS = [
         "What were the action items?",
@@ -163,6 +164,51 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         onEndMeetingFromTrayConsumed?.();
     }, [triggerEndMeetingFromTray, onEndMeetingFromTrayConsumed]);
 
+    // Listen for streaming summary events from Rust backend
+    useEffect(() => {
+        const unlisten = (async () => {
+            const { listen } = await import("@tauri-apps/api/event");
+            return listen<{ line?: string; done?: boolean; error?: string }>(
+                "meeting-summary-stream",
+                (event) => {
+                    const payload = event.payload;
+                    if (streamingForMeetingIdRef.current !== meetingId) return;
+                    if (payload.error) {
+                        console.error("Meeting summary stream error:", payload.error);
+                        streamingForMeetingIdRef.current = null;
+                        setIsGeneratingSummary(false);
+                        return;
+                    }
+                    if (payload.done) {
+                        setStreamingLines((prev) => {
+                            const full = prev.map((l) => l.raw).join("\n");
+                            setActiveSummary(full || null);
+                            if (full && meeting) {
+                                onMeetingsUpdated((p) =>
+                                    p.map((m) => (m.id === meetingId ? { ...m, summary: full } : m))
+                                );
+                            }
+                            streamingForMeetingIdRef.current = null;
+                            setIsGeneratingSummary(false);
+                            return [];
+                        });
+                        setSuggestedQuestions(null);
+                        return;
+                    }
+                    if (payload.line) {
+                        setStreamingLines((prev) => [
+                            ...prev,
+                            createSummaryLine(payload.line!, prev.length),
+                        ]);
+                    }
+                }
+            );
+        })();
+        return () => {
+            unlisten.then((fn) => fn());
+        };
+    }, [meetingId, meeting, onMeetingsUpdated]);
+
     const startRecording = async () => {
         if (!tokens?.access_token) return;
         setIsInitializingMeeting(true);
@@ -186,67 +232,20 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
     const handleGenerateSummary = async () => {
         if (!meetingId || isGeneratingSummary || !tokens?.access_token) return;
-        const isRegenerate = !!activeSummary; // capture before clearing state
+        const isRegenerate = !!activeSummary;
         setIsGeneratingSummary(true);
         setStreamingLines([]);
         setActiveSummary(null);
-        setSuggestedQuestions(null); // refetch after new summary is saved
+        setSuggestedQuestions(null);
+        streamingForMeetingIdRef.current = meetingId;
         try {
-            const baseUrl = await invoke<string>("get_api_base_url");
-            const url = `${baseUrl}/api/v1/meetings/${meetingId}/summarize/stream${isRegenerate ? "?regenerate=true" : ""}`;
-            const res = await fetch(url, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${tokens.access_token}` },
+            await invoke("stream_meeting_summary", {
+                meetingId,
+                regenerate: isRegenerate,
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const reader = res.body?.getReader();
-            if (!reader) throw new Error("No response body");
-            const decoder = new TextDecoder();
-            let buffer = "";
-            const allLines: string[] = [];
-
-            const processBuffer = () => {
-                const parts = buffer.split("\n");
-                buffer = parts.pop() ?? "";
-                for (const part of parts) {
-                    if (!part.trim()) continue;
-                    try {
-                        const obj = JSON.parse(part) as { line?: string; done?: boolean; error?: string };
-                        if (obj.error) throw new Error(obj.error);
-                        if (obj.done) return true;
-                        if (obj.line) {
-                            allLines.push(obj.line);
-                            setStreamingLines((prev) => [
-                                ...prev,
-                                createSummaryLine(obj.line!, prev.length),
-                            ]);
-                        }
-                    } catch (e) {
-                        if (e instanceof SyntaxError) continue;
-                        throw e;
-                    }
-                }
-                return false;
-            };
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (value) buffer += decoder.decode(value, { stream: true });
-                if (processBuffer()) break;
-                if (done) break;
-            }
-            const fullSummary = allLines.join("\n");
-            setActiveSummary(fullSummary || null);
-            setStreamingLines([]);
-            if (fullSummary && meeting) {
-                onMeetingsUpdated((prev) =>
-                    prev.map((m) =>
-                        m.id === meetingId ? { ...m, summary: fullSummary } : m
-                    )
-                );
-            }
         } catch (error) {
             console.error("Failed to generate meeting summary:", error);
+            streamingForMeetingIdRef.current = null;
         } finally {
             setIsGeneratingSummary(false);
         }

@@ -113,8 +113,8 @@ use commands::onboarding::{
 };
 use meetings::commands::{
     add_meeting_note, create_meeting, get_meeting_details, get_meeting_suggested_questions,
-    list_meetings, start_meeting_recording, stop_meeting_recording, update_meeting, delete_meeting,
-    summarize_meeting, send_meeting_chat, create_doc_from_meeting,
+    list_meetings, send_meeting_chat, start_meeting_recording, stream_meeting_summary,
+    stop_meeting_recording, update_meeting, delete_meeting, create_doc_from_meeting,
 };
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
@@ -320,7 +320,7 @@ pub fn main() {
             stop_meeting_recording,
             update_meeting,
             delete_meeting,
-            summarize_meeting,
+            stream_meeting_summary,
             send_meeting_chat,
             create_doc_from_meeting,
             get_app_icon,
