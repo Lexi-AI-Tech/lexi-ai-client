@@ -637,6 +637,11 @@
   color: var(--lexi-text-muted);
 }
 
+/* Fixed width for save indicator to prevent layout jitter when toggling Saving/Saved */
+.docs-editor-toolbar-meta--save-only {
+  min-width: 4.5rem;
+}
+
 .docs-editor-toolbar-pill--ai {
   background: rgba(17, 24, 39, 0.08);
   color: var(--lexi-text);

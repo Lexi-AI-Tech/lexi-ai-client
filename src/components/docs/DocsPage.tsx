@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ArrowLeft, Mic, Square, Trash2 } from "lucide-react";
@@ -10,6 +10,39 @@ import { RichTextEditor, type RichTextEditorRef } from "./RichTextEditor";
 import "./docs.css";
 
 const SAVE_DEBOUNCE_MS = 600;
+const SAVE_INDICATOR_MIN_MS = 400;
+
+/** Isolated save indicator so parent doesn't re-render on saving state change */
+export interface SaveIndicatorRef {
+  setSaving: (saving: boolean) => void;
+}
+
+const SaveIndicator = React.forwardRef<
+  SaveIndicatorRef,
+  { isStructuring?: boolean }
+>(function SaveIndicator({ isStructuring }, ref) {
+  const [saving, setSaving] = useState(false);
+  useImperativeHandle(ref, () => ({ setSaving }), []);
+  return (
+    <div className="docs-editor-toolbar-meta docs-editor-toolbar-meta--save-only">
+      {saving && (
+        <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted">
+          Saving…
+        </span>
+      )}
+      {!saving && (
+        <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted">
+          Saved
+        </span>
+      )}
+      {isStructuring && (
+        <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--ai">
+          Structuring from voice…
+        </span>
+      )}
+    </div>
+  );
+});
 
 interface DocsPageProps {
   /** When set, open this doc (e.g. after creating from meeting). Cleared via onInitialDocConsumed. */
@@ -25,17 +58,26 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedContentRef = useRef<string | null>(null);
   const lastSavedTitleRef = useRef<string | null>(null);
+  const lastSavedDocIdRef = useRef<string | null>(null);
   const editorRef = useRef<RichTextEditorRef>(null);
+  const saveIndicatorRef = useRef<SaveIndicatorRef>(null);
   const [isDocRecording, setIsDocRecording] = useState(false);
   const [isStructuring, setIsStructuring] = useState(false);
+  /** Local title for the current doc to avoid setDocs on every keystroke */
+  const [editingTitle, setEditingTitle] = useState("");
 
   const selectedDoc = docs.find((d) => d.id === selectedId);
+
+  // Sync editing title when switching docs
+  useEffect(() => {
+    if (selectedDoc) setEditingTitle(selectedDoc.title || "");
+    else setEditingTitle("");
+  }, [selectedId, selectedDoc?.id, selectedDoc?.title]);
 
   // Listen for doc recording and transcription events
   useEffect(() => {
@@ -133,29 +175,57 @@ export const DocsPage: React.FC<DocsPageProps> = ({
 
   const saveDoc = useCallback(
     async (docId: string, title: string, content: string) => {
+      const startedAt = Date.now();
+      saveIndicatorRef.current?.setSaving(true);
       try {
-        setSaving(true);
         await invoke("update_doc", {
           docId,
           title,
           content,
         });
-        setDocs((prev) =>
-          prev.map((d) =>
-            d.id === docId ? { ...d, title, content, updated_at: new Date().toISOString() } : d
-          )
-        );
+        lastSavedDocIdRef.current = docId;
         lastSavedContentRef.current = content;
         lastSavedTitleRef.current = title;
+        // Don't setDocs here — avoids re-rendering the whole page. We'll flush
+        // into docs when the user navigates away (see effect below).
       } catch (err) {
         console.error("Failed to save doc:", err);
         toast.error("Failed to save");
       } finally {
-        setSaving(false);
+        // Show "Saving…" for at least a moment so the user sees feedback even when save is instant
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < SAVE_INDICATOR_MIN_MS) {
+          await new Promise((r) => setTimeout(r, SAVE_INDICATOR_MIN_MS - elapsed));
+        }
+        saveIndicatorRef.current?.setSaving(false);
       }
     },
     [toast]
   );
+
+  // When leaving the current doc, flush last-saved state into docs so the list stays in sync
+  const prevSelectedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevSelectedIdRef.current;
+    prevSelectedIdRef.current = selectedId;
+    if (prev != null && prev !== selectedId && lastSavedDocIdRef.current === prev) {
+      const title = lastSavedTitleRef.current;
+      const content = lastSavedContentRef.current;
+      setDocs((p) =>
+        p.map((d) =>
+          d.id === prev
+            ? {
+                ...d,
+                ...(title != null && { title }),
+                ...(content != null && { content }),
+                updated_at: new Date().toISOString(),
+              }
+            : d
+        )
+      );
+      lastSavedDocIdRef.current = null;
+    }
+  }, [selectedId]);
 
   const debouncedSave = useCallback(
     (docId: string, title: string, content: string) => {
@@ -279,34 +349,16 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                 <input
                   type="text"
                   className="docs-editor-toolbar-title-input"
-                  value={selectedDoc.title || ""}
+                  value={editingTitle}
                   onChange={(e) => {
                     const v = e.target.value;
-                    setDocs((prev) =>
-                      prev.map((d) => (d.id === selectedDoc.id ? { ...d, title: v } : d))
-                    );
+                    setEditingTitle(v);
                     debouncedSave(selectedDoc.id, v, selectedDoc.content);
                   }}
                   placeholder="Untitled"
                   aria-label="Document title"
                 />
-                <div className="docs-editor-toolbar-meta">
-                  {saving && (
-                    <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted">
-                      Saving…
-                    </span>
-                  )}
-                  {!saving && (
-                    <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted">
-                      Saved
-                    </span>
-                  )}
-                  {isStructuring && (
-                    <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--ai">
-                      Structuring from voice…
-                    </span>
-                  )}
-                </div>
+                <SaveIndicator ref={saveIndicatorRef} isStructuring={isStructuring} />
                 <button
                   type="button"
                   onClick={handleMicClick}
