@@ -95,6 +95,8 @@ export interface RichTextEditorProps {
   onSelectionChange?: (selection: DocSelection | null) => void;
   /** If provided, show title input above editor */
   title?: string;
+  /** When false, hide the title input (e.g. when title is shown in a parent toolbar). Default true */
+  showTitle?: boolean;
   /** Optional class for the wrapper */
   className?: string;
 }
@@ -117,6 +119,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     onTitleChange,
     onSelectionChange,
     title: initialTitle,
+    showTitle = true,
     className = "",
   },
   ref,
@@ -325,7 +328,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
   return (
     <div className={`docs-editor-wrap ${className}`}>
-      {onTitleChange && (
+      {onTitleChange && showTitle && (
         <input
           className="docs-editor-title"
           value={title}

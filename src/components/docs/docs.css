@@ -101,6 +101,64 @@
   color: #6b21a8;
 }
 
+.docs-page-header__mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: #f3f4f6;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.docs-page-header__mic:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: var(--lexi-text);
+}
+
+.docs-page-header__mic:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.docs-page-header__mic--recording {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.docs-page-header__mic--recording:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.docs-page-header__delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lexi-text-faint);
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.docs-page-header__delete:hover:not(:disabled) {
+  color: var(--lexi-danger);
+  background: var(--lexi-danger-muted);
+}
+
+.docs-page-header__delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .docs-detail-layout {
   flex: 1;
   min-height: 0;
@@ -117,10 +175,36 @@
 .docs-editor-pane__toolbar--detail {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.docs-editor-toolbar-title-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--lexi-text);
+  background: transparent;
+  font-family: inherit;
+  padding: 4px 0;
+}
+
+.docs-editor-toolbar-title-input::placeholder {
+  color: #9ca3af;
+}
+
+.docs-editor-pane__toolbar--detail .docs-editor-toolbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .docs-editor-toolbar-delete {
@@ -144,6 +228,39 @@
 .docs-editor-toolbar-delete:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.docs-mic-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: #f3f4f6;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.docs-mic-btn:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: var(--lexi-text);
+}
+
+.docs-mic-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.docs-mic-btn--recording {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.docs-mic-btn--recording:hover:not(:disabled) {
+  background: #fee2e2;
 }
 
 .docs-layout {

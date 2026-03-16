@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowLeft, Mic, Plus, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, Mic, Square, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
 import { useToast } from "../toast/useToast";
 import { PageLoader } from "../ui/PageLoader";
@@ -252,20 +252,6 @@ export const DocsPage: React.FC<DocsPageProps> = ({
             <ArrowLeft size={20} strokeWidth={2} />
             <span>Docs</span>
           </button>
-          <div className="docs-page-header__title">{selectedDoc.title || "Untitled"}</div>
-          <div className="docs-page-header__meta">
-            {saving && (
-              <span className="docs-page-header__pill docs-page-header__pill--muted">Saving…</span>
-            )}
-            {!saving && (
-              <span className="docs-page-header__pill docs-page-header__pill--muted">Saved</span>
-            )}
-            {isStructuring && (
-              <span className="docs-page-header__pill docs-page-header__pill--ai">
-                Structuring from voice…
-              </span>
-            )}
-          </div>
         </div>
       )}
 
@@ -290,6 +276,20 @@ export const DocsPage: React.FC<DocsPageProps> = ({
           <div className="docs-editor-shell">
             <div className="docs-editor-main">
               <div className="docs-editor-pane__toolbar docs-editor-pane__toolbar--premium docs-editor-pane__toolbar--detail">
+                <input
+                  type="text"
+                  className="docs-editor-toolbar-title-input"
+                  value={selectedDoc.title || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDocs((prev) =>
+                      prev.map((d) => (d.id === selectedDoc.id ? { ...d, title: v } : d))
+                    );
+                    debouncedSave(selectedDoc.id, v, selectedDoc.content);
+                  }}
+                  placeholder="Untitled"
+                  aria-label="Document title"
+                />
                 <div className="docs-editor-toolbar-meta">
                   {saving && (
                     <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted">
@@ -317,19 +317,6 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                       ? "Stop recording"
                       : "Record voice to add structured content"
                   }
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: isDocRecording ? "#fef2f2" : "#f3f4f6",
-                    color: isDocRecording ? "#dc2626" : "#374151",
-                    cursor: isStructuring ? "not-allowed" : "pointer",
-                    opacity: isStructuring ? 0.7 : 1,
-                  }}
                 >
                   {isDocRecording ? (
                     <Square size={18} fill="currentColor" />
@@ -353,10 +340,11 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                   key={selectedDoc.id}
                   content={selectedDoc.content}
                   title={selectedDoc.title}
-                  onUpdate={handleContentUpdate}
                   onTitleChange={handleTitleChange}
+                  onUpdate={handleContentUpdate}
                   placeholder="Start writing…"
                   editable
+                  showTitle={false}
                 />
               </div>
             </div>
