@@ -135,6 +135,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
   const [askLexiSelection, setAskLexiSelection] = useState<DocSelection | null>(
     null,
   );
+  /** Bump to force toolbar re-render so isActive() reflects current selection/marks. */
+  const [, setToolbarVersion] = useState(0);
 
   const editor = useEditor({
     extensions: [
@@ -208,8 +210,10 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     onUpdate: ({ editor }) => {
       const json = JSON.stringify(editor.getJSON());
       onUpdate?.(json);
+      setToolbarVersion((v) => v + 1);
     },
     onSelectionUpdate: ({ editor }) => {
+      setToolbarVersion((v) => v + 1);
       const cb = onSelectionChangeRef.current;
       if (!cb) return;
       const { from, to } = editor.state.selection;
