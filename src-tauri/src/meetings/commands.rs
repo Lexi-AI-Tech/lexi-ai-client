@@ -384,44 +384,6 @@ pub async fn delete_meeting(app: AppHandle, meeting_id: String) -> Result<(), St
     Ok(())
 }
 
-/// Summarize a meeting
-#[tauri::command]
-pub async fn summarize_meeting(
-    app: AppHandle,
-    meeting_id: String,
-) -> Result<serde_json::Value, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .map_err(|_| "Authentication required")?;
-
-    let client = crate::utils::create_http_client();
-    let url = format!(
-        "{}/api/v1/meetings/{}/summarize",
-        crate::config::api_base_url(),
-        meeting_id
-    );
-
-    utils::log_api_request("Summarize meeting", "POST", &url);
-
-    let response = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
-    }
-
-    let meeting: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    Ok(meeting)
-}
-
 /// Add a user note to the meeting transcript (typed during the meeting).
 #[tauri::command]
 pub async fn add_meeting_note(
