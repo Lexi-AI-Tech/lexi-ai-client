@@ -150,7 +150,6 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                                         }
                                     }}
                                 >
-                                    <div className="meetings-list-page__card-accent" aria-hidden />
                                     <div className="meetings-list-page__card-body">
                                         <div className="meetings-list-page__card-meta-row">
                                             <span className="meetings-list-page__card-badge">

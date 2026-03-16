@@ -97,28 +97,10 @@
   overflow: hidden;
 }
 
-.meetings-list-page__card-accent {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--lexi-primary) 0%, var(--lexi-primary-hover) 100%);
-  opacity: 0;
-  transform: scaleX(0.95);
-  transform-origin: center top;
-  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
 .meetings-list-page__card:hover {
   border-color: var(--lexi-border);
   box-shadow: var(--lexi-shadow-md);
   transform: translateY(-3px);
-}
-
-.meetings-list-page__card:hover .meetings-list-page__card-accent {
-  opacity: 1;
-  transform: scaleX(1);
 }
 
 .meetings-list-page__card:active {
