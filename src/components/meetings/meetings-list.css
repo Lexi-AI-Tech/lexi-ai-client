@@ -164,6 +164,51 @@
   overflow: hidden;
 }
 
+/* Rendered markdown preview: compact headings and lists, still clamped to 2 lines */
+.meetings-list-page__card-summary--preview {
+  font-size: 0.8125rem;
+  color: var(--lexi-text-muted);
+}
+
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown {
+  margin: 0;
+  padding: 0;
+}
+
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown h1,
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown h2,
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown h3,
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown h4 {
+  margin: 0 0 0.15em 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lexi-text-muted);
+  line-height: 1.5;
+}
+
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown p,
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown ul,
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown ol {
+  margin: 0 0 0.15em 0;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  line-height: 1.5;
+}
+
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown li {
+  margin: 0 0 0 0.5em;
+  padding: 0;
+  font-size: inherit;
+  list-style: disc;
+}
+
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown ul,
+.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown ol {
+  padding-left: 1em;
+}
+
 .meetings-list-page__card-summary--muted {
   color: var(--lexi-text-faint);
   font-style: italic;

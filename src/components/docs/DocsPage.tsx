@@ -179,9 +179,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
       saveIndicatorRef.current?.setSaving(true);
       try {
         await invoke("update_doc", {
-          docId,
-          title,
-          content,
+          payload: { docId, title, content },
         });
         lastSavedDocIdRef.current = docId;
         lastSavedContentRef.current = content;
@@ -275,7 +273,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     if (!deleteConfirmId) return;
     setDeletingId(deleteConfirmId);
     try {
-      await invoke("delete_doc", { docId: deleteConfirmId });
+      await invoke("delete_doc", { payload: { docId: deleteConfirmId } });
       setDocs((prev) => prev.filter((d) => d.id !== deleteConfirmId));
       if (selectedId === deleteConfirmId) setSelectedId(null);
       setDeleteConfirmId(null);
