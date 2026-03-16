@@ -14,7 +14,7 @@ pub fn api_base_url() -> &'static str {
     }
     #[cfg(not(feature = "custom-protocol"))]
     {
-        // "https://dev-server.speaklexi.com"
-        "http://localhost:3000"
+        "https://dev-server.speaklexi.com"
+        // "http://localhost:3000"
     }
 }

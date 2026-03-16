@@ -207,19 +207,6 @@ export interface PaginatedNotesResponse {
 }
 
 // ============================================================================
-// Docs Types (rich-text, Notion-style)
-// ============================================================================
-
-export interface Doc {
-  id: string;
-  title: string;
-  /** TipTap/ProseMirror JSON document as string */
-  content: string;
-  created_at: string;
-  updated_at: string;
-}
-
-// ============================================================================
 // UI Component Types
 // ============================================================================
 
@@ -268,15 +255,14 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-  | "home"
-  | "transcripts"
-  | "settings"
-  | "vocabulary"
-  | "actions"
-  | "shortcuts"
-  | "notes"
-  | "meetings"
-  | "docs";
+    | "home"
+    | "transcripts"
+    | "settings"
+    | "vocabulary"
+    | "actions"
+    | "shortcuts"
+    | "notes"
+    | "meetings";
   onNavigate: (
     page:
       | "home"
@@ -286,8 +272,7 @@ export interface SidebarProps {
       | "actions"
       | "shortcuts"
       | "notes"
-      | "meetings"
-      | "docs",
+      | "meetings",
   ) => void;
 }
 

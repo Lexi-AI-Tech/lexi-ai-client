@@ -46,7 +46,6 @@ use tokio::sync::watch;
 // Module declarations for core functionality
 mod actions; // Voice actions (triggered by hotkeys)
 mod api_endpoints; // Centralized API endpoint definitions
-mod app_icon; // macOS app icon for Transcript List app column
 mod assistant; // Recording thread management
 mod audio;
 mod commands;
@@ -89,7 +88,6 @@ use permissions::{
 };
 
 use actions::commands::{delete_action_history, get_action_history};
-use app_icon::get_app_icon;
 use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{get_app_config, update_app_config};
@@ -101,20 +99,11 @@ use commands::auth::{
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
-use commands::docs::{
-    create_doc, delete_doc, get_doc, get_docs, rewrite_doc_section, start_doc_recording,
-    stop_doc_recording, structure_doc_content, update_doc,
-};
 use commands::notes::{create_note, delete_note, get_note, get_notes, update_note};
 use commands::onboarding::{
     complete_onboarding, complete_server_onboarding, get_onboarding_state,
     get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
     set_onboarding_step,
-};
-use meetings::commands::{
-    add_meeting_note, create_meeting, get_meeting_details, get_meeting_suggested_questions,
-    list_meetings, start_meeting_recording, stop_meeting_recording, update_meeting, delete_meeting,
-    send_meeting_chat, create_doc_from_meeting, stream_meeting_summary,
 };
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
@@ -124,6 +113,11 @@ use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, updat
 use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type};
 use commands::window::{open_devtools, show_main_window};
+use meetings::commands::{
+    add_meeting_note, create_meeting, delete_meeting, get_meeting_details, list_meetings,
+    send_meeting_chat, start_meeting_recording, stop_meeting_recording, summarize_meeting,
+    update_meeting,
+};
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
 /// Command to control recording state
@@ -133,14 +127,9 @@ pub enum RecordingCommand {
     Stop,              // Regular recording hotkey released
     ActionStart,       // Action hotkey pressed
     ActionStop,        // Action hotkey released
-    DocStart,          // Start recording for doc (from Docs UI mic button)
-    DocStop,           // Stop recording for doc and emit transcript
     SwitchToAction,    // Mode dynamically switched to Action
     SwitchToAssistant, // Mode dynamically switched to Assistant
 }
-
-/// Shared sender for recording commands (used by key listener and by doc recording commands).
-pub struct RecordingCommandTx(pub mpsc::Sender<RecordingCommand>);
 
 /// State held so the global key listener can be started later (after permissions are granted).
 /// This fixes Fn key not working on first install until app restart.
@@ -295,15 +284,6 @@ pub fn main() {
             create_note,
             update_note,
             delete_note,
-            get_docs,
-            get_doc,
-            create_doc,
-            update_doc,
-            delete_doc,
-            start_doc_recording,
-            stop_doc_recording,
-            structure_doc_content,
-            rewrite_doc_section,
             create_room,
             list_rooms,
             get_room_details,
@@ -315,15 +295,12 @@ pub fn main() {
             create_meeting,
             list_meetings,
             get_meeting_details,
-            get_meeting_suggested_questions,
             start_meeting_recording,
             stop_meeting_recording,
             update_meeting,
             delete_meeting,
+            summarize_meeting,
             send_meeting_chat,
-            create_doc_from_meeting,
-            stream_meeting_summary,
-            get_app_icon,
             start_global_key_listener,
         ])
         .setup(move |app| {
@@ -374,8 +351,7 @@ pub fn main() {
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
             let (recording_tx, recording_rx) = mpsc::channel::<RecordingCommand>();
 
-            // Expose a clone so doc recording (mic in Docs UI) can send DocStart/DocStop
-            app.manage(RecordingCommandTx(recording_tx.clone()));
+
 
             // Initialize hotkey channels with empty default states to avoid blocking startup.
             let (config_tx, config_rx) = watch::channel(Vec::new());
