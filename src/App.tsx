@@ -21,7 +21,6 @@ import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { NotesPage } from "./components/NotesPage";
 import { MeetingsPage } from "./components/MeetingsPage";
-import { DocsPage } from "./components/docs/DocsPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
 import { useAutoUpdater } from "./hooks/useAutoUpdater";
@@ -36,8 +35,7 @@ type Page =
   | "actions"
   | "shortcuts"
   | "notes"
-  | "meetings"
-  | "docs";
+  | "meetings";
 
 const LOADING_DELAY_MS = 150; // Only show loading spinner if init takes longer than this (avoids brief flash on first load)
 
@@ -199,47 +197,12 @@ function App() {
     };
 
     setup().catch((e) => {
-      console.error(
-        "Failed to set up meeting-recording-started listener:",
-        e,
-      );
+      console.error("Failed to set up meeting-recording-started listener:", e);
     });
 
     return () => {
       cancelled = true;
       if (unlistenFn) unlistenFn();
-    };
-  }, []);
-
-  // Navigate to docs page, optionally opening a specific doc (e.g. after creating from meeting)
-  const [selectedDocIdToOpen, setSelectedDocIdToOpen] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handleNavigateToDocs = () => {
-      setSelectedDocIdToOpen(null);
-      setCurrentPage("docs");
-    };
-    const handleNavigateToDoc = (e: Event) => {
-      const ev = e as CustomEvent<{ docId: string }>;
-      const docId = ev.detail?.docId;
-      if (docId) {
-        setSelectedDocIdToOpen(docId);
-      } else {
-        setSelectedDocIdToOpen(null);
-      }
-      setCurrentPage("docs");
-    };
-    window.addEventListener(
-      "lexi-navigate-to-docs",
-      handleNavigateToDocs as EventListener,
-    );
-    window.addEventListener("lexi-navigate-to-doc", handleNavigateToDoc);
-    return () => {
-      window.removeEventListener(
-        "lexi-navigate-to-docs",
-        handleNavigateToDocs as EventListener,
-      );
-      window.removeEventListener("lexi-navigate-to-doc", handleNavigateToDoc);
     };
   }, []);
 
@@ -314,7 +277,7 @@ function App() {
           </div>
         )}
         {currentPage === "meetings" && (
-          <div className="container container--meetings">
+          <div className="container">
             <MeetingsPage
               autoStart={pendingTrayMeeting}
               autoStartPlatform={pendingTrayMeetingPlatform}
@@ -325,14 +288,6 @@ function App() {
               onEndMeetingFromTrayConsumed={() =>
                 setTriggerEndMeetingFromTray(false)
               }
-            />
-          </div>
-        )}
-        {currentPage === "docs" && (
-          <div className="container container--docs">
-            <DocsPage
-              initialSelectedDocId={selectedDocIdToOpen}
-              onInitialDocConsumed={() => setSelectedDocIdToOpen(null)}
             />
           </div>
         )}

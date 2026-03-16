@@ -6,7 +6,6 @@
 pub mod analytics;
 pub mod app_config;
 pub mod auth;
-pub mod docs;
 pub mod hotkey;
 pub mod notes;
 pub mod onboarding;

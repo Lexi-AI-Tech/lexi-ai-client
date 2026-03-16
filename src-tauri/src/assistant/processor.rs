@@ -150,37 +150,3 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         }
     });
 }
-
-/// Processes recorded audio for the Docs feature: transcribes only and emits
-/// `doc_transcription_ready` with the transcript text (no injection).
-pub fn process_audio_for_doc(audio_data: Vec<u8>, app_handle: AppHandle) {
-    let app_handle_for_task = app_handle.clone();
-
-    let _task = tauri::async_runtime::spawn(async move {
-        let auth_token = get_auth_token_async(&app_handle_for_task).await;
-        if auth_token.is_err() {
-            let _ = app_handle_for_task.emit("doc_transcription_error", "Authentication required");
-            return;
-        }
-
-        let assistant_service = AssistantService::new();
-        let offline_transcription = false;
-        let transcription_result = assistant_service
-            .transcribe_audio(
-                audio_data,
-                auth_token,
-                Some(app_handle_for_task.clone()),
-                offline_transcription,
-            )
-            .await;
-
-        match transcription_result {
-            Ok((transcription, _)) => {
-                let _ = app_handle_for_task.emit("doc_transcription_ready", &transcription);
-            }
-            Err(e) => {
-                let _ = app_handle_for_task.emit("doc_transcription_error", e.to_string());
-            }
-        }
-    });
-}
