@@ -21,6 +21,7 @@ interface MeetingsListPageProps {
     onStartNewMeeting: () => void;
     isRecording: boolean;
     isGeneratingSummary: boolean;
+    isLoading?: boolean;
 }
 
 export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
@@ -30,6 +31,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
     onStartNewMeeting,
     isRecording,
     isGeneratingSummary,
+    isLoading = false,
 }) => {
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -85,7 +87,43 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
     return (
         <div className="meetings-list-page">
             <AnimatePresence mode="wait">
-                {meetings.length === 0 ? (
+                {isLoading ? (
+                    <motion.div
+                        key="loading"
+                        className="meetings-list-page__loading"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <header className="meetings-list-page__header">
+                            <div className="meetings-list-page__header-inner">
+                                <h1 className="meetings-list-page__title">Meetings</h1>
+                                <p className="meetings-list-page__subtitle">Loading…</p>
+                            </div>
+                            <button
+                                type="button"
+                                className="meetings-list-page__cta"
+                                onClick={onStartNewMeeting}
+                                disabled={true}
+                            >
+                                <Mic size={18} strokeWidth={2} />
+                                Start New Meeting
+                            </button>
+                        </header>
+
+                        <div className="meetings-list-page__grid">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <div key={i} className="meetings-list-page__card meetings-list-page__card--skeleton">
+                                    <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--sm" />
+                                    <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--md" />
+                                    <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--lg" />
+                                    <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--lg" />
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                ) : meetings.length === 0 ? (
                     <motion.div
                         key="empty"
                         className="meetings-list-page__empty"

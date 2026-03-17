@@ -79,6 +79,61 @@
   min-height: min-content;
 }
 
+/* ----- Loading skeleton ----- */
+.meetings-list-page__loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.meetings-list-page__card--skeleton {
+  cursor: default;
+  border-color: var(--lexi-border);
+  box-shadow: var(--lexi-shadow-sm);
+}
+
+.meetings-list-page__card--skeleton:hover,
+.meetings-list-page__card--skeleton:active {
+  transform: none;
+  box-shadow: var(--lexi-shadow-sm);
+}
+
+.meetings-list-page__skeleton-line {
+  height: 12px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.16) 0%,
+    rgba(148, 163, 184, 0.28) 45%,
+    rgba(148, 163, 184, 0.16) 100%
+  );
+  background-size: 200% 100%;
+  animation: meetings-skeleton-shimmer 1.1s ease-in-out infinite;
+  margin-bottom: 10px;
+}
+
+.meetings-list-page__skeleton-line--sm {
+  width: 40%;
+  height: 10px;
+}
+
+.meetings-list-page__skeleton-line--md {
+  width: 70%;
+}
+
+.meetings-list-page__skeleton-line--lg {
+  width: 100%;
+}
+
+@keyframes meetings-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 /* ----- Cards ----- */
 .meetings-list-page__card {
   display: flex;

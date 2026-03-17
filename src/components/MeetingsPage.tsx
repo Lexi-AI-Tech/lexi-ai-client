@@ -38,6 +38,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
 }) => {
     const { tokens } = useAuthStore();
     const [meetings, setMeetings] = useState<Meeting[]>([]);
+    const [isMeetingsLoading, setIsMeetingsLoading] = useState(false);
     const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
     const [openToSummaryTab, setOpenToSummaryTab] = useState(false);
     const [recordingMeetingId, setRecordingMeetingId] = useState<string | null>(null);
@@ -48,11 +49,14 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
         : null;
 
     const fetchMeetings = useCallback(async () => {
+        setIsMeetingsLoading(true);
         try {
             const result = await invoke<Meeting[]>("list_meetings");
             setMeetings(result);
         } catch (error) {
             console.error("Failed to fetch meetings:", error);
+        } finally {
+            setIsMeetingsLoading(false);
         }
     }, []);
 
@@ -255,6 +259,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                     onStartNewMeeting={handleCreateAndStartMeeting}
                     isRecording={!!recordingMeetingId}
                     isGeneratingSummary={false}
+                    isLoading={isMeetingsLoading}
                 />
             )}
         </div>
