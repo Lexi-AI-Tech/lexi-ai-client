@@ -415,7 +415,11 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
     const SECTION_VARIANTS = {
         hidden: { opacity: 0, y: 16 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 0.61, 0.36, 1] } },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.5, ease: [0.22, 0.61, 0.36, 1] as const },
+        },
     };
 
     return (
@@ -499,7 +503,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                             initial={{ opacity: 0, x: -8 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 8 }}
-                            transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] }}
+                            transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] as const }}
                         >
                             <div ref={scrollRef} className="meeting-detail-transcript__scroll">
                                 {isInitializingMeeting ? (
@@ -571,7 +575,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                             initial={{ opacity: 0, x: 8 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -8 }}
-                            transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] }}
+                            transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] as const }}
                         >
                             <div className="meeting-detail-main">
                                 <div className="meeting-detail-card meeting-detail-summary-panel">
