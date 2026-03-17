@@ -247,6 +247,10 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                         setRecordingMeetingId(null);
                         setLiveSegments([]);
                     }}
+                    onRecordingStarted={(id) => {
+                        setRecordingMeetingId(id);
+                        setLiveSegments([]);
+                    }}
                 />
             ) : (
                 <MeetingsListPage

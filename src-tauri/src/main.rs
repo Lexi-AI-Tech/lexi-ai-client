@@ -400,6 +400,7 @@ pub fn main() {
                 command_tx: Mutex::new(None),
                 system_stop_tx: Mutex::new(None),
                 meeting_ws_text_tx: Mutex::new(None),
+                meeting_ws_close_tx: Mutex::new(None),
                 tray_start_meeting: Mutex::new(Some(start_meeting_menu_item)),
                 meeting_recording_tx: Mutex::new(meeting_recording_tx),
             });

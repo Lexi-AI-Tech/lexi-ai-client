@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
@@ -45,6 +45,8 @@ interface MeetingDetailPageProps {
     onEndMeetingFromTrayConsumed?: () => void;
     /** Called when recording is stopped (so parent can clear recording state) */
     onRecordingStopped?: () => void;
+    /** Called when recording is started (e.g. Resume) so parent can set recordingMeetingId and show live segments */
+    onRecordingStarted?: (meetingId: string) => void;
     /** When set, the detail page opens on this tab (e.g. "summary" when coming from list "View details"). */
     initialTab?: "transcript" | "summary";
 }
@@ -61,6 +63,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     triggerEndMeetingFromTray,
     onEndMeetingFromTrayConsumed,
     onRecordingStopped,
+    onRecordingStarted,
     initialTab,
 }) => {
     const { tokens } = useAuthStore();
@@ -96,7 +99,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         "Any risks or blockers mentioned?",
     ];
 
-    const segments = isThisMeetingRecording ? liveSegments : fetchedSegments;
+    const segments = isThisMeetingRecording
+        ? [...fetchedSegments, ...liveSegments]
+        : fetchedSegments;
 
     const summaryLines = useMemo(() => {
         if (streamingLines.length > 0) return streamingLines;
@@ -108,23 +113,33 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     }, [streamingLines, activeSummary]);
 
 
-    useEffect(() => {
-        const fetchDetails = async () => {
-            if (!meetingId) return;
-            try {
-                const details = await invoke<{ transcripts?: TranscriptSegment[]; summary?: string | null }>(
-                    "get_meeting_details",
-                    { meetingId }
-                );
-                setFetchedSegments(details.transcripts ?? []);
-                setActiveSummary(details.summary ?? null);
-            } catch (error) {
-                console.error("Failed to fetch meeting details:", error);
-                setFetchedSegments([]);
-            }
-        };
-        fetchDetails();
+    const fetchMeetingDetails = useCallback(async () => {
+        if (!meetingId) return;
+        try {
+            const details = await invoke<{ transcripts?: TranscriptSegment[]; summary?: string | null }>(
+                "get_meeting_details",
+                { meetingId }
+            );
+            setFetchedSegments(details.transcripts ?? []);
+            setActiveSummary(details.summary ?? null);
+        } catch (error) {
+            console.error("Failed to fetch meeting details:", error);
+            setFetchedSegments([]);
+        }
     }, [meetingId]);
+
+    useEffect(() => {
+        fetchMeetingDetails();
+    }, [fetchMeetingDetails]);
+
+    // When recording stops, refetch so we show the latest saved transcripts (they were saved by the server during the stream)
+    const wasRecordingRef = useRef(isThisMeetingRecording);
+    useEffect(() => {
+        if (wasRecordingRef.current && !isThisMeetingRecording) {
+            fetchMeetingDetails();
+        }
+        wasRecordingRef.current = isThisMeetingRecording;
+    }, [isThisMeetingRecording, fetchMeetingDetails]);
 
     useEffect(() => {
         setSuggestedQuestions(null);
@@ -216,6 +231,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         setIsInitializingMeeting(true);
         try {
             await invoke("start_meeting_recording", { meetingId });
+            onRecordingStarted?.(meetingId);
         } catch (error) {
             console.error("Failed to start meeting recording:", error);
         } finally {
@@ -431,7 +447,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                             Transcript
                         </button>
                     </div>
-                    {!activeSummary && !isGeneratingSummary && !isInitializingMeeting && (segments.length === 0 || isThisMeetingRecording) && (
+                    {!activeSummary && !isGeneratingSummary && !isInitializingMeeting && (
                         <div className="meeting-detail-controls">
                             <button
                                 type="button"

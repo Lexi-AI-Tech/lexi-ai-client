@@ -165,6 +165,9 @@ pub async fn start_meeting_recording(
     if let Some(tx) = websocket.text_tx.lock().unwrap().take() {
         *state.meeting_ws_text_tx.lock().unwrap() = Some(tx);
     }
+    if let Some(tx) = websocket.close_tx.lock().unwrap().take() {
+        *state.meeting_ws_close_tx.lock().unwrap() = Some(tx);
+    }
     *state.is_recording.lock().unwrap() = true;
 
     // Broadcast so key listener disables assistant/action hotkeys while meeting is running
@@ -224,6 +227,11 @@ pub async fn stop_meeting_recording(
     let ws_tx = state.meeting_ws_text_tx.lock().unwrap().take();
     if let Some(tx) = ws_tx {
         let _ = tx.send(r#"{"type":"end_recording"}"#.to_string()).await;
+    }
+    // Explicitly close the WebSocket so send/recv tasks exit and connection and mic are released
+    let close_tx = state.meeting_ws_close_tx.lock().unwrap().take();
+    if let Some(tx) = close_tx {
+        let _ = tx.send(()).await;
     }
 
     // Broadcast so key listener re-enables assistant/action hotkeys

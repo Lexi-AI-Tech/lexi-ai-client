@@ -18,6 +18,8 @@ pub struct MeetingWebSocket {
     /// Sends (source, chunk) where source is "user" or "system"; server tags transcripts with message_type.
     pub audio_tx: Arc<Mutex<Option<mpsc::Sender<(String, Vec<u8>)>>>>,
     pub text_tx: Arc<Mutex<Option<mpsc::Sender<String>>>>, // For sending text messages (like end_recording)
+    /// Signal to send WebSocket Close frame and exit send task (so connection is cleanly closed and mic released)
+    pub close_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
     is_connected: Arc<Mutex<bool>>,
     pub ready_rx: Arc<Mutex<Option<tokio::sync::oneshot::Receiver<()>>>>, // Receive signal when server is ready
 }
@@ -30,6 +32,7 @@ impl MeetingWebSocket {
             jwt_token,
             audio_tx: Arc::new(Mutex::new(None)),
             text_tx: Arc::new(Mutex::new(None)),
+            close_tx: Arc::new(Mutex::new(None)),
             is_connected: Arc::new(Mutex::new(false)),
             ready_rx: Arc::new(Mutex::new(None)),
         }
@@ -63,8 +66,10 @@ impl MeetingWebSocket {
         // Create channels: audio as (source, chunk) so server can tag transcripts by speaker_type
         let (audio_tx, mut audio_rx) = mpsc::channel::<(String, Vec<u8>)>(100);
         let (text_tx, mut text_rx) = mpsc::channel::<String>(10);
+        let (close_tx, mut close_rx) = mpsc::channel::<()>(1);
         *self.audio_tx.lock().unwrap() = Some(audio_tx);
         *self.text_tx.lock().unwrap() = Some(text_tx);
+        *self.close_tx.lock().unwrap() = Some(close_tx);
 
         // Create ready signal channel
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
@@ -107,6 +112,12 @@ impl MeetingWebSocket {
                             eprintln!("❌ Failed to send text message: {}", e);
                             break;
                         }
+                    }
+                    // Explicit close so server and client both release the connection (and mic is released)
+                    _ = close_rx.recv() => {
+                        println!("📤 Sending WebSocket Close frame");
+                        let _ = write.send(Message::Close(None)).await;
+                        break;
                     }
                     else => {
                         println!("📤 Audio/text sending complete. Total: {} chunks, {} bytes", total_chunks, total_bytes);
