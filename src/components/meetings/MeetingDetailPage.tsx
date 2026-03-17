@@ -91,6 +91,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     const scrollRef = useRef<HTMLDivElement>(null);
     const chatScrollRef = useRef<HTMLDivElement>(null);
     const streamingForMeetingIdRef = useRef<string | null>(null);
+    /** When true, suggested questions are being fetched in the stream-done handler; useEffect should skip to avoid double fetch */
+    const suggestedQuestionsFetchedByStreamRef = useRef(false);
 
     const DEFAULT_SUGGESTED_QUESTIONS = [
         "What were the action items?",
@@ -147,6 +149,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
     useEffect(() => {
         if (!meetingId || !activeSummary?.trim() || suggestedQuestions !== null) return;
+        if (suggestedQuestionsFetchedByStreamRef.current) {
+            suggestedQuestionsFetchedByStreamRef.current = false;
+            return;
+        }
         let cancelled = false;
         setIsLoadingSuggestedQuestions(true);
         (async () => {
@@ -195,6 +201,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         return;
                     }
                     if (payload.done) {
+                        suggestedQuestionsFetchedByStreamRef.current = true;
                         setStreamingLines((prev) => {
                             const full = prev.map((l) => l.raw).join("\n");
                             setActiveSummary(full || null);
@@ -209,7 +216,14 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                             // doesn't "jump" from streaming → full re-render on completion.
                             return prev;
                         });
-                        setSuggestedQuestions(null);
+                        // Fetch suggested questions in parallel; no clear so no blink
+                        setIsLoadingSuggestedQuestions(true);
+                        invoke<string[]>("get_meeting_suggested_questions", { meetingId })
+                            .then((questions) => {
+                                setSuggestedQuestions(Array.isArray(questions) ? questions : []);
+                            })
+                            .catch(() => setSuggestedQuestions([]))
+                            .finally(() => setIsLoadingSuggestedQuestions(false));
                         return;
                     }
                     if (payload.line) {
@@ -255,6 +269,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         setStreamingLines([]);
         setActiveSummary(null);
         setSuggestedQuestions(null);
+        setIsLoadingSuggestedQuestions(true);
         streamingForMeetingIdRef.current = meetingId;
         try {
             await invoke("stream_meeting_summary", {
@@ -571,7 +586,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     {activeTab === "summary" && (
                         <motion.div
                             key="summary"
-                            className={`meeting-detail-split ${activeSummary ? "" : "meeting-detail-split--no-rail"}`}
+                            className={`meeting-detail-split ${activeSummary || isGeneratingSummary ? "" : "meeting-detail-split--no-rail"}`}
                             initial={{ opacity: 0, x: 8 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -8 }}
@@ -583,31 +598,31 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                                         <h3 className="meeting-detail-summary-panel__title">AI Summary</h3>
                                         <div className="meeting-detail-summary-panel__actions">
                                             {activeSummary && (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        className="meeting-detail-btn meeting-detail-btn--secondary"
-                                                        onClick={() => setShowCreateDocModal(true)}
-                                                        title="Create a document from this meeting"
-                                                    >
-                                                        <FilePlus size={14} className="meeting-detail-btn__icon" aria-hidden />
-                                                        Create doc
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="meeting-detail-btn meeting-detail-btn--secondary"
-                                                        onClick={handleGenerateSummary}
-                                                        disabled={!meetingId || isGeneratingSummary}
-                                                        title="Generate a new summary"
-                                                    >
-                                                        <RefreshCw
-                                                            size={14}
-                                                            className={`meeting-detail-btn__icon ${isGeneratingSummary ? "meeting-detail-btn__icon--spin" : ""}`}
-                                                            aria-hidden
-                                                        />
-                                                        {isGeneratingSummary ? "Regenerating…" : "Regenerate"}
-                                                    </button>
-                                                </>
+                                                <button
+                                                    type="button"
+                                                    className="meeting-detail-btn meeting-detail-btn--secondary"
+                                                    onClick={() => setShowCreateDocModal(true)}
+                                                    title="Create a document from this meeting"
+                                                >
+                                                    <FilePlus size={14} className="meeting-detail-btn__icon" aria-hidden />
+                                                    Create doc
+                                                </button>
+                                            )}
+                                            {(activeSummary || isGeneratingSummary) && (
+                                                <button
+                                                    type="button"
+                                                    className="meeting-detail-btn meeting-detail-btn--secondary"
+                                                    onClick={handleGenerateSummary}
+                                                    disabled={!meetingId || isGeneratingSummary}
+                                                    title="Generate a new summary"
+                                                >
+                                                    <RefreshCw
+                                                        size={14}
+                                                        className={`meeting-detail-btn__icon ${isGeneratingSummary ? "meeting-detail-btn__icon--spin" : ""}`}
+                                                        aria-hidden
+                                                    />
+                                                    {isGeneratingSummary ? "Generating…" : "Regenerate"}
+                                                </button>
                                             )}
                                         </div>
                                     </div>
@@ -643,7 +658,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                                     </div>
                                 </div>
                             </div>
-                            {activeSummary && (
+                            {(activeSummary || isGeneratingSummary) && (
                                 <aside className="meeting-detail-rail">
                                     <div className="meeting-detail-rail__header">
                                         <span className="meeting-detail-rail__label">
