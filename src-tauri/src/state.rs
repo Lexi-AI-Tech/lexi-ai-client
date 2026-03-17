@@ -45,6 +45,8 @@ pub struct MeetingState {
     pub system_stop_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
     /// Sender to send an end event to the meeting WebSocket so the server can finalize and close the stream
     pub meeting_ws_text_tx: Mutex<Option<mpsc::Sender<String>>>,
+    /// Signal to close the meeting WebSocket (send Close frame and exit send/recv tasks so connection and mic are released)
+    pub meeting_ws_close_tx: Mutex<Option<mpsc::Sender<()>>>,
     /// Handle to the tray "Start Meeting" menu item for dynamic enable/disable
     pub tray_start_meeting: Mutex<Option<tauri::menu::MenuItem<tauri::Wry>>>,
     /// Broadcasts when meeting recording starts (true) or stops (false). Key listener uses this to disable assistant/action hotkeys.

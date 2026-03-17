@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
@@ -45,6 +45,8 @@ interface MeetingDetailPageProps {
     onEndMeetingFromTrayConsumed?: () => void;
     /** Called when recording is stopped (so parent can clear recording state) */
     onRecordingStopped?: () => void;
+    /** Called when recording is started (e.g. Resume) so parent can set recordingMeetingId and show live segments */
+    onRecordingStarted?: (meetingId: string) => void;
     /** When set, the detail page opens on this tab (e.g. "summary" when coming from list "View details"). */
     initialTab?: "transcript" | "summary";
 }
@@ -61,6 +63,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     triggerEndMeetingFromTray,
     onEndMeetingFromTrayConsumed,
     onRecordingStopped,
+    onRecordingStarted,
     initialTab,
 }) => {
     const { tokens } = useAuthStore();
@@ -88,6 +91,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     const scrollRef = useRef<HTMLDivElement>(null);
     const chatScrollRef = useRef<HTMLDivElement>(null);
     const streamingForMeetingIdRef = useRef<string | null>(null);
+    /** When true, suggested questions are being fetched in the stream-done handler; useEffect should skip to avoid double fetch */
+    const suggestedQuestionsFetchedByStreamRef = useRef(false);
 
     const DEFAULT_SUGGESTED_QUESTIONS = [
         "What were the action items?",
@@ -96,7 +101,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         "Any risks or blockers mentioned?",
     ];
 
-    const segments = isThisMeetingRecording ? liveSegments : fetchedSegments;
+    const segments = isThisMeetingRecording
+        ? [...fetchedSegments, ...liveSegments]
+        : fetchedSegments;
 
     const summaryLines = useMemo(() => {
         if (streamingLines.length > 0) return streamingLines;
@@ -108,23 +115,33 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     }, [streamingLines, activeSummary]);
 
 
-    useEffect(() => {
-        const fetchDetails = async () => {
-            if (!meetingId) return;
-            try {
-                const details = await invoke<{ transcripts?: TranscriptSegment[]; summary?: string | null }>(
-                    "get_meeting_details",
-                    { meetingId }
-                );
-                setFetchedSegments(details.transcripts ?? []);
-                setActiveSummary(details.summary ?? null);
-            } catch (error) {
-                console.error("Failed to fetch meeting details:", error);
-                setFetchedSegments([]);
-            }
-        };
-        fetchDetails();
+    const fetchMeetingDetails = useCallback(async () => {
+        if (!meetingId) return;
+        try {
+            const details = await invoke<{ transcripts?: TranscriptSegment[]; summary?: string | null }>(
+                "get_meeting_details",
+                { meetingId }
+            );
+            setFetchedSegments(details.transcripts ?? []);
+            setActiveSummary(details.summary ?? null);
+        } catch (error) {
+            console.error("Failed to fetch meeting details:", error);
+            setFetchedSegments([]);
+        }
     }, [meetingId]);
+
+    useEffect(() => {
+        fetchMeetingDetails();
+    }, [fetchMeetingDetails]);
+
+    // When recording stops, refetch so we show the latest saved transcripts (they were saved by the server during the stream)
+    const wasRecordingRef = useRef(isThisMeetingRecording);
+    useEffect(() => {
+        if (wasRecordingRef.current && !isThisMeetingRecording) {
+            fetchMeetingDetails();
+        }
+        wasRecordingRef.current = isThisMeetingRecording;
+    }, [isThisMeetingRecording, fetchMeetingDetails]);
 
     useEffect(() => {
         setSuggestedQuestions(null);
@@ -132,6 +149,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
     useEffect(() => {
         if (!meetingId || !activeSummary?.trim() || suggestedQuestions !== null) return;
+        if (suggestedQuestionsFetchedByStreamRef.current) {
+            suggestedQuestionsFetchedByStreamRef.current = false;
+            return;
+        }
         let cancelled = false;
         setIsLoadingSuggestedQuestions(true);
         (async () => {
@@ -180,6 +201,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         return;
                     }
                     if (payload.done) {
+                        suggestedQuestionsFetchedByStreamRef.current = true;
                         setStreamingLines((prev) => {
                             const full = prev.map((l) => l.raw).join("\n");
                             setActiveSummary(full || null);
@@ -194,7 +216,14 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                             // doesn't "jump" from streaming → full re-render on completion.
                             return prev;
                         });
-                        setSuggestedQuestions(null);
+                        // Fetch suggested questions in parallel; no clear so no blink
+                        setIsLoadingSuggestedQuestions(true);
+                        invoke<string[]>("get_meeting_suggested_questions", { meetingId })
+                            .then((questions) => {
+                                setSuggestedQuestions(Array.isArray(questions) ? questions : []);
+                            })
+                            .catch(() => setSuggestedQuestions([]))
+                            .finally(() => setIsLoadingSuggestedQuestions(false));
                         return;
                     }
                     if (payload.line) {
@@ -216,6 +245,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         setIsInitializingMeeting(true);
         try {
             await invoke("start_meeting_recording", { meetingId });
+            onRecordingStarted?.(meetingId);
         } catch (error) {
             console.error("Failed to start meeting recording:", error);
         } finally {
@@ -239,6 +269,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         setStreamingLines([]);
         setActiveSummary(null);
         setSuggestedQuestions(null);
+        setIsLoadingSuggestedQuestions(true);
         streamingForMeetingIdRef.current = meetingId;
         try {
             await invoke("stream_meeting_summary", {
@@ -399,7 +430,11 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
     const SECTION_VARIANTS = {
         hidden: { opacity: 0, y: 16 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 0.61, 0.36, 1] } },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.5, ease: [0.22, 0.61, 0.36, 1] as const },
+        },
     };
 
     return (
@@ -431,7 +466,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                             Transcript
                         </button>
                     </div>
-                    {!activeSummary && !isGeneratingSummary && !isInitializingMeeting && (segments.length === 0 || isThisMeetingRecording) && (
+                    {!activeSummary && !isGeneratingSummary && !isInitializingMeeting && (
                         <div className="meeting-detail-controls">
                             <button
                                 type="button"
@@ -483,7 +518,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                             initial={{ opacity: 0, x: -8 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 8 }}
-                            transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] }}
+                            transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] as const }}
                         >
                             <div ref={scrollRef} className="meeting-detail-transcript__scroll">
                                 {isInitializingMeeting ? (
@@ -551,11 +586,11 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     {activeTab === "summary" && (
                         <motion.div
                             key="summary"
-                            className={`meeting-detail-split ${activeSummary ? "" : "meeting-detail-split--no-rail"}`}
+                            className={`meeting-detail-split ${activeSummary || isGeneratingSummary ? "" : "meeting-detail-split--no-rail"}`}
                             initial={{ opacity: 0, x: 8 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -8 }}
-                            transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] }}
+                            transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] as const }}
                         >
                             <div className="meeting-detail-main">
                                 <div className="meeting-detail-card meeting-detail-summary-panel">
@@ -563,31 +598,31 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                                         <h3 className="meeting-detail-summary-panel__title">AI Summary</h3>
                                         <div className="meeting-detail-summary-panel__actions">
                                             {activeSummary && (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        className="meeting-detail-btn meeting-detail-btn--secondary"
-                                                        onClick={() => setShowCreateDocModal(true)}
-                                                        title="Create a document from this meeting"
-                                                    >
-                                                        <FilePlus size={14} className="meeting-detail-btn__icon" aria-hidden />
-                                                        Create doc
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="meeting-detail-btn meeting-detail-btn--secondary"
-                                                        onClick={handleGenerateSummary}
-                                                        disabled={!meetingId || isGeneratingSummary}
-                                                        title="Generate a new summary"
-                                                    >
-                                                        <RefreshCw
-                                                            size={14}
-                                                            className={`meeting-detail-btn__icon ${isGeneratingSummary ? "meeting-detail-btn__icon--spin" : ""}`}
-                                                            aria-hidden
-                                                        />
-                                                        {isGeneratingSummary ? "Regenerating…" : "Regenerate"}
-                                                    </button>
-                                                </>
+                                                <button
+                                                    type="button"
+                                                    className="meeting-detail-btn meeting-detail-btn--secondary"
+                                                    onClick={() => setShowCreateDocModal(true)}
+                                                    title="Create a document from this meeting"
+                                                >
+                                                    <FilePlus size={14} className="meeting-detail-btn__icon" aria-hidden />
+                                                    Create doc
+                                                </button>
+                                            )}
+                                            {(activeSummary || isGeneratingSummary) && (
+                                                <button
+                                                    type="button"
+                                                    className="meeting-detail-btn meeting-detail-btn--secondary"
+                                                    onClick={handleGenerateSummary}
+                                                    disabled={!meetingId || isGeneratingSummary}
+                                                    title="Generate a new summary"
+                                                >
+                                                    <RefreshCw
+                                                        size={14}
+                                                        className={`meeting-detail-btn__icon ${isGeneratingSummary ? "meeting-detail-btn__icon--spin" : ""}`}
+                                                        aria-hidden
+                                                    />
+                                                    {isGeneratingSummary ? "Generating…" : "Regenerate"}
+                                                </button>
                                             )}
                                         </div>
                                     </div>
@@ -598,11 +633,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                                                 isStreaming={isGeneratingSummary}
                                                 className="meetings-summary-body"
                                             />
-                                        ) : isGeneratingSummary ? (
-                                            <div className="meeting-detail-generating">
-                                                <div className="meeting-detail-generating__spinner" />
-                                                <p className="meeting-detail-generating__text">Generating summary…</p>
-                                            </div>
                                         ) : (
                                             <div className="meeting-detail-empty-state">
                                                 <div className="meeting-detail-empty-state__icon">✨</div>
@@ -616,14 +646,14 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                                                     onClick={handleGenerateSummary}
                                                     disabled={!meetingId || isGeneratingSummary}
                                                 >
-                                                    Generate summary
+                                                    {isGeneratingSummary ? "Generating…" : "Generate summary"}
                                                 </button>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
-                            {activeSummary && (
+                            {(activeSummary || isGeneratingSummary) && (
                                 <aside className="meeting-detail-rail">
                                     <div className="meeting-detail-rail__header">
                                         <span className="meeting-detail-rail__label">
