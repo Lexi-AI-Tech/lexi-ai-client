@@ -633,11 +633,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                                                 isStreaming={isGeneratingSummary}
                                                 className="meetings-summary-body"
                                             />
-                                        ) : isGeneratingSummary ? (
-                                            <div className="meeting-detail-generating">
-                                                <div className="meeting-detail-generating__spinner" />
-                                                <p className="meeting-detail-generating__text">Generating summary…</p>
-                                            </div>
                                         ) : (
                                             <div className="meeting-detail-empty-state">
                                                 <div className="meeting-detail-empty-state__icon">✨</div>
@@ -651,7 +646,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                                                     onClick={handleGenerateSummary}
                                                     disabled={!meetingId || isGeneratingSummary}
                                                 >
-                                                    Generate summary
+                                                    {isGeneratingSummary ? "Generating…" : "Generate summary"}
                                                 </button>
                                             </div>
                                         )}
