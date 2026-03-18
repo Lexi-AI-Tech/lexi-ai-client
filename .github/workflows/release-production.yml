@@ -116,7 +116,9 @@ jobs:
           releaseBody: ${{ env.RELEASE_NOTES }}
           releaseDraft: false
           prerelease: false
-          args: --target ${{ matrix.target }}
+          # Explicitly enable the prod feature flag for the Rust app.
+          # First `--` separates tauri args from cargo args.
+          args: --target ${{ matrix.target }} -- --features custom-protocol
 
       - name: Publish update manifest to Lexi AI Prod Server
         if: success() && matrix.os == 'macos-latest'
