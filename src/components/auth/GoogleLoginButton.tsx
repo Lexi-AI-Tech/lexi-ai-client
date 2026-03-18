@@ -113,22 +113,13 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     setError(null);
 
     try {
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-
-      if (!clientId) {
-        throw new Error(
-          "Google OAuth credentials not configured. " +
-            "Please set VITE_GOOGLE_CLIENT_ID in your .env file.",
-        );
-      }
-
       // Start OAuth flow - Rust handles everything
       const pkceData = await invoke<{
         challenge: string;
         verifier: string;
         state: string;
         auth_url: string;
-      }>("start_google_login", { clientId });
+      }>("start_google_login");
 
       console.log("OAuth started, state:", pkceData.state.slice(0, 10) + "...");
 

@@ -7,7 +7,10 @@ use futures_util::{SinkExt, StreamExt};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{client::IntoClientRequest, Message},
+};
 
 use crate::room_websocket::{ServerMessage, TranscriptMessage};
 
@@ -39,25 +42,21 @@ impl MeetingWebSocket {
     }
 
     pub async fn connect(&mut self) -> Result<(), String> {
-        use urlencoding::encode;
-
         let api_base_url = crate::config::api_base_url();
         let ws_base_url = api_base_url
             .replace("http://", "ws://")
             .replace("https://", "wss://");
-        let ws_url = format!(
-            "{}/api/v1/meetings/{}/stream?token={}",
-            ws_base_url,
-            self.meeting_id,
-            encode(&self.jwt_token)
-        );
+        let ws_url = format!("{}/api/v1/meetings/{}/stream", ws_base_url, self.meeting_id);
 
-        let url = ws_url
-            .parse::<tokio_tungstenite::tungstenite::http::Uri>()
+        let mut request = ws_url
+            .into_client_request()
             .map_err(|e| format!("Invalid WebSocket URL: {}", e))?;
+        request
+            .headers_mut()
+            .insert("Authorization", format!("Bearer {}", self.jwt_token).parse().unwrap());
 
         // Connect to WebSocket
-        let (ws_stream, _) = connect_async(url)
+        let (ws_stream, _) = connect_async(request)
             .await
             .map_err(|e| format!("Failed to connect to WebSocket: {}", e))?;
 

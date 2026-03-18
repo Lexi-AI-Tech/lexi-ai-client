@@ -92,7 +92,7 @@ use actions::commands::{delete_action_history, get_action_history};
 use app_icon::get_app_icon;
 use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
-use commands::app_config::{get_app_config, update_app_config};
+use commands::app_config::{get_app_config, get_default_hotkeys, update_app_config};
 use commands::auth::{
     clear_auth_data, get_api_base_url, get_auth_data, get_auth_token, get_current_user,
     get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
@@ -266,6 +266,7 @@ pub fn main() {
             logout,
             refresh_auth_token,
             get_app_config,
+            get_default_hotkeys,
             update_app_config,
             get_system_type,
             copy_to_clipboard,

@@ -158,7 +158,6 @@ fn open_browser(url: &str, app: AppHandle) {
 pub async fn start_google_login(
     app: AppHandle,
     state: State<'_, OAuthState>,
-    client_id: String,
 ) -> Result<PkceChallenge, String> {
     // Generate PKCE verifier and challenge
     let verifier = generate_pkce_verifier();
@@ -216,6 +215,8 @@ pub async fn start_google_login(
             return Err(format!("Failed to store verifier: {}", e));
         }
     }
+
+    let client_id = config::google_oauth_client_id();
 
     // Build Google OAuth URL with configured redirect URI
     let redirect_uri = api_endpoints::auth::oauth_callback_url();

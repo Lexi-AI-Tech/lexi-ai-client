@@ -59,6 +59,7 @@ pub mod app_config {
 
     pub const GET: &str = "/app-config";
     pub const UPDATE: &str = "/app-config";
+    pub const DEFAULTS_HOTKEYS: &str = "/app-config/defaults-hotkeys";
 
     /// Build config endpoint URL with optional query parameters
     pub fn get_url(params: Option<&str>) -> String {
@@ -71,6 +72,25 @@ pub mod app_config {
                 p
             ),
             None => format!("{}{}{}", config::api_base_url(), super::API_V1_PREFIX, GET),
+        }
+    }
+
+    /// Build default-hotkeys endpoint URL with optional query parameters
+    pub fn defaults_hotkeys_url(params: Option<&str>) -> String {
+        match params {
+            Some(p) => format!(
+                "{}{}{}?{}",
+                config::api_base_url(),
+                super::API_V1_PREFIX,
+                DEFAULTS_HOTKEYS,
+                p
+            ),
+            None => format!(
+                "{}{}{}",
+                config::api_base_url(),
+                super::API_V1_PREFIX,
+                DEFAULTS_HOTKEYS
+            ),
         }
     }
 

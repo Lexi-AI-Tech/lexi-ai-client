@@ -108,7 +108,9 @@ jobs:
           releaseBody: ${{ env.RELEASE_NOTES }}
           releaseDraft: true
           prerelease: true
-          args: --target ${{ matrix.target }}
+          # Keep dev builds aligned with production behavior (server/protocol paths).
+          # First `--` separates tauri args from cargo args.
+          args: --target ${{ matrix.target }} -- --features custom-protocol
 
       - name: Publish update manifest to Lexi AI Dev Server
         if: success() && matrix.os == 'macos-latest'

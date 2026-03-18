@@ -7,7 +7,9 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "build": "tauri build --features custom-protocol",
+    "build": "tauri build -- --features custom-protocol",
+    "build:tauri": "tauri build -- --features custom-protocol",
+    "build:mac": "node scripts/build-mac.js",
     "dev:frontend": "vite",
     "build:frontend": "vite build",
     "preview": "vite preview",

@@ -7,7 +7,7 @@ use tokio::sync::watch;
 
 use super::{key_to_string, normalize_key_string, HotkeyCommandResult, Key, KeyStateTracker};
 
-use objc2_core_foundation::{kCFRunLoopCommonModes, CFMachPort, CFRunLoop};
+use objc2_core_foundation::{kCFRunLoopCommonModes, CFMachPort, CFRetained, CFRunLoop};
 use objc2_core_graphics::{
     kCGEventMaskForAllEvents, CGEvent, CGEventField, CGEventFlags, CGEventTapCallBack,
     CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventTapProxy, CGEventType,
@@ -103,9 +103,9 @@ struct GlobalListenerState {
     recording_state: Arc<Mutex<bool>>,
     meeting_recording_rx: watch::Receiver<bool>,
     tracker: Arc<Mutex<KeyStateTracker>>,
-    tap_ptr: Option<*mut c_void>, // CFMachPort is !Send !Sync, so we use a raw pointer
+    tap: Option<CFRetained<CFMachPort>>,
 }
-// Rust's raw pointers are !Send and !Sync, so we must unsafe impl it for the struct
+// CFRetained<CFMachPort> is !Send and !Sync, so we must unsafe impl it for the struct.
 unsafe impl Send for GlobalListenerState {}
 unsafe impl Sync for GlobalListenerState {}
 
@@ -115,6 +115,26 @@ unsafe extern "C-unwind" fn raw_callback(
     cg_event: NonNull<CGEvent>,
     _user_info: *mut c_void,
 ) -> *mut CGEvent {
+    // macOS can disable event taps if the callback is slow or due to user input.
+    // If we don't re-enable, hotkeys silently stop working while the app keeps running.
+    if matches!(
+        _type,
+        CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput
+    ) {
+        // Use try_lock() to avoid blocking inside the event tap callback thread.
+        if let Ok(lock_guard) = GLOBAL_STATE.try_lock() {
+            if let Some(state) = lock_guard.as_ref() {
+                if let Some(tap) = state.tap.as_ref() {
+                    CGEvent::tap_enable(&*tap, true);
+                    eprintln!("⚠️  CGEventTap was disabled; re-enabled automatically ({:?})", _type);
+                } else {
+                    eprintln!("⚠️  CGEventTap disabled but tap not set ({:?})", _type);
+                }
+            }
+        }
+        return cg_event.as_ptr();
+    }
+
     // Only capture keyboard events
     let is_press = match _type {
         CGEventType::KeyDown | CGEventType::FlagsChanged => true, // Treat FlagsChanged as press temporarily, will refine based on key state
@@ -152,9 +172,10 @@ unsafe extern "C-unwind" fn raw_callback(
     let key_str = normalize_key_string(&key_to_string(&internal_key));
 
     // Process safely without keeping the lock too long
-    if let Ok(mut lock_guard) = GLOBAL_STATE.lock() {
+    if let Ok(mut lock_guard) = GLOBAL_STATE.try_lock() {
         if let Some(state) = lock_guard.as_mut() {
-            let is_recording_mode = state.recording_state.lock().map(|g| *g).unwrap_or(false);
+            let is_recording_mode =
+                state.recording_state.try_lock().map(|g| *g).unwrap_or(false);
 
             if is_recording_mode {
                 let app_clone = state.app.clone();
@@ -179,7 +200,7 @@ unsafe extern "C-unwind" fn raw_callback(
                 });
             }
 
-            if let Ok(mut tracker) = state.tracker.lock() {
+            if let Ok(mut tracker) = state.tracker.try_lock() {
                 tracker.update_key_state(&key_str, is_actual_press);
 
                 let recording_hotkeys_guard = state.config_rx.borrow();
@@ -212,8 +233,8 @@ unsafe extern "C-unwind" fn raw_callback(
                         }
                         HotkeyCommandResult::SendStopAfter(stop_cmd, delay) => {
                             let tx = state.recording_tx.clone();
-                            std::thread::spawn(move || {
-                                std::thread::sleep(delay);
+                            tauri::async_runtime::spawn(async move {
+                                tokio::time::sleep(delay).await;
                                 let _ = tx.send(stop_cmd);
                             });
                         }
@@ -251,42 +272,42 @@ pub(crate) fn start_listener(
         recording_state,
         meeting_recording_rx,
         tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
-        tap_ptr: None,
+        tap: None,
     });
 
     std::thread::spawn(move || unsafe {
         let _pool = NSAutoreleasePool::new();
         let callback: CGEventTapCallBack = Some(raw_callback);
 
-        let tap = CGEvent::tap_create(
+        let tap = match CGEvent::tap_create(
             CGEventTapLocation::HIDEventTap,
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::Default,
             kCGEventMaskForAllEvents.into(),
             callback,
             null_mut(),
-        )
-        .expect("Failed to create CGEventTap. Ensure Accessibility permissions are granted!");
+        ) {
+            Some(tap) => tap,
+            None => {
+                eprintln!("Failed to create CGEventTap. Accessibility permission likely missing (System Settings -> Privacy & Security -> Accessibility).");
+                return;
+            }
+        };
 
         let loop_source = CFMachPort::new_run_loop_source(None, Some(&tap), 0)
             .expect("Failed to create loop source");
 
-        // Store the tap port in the global state so it can be re-enabled on system wake
-        // using objc2_core_foundation's CFRetained to pointer memory
-        let tap_ptr = objc2_core_foundation::CFRetained::into_raw(tap).as_ptr() as *mut c_void;
+        // Store the tap in the global state so it can be re-enabled on system wake.
         if let Ok(mut lock_guard) = GLOBAL_STATE.lock() {
             if let Some(state) = lock_guard.as_mut() {
-                state.tap_ptr = Some(tap_ptr);
+                state.tap = Some(tap.clone());
             }
         }
-
-        // Use the raw pointer to create a borrowed reference since we consumed it above
-        let tap_ref = &*(tap_ptr as *const CFMachPort);
 
         let current_loop = CFRunLoop::current().unwrap();
         current_loop.add_source(Some(&loop_source), kCFRunLoopCommonModes);
 
-        CGEvent::tap_enable(tap_ref, true);
+        CGEvent::tap_enable(&*tap, true);
 
         println!("✅ Native macOS CGEventTap started");
         CFRunLoop::run();
@@ -300,10 +321,9 @@ pub(crate) fn start_listener(
 pub(crate) fn re_enable_tap() {
     if let Ok(lock_guard) = GLOBAL_STATE.lock() {
         if let Some(state) = lock_guard.as_ref() {
-            if let Some(tap_ptr) = state.tap_ptr {
+            if let Some(tap) = state.tap.as_ref() {
                 println!("🔄 Re-enabling CGEventTap after wake...");
-                let tap_ref = unsafe { &*(tap_ptr as *const CFMachPort) };
-                CGEvent::tap_enable(tap_ref, true);
+                CGEvent::tap_enable(&*tap, true);
             } else {
                 eprintln!("⚠️  Cannot re-enable CGEventTap: Tap was not initialized.");
             }
