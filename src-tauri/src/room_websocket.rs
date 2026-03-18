@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{client::IntoClientRequest, Message},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TranscriptMessage {
@@ -66,19 +69,21 @@ impl RoomWebSocket {
             .replace("http://", "ws://")
             .replace("https://", "wss://");
         let ws_url = format!(
-            "{}/api/v1/rooms/{}/stream?token={}&language={}",
+            "{}/api/v1/rooms/{}/stream?language={}",
             ws_base_url,
             self.room_id,
-            encode(&self.jwt_token),
             encode(&self.language)
         );
 
-        let url = ws_url
-            .parse::<tokio_tungstenite::tungstenite::http::Uri>()
+        let mut request = ws_url
+            .into_client_request()
             .map_err(|e| format!("Invalid WebSocket URL: {}", e))?;
+        request
+            .headers_mut()
+            .insert("Authorization", format!("Bearer {}", self.jwt_token).parse().unwrap());
 
         // Connect to WebSocket
-        let (ws_stream, _) = connect_async(url)
+        let (ws_stream, _) = connect_async(request)
             .await
             .map_err(|e| format!("Failed to connect to WebSocket: {}", e))?;
 
