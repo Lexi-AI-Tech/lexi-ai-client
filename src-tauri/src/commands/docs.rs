@@ -20,12 +20,6 @@ pub struct Doc {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CreateDocRequest {
-    pub title: Option<String>,
-    pub content: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateDocRequest {
     #[serde(rename = "docId")]
     pub doc_id: String,

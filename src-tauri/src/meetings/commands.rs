@@ -50,12 +50,6 @@ pub struct MeetingChatRequest {
     pub history: Vec<serde_json::Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateMeetingDocRequest {
-    pub doc_kind: String,
-    pub title: Option<String>,
-}
-
 /// Create a new meeting
 #[tauri::command]
 pub async fn create_meeting(
