@@ -101,9 +101,6 @@ export const OnboardingFlow: React.FC = () => {
       {/* Visual Area */}
       <div className="onboarding-visual-area">
         <VisualSide step={currentStepIndex} />
-
-        {/* Version badge */}
-        <div className="version-badge">v1.0.0</div>
       </div>
     </div>
   );
