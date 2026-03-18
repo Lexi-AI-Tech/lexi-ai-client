@@ -10,7 +10,7 @@
 pub fn api_base_url() -> &'static str {
     #[cfg(feature = "custom-protocol")]
     {
-        "https://dev-server.speaklexi.com"
+        "https://server.speaklexi.com"
     }
     #[cfg(not(feature = "custom-protocol"))]
     {
