@@ -18,3 +18,25 @@ pub fn api_base_url() -> &'static str {
         "http://localhost:3000"
     }
 }
+
+/// Google OAuth client id selection.
+///
+/// This is intentionally owned by the Tauri backend so we don't have to rely on
+/// Vite env files (`.env`, `.env.production`, etc.) for auth correctness.
+///
+/// - Dev: uses the dev client id (non-`custom-protocol` build).
+/// - Prod: uses the prod client id (`custom-protocol` build).
+///
+pub fn google_oauth_client_id() -> String {
+    #[cfg(feature = "custom-protocol")]
+    {
+        // Production OAuth client id
+        "48146086016-hjcvnjvaakuof8iikh0rkc6t820j326p.apps.googleusercontent.com".to_string()
+    }
+
+    #[cfg(not(feature = "custom-protocol"))]
+    {
+        // Development OAuth client id
+        "576813768140-ktsr4n57jfllih23g6pc1g68ufkqk2cq.apps.googleusercontent.com".to_string()
+    }
+}
