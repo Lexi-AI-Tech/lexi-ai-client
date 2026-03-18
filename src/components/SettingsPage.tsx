@@ -24,6 +24,11 @@ import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
 import { PageLoader } from "./ui/PageLoader";
 
+type DefaultHotkeysResponse = {
+  hotkeys: string[];
+  action_hotkeys: string[];
+};
+
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
   value: code,
@@ -313,6 +318,39 @@ export const SettingsPage: React.FC = () => {
       if (actionHotkeysChanged) {
         setCurrentActionHotkeys({ hotkeys: configActionHotkeys.slice(0, 3) });
       }
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleResetHotkeys = async () => {
+    try {
+      setIsUpdating(true);
+
+      const defaults = await invoke<DefaultHotkeysResponse>(
+        "get_default_hotkeys",
+      );
+
+      const updates: Partial<TauriAppConfig> = {
+        hotkeys: defaults.hotkeys.slice(0, 3),
+        action_hotkeys: defaults.action_hotkeys.slice(0, 3),
+      };
+
+      const updatedConfig = await updateConfig(updates);
+
+      setCurrentHotkeys({
+        hotkeys: (updatedConfig.hotkeys ?? defaults.hotkeys).slice(0, 3),
+      });
+      setCurrentActionHotkeys({
+        hotkeys: (updatedConfig.action_hotkeys ?? defaults.action_hotkeys).slice(
+          0,
+          3,
+        ),
+      });
+
+      toast.success("Hotkeys reset to defaults");
+    } catch (err: any) {
+      console.error("Failed to reset hotkeys:", err);
     } finally {
       setIsUpdating(false);
     }
@@ -692,7 +730,7 @@ export const SettingsPage: React.FC = () => {
                   disabled={isLoading || isUpdating}
                 />
               </div>
-              <div className="mb-24">
+              <div className="mb-16">
                 <HotkeySelector
                   label="Action Hotkeys"
                   description={`Hold ${currentActionHotkeys.hotkeys.length > 0 && !currentActionHotkeys.hotkeys[0].includes("+") ? "this key" : "this hotkey combination"} to record a voice command for actions`}
@@ -701,6 +739,16 @@ export const SettingsPage: React.FC = () => {
                   maxHotkeys={3}
                   disabled={isLoading || isUpdating}
                 />
+              </div>
+              <div className="btn-row" style={{ marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={handleResetHotkeys}
+                  disabled={isLoading || isUpdating}
+                  className="btn btn--outline"
+                >
+                  Reset to defaults
+                </button>
               </div>
             </div>
           </div>

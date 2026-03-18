@@ -63,6 +63,12 @@ struct ServerAppConfigResponse {
     pub shortcuts: Vec<Shortcut>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DefaultHotkeysResponse {
+    pub hotkeys: Vec<String>,
+    pub action_hotkeys: Vec<String>,
+}
+
 /// Get the complete app configuration from server
 ///
 /// Always attempts to fetch fresh config from server.
@@ -92,6 +98,55 @@ pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     update_hotkey_state(&app, &config);
 
     Ok(config)
+}
+
+/// Get server-defined default hotkeys (used by "Reset to defaults").
+#[tauri::command]
+pub async fn get_default_hotkeys(app: AppHandle) -> Result<DefaultHotkeysResponse, String> {
+    let auth_token = match get_auth_token_async(&app).await {
+        Ok(token) => token,
+        Err(e) if e == "network_error" => {
+            return Err(
+                "Network error while trying to authenticate. Please check your connection."
+                    .to_string(),
+            );
+        }
+        Err(_) => {
+            crate::commands::auth::handle_auth_expired(&app);
+            return Err("Please sign in to sync your settings".to_string());
+        }
+    };
+
+    let client = crate::utils::create_http_client();
+    let url = app_config::defaults_hotkeys_url(Some(&format!(
+        "system_type={}",
+        utils::get_system_type()
+    )));
+
+    utils::log_api_request("Fetch default hotkeys from server", "GET", &url);
+
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|_| "Unable to connect to server. Please check your internet connection.".to_string())?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let json_value: serde_json::Value = response
+            .json()
+            .await
+            .unwrap_or_else(|_| serde_json::json!({}));
+        let error_msg = extract_error_message(&json_value, status);
+        return Err(format!("Unable to load default hotkeys: {}", error_msg));
+    }
+
+    let server_response: DefaultHotkeysResponse = response.json().await.map_err(|_| {
+        "Received invalid default-hotkeys format from server. Please try again.".to_string()
+    })?;
+
+    Ok(server_response)
 }
 
 /// Fetch app configuration from server
