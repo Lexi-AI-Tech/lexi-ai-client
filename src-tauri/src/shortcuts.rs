@@ -6,9 +6,14 @@
 //! still match the shortcut phrase "hello".
 
 use std::collections::HashMap;
-use tauri::AppHandle;
+use std::time::Duration;
+use tauri::{AppHandle, Manager};
 
 use crate::commands::app_config::get_app_config;
+use crate::commands::shortcuts::Shortcut;
+use crate::state::ShortcutCommandsState;
+
+const SHORTCUT_COMMANDS_CACHE_TTL: Duration = Duration::from_secs(30 * 60);
 
 /// Normalizes text for shortcut lookup: trim, lowercase, remove punctuation, collapse whitespace.
 /// This makes detection foolproof when the assistant adds punctuation (e.g. "hello." → "hello").
@@ -31,24 +36,56 @@ fn normalize_for_shortcut_lookup(s: &str) -> String {
 /// On fetch failure, returns an empty map so injection still uses the raw transcription.
 /// Commands are case-insensitive and punctuation-insensitive.
 pub async fn get_commands(app: &AppHandle) -> HashMap<String, String> {
+    // Fast path: use in-memory cache populated from app config fetch/update, while fresh.
+    let mut stale_cached_commands: HashMap<String, String> = HashMap::new();
+    if let Some(cache_state) = app.try_state::<ShortcutCommandsState>() {
+        if let Ok(cache) = cache_state.0.lock() {
+            stale_cached_commands = cache.commands.clone();
+            let is_fresh = cache
+                .last_refreshed_at
+                .map(|t| t.elapsed() < SHORTCUT_COMMANDS_CACHE_TTL)
+                .unwrap_or(false);
+            if is_fresh && !cache.commands.is_empty() {
+                return cache.commands.clone();
+            }
+        }
+    }
+
+    // Cold start or TTL-expired path: fetch from server and warm cache.
     let config = match get_app_config(app.clone()).await {
         Ok(c) => c,
         Err(e) => {
             eprintln!("⚠️  Failed to load shortcuts from app config: {}", e);
-            return HashMap::new();
+            // If refresh fails, keep serving stale cache to avoid breaking transcription.
+            return stale_cached_commands;
         }
     };
 
+    let commands = build_commands_map(config.shortcuts.as_deref().unwrap_or(&[]));
+    set_cached_commands(app, commands.clone());
+    commands
+}
+
+/// Build normalized command map from shortcuts list.
+pub fn build_commands_map(shortcuts: &[Shortcut]) -> HashMap<String, String> {
     let mut commands = HashMap::new();
-    if let Some(shortcuts) = config.shortcuts {
-        for s in shortcuts {
-            let key = normalize_for_shortcut_lookup(&s.phrase);
-            if !key.is_empty() {
-                commands.insert(key, s.value);
-            }
+    for s in shortcuts {
+        let key = normalize_for_shortcut_lookup(&s.phrase);
+        if !key.is_empty() {
+            commands.insert(key, s.value.clone());
         }
     }
     commands
+}
+
+/// Replace in-memory shortcut command cache.
+pub fn set_cached_commands(app: &AppHandle, commands: HashMap<String, String>) {
+    if let Some(cache_state) = app.try_state::<ShortcutCommandsState>() {
+        if let Ok(mut cache) = cache_state.0.lock() {
+            cache.commands = commands;
+            cache.last_refreshed_at = Some(std::time::Instant::now());
+        }
+    }
 }
 
 /// Checks if the transcription matches any command and returns the replacement value.

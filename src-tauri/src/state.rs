@@ -5,7 +5,9 @@
 //!
 //! Only runtime state that needs to be in-memory (like task handles, recording state) is stored here.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tokio::sync::{mpsc, watch};
 
 /// State for watch sender (to broadcast config changes)
@@ -16,6 +18,17 @@ pub struct HotkeyWatchState(pub watch::Sender<Vec<String>>);
 
 /// State for watch sender (to broadcast action hotkey changes)
 pub struct ActionHotkeyWatchState(pub watch::Sender<Vec<String>>);
+
+/// In-memory shortcuts command cache used by transcription pipeline.
+///
+/// Maps normalized shortcut phrase -> replacement value, with a last-refresh timestamp
+/// for TTL-based refresh.
+pub struct ShortcutCommandsState(pub Arc<Mutex<ShortcutCommandsCache>>);
+
+pub struct ShortcutCommandsCache {
+    pub commands: HashMap<String, String>,
+    pub last_refreshed_at: Option<Instant>,
+}
 
 /// Hotkey recording state - tracks if we're in recording mode for hotkey selection
 ///

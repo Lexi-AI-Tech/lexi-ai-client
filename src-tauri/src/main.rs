@@ -80,6 +80,7 @@ use google_oauth::OAuthState;
 
 use state::{
     ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, MeetingState, RoomState,
+    ShortcutCommandsCache, ShortcutCommandsState,
 };
 use window::show_and_focus_main_window;
 
@@ -389,6 +390,12 @@ pub fn main() {
             let recording_state_arc = Arc::new(Mutex::new(false));
             app.manage(HotkeyWatchState(config_tx));
             app.manage(ActionHotkeyWatchState(action_hotkey_tx));
+            app.manage(ShortcutCommandsState(Arc::new(Mutex::new(
+                ShortcutCommandsCache {
+                    commands: std::collections::HashMap::new(),
+                    last_refreshed_at: None,
+                },
+            ))));
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });
