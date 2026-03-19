@@ -107,12 +107,33 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     };
   }, []);
 
+  const handleCancelLogin = async () => {
+    try {
+      await invoke("stop_oauth_websocket");
+    } catch (error) {
+      console.error("Failed to cancel OAuth WebSocket:", error);
+    } finally {
+      setLoading(false);
+      setLocalLoading(false);
+      setError(null);
+      toast.info("Sign-in cancelled");
+    }
+  };
+
   const handleGoogleLogin = async () => {
+    if (loading) {
+      await handleCancelLogin();
+      return;
+    }
+
     setLocalLoading(true);
     setLoading(true);
     setError(null);
 
     try {
+      // Always clear any stale OAuth socket before starting a new login attempt.
+      await invoke("stop_oauth_websocket").catch(() => undefined);
+
       // Start OAuth flow - Rust handles everything
       const pkceData = await invoke<{
         challenge: string;
@@ -124,7 +145,18 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       console.log("OAuth started, state:", pkceData.state.slice(0, 10) + "...");
 
       // Start WebSocket connection to receive OAuth result
-      await invoke("start_oauth_websocket", { state: pkceData.state });
+      try {
+        await invoke("start_oauth_websocket", { state: pkceData.state });
+      } catch (wsError: any) {
+        const wsMessage = wsError?.message || "";
+        if (wsMessage.includes("WebSocket connection already active")) {
+          // Retry once after force-stopping to recover from stale in-flight sessions.
+          await invoke("stop_oauth_websocket").catch(() => undefined);
+          await invoke("start_oauth_websocket", { state: pkceData.state });
+        } else {
+          throw wsError;
+        }
+      }
       console.log("WebSocket connection started");
     } catch (error: any) {
       const errorMessage = error?.message || "Google login failed";
@@ -203,13 +235,11 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   return (
     <button
       onClick={handleGoogleLogin}
-      disabled={loading}
       className="auth-button google-login"
     >
       {loading ? (
         <>
-          <span className="auth-spinner">⏳</span>
-          Signing in...
+          Cancel sign-in
         </>
       ) : (
         <>
