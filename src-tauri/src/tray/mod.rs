@@ -60,6 +60,8 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
         true,
         None::<&str>,
     )?;
+    let check_updates_item =
+        MenuItem::with_id(app, "check_updates", "Check for Updates", true, None::<&str>)?;
     let version_label = format!("Version {}", app.package_info().version);
     let version_item = MenuItem::with_id(app, "version", version_label, false, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -69,6 +71,7 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
             &show_item,
             &start_meeting_item,
             &paste_transcript_item,
+            &check_updates_item,
             &version_item,
             &quit_item,
         ],
@@ -169,6 +172,15 @@ fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                     Err(e) => {
                         eprintln!("Failed to fetch last transcript: {}", e);
                     }
+                }
+            });
+        }
+        "check_updates" => {
+            show_and_focus_main_window(app);
+            let app_clone = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = app_clone.emit("check-updates-from-tray", ()) {
+                    eprintln!("Failed to emit check-updates-from-tray event: {}", e);
                 }
             });
         }

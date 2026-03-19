@@ -24,7 +24,9 @@ import { MeetingsPage } from "./components/MeetingsPage";
 import { DocsPage } from "./components/docs/DocsPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
-import { useAutoUpdater } from "./hooks/useAutoUpdater";
+import { useAutoUpdater, checkUpdateDetails } from "./hooks/useAutoUpdater";
+import { useUpdaterStore } from "./store/updaterStore";
+import { useToast } from "./components/toast/useToast";
 
 const ONBOARDING_VERSION = 1;
 
@@ -48,6 +50,7 @@ function App() {
   const [onboardingSyncDone, setOnboardingSyncDone] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const prevCompletedRef = useRef(isCompleted);
+  const toast = useToast();
 
   // Initialize auto-updating background worker
   useAutoUpdater();
@@ -173,6 +176,43 @@ function App() {
       if (unlistenFn) unlistenFn();
     };
   }, []);
+
+  // Listen for "Check for Updates" from system tray
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenFn: (() => void) | undefined;
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen("check-updates-from-tray", async () => {
+        if (cancelled) return;
+        try {
+          const { check } = await import("@tauri-apps/plugin-updater");
+          const update = await check();
+          if (update) {
+            const details = await checkUpdateDetails();
+            useUpdaterStore.getState().setUpdate(update, details);
+            useUpdaterStore.getState().openModal();
+          } else {
+            toast.info("Lexi AI is up to date");
+          }
+        } catch (e) {
+          console.error("Tray update check failed:", e);
+          toast.error("Update check failed");
+        }
+      });
+      unlistenFn = unlisten;
+    };
+
+    setup().catch((e) => {
+      console.error("Failed to set up check-updates-from-tray listener:", e);
+    });
+
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, [toast]);
 
   // Listen for meeting started events (pill, tray, or elsewhere)
   useEffect(() => {
