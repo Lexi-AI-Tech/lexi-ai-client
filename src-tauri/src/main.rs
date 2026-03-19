@@ -78,7 +78,9 @@ use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 
-use state::{ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState};
+use state::{
+    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, MeetingState, RoomState,
+};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -396,7 +398,7 @@ pub fn main() {
                 command_tx: Mutex::new(None),
             });
 
-            app.manage(crate::state::MeetingState {
+            app.manage(MeetingState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
                 system_stop_tx: Mutex::new(None),
@@ -404,6 +406,8 @@ pub fn main() {
                 meeting_ws_close_tx: Mutex::new(None),
                 tray_start_meeting: Mutex::new(Some(start_meeting_menu_item)),
                 meeting_recording_tx: Mutex::new(meeting_recording_tx),
+                current_meeting_id: Mutex::new(None),
+                reminder_task: Mutex::new(None),
             });
 
             // Fetch config in background after state is managed to ensure channels get updated

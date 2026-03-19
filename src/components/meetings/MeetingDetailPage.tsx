@@ -42,6 +42,8 @@ interface MeetingDetailPageProps {
     onLiveSegmentAdded?: (segment: TranscriptSegment) => void;
     /** When tray triggers end meeting */
     triggerEndMeetingFromTray?: boolean;
+    /** When reminder triggers end meeting, run full end flow immediately (no extra confirm modal). */
+    triggerAutoEndMeetingFromReminder?: boolean;
     onEndMeetingFromTrayConsumed?: () => void;
     /** Called when recording is stopped (so parent can clear recording state) */
     onRecordingStopped?: () => void;
@@ -61,6 +63,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     liveSegments,
     onLiveSegmentAdded,
     triggerEndMeetingFromTray,
+    triggerAutoEndMeetingFromReminder,
     onEndMeetingFromTrayConsumed,
     onRecordingStopped,
     onRecordingStarted,
@@ -403,6 +406,13 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
             setIsEnding(false);
         }
     };
+
+    useEffect(() => {
+        if (!triggerAutoEndMeetingFromReminder) return;
+        setActiveTab("summary");
+        // Auto-run the same "End" flow used by the End button.
+        handleEndMeeting();
+    }, [triggerAutoEndMeetingFromReminder]);
 
     const formatMeetingDate = (createdAt: string) => {
         try {

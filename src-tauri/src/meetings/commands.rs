@@ -163,6 +163,48 @@ pub async fn start_meeting_recording(
         *state.meeting_ws_close_tx.lock().unwrap() = Some(tx);
     }
     *state.is_recording.lock().unwrap() = true;
+    *state.current_meeting_id.lock().unwrap() = Some(meeting_id.clone());
+
+    // Start / restart the 45-minute reminder loop (abort any previous task defensively)
+    {
+        let mut guard = state.reminder_task.lock().unwrap();
+        if let Some(handle) = guard.take() {
+            handle.abort();
+        }
+        let app_handle = app.clone();
+        *guard = Some(tokio::spawn(async move {
+            let mut intervals = 0u32;
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(1 * 60)).await;
+
+                // Exit if meeting is no longer recording
+                let meeting_state = app_handle.state::<MeetingState>();
+                let still_recording = *meeting_state.is_recording.lock().unwrap();
+                if !still_recording {
+                    break;
+                }
+
+                intervals += 1;
+                let minutes = intervals * 1;
+                let meeting_id = meeting_state
+                    .current_meeting_id
+                    .lock()
+                    .unwrap()
+                    .clone()
+                    .unwrap_or_default();
+
+                // Bring the window up and ask frontend to confirm
+                crate::window::show_and_focus_main_window(&app_handle);
+                let _ = app_handle.emit(
+                    "meeting-duration-reminder",
+                    serde_json::json!({
+                        "meetingId": meeting_id,
+                        "minutes": minutes,
+                    }),
+                );
+            }
+        }));
+    }
 
     // Broadcast so key listener disables assistant/action hotkeys while meeting is running
     if let Ok(tx) = state.meeting_recording_tx.lock() {
@@ -216,6 +258,15 @@ pub async fn stop_meeting_recording(
 
         *is_recording = false;
     }
+
+    // Stop reminder loop
+    {
+        let mut guard = state.reminder_task.lock().unwrap();
+        if let Some(handle) = guard.take() {
+            handle.abort();
+        }
+    }
+    *state.current_meeting_id.lock().unwrap() = None;
 
     // Send end event so Lexi AI server can finalize and close the stream (no reliance on timeout)
     let ws_tx = state.meeting_ws_text_tx.lock().unwrap().take();

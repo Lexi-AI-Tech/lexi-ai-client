@@ -51,4 +51,8 @@ pub struct MeetingState {
     pub tray_start_meeting: Mutex<Option<tauri::menu::MenuItem<tauri::Wry>>>,
     /// Broadcasts when meeting recording starts (true) or stops (false). Key listener uses this to disable assistant/action hotkeys.
     pub meeting_recording_tx: Mutex<watch::Sender<bool>>,
+    /// Current meeting id while recording (used for reminders / UX)
+    pub current_meeting_id: Mutex<Option<String>>,
+    /// Background task handle for the 45-minute reminder loop (aborted on stop)
+    pub reminder_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }

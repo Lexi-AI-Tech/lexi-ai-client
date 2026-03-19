@@ -43,6 +43,20 @@ type Page =
 
 const LOADING_DELAY_MS = 150; // Only show loading spinner if init takes longer than this (avoids brief flash on first load)
 
+function formatMeetingDuration(totalMinutes: number): string {
+  const safeMinutes = Math.max(0, Math.floor(totalMinutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const minutes = safeMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+  if (minutes === 0) {
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  return `${hours} hour${hours === 1 ? "" : "s"} ${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
+
 function App() {
   const authStore = useAuthStore();
   const { isCompleted, isInitialized, refreshState } = useOnboardingStore();
@@ -59,6 +73,13 @@ function App() {
   // 1. Switch to the Meetings page
   // 2. Focus that specific meeting and show its transcript tab
   const [pillMeetingId, setPillMeetingId] = useState<string | null>(null);
+  const [meetingReminderModal, setMeetingReminderModal] = useState<{
+    meetingId: string;
+    readableDuration: string;
+    minutes: number;
+  } | null>(null);
+  const [pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
+    useState<string | null>(null);
 
   // When not authenticated, reset sync flag so we sync again after next login
   useEffect(() => {
@@ -251,6 +272,56 @@ function App() {
     };
   }, []);
 
+  // Periodic safety reminder for long-running meetings (every 45 minutes)
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenFn: (() => void) | undefined;
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen<{ meetingId: string; minutes: number }>(
+        "meeting-duration-reminder",
+        async (event) => {
+          if (cancelled) return;
+          const payload = (event.payload || {}) as any;
+          const meetingId =
+            payload && typeof payload.meetingId === "string"
+              ? payload.meetingId
+              : null;
+          const minutes =
+            payload && typeof payload.minutes === "number" ? payload.minutes : 45;
+          const readableDuration = formatMeetingDuration(minutes);
+          if (meetingId) {
+            setMeetingReminderModal({ meetingId, readableDuration, minutes });
+          }
+        },
+      );
+      unlistenFn = unlisten;
+    };
+
+    setup().catch((e) => {
+      console.error("Failed to set up meeting-duration-reminder listener:", e);
+    });
+
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
+
+  const handleKeepMeetingRunning = () => {
+    setMeetingReminderModal(null);
+  };
+
+  const handleEndMeetingFromReminder = () => {
+    if (!meetingReminderModal?.meetingId) return;
+    // Run the same full end flow as the Meetings "End" button:
+    // stop recording, switch to summary tab, and generate summary.
+    setPendingReminderAutoEndMeetingId(meetingReminderModal.meetingId);
+    setCurrentPage("meetings");
+    setMeetingReminderModal(null);
+  };
+
   // Navigate to docs page, optionally opening a specific doc (e.g. after creating from meeting)
   const [selectedDocIdToOpen, setSelectedDocIdToOpen] = useState<string | null>(null);
 
@@ -365,6 +436,12 @@ function App() {
               onEndMeetingFromTrayConsumed={() =>
                 setTriggerEndMeetingFromTray(false)
               }
+              triggerAutoEndMeetingFromReminderId={
+                pendingReminderAutoEndMeetingId
+              }
+              onAutoEndMeetingFromReminderConsumed={() =>
+                setPendingReminderAutoEndMeetingId(null)
+              }
             />
           </div>
         )}
@@ -377,6 +454,40 @@ function App() {
           </div>
         )}
       </div>
+
+      {meetingReminderModal && (
+        <div
+          className="delete-modal-overlay"
+          onClick={handleKeepMeetingRunning}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Meeting still running?</h3>
+            <p>
+              The meeting has been running for{" "}
+              {meetingReminderModal.readableDuration}. Is it still running?
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={handleKeepMeetingRunning}
+              >
+                Keep Running
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleEndMeetingFromReminder}
+              >
+                End Meeting
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
