@@ -25,6 +25,12 @@ interface MeetingsPageProps {
   /** When true, open the end-meeting confirmation modal (e.g. from tray "Stop Meeting"). */
   triggerEndMeetingFromTray?: boolean;
   onEndMeetingFromTrayConsumed?: () => void;
+  /** When set, auto-run the full end-meeting flow (no extra confirmation). */
+  triggerAutoEndMeetingFromReminderId?: string | null;
+  onAutoEndMeetingFromReminderConsumed?: () => void;
+  activeRecordingMeetingId?: string | null;
+  onRecordingStartedGlobal?: (meetingId: string) => void;
+  onRecordingStoppedGlobal?: () => void;
 }
 
 export const MeetingsPage: React.FC<MeetingsPageProps> = ({
@@ -35,6 +41,11 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   onPillMeetingConsumed,
   triggerEndMeetingFromTray,
   onEndMeetingFromTrayConsumed,
+  triggerAutoEndMeetingFromReminderId,
+  onAutoEndMeetingFromReminderConsumed,
+  activeRecordingMeetingId = null,
+  onRecordingStartedGlobal,
+  onRecordingStoppedGlobal,
 }) => {
     const { tokens } = useAuthStore();
     const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -65,6 +76,11 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
             fetchMeetings();
         }
     }, [tokens, fetchMeetings]);
+
+    // Keep recording state stable across page unmount/remount by syncing from app-level state.
+    useEffect(() => {
+        setRecordingMeetingId(activeRecordingMeetingId ?? null);
+    }, [activeRecordingMeetingId]);
 
     // Real-time transcript listener
     useEffect(() => {
@@ -159,6 +175,18 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
         // Detail page will call onEndMeetingFromTrayConsumed when it shows the modal
     }, [triggerEndMeetingFromTray, recordingMeetingId, selectedMeetingId]);
 
+    // When reminder triggers auto-end: open that meeting detail so it can run
+    // the same end flow used by the End button.
+    useEffect(() => {
+        if (!triggerAutoEndMeetingFromReminderId) return;
+        setSelectedMeetingId(triggerAutoEndMeetingFromReminderId);
+        setRecordingMeetingId(triggerAutoEndMeetingFromReminderId);
+        onAutoEndMeetingFromReminderConsumed?.();
+    }, [
+        triggerAutoEndMeetingFromReminderId,
+        onAutoEndMeetingFromReminderConsumed,
+    ]);
+
     const handleStopRecording = useCallback(() => {
         setRecordingMeetingId(null);
         setLiveSegments([]);
@@ -243,13 +271,18 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                         triggerEndMeetingFromTray && recordingMeetingId === selectedMeetingId
                     }
                     onEndMeetingFromTrayConsumed={onEndMeetingFromTrayConsumed}
+                    triggerAutoEndMeetingFromReminder={
+                        triggerAutoEndMeetingFromReminderId === selectedMeetingId
+                    }
                     onRecordingStopped={() => {
                         setRecordingMeetingId(null);
                         setLiveSegments([]);
+                        onRecordingStoppedGlobal?.();
                     }}
                     onRecordingStarted={(id) => {
                         setRecordingMeetingId(id);
                         setLiveSegments([]);
+                        onRecordingStartedGlobal?.(id);
                     }}
                 />
             ) : (
@@ -262,6 +295,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                     }}
                     onStartNewMeeting={handleCreateAndStartMeeting}
                     isRecording={!!recordingMeetingId}
+                    activeRecordingMeetingId={recordingMeetingId}
                     isGeneratingSummary={false}
                     isLoading={isMeetingsLoading}
                 />

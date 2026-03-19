@@ -10,6 +10,8 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+const MEETING_REMINDER_INTERVAL_MINUTES: u64 = 45;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Meeting {
     pub id: String,
@@ -163,6 +165,55 @@ pub async fn start_meeting_recording(
         *state.meeting_ws_close_tx.lock().unwrap() = Some(tx);
     }
     *state.is_recording.lock().unwrap() = true;
+    *state.current_meeting_id.lock().unwrap() = Some(meeting_id.clone());
+    let _ = app.emit(
+        "meeting-recording-started",
+        serde_json::json!({ "meetingId": meeting_id }),
+    );
+
+    // Start / restart the periodic meeting reminder loop (abort any previous task defensively)
+    {
+        let mut guard = state.reminder_task.lock().unwrap();
+        if let Some(handle) = guard.take() {
+            handle.abort();
+        }
+        let app_handle = app.clone();
+        *guard = Some(tokio::spawn(async move {
+            let mut intervals = 0u32;
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(
+                    MEETING_REMINDER_INTERVAL_MINUTES * 60,
+                ))
+                .await;
+
+                // Exit if meeting is no longer recording
+                let meeting_state = app_handle.state::<MeetingState>();
+                let still_recording = *meeting_state.is_recording.lock().unwrap();
+                if !still_recording {
+                    break;
+                }
+
+                intervals += 1;
+                let minutes = intervals * (MEETING_REMINDER_INTERVAL_MINUTES as u32);
+                let meeting_id = meeting_state
+                    .current_meeting_id
+                    .lock()
+                    .unwrap()
+                    .clone()
+                    .unwrap_or_default();
+
+                // Bring the window up and ask frontend to confirm
+                crate::window::show_and_focus_main_window(&app_handle);
+                let _ = app_handle.emit(
+                    "meeting-duration-reminder",
+                    serde_json::json!({
+                        "meetingId": meeting_id,
+                        "minutes": minutes,
+                    }),
+                );
+            }
+        }));
+    }
 
     // Broadcast so key listener disables assistant/action hotkeys while meeting is running
     if let Ok(tx) = state.meeting_recording_tx.lock() {
@@ -192,6 +243,7 @@ pub async fn stop_meeting_recording(
     state: State<'_, MeetingState>,
     _meeting_id: String,
 ) -> Result<String, String> {
+    let ended_meeting_id = state.current_meeting_id.lock().unwrap().clone();
     {
         let mut is_recording = state.is_recording.lock().unwrap();
         if !*is_recording {
@@ -217,6 +269,15 @@ pub async fn stop_meeting_recording(
         *is_recording = false;
     }
 
+    // Stop reminder loop
+    {
+        let mut guard = state.reminder_task.lock().unwrap();
+        if let Some(handle) = guard.take() {
+            handle.abort();
+        }
+    }
+    *state.current_meeting_id.lock().unwrap() = None;
+
     // Send end event so Lexi AI server can finalize and close the stream (no reliance on timeout)
     let ws_tx = state.meeting_ws_text_tx.lock().unwrap().take();
     if let Some(tx) = ws_tx {
@@ -241,6 +302,13 @@ pub async fn stop_meeting_recording(
     // Restore tray to "Start Meeting"
     if let Some(ref item) = *state.tray_start_meeting.lock().unwrap() {
         let _ = item.set_text("Start Meeting");
+    }
+
+    if let Some(meeting_id) = ended_meeting_id {
+        let _ = app.emit(
+            "meeting-recording-stopped",
+            serde_json::json!({ "meetingId": meeting_id }),
+        );
     }
 
     Ok("Recording stopped".to_string())
@@ -452,27 +520,36 @@ pub async fn stream_meeting_summary(
             match parsed {
                 Ok(payload) => {
                     if let Some(err) = payload.error.as_ref() {
-                        let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
-                            line: None,
-                            done: None,
-                            error: Some(err.clone()),
-                        });
+                        let _ = app.emit(
+                            "meeting-summary-stream",
+                            &MeetingSummaryStreamPayload {
+                                line: None,
+                                done: None,
+                                error: Some(err.clone()),
+                            },
+                        );
                         return Err(err.clone());
                     }
                     if payload.done == Some(true) {
-                        let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
-                            line: None,
-                            done: Some(true),
-                            error: None,
-                        });
+                        let _ = app.emit(
+                            "meeting-summary-stream",
+                            &MeetingSummaryStreamPayload {
+                                line: None,
+                                done: Some(true),
+                                error: None,
+                            },
+                        );
                         return Ok(());
                     }
                     if let Some(l) = payload.line.as_ref() {
-                        let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
-                            line: Some(l.clone()),
-                            done: None,
-                            error: None,
-                        });
+                        let _ = app.emit(
+                            "meeting-summary-stream",
+                            &MeetingSummaryStreamPayload {
+                                line: Some(l.clone()),
+                                done: None,
+                                error: None,
+                            },
+                        );
                     }
                 }
                 Err(_) => {}
@@ -481,11 +558,14 @@ pub async fn stream_meeting_summary(
     }
 
     // Stream ended without {"done": true}; emit done anyway so frontend can finalize
-    let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
-        line: None,
-        done: Some(true),
-        error: None,
-    });
+    let _ = app.emit(
+        "meeting-summary-stream",
+        &MeetingSummaryStreamPayload {
+            line: None,
+            done: Some(true),
+            error: None,
+        },
+    );
     Ok(())
 }
 
@@ -547,7 +627,11 @@ pub async fn send_meeting_chat(
         .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client_long_timeout();
-    let url = format!("{}/api/v1/meetings/{}/chat", crate::config::api_base_url(), meeting_id);
+    let url = format!(
+        "{}/api/v1/meetings/{}/chat",
+        crate::config::api_base_url(),
+        meeting_id
+    );
 
     let payload = MeetingChatRequest { content, history };
 

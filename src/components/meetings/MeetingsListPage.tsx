@@ -20,6 +20,7 @@ interface MeetingsListPageProps {
     onSelectMeeting: (meetingId: string, openToSummary?: boolean) => void;
     onStartNewMeeting: () => void;
     isRecording: boolean;
+    activeRecordingMeetingId?: string | null;
     isGeneratingSummary: boolean;
     isLoading?: boolean;
 }
@@ -30,6 +31,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
     onSelectMeeting,
     onStartNewMeeting,
     isRecording,
+    activeRecordingMeetingId = null,
     isGeneratingSummary,
     isLoading = false,
 }) => {
@@ -81,7 +83,11 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
 
     const CARD_VARIANTS = {
         hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 0.61, 0.36, 1] } },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.4, ease: [0.22, 0.61, 0.36, 1] as const },
+        },
     };
 
     return (
@@ -174,7 +180,9 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                             initial="hidden"
                             animate="visible"
                         >
-                            {meetings.map((m) => (
+                            {meetings.map((m) => {
+                                const isLiveMeeting = activeRecordingMeetingId === m.id;
+                                return (
                                 <motion.div
                                     key={m.id}
                                     className="meetings-list-page__card"
@@ -194,6 +202,12 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                                             <span className="meetings-list-page__card-badge">
                                                 {m.platform || "Lexi AI"}
                                             </span>
+                                            {activeRecordingMeetingId === m.id && (
+                                                <span className="meetings-page-header__badge meetings-page-header__badge--live">
+                                                    <span className="meetings-page-header__badge-dot" />
+                                                    Live
+                                                </span>
+                                            )}
                                             {formatDateShort(m.created_at) && (
                                                 <span className="meetings-list-page__card-date">
                                                     {formatDateShort(m.created_at)}
@@ -224,14 +238,19 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                                             type="button"
                                             className="meetings-list-page__card-delete"
                                             onClick={(e) => openDeleteConfirm(e, m.id)}
-                                            disabled={!!deletingId}
-                                            title="Delete meeting"
+                                            disabled={!!deletingId || isLiveMeeting}
+                                            title={
+                                                isLiveMeeting
+                                                    ? "Cannot delete while meeting is live"
+                                                    : "Delete meeting"
+                                            }
                                         >
                                             <Trash2 size={16} strokeWidth={1.5} />
                                         </button>
                                     </div>
                                 </motion.div>
-                            ))}
+                                );
+                            })}
                         </motion.div>
                     </>
                 )}

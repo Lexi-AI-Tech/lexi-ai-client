@@ -10,7 +10,6 @@ import {
   VisualSide,
 } from "./onboarding-steps";
 import "./onboarding.css";
-import Logo from "../../assets/light_mode_without_text.png";
 
 const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];
 
@@ -40,7 +39,6 @@ export const OnboardingFlow: React.FC = () => {
       <div className="onboarding-form-area">
         {/* Header */}
         <header className="onboarding-header">
-          <img src={Logo} alt="Lexi AI" className="onboarding-header-logo" />
           <div className="step-indicators">
             {STEPS.map((_, i) => (
               <div

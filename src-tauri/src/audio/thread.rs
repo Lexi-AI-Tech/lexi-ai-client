@@ -137,10 +137,7 @@ pub fn spawn_recording_thread(
                     RecordingCommand::ActionStart,
                     RecordingPhase::Idle | RecordingPhase::Error(_),
                 )
-                | (
-                    RecordingCommand::DocStart,
-                    RecordingPhase::Idle | RecordingPhase::Error(_),
-                ) => {
+                | (RecordingCommand::DocStart, RecordingPhase::Idle | RecordingPhase::Error(_)) => {
                     // distinct mode setup
                     ctx.mode = match command {
                         RecordingCommand::ActionStart => RecordingMode::Action,
@@ -290,9 +287,14 @@ pub fn spawn_recording_thread(
                                     let mode_skip = ctx.mode;
                                     tauri::async_runtime::spawn(async move {
                                         if mode_skip == RecordingMode::Doc {
-                                            let _ = app_handle_clone.emit("doc_transcription_error", "Recording too short");
+                                            let _ = app_handle_clone.emit(
+                                                "doc_transcription_error",
+                                                "Recording too short",
+                                            );
                                         } else {
-                                            app_handle_clone.emit("recording_skipped", ()).unwrap_or_default();
+                                            app_handle_clone
+                                                .emit("recording_skipped", ())
+                                                .unwrap_or_default();
                                         }
                                     });
                                 } else {
