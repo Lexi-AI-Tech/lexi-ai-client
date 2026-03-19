@@ -180,7 +180,9 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                             initial="hidden"
                             animate="visible"
                         >
-                            {meetings.map((m) => (
+                            {meetings.map((m) => {
+                                const isLiveMeeting = activeRecordingMeetingId === m.id;
+                                return (
                                 <motion.div
                                     key={m.id}
                                     className="meetings-list-page__card"
@@ -236,14 +238,19 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                                             type="button"
                                             className="meetings-list-page__card-delete"
                                             onClick={(e) => openDeleteConfirm(e, m.id)}
-                                            disabled={!!deletingId}
-                                            title="Delete meeting"
+                                            disabled={!!deletingId || isLiveMeeting}
+                                            title={
+                                                isLiveMeeting
+                                                    ? "Cannot delete while meeting is live"
+                                                    : "Delete meeting"
+                                            }
                                         >
                                             <Trash2 size={16} strokeWidth={1.5} />
                                         </button>
                                     </div>
                                 </motion.div>
-                            ))}
+                                );
+                            })}
                         </motion.div>
                     </>
                 )}
