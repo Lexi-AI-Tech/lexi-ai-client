@@ -10,6 +10,8 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+const MEETING_REMINDER_INTERVAL_MINUTES: u64 = 45;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Meeting {
     pub id: String,
@@ -165,7 +167,7 @@ pub async fn start_meeting_recording(
     *state.is_recording.lock().unwrap() = true;
     *state.current_meeting_id.lock().unwrap() = Some(meeting_id.clone());
 
-    // Start / restart the 45-minute reminder loop (abort any previous task defensively)
+    // Start / restart the periodic meeting reminder loop (abort any previous task defensively)
     {
         let mut guard = state.reminder_task.lock().unwrap();
         if let Some(handle) = guard.take() {
@@ -175,7 +177,10 @@ pub async fn start_meeting_recording(
         *guard = Some(tokio::spawn(async move {
             let mut intervals = 0u32;
             loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(1 * 60)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(
+                    MEETING_REMINDER_INTERVAL_MINUTES * 60,
+                ))
+                .await;
 
                 // Exit if meeting is no longer recording
                 let meeting_state = app_handle.state::<MeetingState>();
@@ -185,7 +190,7 @@ pub async fn start_meeting_recording(
                 }
 
                 intervals += 1;
-                let minutes = intervals * 1;
+                let minutes = intervals * (MEETING_REMINDER_INTERVAL_MINUTES as u32);
                 let meeting_id = meeting_state
                     .current_meeting_id
                     .lock()

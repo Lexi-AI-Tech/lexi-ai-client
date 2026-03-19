@@ -42,6 +42,7 @@ type Page =
   | "docs";
 
 const LOADING_DELAY_MS = 150; // Only show loading spinner if init takes longer than this (avoids brief flash on first load)
+const MEETING_REMINDER_INTERVAL_MINUTES = 45;
 
 function formatMeetingDuration(totalMinutes: number): string {
   const safeMinutes = Math.max(0, Math.floor(totalMinutes));
@@ -76,7 +77,6 @@ function App() {
   const [meetingReminderModal, setMeetingReminderModal] = useState<{
     meetingId: string;
     readableDuration: string;
-    minutes: number;
   } | null>(null);
   const [pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
     useState<string | null>(null);
@@ -289,10 +289,12 @@ function App() {
               ? payload.meetingId
               : null;
           const minutes =
-            payload && typeof payload.minutes === "number" ? payload.minutes : 45;
+            payload && typeof payload.minutes === "number"
+              ? payload.minutes
+              : MEETING_REMINDER_INTERVAL_MINUTES;
           const readableDuration = formatMeetingDuration(minutes);
           if (meetingId) {
-            setMeetingReminderModal({ meetingId, readableDuration, minutes });
+            setMeetingReminderModal({ meetingId, readableDuration });
           }
         },
       );
