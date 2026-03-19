@@ -20,6 +20,7 @@ interface MeetingsListPageProps {
     onSelectMeeting: (meetingId: string, openToSummary?: boolean) => void;
     onStartNewMeeting: () => void;
     isRecording: boolean;
+    activeRecordingMeetingId?: string | null;
     isGeneratingSummary: boolean;
     isLoading?: boolean;
 }
@@ -30,6 +31,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
     onSelectMeeting,
     onStartNewMeeting,
     isRecording,
+    activeRecordingMeetingId = null,
     isGeneratingSummary,
     isLoading = false,
 }) => {
@@ -81,7 +83,11 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
 
     const CARD_VARIANTS = {
         hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 0.61, 0.36, 1] } },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.4, ease: [0.22, 0.61, 0.36, 1] as const },
+        },
     };
 
     return (
@@ -194,6 +200,12 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                                             <span className="meetings-list-page__card-badge">
                                                 {m.platform || "Lexi AI"}
                                             </span>
+                                            {activeRecordingMeetingId === m.id && (
+                                                <span className="meetings-page-header__badge meetings-page-header__badge--live">
+                                                    <span className="meetings-page-header__badge-dot" />
+                                                    Live
+                                                </span>
+                                            )}
                                             {formatDateShort(m.created_at) && (
                                                 <span className="meetings-list-page__card-date">
                                                     {formatDateShort(m.created_at)}

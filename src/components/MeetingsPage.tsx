@@ -28,6 +28,9 @@ interface MeetingsPageProps {
   /** When set, auto-run the full end-meeting flow (no extra confirmation). */
   triggerAutoEndMeetingFromReminderId?: string | null;
   onAutoEndMeetingFromReminderConsumed?: () => void;
+  activeRecordingMeetingId?: string | null;
+  onRecordingStartedGlobal?: (meetingId: string) => void;
+  onRecordingStoppedGlobal?: () => void;
 }
 
 export const MeetingsPage: React.FC<MeetingsPageProps> = ({
@@ -40,6 +43,9 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   onEndMeetingFromTrayConsumed,
   triggerAutoEndMeetingFromReminderId,
   onAutoEndMeetingFromReminderConsumed,
+  activeRecordingMeetingId = null,
+  onRecordingStartedGlobal,
+  onRecordingStoppedGlobal,
 }) => {
     const { tokens } = useAuthStore();
     const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -70,6 +76,11 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
             fetchMeetings();
         }
     }, [tokens, fetchMeetings]);
+
+    // Keep recording state stable across page unmount/remount by syncing from app-level state.
+    useEffect(() => {
+        setRecordingMeetingId(activeRecordingMeetingId ?? null);
+    }, [activeRecordingMeetingId]);
 
     // Real-time transcript listener
     useEffect(() => {
@@ -266,10 +277,12 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                     onRecordingStopped={() => {
                         setRecordingMeetingId(null);
                         setLiveSegments([]);
+                        onRecordingStoppedGlobal?.();
                     }}
                     onRecordingStarted={(id) => {
                         setRecordingMeetingId(id);
                         setLiveSegments([]);
+                        onRecordingStartedGlobal?.(id);
                     }}
                 />
             ) : (
@@ -282,6 +295,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                     }}
                     onStartNewMeeting={handleCreateAndStartMeeting}
                     isRecording={!!recordingMeetingId}
+                    activeRecordingMeetingId={recordingMeetingId}
                     isGeneratingSummary={false}
                     isLoading={isMeetingsLoading}
                 />

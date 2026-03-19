@@ -80,6 +80,9 @@ function App() {
   } | null>(null);
   const [pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
     useState<string | null>(null);
+  const [activeRecordingMeetingId, setActiveRecordingMeetingId] = useState<
+    string | null
+  >(null);
 
   // When not authenticated, reset sync flag so we sync again after next login
   useEffect(() => {
@@ -235,14 +238,15 @@ function App() {
     };
   }, [toast]);
 
-  // Listen for meeting started events (pill, tray, or elsewhere)
+  // Listen for meeting recording lifecycle events globally so active
+  // recording state survives page navigation.
   useEffect(() => {
     let cancelled = false;
     let unlistenFn: (() => void) | undefined;
 
     const setup = async () => {
       const { listen } = await import("@tauri-apps/api/event");
-      const unlisten = await listen<{ meetingId: string }>(
+      const unlistenStarted = await listen<{ meetingId: string }>(
         "meeting-recording-started",
         (event) => {
           if (cancelled) return;
@@ -252,11 +256,22 @@ function App() {
               ? payload.meetingId
               : null;
           if (!id) return;
+          setActiveRecordingMeetingId(id);
           setPillMeetingId(id);
           setCurrentPage("meetings");
         },
       );
-      unlistenFn = unlisten;
+      const unlistenStopped = await listen<{ meetingId?: string }>(
+        "meeting-recording-stopped",
+        () => {
+          if (cancelled) return;
+          setActiveRecordingMeetingId(null);
+        },
+      );
+      unlistenFn = () => {
+        unlistenStarted();
+        unlistenStopped();
+      };
     };
 
     setup().catch((e) => {
@@ -444,6 +459,9 @@ function App() {
               onAutoEndMeetingFromReminderConsumed={() =>
                 setPendingReminderAutoEndMeetingId(null)
               }
+              activeRecordingMeetingId={activeRecordingMeetingId}
+              onRecordingStartedGlobal={setActiveRecordingMeetingId}
+              onRecordingStoppedGlobal={() => setActiveRecordingMeetingId(null)}
             />
           </div>
         )}

@@ -166,6 +166,10 @@ pub async fn start_meeting_recording(
     }
     *state.is_recording.lock().unwrap() = true;
     *state.current_meeting_id.lock().unwrap() = Some(meeting_id.clone());
+    let _ = app.emit(
+        "meeting-recording-started",
+        serde_json::json!({ "meetingId": meeting_id }),
+    );
 
     // Start / restart the periodic meeting reminder loop (abort any previous task defensively)
     {
@@ -239,6 +243,7 @@ pub async fn stop_meeting_recording(
     state: State<'_, MeetingState>,
     _meeting_id: String,
 ) -> Result<String, String> {
+    let ended_meeting_id = state.current_meeting_id.lock().unwrap().clone();
     {
         let mut is_recording = state.is_recording.lock().unwrap();
         if !*is_recording {
@@ -297,6 +302,13 @@ pub async fn stop_meeting_recording(
     // Restore tray to "Start Meeting"
     if let Some(ref item) = *state.tray_start_meeting.lock().unwrap() {
         let _ = item.set_text("Start Meeting");
+    }
+
+    if let Some(meeting_id) = ended_meeting_id {
+        let _ = app.emit(
+            "meeting-recording-stopped",
+            serde_json::json!({ "meetingId": meeting_id }),
+        );
     }
 
     Ok("Recording stopped".to_string())
