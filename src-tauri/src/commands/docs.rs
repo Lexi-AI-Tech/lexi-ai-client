@@ -35,12 +35,38 @@ pub struct DeleteDocRequest {
 
 /// Parse API doc response into Doc (pub for use from meeting commands).
 pub fn parse_doc_from_value(v: &serde_json::Value) -> Result<Doc, String> {
-    let id = v.get("id").and_then(|x| x.as_str()).ok_or("Missing id")?.to_string();
-    let title = v.get("title").and_then(|x| x.as_str()).unwrap_or("Untitled").to_string();
-    let content = v.get("content").and_then(|x| x.as_str()).unwrap_or("").to_string();
-    let created_at = v.get("created_at").and_then(|x| x.as_str()).ok_or("Missing created_at")?.to_string();
-    let updated_at = v.get("updated_at").and_then(|x| x.as_str()).ok_or("Missing updated_at")?.to_string();
-    Ok(Doc { id, title, content, created_at, updated_at })
+    let id = v
+        .get("id")
+        .and_then(|x| x.as_str())
+        .ok_or("Missing id")?
+        .to_string();
+    let title = v
+        .get("title")
+        .and_then(|x| x.as_str())
+        .unwrap_or("Untitled")
+        .to_string();
+    let content = v
+        .get("content")
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .to_string();
+    let created_at = v
+        .get("created_at")
+        .and_then(|x| x.as_str())
+        .ok_or("Missing created_at")?
+        .to_string();
+    let updated_at = v
+        .get("updated_at")
+        .and_then(|x| x.as_str())
+        .ok_or("Missing updated_at")?
+        .to_string();
+    Ok(Doc {
+        id,
+        title,
+        content,
+        created_at,
+        updated_at,
+    })
 }
 
 fn parse_doc_list(value: serde_json::Value) -> Result<Vec<Doc>, String> {
@@ -58,7 +84,9 @@ async fn docs_request(
     url: &str,
     body: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
-    let auth_token = get_auth_token_async(app).await.map_err(|_| "Authentication required")?;
+    let auth_token = get_auth_token_async(app)
+        .await
+        .map_err(|_| "Authentication required")?;
     let client = crate::utils::create_http_client();
     let mut req = match method {
         "GET" => client.get(url),
@@ -71,7 +99,10 @@ async fn docs_request(
     if let Some(b) = body {
         req = req.header("Content-Type", "application/json").json(&b);
     }
-    let response = req.send().await.map_err(|e| format!("Request failed: {}", e))?;
+    let response = req
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
@@ -80,7 +111,10 @@ async fn docs_request(
     if response.status().as_u16() == 204 {
         return Ok(serde_json::Value::Null);
     }
-    response.json().await.map_err(|e| format!("Invalid response: {}", e))
+    response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response: {}", e))
 }
 
 /// List all docs (newest first) from the backend.
@@ -145,20 +179,24 @@ pub async fn delete_doc(app: AppHandle, payload: DeleteDocRequest) -> Result<(),
 #[tauri::command]
 pub fn start_doc_recording(app: AppHandle) -> Result<(), String> {
     let tx = app.state::<RecordingCommandTx>();
-    tx.0.send(RecordingCommand::DocStart).map_err(|e| e.to_string())
+    tx.0.send(RecordingCommand::DocStart)
+        .map_err(|e| e.to_string())
 }
 
 /// Stop recording for doc. Transcript will be emitted via doc_transcription_ready after processing.
 #[tauri::command]
 pub fn stop_doc_recording(app: AppHandle) -> Result<(), String> {
     let tx = app.state::<RecordingCommandTx>();
-    tx.0.send(RecordingCommand::DocStop).map_err(|e| e.to_string())
+    tx.0.send(RecordingCommand::DocStop)
+        .map_err(|e| e.to_string())
 }
 
 /// Call server LLM to structure transcript into TipTap/Notion-style rich content. Returns TipTap JSON string.
 #[tauri::command]
 pub async fn structure_doc_content(app: AppHandle, transcript: String) -> Result<String, String> {
-    let auth_token = get_auth_token_async(&app).await.map_err(|_| "Authentication required")?;
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
     let url = crate::api_endpoints::docs::structure_content_url();
     let client = crate::utils::create_http_client();
     let response = client
@@ -171,7 +209,10 @@ pub async fn structure_doc_content(app: AppHandle, transcript: String) -> Result
         .map_err(|e| format!("Request failed: {}", e))?;
 
     if !response.status().is_success() {
-        let err_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        let err_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
         return Err(format!("Server error: {}", err_text));
     }
 
@@ -196,7 +237,9 @@ pub async fn rewrite_doc_section(
     context_before: Option<String>,
     context_after: Option<String>,
 ) -> Result<String, String> {
-    let auth_token = get_auth_token_async(&app).await.map_err(|_| "Authentication required")?;
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
     let url = crate::api_endpoints::docs::rewrite_section_url();
     let client = crate::utils::create_http_client();
     let response = client
@@ -214,7 +257,10 @@ pub async fn rewrite_doc_section(
         .map_err(|e| format!("Request failed: {}", e))?;
 
     if !response.status().is_success() {
-        let err_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        let err_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
         return Err(format!("Server error: {}", err_text));
     }
 

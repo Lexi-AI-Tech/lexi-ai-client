@@ -60,6 +60,8 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
         true,
         None::<&str>,
     )?;
+    let version_label = format!("Version {}", app.package_info().version);
+    let version_item = MenuItem::with_id(app, "version", version_label, false, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let tray_menu = Menu::with_items(
         app,
@@ -67,6 +69,7 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
             &show_item,
             &start_meeting_item,
             &paste_transcript_item,
+            &version_item,
             &quit_item,
         ],
     )?;

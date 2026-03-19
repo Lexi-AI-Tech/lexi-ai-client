@@ -452,27 +452,36 @@ pub async fn stream_meeting_summary(
             match parsed {
                 Ok(payload) => {
                     if let Some(err) = payload.error.as_ref() {
-                        let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
-                            line: None,
-                            done: None,
-                            error: Some(err.clone()),
-                        });
+                        let _ = app.emit(
+                            "meeting-summary-stream",
+                            &MeetingSummaryStreamPayload {
+                                line: None,
+                                done: None,
+                                error: Some(err.clone()),
+                            },
+                        );
                         return Err(err.clone());
                     }
                     if payload.done == Some(true) {
-                        let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
-                            line: None,
-                            done: Some(true),
-                            error: None,
-                        });
+                        let _ = app.emit(
+                            "meeting-summary-stream",
+                            &MeetingSummaryStreamPayload {
+                                line: None,
+                                done: Some(true),
+                                error: None,
+                            },
+                        );
                         return Ok(());
                     }
                     if let Some(l) = payload.line.as_ref() {
-                        let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
-                            line: Some(l.clone()),
-                            done: None,
-                            error: None,
-                        });
+                        let _ = app.emit(
+                            "meeting-summary-stream",
+                            &MeetingSummaryStreamPayload {
+                                line: Some(l.clone()),
+                                done: None,
+                                error: None,
+                            },
+                        );
                     }
                 }
                 Err(_) => {}
@@ -481,11 +490,14 @@ pub async fn stream_meeting_summary(
     }
 
     // Stream ended without {"done": true}; emit done anyway so frontend can finalize
-    let _ = app.emit("meeting-summary-stream", &MeetingSummaryStreamPayload {
-        line: None,
-        done: Some(true),
-        error: None,
-    });
+    let _ = app.emit(
+        "meeting-summary-stream",
+        &MeetingSummaryStreamPayload {
+            line: None,
+            done: Some(true),
+            error: None,
+        },
+    );
     Ok(())
 }
 
@@ -547,7 +559,11 @@ pub async fn send_meeting_chat(
         .map_err(|_| "Authentication required")?;
 
     let client = crate::utils::create_http_client_long_timeout();
-    let url = format!("{}/api/v1/meetings/{}/chat", crate::config::api_base_url(), meeting_id);
+    let url = format!(
+        "{}/api/v1/meetings/{}/chat",
+        crate::config::api_base_url(),
+        meeting_id
+    );
 
     let payload = MeetingChatRequest { content, history };
 

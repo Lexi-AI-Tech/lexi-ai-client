@@ -98,23 +98,18 @@ use commands::auth::{
     get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
     store_auth_data,
 };
-use commands::hotkey::{
-    get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
-};
 use commands::docs::{
     create_doc, delete_doc, get_doc, get_docs, rewrite_doc_section, start_doc_recording,
     stop_doc_recording, structure_doc_content, update_doc,
+};
+use commands::hotkey::{
+    get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
 use commands::notes::{create_note, delete_note, get_note, get_notes, update_note};
 use commands::onboarding::{
     complete_onboarding, complete_server_onboarding, get_onboarding_state,
     get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
     set_onboarding_step,
-};
-use meetings::commands::{
-    add_meeting_note, create_meeting, get_meeting_details, get_meeting_suggested_questions,
-    list_meetings, send_meeting_chat, start_meeting_recording, stream_meeting_summary,
-    stop_meeting_recording, update_meeting, delete_meeting, create_doc_from_meeting,
 };
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
@@ -124,6 +119,11 @@ use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, updat
 use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type};
 use commands::window::{open_devtools, show_main_window};
+use meetings::commands::{
+    add_meeting_note, create_doc_from_meeting, create_meeting, delete_meeting, get_meeting_details,
+    get_meeting_suggested_questions, list_meetings, send_meeting_chat, start_meeting_recording,
+    stop_meeting_recording, stream_meeting_summary, update_meeting,
+};
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
 /// Command to control recording state

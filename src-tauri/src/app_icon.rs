@@ -64,9 +64,7 @@ mod macos {
         // Empty dictionary for PNG representation options
         let empty = NSDictionary::<NSString, objc2_foundation::NSObject>::dictionary();
         let empty_ref: &NSDictionary<NSString, objc2_foundation::NSObject> = empty.as_ref();
-        let props = unsafe {
-            empty_ref.cast_unchecked::<NSBitmapImageRepPropertyKey, AnyObject>()
-        };
+        let props = unsafe { empty_ref.cast_unchecked::<NSBitmapImageRepPropertyKey, AnyObject>() };
         let png_data = unsafe {
             bitmap_rep.representationUsingType_properties(NSBitmapImageFileType::PNG, props)
         }?;

@@ -130,7 +130,9 @@ pub async fn get_default_hotkeys(app: AppHandle) -> Result<DefaultHotkeysRespons
         .header("Authorization", format!("Bearer {}", auth_token))
         .send()
         .await
-        .map_err(|_| "Unable to connect to server. Please check your internet connection.".to_string())?;
+        .map_err(|_| {
+            "Unable to connect to server. Please check your internet connection.".to_string()
+        })?;
 
     let status = response.status();
     if !status.is_success() {

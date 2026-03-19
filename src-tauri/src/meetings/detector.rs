@@ -26,9 +26,7 @@ struct AppInfo {
 fn is_system_app_for_display(app: &AppInfo) -> bool {
     let id = app.id.to_lowercase();
     let name = app.name.to_lowercase();
-    id.starts_with("com.apple.")
-        || name.contains("core speech")
-        || name.contains("corespeechd")
+    id.starts_with("com.apple.") || name.contains("core speech") || name.contains("corespeechd")
 }
 
 /// Score how "meeting-like" an app is; higher = more likely a real meeting app.
@@ -57,11 +55,17 @@ fn score_app_for_meeting(app: &AppInfo) -> i32 {
         return 6;
     }
     // Chrome/Safari with Meet or similar: often just "Google Chrome" when in Meet
-    if (id.contains("google.chrome") || id.contains("apple.safari")) && (name.contains("chrome") || name.contains("safari")) {
+    if (id.contains("google.chrome") || id.contains("apple.safari"))
+        && (name.contains("chrome") || name.contains("safari"))
+    {
         return 3;
     }
     // Generic browser with no meeting hints: low score so known meeting apps win
-    if name.contains("chrome") || name.contains("safari") || name.contains("firefox") || name.contains("edge") {
+    if name.contains("chrome")
+        || name.contains("safari")
+        || name.contains("firefox")
+        || name.contains("edge")
+    {
         return 1;
     }
     // Unknown app: neutral
@@ -264,8 +268,11 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
     let mut apps: Vec<AppInfo> = mic_processes
         .into_iter()
         .filter_map(|(pid, bundle_id)| {
-            let mut info = resolve_to_app(pid)
-                .or_else(|| bundle_id.as_ref().map(|b| fallback_from_bundle_id(b.clone())))?;
+            let mut info = resolve_to_app(pid).or_else(|| {
+                bundle_id
+                    .as_ref()
+                    .map(|b| fallback_from_bundle_id(b.clone()))
+            })?;
 
             // If this process looks like a helper, try parent process walk first, then bundle truncation.
             if let Some(ref bid) = bundle_id {
@@ -282,7 +289,10 @@ fn list_mic_using_apps() -> Vec<AppInfo> {
                 return None;
             }
 
-            println!("[detector] resolved PID {} -> {} ({})", pid, info.name, info.id);
+            println!(
+                "[detector] resolved PID {} -> {} ({})",
+                pid, info.name, info.id
+            );
             Some(info)
         })
         .collect();

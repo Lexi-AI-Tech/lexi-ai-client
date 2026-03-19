@@ -51,9 +51,10 @@ impl MeetingWebSocket {
         let mut request = ws_url
             .into_client_request()
             .map_err(|e| format!("Invalid WebSocket URL: {}", e))?;
-        request
-            .headers_mut()
-            .insert("Authorization", format!("Bearer {}", self.jwt_token).parse().unwrap());
+        request.headers_mut().insert(
+            "Authorization",
+            format!("Bearer {}", self.jwt_token).parse().unwrap(),
+        );
 
         // Connect to WebSocket
         let (ws_stream, _) = connect_async(request)
