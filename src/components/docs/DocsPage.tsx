@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { ArrowLeft, Mic, Square, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
 import { useToast } from "../toast/useToast";
-import { PageLoader } from "../ui/PageLoader";
+import { ScreenSkeleton } from "../ui/ScreenSkeleton";
 import { DocsListPage } from "./DocsListPage";
 import { RichTextEditor, type RichTextEditorRef } from "./RichTextEditor";
 import "./docs.css";
@@ -299,7 +299,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     return (
       <div className="docs-page">
         <h2 className="docs-page__title">Docs</h2>
-        <PageLoader className="page__empty" />
+        <ScreenSkeleton variant="docs" className="page__empty" />
       </div>
     );
   }
