@@ -11,9 +11,7 @@
   max-height: 100vh;
   overflow-y: auto;
   background: var(--lexi-surface-elevated);
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
-    sans-serif;
+  font-family: var(--lexi-font-body);
   color: var(--lexi-text);
 }
 
@@ -410,7 +408,7 @@
 
 .home-loading-full {
   margin-top: 2rem;
-  min-height: 200px;
+  min-height: calc(100vh - 260px);
 }
 
 .empty-icon {
