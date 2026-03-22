@@ -8,12 +8,13 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, Check, Trash2, Play, Pause } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 
 export const TranscriptsList: React.FC = () => {
@@ -197,6 +198,8 @@ export const TranscriptsList: React.FC = () => {
     (!authStore.isAuthenticated || !!authStore.tokens?.access_token);
   const showLogin = authStore.isInitialized && !authStore.isAuthenticated;
 
+  const shouldAnimateRowIn = page === 1;
+
   return (
     <div className="transcripts-page">
       <h2 className="transcripts-page-title">
@@ -209,7 +212,10 @@ export const TranscriptsList: React.FC = () => {
       {!showContent && (
         <div className="transcripts-page">
           <h2 className="transcripts-page-title">Transcripts</h2>
-          <PageLoader className="page__empty" />
+          <ScreenSkeleton
+            variant="transcripts"
+            className="page__empty"
+          />
         </div>
       )}
 
@@ -223,7 +229,10 @@ export const TranscriptsList: React.FC = () => {
       )}
 
       {showContent && !showLogin && loading && transcripts.length === 0 && (
-        <PageLoader className="transcripts-loading-inline" />
+        <ScreenSkeleton
+          variant="transcripts"
+          className="transcripts-loading-inline"
+        />
       )}
 
       {showContent && !showLogin && !loading && transcripts.length === 0 && (
@@ -239,7 +248,7 @@ export const TranscriptsList: React.FC = () => {
         <div className="transcripts-list transcripts-table transcripts-list-wrapper">
           {loading && page === 1 && (
             <div className="transcripts-loading-overlay">
-              <PageLoader />
+              <ScreenSkeleton variant="transcriptsRows" />
             </div>
           )}
           <div className="transcripts-table-header">
@@ -248,14 +257,29 @@ export const TranscriptsList: React.FC = () => {
             <span>App</span>
             <span>Actions</span>
           </div>
-          {transcripts.map((transcript, index) => {
-            const isLastElement = index === transcripts.length - 1;
-            return (
-              <div
-                ref={isLastElement ? lastElementRef : null}
-                key={transcript.id}
-                className="transcript-item transcripts-table-row"
-              >
+          <AnimatePresence initial={false}>
+            {transcripts.map((transcript, index) => {
+              const isLastElement = index === transcripts.length - 1;
+              return (
+                <motion.div
+                  ref={isLastElement ? lastElementRef : undefined}
+                  key={transcript.id}
+                  className="transcript-item transcripts-table-row"
+                  layout
+                  initial={
+                    shouldAnimateRowIn ? { opacity: 0, y: 8 } : false
+                  }
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{
+                    opacity: 0,
+                    y: -8,
+                    transition: { duration: 0.12 },
+                  }}
+                  transition={{
+                    duration: 0.22,
+                    delay: shouldAnimateRowIn ? index * 0.02 : 0,
+                  }}
+                >
                 <div className="transcript-cell transcript-cell-date">
                   {formatDateRelative(transcript.created_at)}
                 </div>
@@ -403,12 +427,13 @@ export const TranscriptsList: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
           {loading && page > 1 && (
             <div className="transcripts-load-more">
-              <PageLoader />
+              <ScreenSkeleton variant="transcriptsRows" />
             </div>
           )}
         </div>
