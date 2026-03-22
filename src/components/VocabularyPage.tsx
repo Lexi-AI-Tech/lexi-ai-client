@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Search, RefreshCw, Plus, X, Trash2, Edit } from "lucide-react";
 import type { TauriAppConfig } from "../types";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 
 export const VocabularyPage: React.FC = () => {
@@ -165,7 +165,7 @@ export const VocabularyPage: React.FC = () => {
     return (
       <div className="page">
         <h2 className="page__title">Vocabulary</h2>
-        <PageLoader className="page__empty" />
+        <ScreenSkeleton variant="vocabulary" className="page__empty" />
       </div>
     );
   }
