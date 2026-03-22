@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 
 type ViewMode = "list" | "grid";
@@ -174,7 +174,7 @@ export const NotesPage: React.FC = () => {
     return (
       <div className="page">
         <h2 className="page__title">Notes</h2>
-        <PageLoader className="page__empty" />
+        <ScreenSkeleton variant="notes" className="page__empty" />
       </div>
     );
   }
@@ -185,8 +185,7 @@ export const NotesPage: React.FC = () => {
         padding: "2rem 2.5rem",
         background: "#ffffff",
         minHeight: "100vh",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        fontFamily: "var(--lexi-font-body)",
       }}
     >
       <h2
