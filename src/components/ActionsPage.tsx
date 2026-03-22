@@ -8,7 +8,7 @@ import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
 import "../styles/components/hotkey-selector.css";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 
 export const ActionsPage: React.FC = () => {
@@ -156,7 +156,10 @@ export const ActionsPage: React.FC = () => {
     return (
       <div className="page">
         <h2 className="page__title">Actions</h2>
-        <PageLoader className="page__empty" />
+        <ScreenSkeleton
+          variant="actions"
+          className="page__empty"
+        />
       </div>
     );
   }
@@ -169,8 +172,7 @@ export const ActionsPage: React.FC = () => {
           padding: "2rem 2.5rem",
           background: "#ffffff",
           minHeight: "100vh",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+          fontFamily: "var(--lexi-font-body)",
         }}
       >
         <h2
@@ -212,8 +214,7 @@ export const ActionsPage: React.FC = () => {
         padding: "2rem 2.5rem",
         background: "#ffffff",
         minHeight: "100vh",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        fontFamily: "var(--lexi-font-body)",
       }}
     >
       <h2
@@ -308,7 +309,7 @@ export const ActionsPage: React.FC = () => {
         </h3>
 
         {isLoading ? (
-          <PageLoader />
+          <ScreenSkeleton variant="actionsHistory" />
         ) : !actionHistory || actionHistory.actions.length === 0 ? (
           <div
             style={{
