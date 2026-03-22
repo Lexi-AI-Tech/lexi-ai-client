@@ -10,7 +10,7 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  font-family: var(--lexi-font-body);
 }
 
 .docs-page__header {
