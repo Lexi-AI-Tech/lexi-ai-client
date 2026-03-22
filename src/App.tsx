@@ -25,6 +25,7 @@ import { DocsPage } from "./components/docs/DocsPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
 import { useAutoUpdater } from "./hooks/useAutoUpdater";
+import { AnimatePresence, motion } from "framer-motion";
 
 const ONBOARDING_VERSION = 1;
 
@@ -40,6 +41,16 @@ type Page =
   | "docs";
 
 const LOADING_DELAY_MS = 150; // Only show loading spinner if init takes longer than this (avoids brief flash on first load)
+
+const PAGE_TRANSITION_VARIANTS = {
+  initial: { opacity: 0, y: 8 },
+  animate: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] as const },
+  },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.18 } },
+} as const;
 
 function App() {
   const authStore = useAuthStore();
@@ -124,10 +135,10 @@ function App() {
     invoke<boolean>("check_input_monitoring_permission")
       .then((granted) => {
         if (granted) {
-          invoke("start_global_key_listener").catch(() => {});
+          invoke("start_global_key_listener").catch(() => { });
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isCompleted]);
 
   // Listen for "Start Meeting" from system tray
@@ -278,67 +289,99 @@ function App() {
     <div className="app">
       <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
       <div className="main-content">
-        {currentPage === "home" && (
-          <HomePage
-            onViewAllTranscripts={() => setCurrentPage("transcripts")}
-          />
-        )}
-        {currentPage === "transcripts" && (
-          <div className="container container--transcripts">
-            <TranscriptsList />
-          </div>
-        )}
-        {currentPage === "settings" && (
-          <div className="container">
-            <SettingsPage />
-          </div>
-        )}
-        {currentPage === "vocabulary" && (
-          <div className="container">
-            <VocabularyPage />
-          </div>
-        )}
-        {currentPage === "actions" && (
-          <div className="container">
-            <ActionsPage />
-          </div>
-        )}
-        {currentPage === "shortcuts" && (
-          <div className="container">
-            <ShortcutsPage />
-          </div>
-        )}
-        {currentPage === "notes" && (
-          <div className="container">
-            <NotesPage />
-          </div>
-        )}
-        {currentPage === "meetings" && (
-          <div className="container container--meetings">
-            <MeetingsPage
-              autoStart={pendingTrayMeeting}
-              autoStartPlatform={pendingTrayMeetingPlatform}
-              onAutoStartConsumed={() => setPendingTrayMeeting(false)}
-              pillMeetingId={pillMeetingId}
-              onPillMeetingConsumed={() => setPillMeetingId(null)}
-              triggerEndMeetingFromTray={triggerEndMeetingFromTray}
-              onEndMeetingFromTrayConsumed={() =>
-                setTriggerEndMeetingFromTray(false)
-              }
-            />
-          </div>
-        )}
-        {currentPage === "docs" && (
-          <div className="container container--docs">
-            <DocsPage
-              initialSelectedDocId={selectedDocIdToOpen}
-              onInitialDocConsumed={() => setSelectedDocIdToOpen(null)}
-            />
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentPage}
+            variants={PAGE_TRANSITION_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            style={{ flex: 1, display: "flex", flexDirection: "column" }}
+          >
+            {currentPage === "home" && (
+              <HomePage
+                onViewAllTranscripts={() => setCurrentPage("transcripts")}
+              />
+            )}
+            {currentPage === "transcripts" && (
+              <div className="container container--transcripts">
+                <TranscriptsList />
+              </div>
+            )}
+            {currentPage === "settings" && (
+              <div className="container">
+                <SettingsPage />
+              </div>
+            )}
+            {currentPage === "vocabulary" && (
+              <div className="container">
+                <VocabularyPage />
+              </div>
+            )}
+            {currentPage === "actions" && (
+              <div className="container">
+                <ActionsPage />
+              </div>
+            )}
+            {currentPage === "shortcuts" && (
+              <div className="container">
+                <ShortcutsPage />
+              </div>
+            )}
+            {currentPage === "notes" && (
+              <div className="container">
+                <NotesPage />
+              </div>
+            )}
+            {currentPage === "meetings" && (
+              <div className="container container--meetings">
+                <MeetingsPage
+                  autoStart={pendingTrayMeeting}
+                  autoStartPlatform={pendingTrayMeetingPlatform}
+                  onAutoStartConsumed={() => setPendingTrayMeeting(false)}
+                  pillMeetingId={pillMeetingId}
+                  onPillMeetingConsumed={() => setPillMeetingId(null)}
+                  triggerEndMeetingFromTray={triggerEndMeetingFromTray}
+                  onEndMeetingFromTrayConsumed={() =>
+                    setTriggerEndMeetingFromTray(false)
+                  }
+                />
+              </div>
+            )}
+            {currentPage === "docs" && (
+              <div className="container container--docs">
+                <DocsPage
+                  initialSelectedDocId={selectedDocIdToOpen}
+                  onInitialDocConsumed={() => setSelectedDocIdToOpen(null)}
+                />
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
 }
 
 export default App;
+
+
+
+
+
+
+// export const sage = {
+//   bg: "#f5f7f4",
+//   sidebar: "#eaefe8",
+//   sidebarBorder: "#dce4d9",
+//   card: "#ffffff",
+//   cardBorder: "#e4eae1",
+//   accent: "#6b8f6e",
+//   accentLight: "#d4e2d4",
+//   accentMid: "#8fab8e",
+//   text: "#2e3b2f",
+//   textMid: "#5a6e5c",
+//   textLight: "#8fa48f",
+//   textFaint: "#b4c4b5",
+//   activeNav: "#ddeadc",
+// };
