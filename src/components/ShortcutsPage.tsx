@@ -5,7 +5,7 @@ import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 
 export const ShortcutsPage: React.FC = () => {
@@ -214,7 +214,7 @@ export const ShortcutsPage: React.FC = () => {
     return (
       <div className="page">
         <h2 className="page__title">Shortcuts</h2>
-        <PageLoader className="page__empty" />
+        <ScreenSkeleton variant="shortcuts" className="page__empty" />
       </div>
     );
   }
@@ -342,7 +342,10 @@ export const ShortcutsPage: React.FC = () => {
 
         {/* Shortcuts List */}
         {isLoading ? (
-          <PageLoader className="page__empty--sm" />
+          <ScreenSkeleton
+            variant="shortcuts"
+            className="page__empty--sm"
+          />
         ) : filteredShortcuts.length === 0 ? (
           <div
             style={{
