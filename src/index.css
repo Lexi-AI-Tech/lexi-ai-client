@@ -8,41 +8,79 @@
    - Rose:   --lexi-primary: #e11d48; --lexi-primary-hover: #be123c; --lexi-primary-muted: #ffe4e6;
    ============================================================================= */
 :root {
-  /* Primary brand – main actions, active states, logo, focus */
-  --lexi-primary: #0d9488;
-  --lexi-primary-hover: #0f766e;
-  --lexi-primary-muted: #ccfbf1;
+  /* =============================================================================
+     Lexi AI design tokens (Sage theme)
+     Inspired by the shared dashboard reference.
+     ============================================================================= */
+
+  /* Fonts (Option A) */
+  --lexi-font-display:
+    "Cabinet Grotesk",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  --lexi-font-body:
+    "Satoshi",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  --lexi-font-mono:
+    "SF Mono",
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace;
+
+  /* Primary brand – main actions, focus rings, subtle highlights */
+  --lexi-primary: #6b8f6e;
+  --lexi-primary-hover: #587a5b;
+  --lexi-primary-muted: #d4e2d4;
   --lexi-primary-foreground: #ffffff;
 
-  /* Secondary – outline-of-primary style (teal border + text, light fill on hover) for Create doc, Regenerate, etc. */
-  --lexi-secondary: #0d9488;
-  --lexi-secondary-hover: #0f766e;
-  --lexi-secondary-muted: #ccfbf1;
-  --lexi-secondary-foreground: #0d9488;
+  /* Secondary (outline-of-primary) */
+  --lexi-secondary: #6b8f6e;
+  --lexi-secondary-hover: #587a5b;
+  --lexi-secondary-muted: #d4e2d4;
+  --lexi-secondary-foreground: #6b8f6e;
 
   /* Surfaces */
-  --lexi-surface: #f8fafc;
-  --lexi-surface-elevated: #ffffff;
-  --lexi-surface-overlay: #f1f5f9;
+  --lexi-surface: #f5f7f4; /* app background */
+  --lexi-surface-elevated: #ffffff; /* cards/panels */
+  --lexi-surface-overlay: #eaefe8; /* sidebar + soft fills */
 
   /* Text */
-  --lexi-text: #0f172a;
-  --lexi-text-muted: #475569;
-  --lexi-text-faint: #94a3b8;
+  --lexi-text: #2e3b2f;
+  --lexi-text-muted: #5a6e5c;
+  --lexi-text-faint: #8fa48f;
 
   /* Borders */
-  --lexi-border: #e2e8f0;
-  --lexi-border-subtle: #f1f5f9;
+  --lexi-border: #e4eae1;
+  --lexi-border-subtle: #dce4d9;
+
+  /* Sidebar + navigation */
+  --lexi-sidebar-bg: #eaefe8;
+  --lexi-sidebar-border: #dce4d9;
+  --lexi-nav-active-bg: #ddeadc;
+  --lexi-nav-hover-bg: #d4e2d4;
+  --lexi-tooltip-bg: #1f2a20;
+  --lexi-tooltip-fg: #f5f7f4;
 
   /* Semantic */
-  --lexi-success: #0d9488;
-  --lexi-success-hover: #0f766e;
+  --lexi-success: #6b8f6e;
+  --lexi-success-hover: #587a5b;
   --lexi-danger: #dc2626;
   --lexi-danger-muted: #fef2f2;
 
-  /* Shadows (optional – for cards, dropdowns) */
-  --lexi-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --lexi-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  /* Shadows (soft, airy like the reference) */
+  --lexi-shadow-sm: 0 1px 2px rgba(46, 59, 47, 0.06);
+  --lexi-shadow-md: 0 10px 30px rgba(46, 59, 47, 0.08), 0 2px 6px rgba(46, 59, 47, 0.06);
+  --lexi-shadow-lg: 0 10px 30px rgba(46, 59, 47, 0.12), 0 4px 12px rgba(46, 59, 47, 0.08);
 }
 
 * {
@@ -51,11 +89,45 @@
   box-sizing: border-box;
 }
 
+/* ==========================
+   Screen Skeleton (loading)
+   ========================== */
+.skeleton-screen {
+  width: 100%;
+  padding: 0;
+}
+
+.skeleton-block {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 225, 0.55) 0%,
+    rgba(212, 226, 212, 0.95) 35%,
+    rgba(226, 232, 225, 0.55) 70%
+  );
+  background-size: 300% 100%;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+  box-shadow: inset 0 0 0 1px rgba(228, 234, 225, 0.35);
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 110% 0;
+  }
+  100% {
+    background-position: -10% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+  }
+}
+
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
-    sans-serif;
-  background: var(--lexi-surface-elevated);
+  font-family: var(--lexi-font-body);
+  background: var(--lexi-surface);
   color: var(--lexi-text);
   height: 100vh;
   overflow: hidden;
@@ -158,26 +230,21 @@ body {
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 32px;
-  font-family:
-    "SF Pro Display",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--lexi-font-display);
   color: var(--lexi-text);
 }
 
 .sidebar {
   width: 200px;
-  background: var(--lexi-surface-elevated);
-  border-right: 1px solid var(--lexi-border-subtle);
+  background: var(--lexi-sidebar-bg);
+  border-right: 1px solid var(--lexi-sidebar-border);
   display: flex;
   flex-direction: column;
   height: 100%;
   padding: 16px 0;
   flex-shrink: 0;
   border-radius: 12px;
-  box-shadow: var(--lexi-shadow-md);
+  box-shadow: var(--lexi-shadow-lg);
 }
 
 .sidebar-nav {
@@ -195,12 +262,12 @@ body {
   gap: 10px;
   margin: 8px 8px 8px 8px;
   padding: 10px 14px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--lexi-sidebar-border);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #111827;
+  color: var(--lexi-text);
   font-size: 13px;
   font-weight: 500;
   text-align: left;
@@ -208,14 +275,14 @@ body {
 }
 
 .sidebar-update-banner:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.75);
+  border-color: var(--lexi-border);
+  box-shadow: 0 6px 18px rgba(46, 59, 47, 0.08);
 }
 
 .sidebar-update-banner svg {
   flex-shrink: 0;
-  color: #111827;
+  color: var(--lexi-primary-hover);
   animation: sidebar-update-bounce 2s infinite;
 }
 
@@ -243,8 +310,8 @@ body {
   bottom: calc(100% + 12px);
   left: 0;
   width: 240px;
-  background: #111827;
-  color: #f9fafb;
+  background: var(--lexi-tooltip-bg);
+  color: var(--lexi-tooltip-fg);
   padding: 12px 14px;
   border-radius: 8px;
   font-size: 12px;
@@ -273,7 +340,7 @@ body {
   left: 20px;
   width: 8px;
   height: 8px;
-  background: #111827;
+  background: var(--lexi-tooltip-bg);
   transform: rotate(45deg);
 }
 
@@ -293,7 +360,7 @@ body {
 .sidebar-update-banner__title {
   font-weight: 600;
   font-size: 13px;
-  color: #111827;
+  color: var(--lexi-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -301,7 +368,7 @@ body {
 
 .sidebar-update-banner__size {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--lexi-text-faint);
 }
 
 .sidebar-version {
@@ -330,14 +397,14 @@ body {
 }
 
 .sidebar-item:hover {
-  background: var(--lexi-primary-muted);
-  color: var(--lexi-primary-hover);
+  background: var(--lexi-nav-hover-bg);
+  color: var(--lexi-text);
 }
 
 .sidebar-item.active {
-  background: var(--lexi-primary);
-  color: var(--lexi-primary-foreground);
-  border: none;
+  background: var(--lexi-nav-active-bg);
+  color: var(--lexi-text);
+  border: 1px solid var(--lexi-sidebar-border);
 }
 
 .sidebar-item svg {
@@ -405,9 +472,7 @@ body::before {
   padding: 2rem 2.5rem;
   background: var(--lexi-surface-elevated);
   min-height: 100vh;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
-    sans-serif;
+  font-family: var(--lexi-font-body);
 }
 
 .page__title {
@@ -1193,9 +1258,7 @@ textarea.form-input {
   margin-left: 8px;
   font-size: 12px;
   opacity: 0.8;
-  font-family:
-    "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New",
-    monospace;
+  font-family: var(--lexi-font-mono);
 }
 
 .status.recording {
@@ -1485,9 +1548,7 @@ textarea.form-input {
   background: var(--lexi-surface-overlay);
   padding: 4px 8px;
   border-radius: 6px;
-  font-family:
-    "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New",
-    monospace;
+  font-family: var(--lexi-font-mono);
   font-size: 11px;
   border: 1px solid var(--lexi-border);
   color: var(--lexi-text);
@@ -1643,9 +1704,7 @@ textarea.form-input {
   padding: 2rem 2.5rem;
   background: var(--lexi-surface-elevated);
   min-height: 100vh;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
-    sans-serif;
+  font-family: var(--lexi-font-body);
 }
 
 .transcripts-page-title {
