@@ -22,7 +22,7 @@ import { useAuthStore } from "../store/authStore";
 import { useUpdaterStore } from "../store/updaterStore";
 import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 
 type DefaultHotkeysResponse = {
   hotkeys: string[];
@@ -468,7 +468,7 @@ export const SettingsPage: React.FC = () => {
     return (
       <div className="page">
         <h2 className="page__title">Settings</h2>
-        <PageLoader className="page__empty" />
+        <ScreenSkeleton variant="settings" className="page__empty" />
       </div>
     );
   }
