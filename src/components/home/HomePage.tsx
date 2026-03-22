@@ -18,7 +18,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 import type { Transcript, HotkeyConfig } from "../../types";
-import { PageLoader } from "../ui/PageLoader";
+import { ScreenSkeleton } from "../ui/ScreenSkeleton";
 import "./home.css";
 
 // Analytics interfaces
@@ -260,7 +260,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
             </p>
           </div>
         </header>
-        <PageLoader className="home-loading-full" />
+        <ScreenSkeleton variant="home" className="home-loading-full" />
       </div>
     );
   }
