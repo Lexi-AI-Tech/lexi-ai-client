@@ -406,11 +406,7 @@ function App() {
     <div className="app">
       <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
       <div className="main-content">
-        {currentPage === "home" && (
-          <HomePage
-            onViewAllTranscripts={() => setCurrentPage("transcripts")}
-          />
-        )}
+        {currentPage === "home" && <HomePage />}
         {currentPage === "transcripts" && (
           <div className="container container--transcripts">
             <TranscriptsList />
