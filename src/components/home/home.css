@@ -243,6 +243,11 @@
   box-shadow: var(--lexi-shadow-sm);
 }
 
+/* Plan usage card height follows content; analytics may be taller in the same row */
+.billing-usage-section {
+  align-self: start;
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
