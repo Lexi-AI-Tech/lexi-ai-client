@@ -275,10 +275,7 @@ function App() {
     };
 
     setup().catch((e) => {
-      console.error(
-        "Failed to set up meeting-recording-started listener:",
-        e,
-      );
+      console.error("Failed to set up meeting-recording-started listener:", e);
     });
 
     return () => {
@@ -340,7 +337,9 @@ function App() {
   };
 
   // Navigate to docs page, optionally opening a specific doc (e.g. after creating from meeting)
-  const [selectedDocIdToOpen, setSelectedDocIdToOpen] = useState<string | null>(null);
+  const [selectedDocIdToOpen, setSelectedDocIdToOpen] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     const handleNavigateToDocs = () => {
@@ -406,11 +405,7 @@ function App() {
     <div className="app">
       <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
       <div className="main-content">
-        {currentPage === "home" && (
-          <HomePage
-            onViewAllTranscripts={() => setCurrentPage("transcripts")}
-          />
-        )}
+        {currentPage === "home" && <HomePage />}
         {currentPage === "transcripts" && (
           <div className="container container--transcripts">
             <TranscriptsList />

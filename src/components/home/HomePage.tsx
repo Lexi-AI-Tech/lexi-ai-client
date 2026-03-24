@@ -2,7 +2,7 @@
  * HomePage Component
  *
  * The main dashboard displaying greeting, usage tips, stats,
- * past transcriptions, and analytics.
+ * plan usage, and analytics.
  */
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import type { Transcript, HotkeyConfig } from "../../types";
+import type { HotkeyConfig } from "../../types";
 import { PageLoader } from "../ui/PageLoader";
 import "./home.css";
 
@@ -36,8 +36,95 @@ interface ChartData {
 
 type AnalyticsPeriod = "1d" | "7d" | "30d";
 
-interface HomePageProps {
-  onViewAllTranscripts?: () => void;
+interface FeatureUsageEntry {
+  feature_key: string;
+  enabled: boolean;
+  used: number;
+  limit_value: number | null;
+  limit_reset: string | null;
+  metered: boolean;
+}
+
+interface BillingUsageResponse {
+  plan_type: string;
+  period_start: string;
+  period_end: string;
+  limit_reset: string;
+  features: FeatureUsageEntry[];
+}
+
+const FEATURE_LABELS: Record<string, string> = {
+  "assistant.speech_to_text": "Assistant",
+  "meetings.create": "Meeting",
+  "actions.perform": "Actions",
+};
+
+/** Display order for plan usage rows (unknown keys sort after, by key). */
+const PLAN_USAGE_FEATURE_ORDER = [
+  "assistant.speech_to_text",
+  "meetings.create",
+  "actions.perform",
+] as const;
+
+function featureLabel(key: string): string {
+  return FEATURE_LABELS[key] ?? key;
+}
+
+function isProPlan(planType: string): boolean {
+  return planType.trim().toLowerCase() === "pro";
+}
+
+function sortPlanUsageFeatures<T extends { feature_key: string }>(
+  features: T[],
+): T[] {
+  const orderMap = new Map<string, number>(
+    PLAN_USAGE_FEATURE_ORDER.map((k, i) => [k, i]),
+  );
+  return [...features].sort((a, b) => {
+    const ia = orderMap.get(a.feature_key);
+    const ib = orderMap.get(b.feature_key);
+    if (ia !== undefined && ib !== undefined) return ia - ib;
+    if (ia !== undefined) return -1;
+    if (ib !== undefined) return 1;
+    return a.feature_key.localeCompare(b.feature_key);
+  });
+}
+
+/** Time until ``periodEnd``; labels like "Resets in 05d 04h 12m 03s". */
+function formatResetsInCountdown(periodEndMs: number, nowMs: number): string {
+  const ms = periodEndMs - nowMs;
+  if (Number.isNaN(ms) || periodEndMs <= 0) {
+    return "Resets soon";
+  }
+  if (ms <= 0) {
+    return "Resets soon";
+  }
+  const totalSec = Math.floor(ms / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const dPart = days < 100 ? p2(days) : String(days);
+  return `Resets in ${dPart}d ${p2(h)}h ${p2(m)}m ${p2(s)}s`;
+}
+
+function BillingResetCountdown({ periodEndIso }: { periodEndIso: string }) {
+  const endMs = useMemo(() => new Date(periodEndIso).getTime(), [periodEndIso]);
+  const [label, setLabel] = useState(() =>
+    formatResetsInCountdown(endMs, Date.now()),
+  );
+
+  useEffect(() => {
+    const tick = () => {
+      setLabel(formatResetsInCountdown(endMs, Date.now()));
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [endMs]);
+
+  return <span className="billing-period">{label}</span>;
 }
 
 // Animation variants
@@ -118,15 +205,17 @@ const PeriodButton: React.FC<PeriodButtonProps> = ({
   active,
   onClick,
 }) => (
-  <button className={`period-btn ${active ? "active" : ""}`} onClick={onClick}>
+  <button
+    type="button"
+    className={`period-btn ${active ? "active" : ""}`}
+    onClick={onClick}
+  >
     {label}
   </button>
 );
 
-export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
+export const HomePage: React.FC = () => {
   const { user, isAuthenticated, tokens } = useAuthStore();
-  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
-  const [loading, setLoading] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
   const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(
@@ -134,23 +223,18 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
   );
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(
+    null,
+  );
 
-  const fetchTranscripts = useCallback(async () => {
+  const fetchBillingUsage = useCallback(async () => {
     if (!isAuthenticated || !tokens?.access_token) return;
-    setLoading(true);
     try {
-      const response = await invoke<{
-        transcripts: Transcript[];
-        total: number;
-        page: number;
-        page_size: number;
-        total_pages: number;
-      }>("get_transcripts", { page: 1, pageSize: 5 });
-      setTranscripts(response.transcripts);
+      const data = await invoke<BillingUsageResponse>("get_billing_usage");
+      setBillingUsage(data);
     } catch (err) {
-      console.error("Failed to fetch transcripts:", err);
-    } finally {
-      setLoading(false);
+      console.error("Failed to fetch billing usage:", err);
+      setBillingUsage(null);
     }
   }, [isAuthenticated, tokens?.access_token]);
 
@@ -159,7 +243,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
     try {
       const data = await invoke<AnalyticsStats>("get_analytics_stats");
       setStats(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch analytics stats:", error);
     }
   }, [isAuthenticated, tokens?.access_token]);
@@ -168,9 +252,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
     async (period: AnalyticsPeriod) => {
       if (!isAuthenticated || !tokens?.access_token) return;
       try {
-        const data = await invoke<ChartData>("get_analytics_chart", { period });
+        const data = await invoke<ChartData>("get_analytics_chart", {
+          period,
+        });
         setChartData(data);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(
           `Failed to fetch analytics chart for period ${period}:`,
           error,
@@ -189,8 +275,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
     let cancelled = false;
     (async () => {
       try {
-        await Promise.all([fetchTranscripts(), fetchStats(), fetchChart("7d")]);
-      } catch (_) {}
+        await Promise.all([
+          fetchBillingUsage(),
+          fetchStats(),
+          fetchChart("7d"),
+        ]);
+      } catch {
+        /* individual handlers log */
+      }
       if (!cancelled) setInitialLoadDone(true);
     })();
     return () => {
@@ -199,7 +291,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
   }, [
     isAuthenticated,
     tokens?.access_token,
-    fetchTranscripts,
+    fetchBillingUsage,
     fetchStats,
     fetchChart,
   ]);
@@ -335,68 +427,90 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
       </motion.section>
 
       <div className="home-grid">
-        {/* Past Transcriptions Section */}
         <motion.section
-          className="transcriptions-section"
+          className="billing-usage-section"
           variants={itemVariants}
         >
           <div className="section-header">
-            <h2 className="section-title">Recent Transcriptions</h2>
-            <button
-              type="button"
-              className="view-all-btn"
-              onClick={onViewAllTranscripts}
-            >
-              View all
-            </button>
+            <div>
+              <h2 className="section-title">Plan usage</h2>
+              {billingUsage && (
+                <p className="billing-usage-meta">
+                  <span className="billing-plan-badge">
+                    {billingUsage.plan_type}
+                  </span>
+                  {!isProPlan(billingUsage.plan_type) && (
+                    <BillingResetCountdown
+                      periodEndIso={billingUsage.period_end}
+                    />
+                  )}
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="transcriptions-list">
-            {loading ? (
-              <PageLoader />
-            ) : transcripts.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">
-                  <FileText size={32} />
-                </div>
-                <p className="empty-title">No transcriptions yet</p>
-                <p className="empty-sub">
-                  {transcriptionHotkeys.length > 0
-                    ? `Hold ${transcriptionHotkeys.join(" or ")} and speak to create your first transcription`
-                    : "Use your shortcut to create your first transcription"}
-                </p>
-              </div>
-            ) : (
-              transcripts.map((transcript) => (
-                <motion.div
-                  key={transcript.id}
-                  className="transcript-card"
-                  whileHover={{ scale: 1.01 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="transcript-card-header"></div>
-                  <p className="transcript-preview">
-                    {transcript.original_text
-                      ? transcript.original_text.length > 120
-                        ? `${transcript.original_text.slice(0, 120)}...`
-                        : transcript.original_text
-                      : "Processing..."}
-                  </p>
-                  <div className="transcript-meta">
-                    <span>
-                      {transcript.original_text_word_count || 0} words
-                    </span>
-                    {transcript.focused_app && (
-                      <span>• {transcript.focused_app}</span>
-                    )}
-                  </div>
-                </motion.div>
-              ))
-            )}
-          </div>
+          {!billingUsage ? (
+            <p className="billing-usage-empty">
+              Could not load usage. Check your connection and try again.
+            </p>
+          ) : (
+            <ul className="billing-feature-list">
+              {sortPlanUsageFeatures(billingUsage.features).map((f) => {
+                const pro = isProPlan(billingUsage.plan_type);
+                return (
+                  <li key={f.feature_key} className="billing-feature-row">
+                    <div className="billing-feature-info">
+                      <span className="billing-feature-name">
+                        {featureLabel(f.feature_key)}
+                      </span>
+                      {!f.enabled && (
+                        <span className="billing-feature-disabled">
+                          Not on plan
+                        </span>
+                      )}
+                    </div>
+                    <div className="billing-feature-usage">
+                      {pro ? (
+                        <div
+                          className="billing-usage-numbers billing-usage-numbers--infinity"
+                          aria-label={`${f.used} out of unlimited`}
+                        >
+                          {f.used} /{" "}
+                          <span className="billing-infinity" title="Unlimited">
+                            ∞
+                          </span>
+                        </div>
+                      ) : f.metered && f.limit_value != null ? (
+                        <>
+                          <div className="billing-usage-numbers">
+                            {f.used} / {f.limit_value}
+                          </div>
+                          <div className="billing-usage-bar">
+                            <div
+                              className="billing-usage-bar-fill"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  (f.used / Math.max(f.limit_value, 1)) * 100,
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <span className="billing-usage-unlimited">
+                          {f.used > 0 ? `${f.used} used` : "—"}
+                          {!f.metered && " · Unlimited"}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </motion.section>
 
-        {/* Analytics Section */}
         <motion.section className="analytics-section" variants={itemVariants}>
           <div className="section-header">
             <h2 className="section-title">Analytics</h2>

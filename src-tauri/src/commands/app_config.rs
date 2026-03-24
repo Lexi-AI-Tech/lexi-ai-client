@@ -326,9 +326,8 @@ fn update_hotkey_state(app: &AppHandle, config: &AppConfig) {
 
     // Keep shortcuts command cache hot so transcription pipeline does not need
     // to fetch app config on every recording.
-    let commands_map = crate::shortcuts::build_commands_map(
-        config.shortcuts.as_deref().unwrap_or(&[]),
-    );
+    let commands_map =
+        crate::shortcuts::build_commands_map(config.shortcuts.as_deref().unwrap_or(&[]));
     crate::shortcuts::set_cached_commands(app, commands_map);
 }
 

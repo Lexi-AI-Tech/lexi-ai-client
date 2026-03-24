@@ -10,12 +10,20 @@ const PREVIEW_MAX_LENGTH = 140;
 function docContentToPlainText(contentJson: string | undefined): string {
   if (!contentJson?.trim()) return "";
   try {
-    const doc = JSON.parse(contentJson) as { text?: string; content?: unknown[] };
+    const doc = JSON.parse(contentJson) as {
+      text?: string;
+      content?: unknown[];
+    };
     const parts: string[] = [];
-    function visit(n: { text?: string; content?: unknown[] } | undefined): void {
+    function visit(
+      n: { text?: string; content?: unknown[] } | undefined,
+    ): void {
       if (!n) return;
       if (typeof n.text === "string") parts.push(n.text);
-      if (Array.isArray(n.content)) n.content.forEach((c) => visit(c as { text?: string; content?: unknown[] }));
+      if (Array.isArray(n.content))
+        n.content.forEach((c) =>
+          visit(c as { text?: string; content?: unknown[] }),
+        );
     }
     visit(doc);
     const raw = parts.join(" ").replace(/\s+/g, " ").trim();
@@ -150,57 +158,57 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
               {docs.map((doc) => {
                 const previewText = docContentToPlainText(doc.content);
                 return (
-                <motion.div
-                  key={doc.id}
-                  className="docs-list-page__card"
-                  variants={CARD_VARIANTS}
-                  onClick={() => onSelectDoc(doc.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelectDoc(doc.id);
-                    }
-                  }}
-                >
-                  <div className="docs-list-page__card-body">
-                    <div className="docs-list-page__card-meta-row">
-                      {formatDateShort(doc.updated_at) && (
-                        <span className="docs-list-page__card-date">
-                          {formatDateShort(doc.updated_at)}
-                        </span>
-                      )}
+                  <motion.div
+                    key={doc.id}
+                    className="docs-list-page__card"
+                    variants={CARD_VARIANTS}
+                    onClick={() => onSelectDoc(doc.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelectDoc(doc.id);
+                      }
+                    }}
+                  >
+                    <div className="docs-list-page__card-body">
+                      <div className="docs-list-page__card-meta-row">
+                        {formatDateShort(doc.updated_at) && (
+                          <span className="docs-list-page__card-date">
+                            {formatDateShort(doc.updated_at)}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="docs-list-page__card-title">
+                        {doc.title || "Untitled"}
+                      </h3>
+                      {previewText ? (
+                        <p className="docs-list-page__card-summary">
+                          {previewText}
+                        </p>
+                      ) : null}
                     </div>
-                    <h3 className="docs-list-page__card-title">
-                      {doc.title || "Untitled"}
-                    </h3>
-                    {previewText ? (
-                      <p className="docs-list-page__card-summary">
-                        {previewText}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="docs-list-page__card-actions">
-                    <span className="docs-list-page__card-link">
-                      Open
-                      <ChevronRight
-                        size={16}
-                        strokeWidth={2.5}
-                        className="docs-list-page__card-link-arrow"
-                      />
-                    </span>
-                    <button
-                      type="button"
-                      className="docs-list-page__card-delete"
-                      onClick={(e) => openDeleteConfirm(e, doc.id)}
-                      disabled={!!deletingId}
-                      title="Delete doc"
-                    >
-                      <Trash2 size={16} strokeWidth={1.5} />
-                    </button>
-                  </div>
-                </motion.div>
+                    <div className="docs-list-page__card-actions">
+                      <span className="docs-list-page__card-link">
+                        Open
+                        <ChevronRight
+                          size={16}
+                          strokeWidth={2.5}
+                          className="docs-list-page__card-link-arrow"
+                        />
+                      </span>
+                      <button
+                        type="button"
+                        className="docs-list-page__card-delete"
+                        onClick={(e) => openDeleteConfirm(e, doc.id)}
+                        disabled={!!deletingId}
+                        title="Delete doc"
+                      >
+                        <Trash2 size={16} strokeWidth={1.5} />
+                      </button>
+                    </div>
+                  </motion.div>
                 );
               })}
             </motion.div>

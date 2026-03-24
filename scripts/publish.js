@@ -18,25 +18,25 @@ const APPLE_PASSWORD = process.env.APPLE_PASSWORD;
 const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID;
 
 if (
-    !API_KEY ||
-    !TAURI_SIGNING_PRIVATE_KEY ||
-    !APPLE_ID ||
-    !APPLE_PASSWORD ||
-    !APPLE_TEAM_ID
+  !API_KEY ||
+  !TAURI_SIGNING_PRIVATE_KEY ||
+  !APPLE_ID ||
+  !APPLE_PASSWORD ||
+  !APPLE_TEAM_ID
 ) {
-    console.error("❌ Error: Missing required environment variables in .env");
-    console.error(
-        "Ensure APP_RELEASES_API_KEY, TAURI_SIGNING_PRIVATE_KEY, APPLE_ID, APPLE_PASSWORD, and APPLE_TEAM_ID are set.",
-    );
-    process.exit(1);
+  console.error("❌ Error: Missing required environment variables in .env");
+  console.error(
+    "Ensure APP_RELEASES_API_KEY, TAURI_SIGNING_PRIVATE_KEY, APPLE_ID, APPLE_PASSWORD, and APPLE_TEAM_ID are set.",
+  );
+  process.exit(1);
 }
 
 // 1. Get Version & Validate
 const packageJson = JSON.parse(
-    fs.readFileSync(path.join(CLIENT_DIR, "package.json"), "utf-8"),
+  fs.readFileSync(path.join(CLIENT_DIR, "package.json"), "utf-8"),
 );
 const tauriConf = JSON.parse(
-    fs.readFileSync(path.join(TAURI_DIR, "tauri.conf.json"), "utf-8"),
+  fs.readFileSync(path.join(TAURI_DIR, "tauri.conf.json"), "utf-8"),
 );
 const cargoToml = fs.readFileSync(path.join(TAURI_DIR, "Cargo.toml"), "utf-8");
 
@@ -48,16 +48,16 @@ const cargoMatch = cargoToml.match(/^version\s*=\s*"([^"]+)"/m);
 const cargoVersion = cargoMatch ? cargoMatch[1] : null;
 
 if (version !== tauriVersion || version !== cargoVersion) {
-    console.error("❌ Version mismatch detected!");
-    console.error(`   package.json version:    ${version}`);
-    console.error(`   tauri.conf.json version: ${tauriVersion}`);
-    console.error(`   Cargo.toml version:      ${cargoVersion || "Not found"}`);
-    console.error("");
-    console.error(
-        "All three files must have the same version before publishing.",
-    );
-    console.error("Please update them to match and try again.");
-    process.exit(1);
+  console.error("❌ Version mismatch detected!");
+  console.error(`   package.json version:    ${version}`);
+  console.error(`   tauri.conf.json version: ${tauriVersion}`);
+  console.error(`   Cargo.toml version:      ${cargoVersion || "Not found"}`);
+  console.error("");
+  console.error(
+    "All three files must have the same version before publishing.",
+  );
+  console.error("Please update them to match and try again.");
+  process.exit(1);
 }
 
 console.log(`📦 Preparing release for version: ${version}`);
@@ -69,24 +69,24 @@ const buildEnv = { ...process.env };
 buildEnv.TAURI_SIGNING_PRIVATE_KEY = TAURI_SIGNING_PRIVATE_KEY;
 buildEnv.CI = "true";
 buildEnv.TAURI_SIGNING_PRIVATE_KEY_PASSWORD =
-    process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD;
+  process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD;
 
 try {
-    const buildCmd = `APPLE_ID="${APPLE_ID}" APPLE_PASSWORD="${APPLE_PASSWORD}" APPLE_TEAM_ID="${APPLE_TEAM_ID}" npm run tauri build -- --target aarch64-apple-darwin --bundles app,updater`;
-    execSync(buildCmd, {
-        cwd: CLIENT_DIR,
-        stdio: "inherit", // Outputs build logs to console
-        env: buildEnv,
-    });
+  const buildCmd = `APPLE_ID="${APPLE_ID}" APPLE_PASSWORD="${APPLE_PASSWORD}" APPLE_TEAM_ID="${APPLE_TEAM_ID}" npm run tauri build -- --target aarch64-apple-darwin --bundles app,updater`;
+  execSync(buildCmd, {
+    cwd: CLIENT_DIR,
+    stdio: "inherit", // Outputs build logs to console
+    env: buildEnv,
+  });
 } catch (error) {
-    console.error("❌ Tauri build failed.");
-    process.exit(1);
+  console.error("❌ Tauri build failed.");
+  process.exit(1);
 }
 
 // 3. Locate Artifacts
 const bundleDir = path.join(
-    TAURI_DIR,
-    "target/aarch64-apple-darwin/release/bundle",
+  TAURI_DIR,
+  "target/aarch64-apple-darwin/release/bundle",
 );
 const macosDir = path.join(bundleDir, "macos");
 const dmgDir = path.join(bundleDir, "dmg");
@@ -102,15 +102,15 @@ const dmgFilename = "LexiAI-Installer.dmg";
 const dmgPath = path.join(dmgDir, dmgFilename);
 
 if (
-    !fs.existsSync(tarGzPath) ||
-    !fs.existsSync(sigPath) ||
-    !fs.existsSync(dmgOriginalPath)
+  !fs.existsSync(tarGzPath) ||
+  !fs.existsSync(sigPath) ||
+  !fs.existsSync(dmgOriginalPath)
 ) {
-    console.error(`❌ Cannot find build artifacts.`);
-    console.error(`Expected: ${tarGzPath}`);
-    console.error(`Expected: ${sigPath}`);
-    console.error(`Expected: ${dmgOriginalPath}`);
-    process.exit(1);
+  console.error(`❌ Cannot find build artifacts.`);
+  console.error(`Expected: ${tarGzPath}`);
+  console.error(`Expected: ${sigPath}`);
+  console.error(`Expected: ${dmgOriginalPath}`);
+  process.exit(1);
 }
 
 // Rename DMG to a clean distributable name
@@ -128,14 +128,14 @@ console.log(`🌐 Uploading bundle to Lexi AI Server: ${API_URL}`);
 let notes = "";
 const changelogPath = path.join(CLIENT_DIR, "changelog", `${version}.md`);
 if (fs.existsSync(changelogPath)) {
-    notes = fs.readFileSync(changelogPath, "utf-8").trim();
-    console.log(`📝 Found changelog for version ${version}.`);
+  notes = fs.readFileSync(changelogPath, "utf-8").trim();
+  console.log(`📝 Found changelog for version ${version}.`);
 } else {
-    console.error(
-        `❌ Error: No changelog found for version ${version} at changelog/${version}.md`,
-    );
-    console.error("Please create a changelog file before publishing a release.");
-    process.exit(1);
+  console.error(
+    `❌ Error: No changelog found for version ${version} at changelog/${version}.md`,
+  );
+  console.error("Please create a changelog file before publishing a release.");
+  process.exit(1);
 }
 
 const formData = new FormData();
@@ -146,41 +146,41 @@ formData.append("updater_signature", signatureText);
 
 const tarGzBuffer = fs.readFileSync(tarGzPath);
 formData.append(
-    "updater_file",
-    new Blob([tarGzBuffer], { type: "application/gzip" }),
-    tarGzFilename,
+  "updater_file",
+  new Blob([tarGzBuffer], { type: "application/gzip" }),
+  tarGzFilename,
 );
 
 const dmgBuffer = fs.readFileSync(dmgPath);
 formData.append(
-    "installer_file",
-    new Blob([dmgBuffer], { type: "application/octet-stream" }),
-    dmgFilename,
+  "installer_file",
+  new Blob([dmgBuffer], { type: "application/octet-stream" }),
+  dmgFilename,
 );
 
 // 6. Push to Server
 async function uploadRelease() {
-    try {
-        const response = await fetch(API_URL, {
-            method: "POST",
-            headers: {
-                "X-API-Key": API_KEY,
-            },
-            body: formData,
-        });
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "X-API-Key": API_KEY,
+      },
+      body: formData,
+    });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server returned ${response.status}: ${errorText}`);
-        }
-
-        const data = await response.json();
-        console.log("🎉 Successfully published release!");
-        console.log(JSON.stringify(data, null, 2));
-    } catch (error) {
-        console.error("❌ Failed to upload release:", error.message);
-        process.exit(1);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Server returned ${response.status}: ${errorText}`);
     }
+
+    const data = await response.json();
+    console.log("🎉 Successfully published release!");
+    console.log(JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error("❌ Failed to upload release:", error.message);
+    process.exit(1);
+  }
 }
 
 uploadRelease();

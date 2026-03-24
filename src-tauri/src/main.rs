@@ -101,6 +101,7 @@ use commands::auth::{
     get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
     store_auth_data,
 };
+use commands::billing::get_billing_usage;
 use commands::docs::{
     create_doc, delete_doc, get_doc, get_docs, rewrite_doc_section, start_doc_recording,
     stop_doc_recording, structure_doc_content, update_doc,
@@ -278,6 +279,7 @@ pub fn main() {
             delete_transcript,
             get_analytics_stats,
             get_analytics_chart,
+            get_billing_usage,
             get_action_history,
             delete_action_history,
             get_shortcuts,
