@@ -370,6 +370,16 @@
   margin-bottom: 0.25rem;
 }
 
+.billing-usage-numbers--infinity {
+  margin-bottom: 0;
+}
+
+.billing-infinity {
+  font-size: 1.05em;
+  font-family: "Times New Roman", Times, "Liberation Serif", serif;
+  line-height: 1;
+}
+
 .billing-usage-bar {
   height: 0.375rem;
   border-radius: 0.1875rem;

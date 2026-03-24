@@ -70,6 +70,10 @@ function featureLabel(key: string): string {
   return FEATURE_LABELS[key] ?? key;
 }
 
+function isProPlan(planType: string): boolean {
+  return planType.trim().toLowerCase() === "pro";
+}
+
 function sortPlanUsageFeatures<T extends { feature_key: string }>(
   features: T[],
 ): T[] {
@@ -435,9 +439,11 @@ export const HomePage: React.FC = () => {
                   <span className="billing-plan-badge">
                     {billingUsage.plan_type}
                   </span>
-                  <BillingResetCountdown
-                    periodEndIso={billingUsage.period_end}
-                  />
+                  {!isProPlan(billingUsage.plan_type) && (
+                    <BillingResetCountdown
+                      periodEndIso={billingUsage.period_end}
+                    />
+                  )}
                 </p>
               )}
             </div>
@@ -449,7 +455,9 @@ export const HomePage: React.FC = () => {
             </p>
           ) : (
             <ul className="billing-feature-list">
-              {sortPlanUsageFeatures(billingUsage.features).map((f) => (
+              {sortPlanUsageFeatures(billingUsage.features).map((f) => {
+                const pro = isProPlan(billingUsage.plan_type);
+                return (
                 <li key={f.feature_key} className="billing-feature-row">
                   <div className="billing-feature-info">
                     <span className="billing-feature-name">
@@ -462,7 +470,17 @@ export const HomePage: React.FC = () => {
                     )}
                   </div>
                   <div className="billing-feature-usage">
-                    {f.metered && f.limit_value != null ? (
+                    {pro ? (
+                      <div
+                        className="billing-usage-numbers billing-usage-numbers--infinity"
+                        aria-label={`${f.used} out of unlimited`}
+                      >
+                        {f.used} /{" "}
+                        <span className="billing-infinity" title="Unlimited">
+                          ∞
+                        </span>
+                      </div>
+                    ) : f.metered && f.limit_value != null ? (
                       <>
                         <div className="billing-usage-numbers">
                           {f.used} / {f.limit_value}
@@ -487,7 +505,8 @@ export const HomePage: React.FC = () => {
                     )}
                   </div>
                 </li>
-              ))}
+              );
+              })}
             </ul>
           )}
         </motion.section>
