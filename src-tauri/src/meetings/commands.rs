@@ -489,9 +489,12 @@ pub async fn stream_meeting_summary(
     utils::log_api_request("Stream meeting summary", "POST", &url);
 
     let client = crate::utils::create_http_client_long_timeout();
+    // Explicit empty body so proxies (e.g. nginx) receive Content-Length: 0. POST with no body
+    // often omits Content-Length and triggers HTTP 411 Length Required.
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
+        .body("")
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
