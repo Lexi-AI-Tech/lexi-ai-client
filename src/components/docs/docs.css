@@ -3,14 +3,24 @@
 .docs-page {
   padding: 2rem 2.5rem;
   background:
-    radial-gradient(ellipse 120% 80% at 50% -20%, rgba(0, 0, 0, 0.03) 0%, transparent 55%),
-    radial-gradient(ellipse 80% 50% at 100% 0%, rgba(0, 0, 0, 0.02) 0%, transparent 45%),
+    radial-gradient(
+      ellipse 120% 80% at 50% -20%,
+      rgba(0, 0, 0, 0.03) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 80% 50% at 100% 0%,
+      rgba(0, 0, 0, 0.02) 0%,
+      transparent 45%
+    ),
     linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
+    sans-serif;
 }
 
 .docs-page__header {
@@ -59,7 +69,9 @@
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: color 0.2s ease, background 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
   flex-shrink: 0;
 }
 
@@ -112,7 +124,9 @@
   background: #f3f4f6;
   color: #374151;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .docs-page-header__mic:hover:not(:disabled) {
@@ -146,7 +160,9 @@
   background: transparent;
   color: var(--lexi-text-faint);
   cursor: pointer;
-  transition: color 0.2s ease, background 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
 }
 
 .docs-page-header__delete:hover:not(:disabled) {
@@ -241,7 +257,9 @@
   background: #f3f4f6;
   color: #374151;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .docs-mic-btn:hover:not(:disabled) {
@@ -309,7 +327,9 @@
   color: #374151;
   font-size: 14px;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .docs-list__btn:hover {
@@ -371,7 +391,11 @@
   display: flex;
   flex-direction: column;
   padding: 14px 16px 16px;
-  background: radial-gradient(circle at top, rgba(15, 23, 42, 0.06), transparent 65%);
+  background: radial-gradient(
+    circle at top,
+    rgba(15, 23, 42, 0.06),
+    transparent 65%
+  );
 }
 
 @media (max-width: 1100px) {
@@ -436,7 +460,10 @@
   font-weight: 500;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .docs-ask-lexi-rail__chip:hover:not(:disabled) {
@@ -595,7 +622,11 @@
 
 .docs-editor-pane__toolbar--premium {
   flex-shrink: 0;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(249, 250, 251, 0.98));
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.95),
+    rgba(249, 250, 251, 0.98)
+  );
 }
 
 .docs-editor-toolbar-title {
@@ -667,7 +698,9 @@
   background: transparent;
   color: var(--lexi-text-muted);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .docs-editor-toolbar button:hover {

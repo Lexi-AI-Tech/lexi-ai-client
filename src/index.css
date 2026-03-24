@@ -42,7 +42,8 @@
 
   /* Shadows (optional – for cards, dropdowns) */
   --lexi-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --lexi-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --lexi-shadow-md:
+    0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
 }
 
 * {
@@ -632,7 +633,11 @@ textarea.form-input {
 }
 
 .toggle-switch.on {
-  background: linear-gradient(135deg, var(--lexi-success) 0%, var(--lexi-success-hover) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--lexi-success) 0%,
+    var(--lexi-success-hover) 100%
+  );
   box-shadow:
     0 2px 8px rgba(13, 148, 136, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -1816,7 +1821,7 @@ textarea.form-input {
 .transcripts-list {
   display: flex;
   flex-direction: column;
-  flex: 1;  
+  flex: 1;
   height: calc(100vh - 160px);
   overflow-y: auto;
   border: 1px solid var(--lexi-surface-overlay);

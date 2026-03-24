@@ -60,8 +60,13 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
         true,
         None::<&str>,
     )?;
-    let check_updates_item =
-        MenuItem::with_id(app, "check_updates", "Check for Updates", true, None::<&str>)?;
+    let check_updates_item = MenuItem::with_id(
+        app,
+        "check_updates",
+        "Check for Updates",
+        true,
+        None::<&str>,
+    )?;
     let version_label = format!("Version {}", app.package_info().version);
     let version_item = MenuItem::with_id(app, "version", version_label, false, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;

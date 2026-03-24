@@ -555,14 +555,22 @@
   height: var(--chart-height, 100%);
   opacity: var(--chart-opacity, 0.5);
   min-height: var(--chart-min-height, 8px);
-  background: linear-gradient(180deg, var(--lexi-border) 0%, var(--lexi-surface-overlay) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--lexi-border) 0%,
+    var(--lexi-surface-overlay) 100%
+  );
   border-radius: 0.25rem 0.25rem 0 0;
   transition: all 0.3s ease;
 }
 
 .chart-bar:hover {
   opacity: 1 !important;
-  background: linear-gradient(180deg, var(--lexi-primary) 0%, var(--lexi-primary-hover) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--lexi-primary) 0%,
+    var(--lexi-primary-hover) 100%
+  );
 }
 
 .chart-labels {

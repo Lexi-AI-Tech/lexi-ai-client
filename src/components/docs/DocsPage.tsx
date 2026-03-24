@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useImperativeHandle,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ArrowLeft, Mic, Square, Trash2 } from "lucide-react";
@@ -85,10 +91,10 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     (async () => {
       try {
         unlistens.push(
-          await listen("doc_recording_started", () => setIsDocRecording(true))
+          await listen("doc_recording_started", () => setIsDocRecording(true)),
         );
         unlistens.push(
-          await listen("doc_recording_stopped", () => setIsDocRecording(false))
+          await listen("doc_recording_stopped", () => setIsDocRecording(false)),
         );
         unlistens.push(
           await listen<string>("doc_transcription_ready", async (e) => {
@@ -107,13 +113,13 @@ export const DocsPage: React.FC<DocsPageProps> = ({
             } finally {
               setIsStructuring(false);
             }
-          })
+          }),
         );
         unlistens.push(
           await listen<string>("doc_transcription_error", (e) => {
             setIsDocRecording(false);
             toast.error(e.payload || "Transcription failed");
-          })
+          }),
         );
       } catch (err) {
         console.error("Doc event listeners failed:", err);
@@ -147,11 +153,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   // When navigating with a specific doc to open (e.g. from "Create doc" in meetings)
   const hasConsumedInitialRef = useRef(false);
   useEffect(() => {
-    if (
-      initialSelectedDocId &&
-      !loading &&
-      !hasConsumedInitialRef.current
-    ) {
+    if (initialSelectedDocId && !loading && !hasConsumedInitialRef.current) {
       hasConsumedInitialRef.current = true;
       setSelectedId(initialSelectedDocId);
       onInitialDocConsumed?.();
@@ -193,12 +195,14 @@ export const DocsPage: React.FC<DocsPageProps> = ({
         // Show "Saving…" for at least a moment so the user sees feedback even when save is instant
         const elapsed = Date.now() - startedAt;
         if (elapsed < SAVE_INDICATOR_MIN_MS) {
-          await new Promise((r) => setTimeout(r, SAVE_INDICATOR_MIN_MS - elapsed));
+          await new Promise((r) =>
+            setTimeout(r, SAVE_INDICATOR_MIN_MS - elapsed),
+          );
         }
         saveIndicatorRef.current?.setSaving(false);
       }
     },
-    [toast]
+    [toast],
   );
 
   // When leaving the current doc, flush last-saved state into docs so the list stays in sync
@@ -206,7 +210,11 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   useEffect(() => {
     const prev = prevSelectedIdRef.current;
     prevSelectedIdRef.current = selectedId;
-    if (prev != null && prev !== selectedId && lastSavedDocIdRef.current === prev) {
+    if (
+      prev != null &&
+      prev !== selectedId &&
+      lastSavedDocIdRef.current === prev
+    ) {
       const title = lastSavedTitleRef.current;
       const content = lastSavedContentRef.current;
       setDocs((p) =>
@@ -218,8 +226,8 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                 ...(content != null && { content }),
                 updated_at: new Date().toISOString(),
               }
-            : d
-        )
+            : d,
+        ),
       );
       lastSavedDocIdRef.current = null;
     }
@@ -233,7 +241,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
         saveDoc(docId, title, content);
       }, SAVE_DEBOUNCE_MS);
     },
-    [saveDoc]
+    [saveDoc],
   );
 
   const handleContentUpdate = useCallback(
@@ -241,7 +249,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
       if (!selectedDoc) return;
       debouncedSave(selectedDoc.id, selectedDoc.title, json);
     },
-    [selectedDoc, debouncedSave]
+    [selectedDoc, debouncedSave],
   );
 
   const handleTitleChange = useCallback(
@@ -249,7 +257,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
       if (!selectedDoc) return;
       debouncedSave(selectedDoc.id, title, selectedDoc.content);
     },
-    [selectedDoc, debouncedSave]
+    [selectedDoc, debouncedSave],
   );
 
   const handleMicClick = async () => {
@@ -292,7 +300,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
       if (selectedId === docId) setSelectedId(null);
       toast.success("Doc deleted");
     },
-    [selectedId, toast]
+    [selectedId, toast],
   );
 
   if (loading) {
@@ -356,7 +364,10 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                   placeholder="Untitled"
                   aria-label="Document title"
                 />
-                <SaveIndicator ref={saveIndicatorRef} isStructuring={isStructuring} />
+                <SaveIndicator
+                  ref={saveIndicatorRef}
+                  isStructuring={isStructuring}
+                />
                 <button
                   type="button"
                   onClick={handleMicClick}
@@ -384,7 +395,14 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                   <Trash2 size={18} strokeWidth={1.5} />
                 </button>
               </div>
-              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
                 <RichTextEditor
                   ref={editorRef}
                   key={selectedDoc.id}
@@ -402,11 +420,14 @@ export const DocsPage: React.FC<DocsPageProps> = ({
               <div className="docs-ask-lexi-rail__header">
                 <span className="docs-ask-lexi-rail__label">Ask Lexi</span>
                 <p className="docs-ask-lexi-rail__hint">
-                  Turn this doc into briefs, checklists, and summaries with one click.
+                  Turn this doc into briefs, checklists, and summaries with one
+                  click.
                 </p>
               </div>
               <div className="docs-ask-lexi-rail__section">
-                <div className="docs-ask-lexi-rail__section-title">Quick transforms</div>
+                <div className="docs-ask-lexi-rail__section-title">
+                  Quick transforms
+                </div>
                 <button
                   type="button"
                   className="docs-ask-lexi-rail__chip"
@@ -430,10 +451,13 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                 </button>
               </div>
               <div className="docs-ask-lexi-rail__section docs-ask-lexi-rail__section--subtle">
-                <div className="docs-ask-lexi-rail__section-title">From meetings</div>
+                <div className="docs-ask-lexi-rail__section-title">
+                  From meetings
+                </div>
                 <p className="docs-ask-lexi-rail__small">
-                  Docs created from meetings stay linked to their original session, so you can
-                  always jump back to the transcript and AI summary.
+                  Docs created from meetings stay linked to their original
+                  session, so you can always jump back to the transcript and AI
+                  summary.
                 </p>
               </div>
             </aside>
@@ -448,7 +472,10 @@ export const DocsPage: React.FC<DocsPageProps> = ({
         >
           <div className="docs-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Delete this doc?</h3>
-            <p>This action cannot be undone. The document will be permanently removed.</p>
+            <p>
+              This action cannot be undone. The document will be permanently
+              removed.
+            </p>
             <div className="docs-modal-actions">
               <button
                 type="button"

@@ -47,259 +47,269 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   onRecordingStartedGlobal,
   onRecordingStoppedGlobal,
 }) => {
-    const { tokens } = useAuthStore();
-    const [meetings, setMeetings] = useState<Meeting[]>([]);
-    const [isMeetingsLoading, setIsMeetingsLoading] = useState(false);
-    const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
-    const [openToSummaryTab, setOpenToSummaryTab] = useState(false);
-    const [recordingMeetingId, setRecordingMeetingId] = useState<string | null>(null);
-    const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
+  const { tokens } = useAuthStore();
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [isMeetingsLoading, setIsMeetingsLoading] = useState(false);
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(
+    null,
+  );
+  const [openToSummaryTab, setOpenToSummaryTab] = useState(false);
+  const [recordingMeetingId, setRecordingMeetingId] = useState<string | null>(
+    null,
+  );
+  const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
 
-    const selectedMeeting = selectedMeetingId
-        ? meetings.find((m) => m.id === selectedMeetingId) ?? null
-        : null;
+  const selectedMeeting = selectedMeetingId
+    ? (meetings.find((m) => m.id === selectedMeetingId) ?? null)
+    : null;
 
-    const fetchMeetings = useCallback(async () => {
-        setIsMeetingsLoading(true);
-        try {
-            const result = await invoke<Meeting[]>("list_meetings");
-            setMeetings(result);
-        } catch (error) {
-            console.error("Failed to fetch meetings:", error);
-        } finally {
-            setIsMeetingsLoading(false);
-        }
-    }, []);
+  const fetchMeetings = useCallback(async () => {
+    setIsMeetingsLoading(true);
+    try {
+      const result = await invoke<Meeting[]>("list_meetings");
+      setMeetings(result);
+    } catch (error) {
+      console.error("Failed to fetch meetings:", error);
+    } finally {
+      setIsMeetingsLoading(false);
+    }
+  }, []);
 
-    useEffect(() => {
-        if (tokens?.access_token) {
-            fetchMeetings();
-        }
-    }, [tokens, fetchMeetings]);
+  useEffect(() => {
+    if (tokens?.access_token) {
+      fetchMeetings();
+    }
+  }, [tokens, fetchMeetings]);
 
-    // Keep recording state stable across page unmount/remount by syncing from app-level state.
-    useEffect(() => {
-        setRecordingMeetingId(activeRecordingMeetingId ?? null);
-    }, [activeRecordingMeetingId]);
+  // Keep recording state stable across page unmount/remount by syncing from app-level state.
+  useEffect(() => {
+    setRecordingMeetingId(activeRecordingMeetingId ?? null);
+  }, [activeRecordingMeetingId]);
 
-    // Real-time transcript listener
-    useEffect(() => {
-        let isMounted = true;
-        let unlistenFn: (() => void) | undefined;
+  // Real-time transcript listener
+  useEffect(() => {
+    let isMounted = true;
+    let unlistenFn: (() => void) | undefined;
 
-        const setupListener = async () => {
-            const { listen } = await import("@tauri-apps/api/event");
-            const unlisten = await listen<TranscriptSegment & { type?: string }>(
-                "meeting-transcript",
-                (event) => {
-                    if (!isMounted) return;
-                    const payload = event.payload;
-                    const segment: TranscriptSegment = {
-                        id: payload.id || `live-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                        segment_index: payload.segment_index ?? 0,
-                        start_time: payload.start_time ?? "",
-                        end_time: payload.end_time ?? "",
-                        text: payload.text ?? "",
-                        message_type: payload.message_type ?? "user_audio",
-                    };
-                    setLiveSegments((prev) => [...prev, segment]);
-                }
-            );
-            unlistenFn = unlisten;
-        };
-
-        setupListener();
-
-        return () => {
-            isMounted = false;
-            if (unlistenFn) unlistenFn();
-        };
-    }, []);
-
-    const handleCreateAndStartMeeting = async () => {
-        if (!tokens?.access_token) return;
-
-        try {
-            const platform =
-                typeof autoStartPlatform === "string" && autoStartPlatform.trim().length > 0
-                    ? autoStartPlatform
-                    : "Lexi AI";
-            const name =
-                platform.trim().length > 0 ? `${platform} Meeting` : "Meeting Session";
-
-            const newMeeting = await invoke<Meeting>("create_meeting", {
-                name,
-                platform,
-            });
-
-            setMeetings((prev) => [newMeeting, ...prev]);
-            setSelectedMeetingId(newMeeting.id);
-            setRecordingMeetingId(newMeeting.id);
-
-            try {
-                await invoke("start_meeting_recording", { meetingId: newMeeting.id });
-            } catch (error) {
-                console.error("Failed to start meeting recording:", error);
-                setRecordingMeetingId(null);
-            }
-        } catch (error) {
-            console.error("Failed to create new meeting:", error);
-        }
+    const setupListener = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen<TranscriptSegment & { type?: string }>(
+        "meeting-transcript",
+        (event) => {
+          if (!isMounted) return;
+          const payload = event.payload;
+          const segment: TranscriptSegment = {
+            id:
+              payload.id ||
+              `live-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            segment_index: payload.segment_index ?? 0,
+            start_time: payload.start_time ?? "",
+            end_time: payload.end_time ?? "",
+            text: payload.text ?? "",
+            message_type: payload.message_type ?? "user_audio",
+          };
+          setLiveSegments((prev) => [...prev, segment]);
+        },
+      );
+      unlistenFn = unlisten;
     };
 
-    // Auto-start meeting when triggered from system tray
-    useEffect(() => {
-        if (autoStart && !recordingMeetingId) {
-            handleCreateAndStartMeeting();
-            onAutoStartConsumed?.();
-        }
-    }, [autoStart]);
+    setupListener();
 
-    // Focus meeting when triggered from pill overlay
-    useEffect(() => {
-        if (!pillMeetingId) return;
+    return () => {
+      isMounted = false;
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
 
-        fetchMeetings();
-        setSelectedMeetingId(pillMeetingId);
-        setRecordingMeetingId(pillMeetingId);
+  const handleCreateAndStartMeeting = async () => {
+    if (!tokens?.access_token) return;
 
-        onPillMeetingConsumed?.();
-    }, [pillMeetingId]);
+    try {
+      const platform =
+        typeof autoStartPlatform === "string" &&
+        autoStartPlatform.trim().length > 0
+          ? autoStartPlatform
+          : "Lexi AI";
+      const name =
+        platform.trim().length > 0 ? `${platform} Meeting` : "Meeting Session";
 
-    // When tray triggers end meeting: navigate to detail if on list, so detail page can show modal
-    useEffect(() => {
-        if (!triggerEndMeetingFromTray) return;
-        if (recordingMeetingId && !selectedMeetingId) {
-            setSelectedMeetingId(recordingMeetingId);
-        }
-        // Detail page will call onEndMeetingFromTrayConsumed when it shows the modal
-    }, [triggerEndMeetingFromTray, recordingMeetingId, selectedMeetingId]);
+      const newMeeting = await invoke<Meeting>("create_meeting", {
+        name,
+        platform,
+      });
 
-    // When reminder triggers auto-end: open that meeting detail so it can run
-    // the same end flow used by the End button.
-    useEffect(() => {
-        if (!triggerAutoEndMeetingFromReminderId) return;
-        setSelectedMeetingId(triggerAutoEndMeetingFromReminderId);
-        setRecordingMeetingId(triggerAutoEndMeetingFromReminderId);
-        onAutoEndMeetingFromReminderConsumed?.();
-    }, [
-        triggerAutoEndMeetingFromReminderId,
-        onAutoEndMeetingFromReminderConsumed,
-    ]);
+      setMeetings((prev) => [newMeeting, ...prev]);
+      setSelectedMeetingId(newMeeting.id);
+      setRecordingMeetingId(newMeeting.id);
 
-    const handleStopRecording = useCallback(() => {
+      try {
+        await invoke("start_meeting_recording", { meetingId: newMeeting.id });
+      } catch (error) {
+        console.error("Failed to start meeting recording:", error);
         setRecordingMeetingId(null);
-        setLiveSegments([]);
-    }, []);
+      }
+    } catch (error) {
+      console.error("Failed to create new meeting:", error);
+    }
+  };
 
-    const handleLiveSegmentAdded = useCallback((segment: TranscriptSegment) => {
-        setLiveSegments((prev) => [...prev, segment]);
-    }, []);
+  // Auto-start meeting when triggered from system tray
+  useEffect(() => {
+    if (autoStart && !recordingMeetingId) {
+      handleCreateAndStartMeeting();
+      onAutoStartConsumed?.();
+    }
+  }, [autoStart]);
 
-    const formatMeetingDate = (m: Meeting | null) => {
-        if (!m?.created_at) return null;
-        try {
-            const d = new Date(m.created_at);
-            return d.toLocaleDateString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-        } catch {
-            return null;
-        }
-    };
+  // Focus meeting when triggered from pill overlay
+  useEffect(() => {
+    if (!pillMeetingId) return;
 
-    return (
-        <div className={`page ${selectedMeetingId ? "page--meetings-detail" : ""}`}>
-            {selectedMeetingId && selectedMeeting && (
-                <div className="meetings-page-header">
-                    <button
-                        type="button"
-                        className="meetings-page-header__back"
-                        onClick={() => {
-                            setSelectedMeetingId(null);
-                            setOpenToSummaryTab(false);
-                        }}
-                        aria-label="Back to meetings list"
-                    >
-                        <ArrowLeft size={20} strokeWidth={2} />
-                        <span>Meetings</span>
-                    </button>
-                    <div className="meetings-page-header__title">
-                        {selectedMeeting.name || "Untitled Meeting"}
-                    </div>
-                    <div className="meetings-page-header__meta">
-                        {recordingMeetingId === selectedMeetingId && (
-                            <span className="meetings-page-header__badge meetings-page-header__badge--live">
-                                <span className="meetings-page-header__badge-dot" />
-                                Live
-                            </span>
-                        )}
-                        {formatMeetingDate(selectedMeeting) && (
-                            <span className="meetings-page-header__date">
-                                {formatMeetingDate(selectedMeeting)}
-                            </span>
-                        )}
-                    </div>
-                </div>
+    fetchMeetings();
+    setSelectedMeetingId(pillMeetingId);
+    setRecordingMeetingId(pillMeetingId);
+
+    onPillMeetingConsumed?.();
+  }, [pillMeetingId]);
+
+  // When tray triggers end meeting: navigate to detail if on list, so detail page can show modal
+  useEffect(() => {
+    if (!triggerEndMeetingFromTray) return;
+    if (recordingMeetingId && !selectedMeetingId) {
+      setSelectedMeetingId(recordingMeetingId);
+    }
+    // Detail page will call onEndMeetingFromTrayConsumed when it shows the modal
+  }, [triggerEndMeetingFromTray, recordingMeetingId, selectedMeetingId]);
+
+  // When reminder triggers auto-end: open that meeting detail so it can run
+  // the same end flow used by the End button.
+  useEffect(() => {
+    if (!triggerAutoEndMeetingFromReminderId) return;
+    setSelectedMeetingId(triggerAutoEndMeetingFromReminderId);
+    setRecordingMeetingId(triggerAutoEndMeetingFromReminderId);
+    onAutoEndMeetingFromReminderConsumed?.();
+  }, [
+    triggerAutoEndMeetingFromReminderId,
+    onAutoEndMeetingFromReminderConsumed,
+  ]);
+
+  const handleStopRecording = useCallback(() => {
+    setRecordingMeetingId(null);
+    setLiveSegments([]);
+  }, []);
+
+  const handleLiveSegmentAdded = useCallback((segment: TranscriptSegment) => {
+    setLiveSegments((prev) => [...prev, segment]);
+  }, []);
+
+  const formatMeetingDate = (m: Meeting | null) => {
+    if (!m?.created_at) return null;
+    try {
+      const d = new Date(m.created_at);
+      return d.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  return (
+    <div className={`page ${selectedMeetingId ? "page--meetings-detail" : ""}`}>
+      {selectedMeetingId && selectedMeeting && (
+        <div className="meetings-page-header">
+          <button
+            type="button"
+            className="meetings-page-header__back"
+            onClick={() => {
+              setSelectedMeetingId(null);
+              setOpenToSummaryTab(false);
+            }}
+            aria-label="Back to meetings list"
+          >
+            <ArrowLeft size={20} strokeWidth={2} />
+            <span>Meetings</span>
+          </button>
+          <div className="meetings-page-header__title">
+            {selectedMeeting.name || "Untitled Meeting"}
+          </div>
+          <div className="meetings-page-header__meta">
+            {recordingMeetingId === selectedMeetingId && (
+              <span className="meetings-page-header__badge meetings-page-header__badge--live">
+                <span className="meetings-page-header__badge-dot" />
+                Live
+              </span>
             )}
-
-            {selectedMeetingId ? (
-                <MeetingDetailPage
-                    meetingId={selectedMeetingId}
-                    meeting={selectedMeeting}
-                    initialTab={openToSummaryTab ? "summary" : undefined}
-                    onBackToList={() => {
-                        setSelectedMeetingId(null);
-                        setOpenToSummaryTab(false);
-                    }}
-                    onMeetingDeleted={() => {
-                        setMeetings((prev) => prev.filter((m) => m.id !== selectedMeetingId));
-                        setSelectedMeetingId(null);
-                        if (recordingMeetingId === selectedMeetingId) {
-                            handleStopRecording();
-                        }
-                    }}
-                    onMeetingsUpdated={setMeetings}
-                    isThisMeetingRecording={recordingMeetingId === selectedMeetingId}
-                    liveSegments={liveSegments}
-                    onLiveSegmentAdded={handleLiveSegmentAdded}
-                    triggerEndMeetingFromTray={
-                        triggerEndMeetingFromTray && recordingMeetingId === selectedMeetingId
-                    }
-                    onEndMeetingFromTrayConsumed={onEndMeetingFromTrayConsumed}
-                    triggerAutoEndMeetingFromReminder={
-                        triggerAutoEndMeetingFromReminderId === selectedMeetingId
-                    }
-                    onRecordingStopped={() => {
-                        setRecordingMeetingId(null);
-                        setLiveSegments([]);
-                        onRecordingStoppedGlobal?.();
-                    }}
-                    onRecordingStarted={(id) => {
-                        setRecordingMeetingId(id);
-                        setLiveSegments([]);
-                        onRecordingStartedGlobal?.(id);
-                    }}
-                />
-            ) : (
-                <MeetingsListPage
-                    meetings={meetings}
-                    onRefreshMeetings={fetchMeetings}
-                    onSelectMeeting={(id, openToSummary) => {
-                        setSelectedMeetingId(id);
-                        setOpenToSummaryTab(!!openToSummary);
-                    }}
-                    onStartNewMeeting={handleCreateAndStartMeeting}
-                    isRecording={!!recordingMeetingId}
-                    activeRecordingMeetingId={recordingMeetingId}
-                    isGeneratingSummary={false}
-                    isLoading={isMeetingsLoading}
-                />
+            {formatMeetingDate(selectedMeeting) && (
+              <span className="meetings-page-header__date">
+                {formatMeetingDate(selectedMeeting)}
+              </span>
             )}
+          </div>
         </div>
-    );
+      )}
+
+      {selectedMeetingId ? (
+        <MeetingDetailPage
+          meetingId={selectedMeetingId}
+          meeting={selectedMeeting}
+          initialTab={openToSummaryTab ? "summary" : undefined}
+          onBackToList={() => {
+            setSelectedMeetingId(null);
+            setOpenToSummaryTab(false);
+          }}
+          onMeetingDeleted={() => {
+            setMeetings((prev) =>
+              prev.filter((m) => m.id !== selectedMeetingId),
+            );
+            setSelectedMeetingId(null);
+            if (recordingMeetingId === selectedMeetingId) {
+              handleStopRecording();
+            }
+          }}
+          onMeetingsUpdated={setMeetings}
+          isThisMeetingRecording={recordingMeetingId === selectedMeetingId}
+          liveSegments={liveSegments}
+          onLiveSegmentAdded={handleLiveSegmentAdded}
+          triggerEndMeetingFromTray={
+            triggerEndMeetingFromTray &&
+            recordingMeetingId === selectedMeetingId
+          }
+          onEndMeetingFromTrayConsumed={onEndMeetingFromTrayConsumed}
+          triggerAutoEndMeetingFromReminder={
+            triggerAutoEndMeetingFromReminderId === selectedMeetingId
+          }
+          onRecordingStopped={() => {
+            setRecordingMeetingId(null);
+            setLiveSegments([]);
+            onRecordingStoppedGlobal?.();
+          }}
+          onRecordingStarted={(id) => {
+            setRecordingMeetingId(id);
+            setLiveSegments([]);
+            onRecordingStartedGlobal?.(id);
+          }}
+        />
+      ) : (
+        <MeetingsListPage
+          meetings={meetings}
+          onRefreshMeetings={fetchMeetings}
+          onSelectMeeting={(id, openToSummary) => {
+            setSelectedMeetingId(id);
+            setOpenToSummaryTab(!!openToSummary);
+          }}
+          onStartNewMeeting={handleCreateAndStartMeeting}
+          isRecording={!!recordingMeetingId}
+          activeRecordingMeetingId={recordingMeetingId}
+          isGeneratingSummary={false}
+          isLoading={isMeetingsLoading}
+        />
+      )}
+    </div>
+  );
 };

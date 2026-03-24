@@ -233,14 +233,9 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   }
 
   return (
-    <button
-      onClick={handleGoogleLogin}
-      className="auth-button google-login"
-    >
+    <button onClick={handleGoogleLogin} className="auth-button google-login">
       {loading ? (
-        <>
-          Cancel sign-in
-        </>
+        <>Cancel sign-in</>
       ) : (
         <>
           <svg

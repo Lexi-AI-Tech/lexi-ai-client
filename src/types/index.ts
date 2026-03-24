@@ -268,15 +268,15 @@ export interface GoogleLoginButtonProps {
 
 export interface SidebarProps {
   currentPage:
-  | "home"
-  | "transcripts"
-  | "settings"
-  | "vocabulary"
-  | "actions"
-  | "shortcuts"
-  | "notes"
-  | "meetings"
-  | "docs";
+    | "home"
+    | "transcripts"
+    | "settings"
+    | "vocabulary"
+    | "actions"
+    | "shortcuts"
+    | "notes"
+    | "meetings"
+    | "docs";
   onNavigate: (
     page:
       | "home"

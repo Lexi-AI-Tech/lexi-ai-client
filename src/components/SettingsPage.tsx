@@ -342,10 +342,9 @@ export const SettingsPage: React.FC = () => {
         hotkeys: (updatedConfig.hotkeys ?? defaults.hotkeys).slice(0, 3),
       });
       setCurrentActionHotkeys({
-        hotkeys: (updatedConfig.action_hotkeys ?? defaults.action_hotkeys).slice(
-          0,
-          3,
-        ),
+        hotkeys: (
+          updatedConfig.action_hotkeys ?? defaults.action_hotkeys
+        ).slice(0, 3),
       });
 
       toast.success("Hotkeys reset to defaults");

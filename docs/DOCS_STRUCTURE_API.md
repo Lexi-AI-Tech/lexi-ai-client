@@ -53,12 +53,38 @@ Example:
 {
   "type": "doc",
   "content": [
-    { "type": "heading", "attrs": { "level": 1 }, "content": [{ "type": "text", "text": "Meeting notes" }] },
-    { "type": "paragraph", "content": [{ "type": "text", "text": "We discussed the roadmap." }] },
-    { "type": "bulletList", "content": [
-      { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Q1: Launch" }] }] },
-      { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Q2: Scale" }] }] }
-    ]}
+    {
+      "type": "heading",
+      "attrs": { "level": 1 },
+      "content": [{ "type": "text", "text": "Meeting notes" }]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "We discussed the roadmap." }]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "Q1: Launch" }]
+            }
+          ]
+        },
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "Q2: Scale" }]
+            }
+          ]
+        }
+      ]
+    }
   ]
 }
 ```

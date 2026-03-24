@@ -95,13 +95,13 @@ use actions::commands::{delete_action_history, get_action_history};
 use app_icon::get_app_icon;
 use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
-use commands::billing::get_billing_usage;
 use commands::app_config::{get_app_config, get_default_hotkeys, update_app_config};
 use commands::auth::{
     clear_auth_data, get_api_base_url, get_auth_data, get_auth_token, get_current_user,
     get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
     store_auth_data,
 };
+use commands::billing::get_billing_usage;
 use commands::docs::{
     create_doc, delete_doc, get_doc, get_docs, rewrite_doc_section, start_doc_recording,
     stop_doc_recording, structure_doc_content, update_doc,

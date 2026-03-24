@@ -458,54 +458,54 @@ export const HomePage: React.FC = () => {
               {sortPlanUsageFeatures(billingUsage.features).map((f) => {
                 const pro = isProPlan(billingUsage.plan_type);
                 return (
-                <li key={f.feature_key} className="billing-feature-row">
-                  <div className="billing-feature-info">
-                    <span className="billing-feature-name">
-                      {featureLabel(f.feature_key)}
-                    </span>
-                    {!f.enabled && (
-                      <span className="billing-feature-disabled">
-                        Not on plan
+                  <li key={f.feature_key} className="billing-feature-row">
+                    <div className="billing-feature-info">
+                      <span className="billing-feature-name">
+                        {featureLabel(f.feature_key)}
                       </span>
-                    )}
-                  </div>
-                  <div className="billing-feature-usage">
-                    {pro ? (
-                      <div
-                        className="billing-usage-numbers billing-usage-numbers--infinity"
-                        aria-label={`${f.used} out of unlimited`}
-                      >
-                        {f.used} /{" "}
-                        <span className="billing-infinity" title="Unlimited">
-                          ∞
+                      {!f.enabled && (
+                        <span className="billing-feature-disabled">
+                          Not on plan
                         </span>
-                      </div>
-                    ) : f.metered && f.limit_value != null ? (
-                      <>
-                        <div className="billing-usage-numbers">
-                          {f.used} / {f.limit_value}
+                      )}
+                    </div>
+                    <div className="billing-feature-usage">
+                      {pro ? (
+                        <div
+                          className="billing-usage-numbers billing-usage-numbers--infinity"
+                          aria-label={`${f.used} out of unlimited`}
+                        >
+                          {f.used} /{" "}
+                          <span className="billing-infinity" title="Unlimited">
+                            ∞
+                          </span>
                         </div>
-                        <div className="billing-usage-bar">
-                          <div
-                            className="billing-usage-bar-fill"
-                            style={{
-                              width: `${Math.min(
-                                100,
-                                (f.used / Math.max(f.limit_value, 1)) * 100,
-                              )}%`,
-                            }}
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      <span className="billing-usage-unlimited">
-                        {f.used > 0 ? `${f.used} used` : "—"}
-                        {!f.metered && " · Unlimited"}
-                      </span>
-                    )}
-                  </div>
-                </li>
-              );
+                      ) : f.metered && f.limit_value != null ? (
+                        <>
+                          <div className="billing-usage-numbers">
+                            {f.used} / {f.limit_value}
+                          </div>
+                          <div className="billing-usage-bar">
+                            <div
+                              className="billing-usage-bar-fill"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  (f.used / Math.max(f.limit_value, 1)) * 100,
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <span className="billing-usage-unlimited">
+                          {f.used > 0 ? `${f.used} used` : "—"}
+                          {!f.metered && " · Unlimited"}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
               })}
             </ul>
           )}
