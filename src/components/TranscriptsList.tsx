@@ -8,12 +8,13 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, Check, Trash2, Play, Pause } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 
 export const TranscriptsList: React.FC = () => {
@@ -197,19 +198,38 @@ export const TranscriptsList: React.FC = () => {
     (!authStore.isAuthenticated || !!authStore.tokens?.access_token);
   const showLogin = authStore.isInitialized && !authStore.isAuthenticated;
 
+  const GRID_VARIANTS = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.06, delayChildren: 0.08 },
+    },
+  };
+
+  const CARD_VARIANTS = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: [0.22, 0.61, 0.36, 1] as const },
+    },
+  };
+
   return (
     <div className="transcripts-page">
-      <h2 className="transcripts-page-title">
-        Transcripts{" "}
-        {total > 0 && (
-          <span className="transcripts-page-title-count">({total})</span>
-        )}
-      </h2>
+      <h2 className="transcripts-page-title">Transcripts</h2>
+      {loading ? (
+        <p className="app-page-subtitle">Loading…</p>
+      ) : total > 0 ? (
+        <p className="app-page-subtitle">
+          {total} voice {total === 1 ? "transcription" : "transcriptions"}
+        </p>
+      ) : null}
 
       {!showContent && (
         <div className="transcripts-page">
           <h2 className="transcripts-page-title">Transcripts</h2>
-          <PageLoader className="page__empty" />
+          <ScreenSkeleton variant="transcripts" className="page__empty" />
         </div>
       )}
 
@@ -222,197 +242,223 @@ export const TranscriptsList: React.FC = () => {
         </div>
       )}
 
-      {showContent && !showLogin && loading && transcripts.length === 0 && (
-        <PageLoader className="transcripts-loading-inline" />
-      )}
-
-      {showContent && !showLogin && !loading && transcripts.length === 0 && (
-        <div className="transcripts-empty-wrap">
-          <p>No transcripts yet.</p>
-          <p className="transcripts-empty-sub">
-            Start recording to create your first transcript!
-          </p>
-        </div>
-      )}
-
-      {showContent && !showLogin && transcripts.length > 0 && (
-        <div className="transcripts-list transcripts-table transcripts-list-wrapper">
-          {loading && page === 1 && (
-            <div className="transcripts-loading-overlay">
-              <PageLoader />
-            </div>
+      <div className="transcripts-page__content">
+        <AnimatePresence mode="wait">
+          {showContent && !showLogin && loading && transcripts.length === 0 && (
+            <motion.div
+              key="transcripts-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ScreenSkeleton
+                variant="transcripts"
+                className="transcripts-loading-inline"
+              />
+            </motion.div>
           )}
-          <div className="transcripts-table-header">
-            <span>Date</span>
-            <span>Transcript</span>
-            <span>App</span>
-            <span>Actions</span>
-          </div>
-          {transcripts.map((transcript, index) => {
-            const isLastElement = index === transcripts.length - 1;
-            return (
-              <div
-                ref={isLastElement ? lastElementRef : null}
-                key={transcript.id}
-                className="transcript-item transcripts-table-row"
+
+          {showContent &&
+            !showLogin &&
+            !loading &&
+            transcripts.length === 0 && (
+              <motion.div
+                key="transcripts-empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
               >
-                <div className="transcript-cell transcript-cell-date">
-                  {formatDateRelative(transcript.created_at)}
+                <div className="transcripts-empty-wrap">
+                  <p>No transcripts yet.</p>
+                  <p className="transcripts-empty-sub">
+                    Start recording to create your first transcript!
+                  </p>
                 </div>
-                <div className="transcript-cell transcript-cell-text">
-                  {(() => {
-                    const isEnhanced =
-                      transcript.is_enhanced && !!transcript.enhanced_text;
-                    const displayText = isEnhanced
-                      ? transcript.enhanced_text!
-                      : transcript.original_text || "";
-                    const hasText = !!displayText;
-                    const isPlaying = playingId === transcript.id;
+              </motion.div>
+            )}
 
-                    return (
-                      <div className="transcript-display-cell">
-                        {/* Minimal Audio Player */}
-                        {transcript.audio_file_url && (
-                          <div className="transcript-audio-cell">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handlePlayAudio(
-                                  transcript.id,
-                                  transcript.audio_file_url as string,
-                                )
-                              }
-                              className={`transcript-play-btn ${isPlaying ? "playing" : ""}`}
-                              title={isPlaying ? "Pause" : "Play audio"}
-                            >
-                              {isPlaying && (
-                                <svg
-                                  className="transcript-progress-ring"
-                                  aria-hidden
-                                >
-                                  <circle
-                                    cx="14"
-                                    cy="14"
-                                    r="12"
-                                    fill="none"
-                                    stroke="rgba(255,255,255,0.2)"
-                                    strokeWidth="2"
-                                  />
-                                  <circle
-                                    cx="14"
-                                    cy="14"
-                                    r="12"
-                                    fill="none"
-                                    stroke="#fff"
-                                    strokeWidth="2"
-                                    strokeDasharray={`${audioProgress * 0.754} 75.4`}
-                                    strokeLinecap="round"
-                                  />
-                                </svg>
-                              )}
-                              {isPlaying ? (
-                                <Pause size={12} fill="currentColor" />
-                              ) : (
-                                <Play
-                                  size={12}
-                                  fill="currentColor"
-                                  className="icon-play-offset"
-                                />
-                              )}
-                            </button>
+          {showContent && !showLogin && transcripts.length > 0 && (
+            <motion.div
+              key="transcripts-cards"
+              className="transcripts-cards"
+              variants={GRID_VARIANTS}
+              initial="hidden"
+              animate="visible"
+            >
+              {transcripts.map((transcript, index) => {
+                const isLastElement = index === transcripts.length - 1;
+                const appName = (transcript.focused_app || "").trim();
+                const iconUrl = appName
+                  ? (appIcons[appName] ?? undefined)
+                  : undefined;
+
+                const isEnhanced =
+                  transcript.is_enhanced && !!transcript.enhanced_text;
+                const displayText = isEnhanced
+                  ? transcript.enhanced_text!
+                  : transcript.original_text || "";
+                const hasText = !!displayText;
+                const isPlaying = playingId === transcript.id;
+
+                const copyText =
+                  isEnhanced && transcript.enhanced_text
+                    ? transcript.enhanced_text
+                    : transcript.original_text || "";
+
+                return (
+                  <motion.div
+                    ref={isLastElement ? lastElementRef : undefined}
+                    key={transcript.id}
+                    className="transcript-card"
+                    variants={CARD_VARIANTS}
+                  >
+                    <div className="transcript-card__header">
+                      <div className="transcript-card__meta">
+                        <div className="transcript-card__date">
+                          {formatDateRelative(transcript.created_at)}
+                        </div>
+                        <div className="transcript-card__app">
+                          <div className="transcript-cell-app__content">
+                            {iconUrl ? (
+                              <img
+                                src={iconUrl}
+                                alt=""
+                                className="transcript-cell-app__icon"
+                                title={appName || undefined}
+                              />
+                            ) : null}
+                            <span className="transcript-cell-app__name">
+                              {appName || "—"}
+                            </span>
                           </div>
-                        )}
-
-                        {/* Transcript Text */}
-                        <div className="transcript-text-cell">
-                          {hasText ? (
-                            <span className="transcript-item-text">
-                              {displayText}
-                            </span>
-                          ) : (
-                            <span className="transcript-item-empty">
-                              {transcript.status === "processing"
-                                ? "Processing..."
-                                : "No text available"}
-                            </span>
-                          )}
                         </div>
                       </div>
-                    );
-                  })()}
-                </div>
-                <div className="transcript-cell transcript-cell-app">
-                  {(() => {
-                    const appName = transcript.focused_app || "";
-                    const iconUrl = appName
-                      ? (appIcons[appName] ?? undefined)
-                      : undefined;
-                    return (
-                      <div className="transcript-cell-app__content">
-                        {iconUrl ? (
-                          <img
-                            src={iconUrl}
-                            alt=""
-                            className="transcript-cell-app__icon"
-                            title={appName || undefined}
-                          />
-                        ) : null}
-                        <span className="transcript-cell-app__name">
-                          {appName || "—"}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                </div>
-                <div className="transcript-cell transcript-cell-meta">
-                  <div className="transcript-actions-cell">
-                    {(() => {
-                      const isEnhanced =
-                        transcript.is_enhanced && !!transcript.enhanced_text;
-                      const copyText =
-                        isEnhanced && transcript.enhanced_text
-                          ? transcript.enhanced_text
-                          : transcript.original_text || "";
-                      return copyText ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleCopyToClipboard(copyText, transcript.id)
-                          }
-                          className={`transcript-action-btn transcript-action-btn--copy ${copiedId === transcript.id ? "copied" : ""}`}
-                          title={
-                            copiedId === transcript.id
-                              ? "Copied!"
-                              : "Copy transcript"
-                          }
-                        >
-                          {copiedId === transcript.id ? (
-                            <Check size={16} strokeWidth={2.5} />
-                          ) : (
-                            <Copy size={16} />
+                    </div>
+
+                    <div className="transcript-card__body">
+                      <div className="transcript-card__row">
+                        <div className="transcript-display-cell transcript-display-cell--card transcript-card__main">
+                          {/* Minimal Audio Player */}
+                          {transcript.audio_file_url && (
+                            <div className="transcript-audio-cell">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handlePlayAudio(
+                                    transcript.id,
+                                    transcript.audio_file_url as string,
+                                  )
+                                }
+                                className={`transcript-play-btn ${
+                                  isPlaying ? "playing" : ""
+                                }`}
+                                title={isPlaying ? "Pause" : "Play audio"}
+                              >
+                                {isPlaying && (
+                                  <svg
+                                    className="transcript-progress-ring"
+                                    aria-hidden
+                                  >
+                                    <circle
+                                      cx="14"
+                                      cy="14"
+                                      r="12"
+                                      fill="none"
+                                      stroke="rgba(255,255,255,0.2)"
+                                      strokeWidth="2"
+                                    />
+                                    <circle
+                                      cx="14"
+                                      cy="14"
+                                      r="12"
+                                      fill="none"
+                                      stroke="#fff"
+                                      strokeWidth="2"
+                                      strokeDasharray={`${audioProgress * 0.754} 75.4`}
+                                      strokeLinecap="round"
+                                    />
+                                  </svg>
+                                )}
+                                {isPlaying ? (
+                                  <Pause size={12} fill="currentColor" />
+                                ) : (
+                                  <Play
+                                    size={12}
+                                    fill="currentColor"
+                                    className="icon-play-offset"
+                                  />
+                                )}
+                              </button>
+                            </div>
                           )}
-                        </button>
-                      ) : null;
-                    })()}
-                    <button
-                      type="button"
-                      onClick={() => openDeleteConfirm(transcript.id)}
-                      disabled={!!deletingId}
-                      className="transcript-action-btn transcript-action-btn--delete"
-                      title="Delete transcript"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {loading && page > 1 && (
-            <div className="transcripts-load-more">
-              <PageLoader />
-            </div>
+
+                          {/* Transcript Text */}
+                          <div className="transcript-text-cell">
+                            {hasText ? (
+                              <span className="transcript-item-text">
+                                {displayText}
+                              </span>
+                            ) : (
+                              <span className="transcript-item-empty">
+                                {transcript.status === "processing"
+                                  ? "Processing..."
+                                  : "No text available"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="transcript-card__actions">
+                          <div className="transcript-actions-cell">
+                            {copyText ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopyToClipboard(copyText, transcript.id)
+                                }
+                                className={`transcript-action-btn transcript-action-btn--copy ${
+                                  copiedId === transcript.id ? "copied" : ""
+                                }`}
+                                title={
+                                  copiedId === transcript.id
+                                    ? "Copied!"
+                                    : "Copy transcript"
+                                }
+                              >
+                                {copiedId === transcript.id ? (
+                                  <Check size={16} strokeWidth={2.5} />
+                                ) : (
+                                  <Copy size={16} />
+                                )}
+                              </button>
+                            ) : null}
+
+                            <button
+                              type="button"
+                              onClick={() => openDeleteConfirm(transcript.id)}
+                              disabled={!!deletingId}
+                              className="transcript-action-btn transcript-action-btn--delete"
+                              title="Delete transcript"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
           )}
+        </AnimatePresence>
+      </div>
+
+      {loading && page > 1 && (
+        <div className="transcripts-load-more">
+          <ScreenSkeleton variant="transcriptsRows" />
         </div>
       )}
 

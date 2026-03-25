@@ -1,6 +1,7 @@
 import React, {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useMemo,
   useCallback,
@@ -9,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  ArrowLeft,
+  ChevronRight,
   FileText,
   FilePlus,
   MessageCircle,
@@ -29,6 +30,31 @@ import {
 import "../meetings.css";
 import "./meetings-list.css";
 import "./meeting-detail-product.css";
+import { formatLocaleTimeWithSeconds } from "../../lib/dateUtils";
+
+/** Gutter (24px) + max Q&A column (480px) — used for slide animation */
+const Q_A_RAIL_OUTER_WIDTH_PX = 504;
+/** Summary column should keep at least this width; rail outer width = split width − this (capped at 504). */
+const SPLIT_MIN_SUMMARY_WIDTH_PX = 260;
+
+const RAIL_PANEL_TRANSITION = {
+  duration: 0.68,
+  ease: [0.16, 1, 0.3, 1] as const,
+};
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(query).matches : false,
+  );
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const handler = () => setMatches(m.matches);
+    m.addEventListener("change", handler);
+    setMatches(m.matches);
+    return () => m.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
 
 interface TranscriptSegment {
   id: string;
@@ -117,6 +143,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   );
   const [isLoadingSuggestedQuestions, setIsLoadingSuggestedQuestions] =
     useState(false);
+  /** Q&A rail on Summary tab: open by default; user can collapse to focus on notes */
+  const [isChatRailOpen, setIsChatRailOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const streamingForMeetingIdRef = useRef<string | null>(null);
@@ -173,6 +201,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
   useEffect(() => {
     setSuggestedQuestions(null);
+  }, [meetingId]);
+
+  useEffect(() => {
+    setIsChatRailOpen(true);
   }, [meetingId]);
 
   useEffect(() => {
@@ -471,22 +503,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     handleEndMeeting();
   }, [triggerAutoEndMeetingFromReminder]);
 
-  const formatMeetingDate = (createdAt: string) => {
-    try {
-      if (!createdAt) return "";
-      const d = new Date(createdAt);
-      return d.toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "";
-    }
-  };
-
   const PAGE_VARIANTS = {
     hidden: { opacity: 0 },
     visible: {
@@ -503,6 +519,53 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       transition: { duration: 0.5, ease: [0.22, 0.61, 0.36, 1] as const },
     },
   };
+
+  const hasSummaryContent = activeSummary || isGeneratingSummary;
+  const showSummaryChatRail = hasSummaryContent && isChatRailOpen;
+  const isNarrowSplit = useMediaQuery("(max-width: 900px)");
+  const summarySplitRef = useRef<HTMLDivElement>(null);
+  const [railOuterWidthPx, setRailOuterWidthPx] = useState(
+    Q_A_RAIL_OUTER_WIDTH_PX,
+  );
+
+  useLayoutEffect(() => {
+    if (activeTab !== "summary") return;
+    const el = summarySplitRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.getBoundingClientRect().width;
+      const inner = Math.max(0, Math.floor(w - SPLIT_MIN_SUMMARY_WIDTH_PX));
+      const cap = Math.min(Q_A_RAIL_OUTER_WIDTH_PX, inner);
+      setRailOuterWidthPx(Number.isFinite(cap) ? cap : Q_A_RAIL_OUTER_WIDTH_PX);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [activeTab, hasSummaryContent]);
+
+  const chatInputForm = (
+    <form
+      onSubmit={handleSendChatMessage}
+      className="meeting-detail-rail__form"
+    >
+      <input
+        type="text"
+        className="meeting-detail-rail__input"
+        value={chatInput}
+        onChange={(e) => setChatInput(e.target.value)}
+        placeholder="Ask a question..."
+        disabled={isSendingChat || isThisMeetingRecording}
+      />
+      <button
+        type="submit"
+        className="meeting-detail-btn meeting-detail-btn--primary meeting-detail-rail__submit"
+        disabled={isSendingChat || !chatInput.trim() || isThisMeetingRecording}
+      >
+        Send
+      </button>
+    </form>
+  );
 
   return (
     <motion.div
@@ -623,19 +686,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                   </p>
                 ) : null}
                 {segments.map((seg, idx) => {
-                  let timeString = "00:00:00";
-                  try {
-                    if (seg.start_time) {
-                      const d = new Date(seg.start_time);
-                      timeString = d.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      });
-                    }
-                  } catch {
-                    // ignore
-                  }
+                  const timeString = seg.start_time
+                    ? formatLocaleTimeWithSeconds(seg.start_time)
+                    : "00:00:00";
                   const msgType = seg.message_type;
                   const isUser =
                     msgType === "user_audio" || msgType === "user_note";
@@ -655,13 +708,15 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                       key={seg.id ?? idx}
                       className={`meeting-detail-transcript__segment meeting-detail-transcript__segment--${segmentAlign}`}
                     >
-                      <div
-                        className={`meeting-detail-transcript__bubble meeting-detail-transcript__bubble--${bubbleVariant}`}
-                      >
-                        <span className="meeting-detail-transcript__time">
-                          [{timeString}]
+                      <div className="meeting-detail-transcript__block">
+                        <div
+                          className={`meeting-detail-transcript__bubble meeting-detail-transcript__bubble--${bubbleVariant}`}
+                        >
+                          <span>{seg.text}</span>
+                        </div>
+                        <span className="meeting-detail-transcript__time-subtitle">
+                          {timeString}
                         </span>
-                        <span>{seg.text}</span>
                       </div>
                     </div>
                   );
@@ -698,7 +753,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
           {activeTab === "summary" && (
             <motion.div
               key="summary"
-              className={`meeting-detail-split ${activeSummary || isGeneratingSummary ? "" : "meeting-detail-split--no-rail"}`}
+              ref={summarySplitRef}
+              className="meeting-detail-split"
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
@@ -714,6 +770,29 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                       AI Summary
                     </h3>
                     <div className="meeting-detail-summary-panel__actions">
+                      {hasSummaryContent && !isChatRailOpen && (
+                        <motion.button
+                          type="button"
+                          className="meeting-detail-btn meeting-detail-btn--secondary"
+                          onClick={() => setIsChatRailOpen(true)}
+                          title="Show Q&A"
+                          initial={{ opacity: 0, x: 10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{
+                            duration: 0.25,
+                            ease: [0.16, 1, 0.3, 1],
+                          }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.97 }}
+                        >
+                          <MessageCircle
+                            size={14}
+                            className="meeting-detail-btn__icon"
+                            aria-hidden
+                          />
+                          Q&A
+                        </motion.button>
+                      )}
                       {activeSummary && (
                         <button
                           type="button"
@@ -781,108 +860,165 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                   </div>
                 </div>
               </div>
-              {(activeSummary || isGeneratingSummary) && (
-                <aside className="meeting-detail-rail">
-                  <div className="meeting-detail-rail__header">
-                    <span className="meeting-detail-rail__label">
-                      <MessageCircle
-                        size={12}
-                        style={{ verticalAlign: -2, marginRight: 4 }}
-                      />
-                      Q&A
-                    </span>
-                    <p className="meeting-detail-rail__hint">
-                      Ask about this meeting. Use suggested questions or type
-                      your own.
-                    </p>
-                  </div>
-                  <div className="meeting-detail-rail__section">
-                    <div className="meeting-detail-rail__section-title">
-                      Suggested questions
-                    </div>
-                    {isLoadingSuggestedQuestions ? (
-                      <p className="meeting-detail-rail__suggestions-loading">
-                        Loading…
-                      </p>
-                    ) : (
-                      (suggestedQuestions && suggestedQuestions.length > 0
-                        ? suggestedQuestions
-                        : DEFAULT_SUGGESTED_QUESTIONS
-                      ).map((q) => (
-                        <button
-                          key={q}
-                          type="button"
-                          className="meeting-detail-rail__chip"
-                          onClick={() => handleSendChatMessage(undefined, q)}
-                          disabled={
-                            !activeSummary ||
-                            isSendingChat ||
-                            isThisMeetingRecording
-                          }
-                        >
-                          {q}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                  <div className="meeting-detail-rail__section meeting-detail-rail__section--conversation">
-                    <div className="meeting-detail-rail__section-title">
-                      Conversation
-                    </div>
-                    <div
-                      ref={chatScrollRef}
-                      className="meeting-detail-rail__messages"
-                    >
-                      {chatMessages.length === 0 && !isSendingChat ? (
-                        <p className="meeting-detail-rail__empty">
-                          Your questions and answers appear here.
-                        </p>
-                      ) : (
-                        <>
-                          {chatMessages.map((msg) => (
-                            <div
-                              key={msg.id}
-                              className={`meeting-detail-rail__msg meeting-detail-rail__msg--${msg.role}`}
-                            >
-                              <div className="meeting-detail-rail__msg-body">
-                                <ReactMarkdown>{msg.content}</ReactMarkdown>
-                              </div>
-                            </div>
-                          ))}
-                          {isSendingChat && (
-                            <div className="meeting-detail-rail__msg meeting-detail-rail__msg--assistant meeting-detail-rail__msg--loading">
-                              <span className="meeting-detail-rail__loading-dots" />
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <form
-                      onSubmit={handleSendChatMessage}
-                      className="meeting-detail-rail__form"
-                    >
-                      <input
-                        type="text"
-                        className="meeting-detail-rail__input"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="Ask a question..."
-                        disabled={isSendingChat || isThisMeetingRecording}
-                      />
-                      <button
-                        type="submit"
-                        className="meeting-detail-btn meeting-detail-btn--primary meeting-detail-rail__submit"
-                        disabled={
-                          isSendingChat ||
-                          !chatInput.trim() ||
-                          isThisMeetingRecording
+              {hasSummaryContent && (
+                <motion.div
+                  className="meeting-detail-split__rail-host"
+                  initial={false}
+                  animate={
+                    isNarrowSplit
+                      ? {
+                          maxHeight: showSummaryChatRail ? 9999 : 0,
+                          opacity: showSummaryChatRail ? 1 : 0,
+                          width: "100%",
                         }
+                      : {
+                          width: showSummaryChatRail ? railOuterWidthPx : 0,
+                          opacity: 1,
+                        }
+                  }
+                  transition={
+                    isNarrowSplit
+                      ? {
+                          maxHeight: RAIL_PANEL_TRANSITION,
+                          opacity: { duration: 0.42, ease: [0.16, 1, 0.3, 1] },
+                        }
+                      : {
+                          width: RAIL_PANEL_TRANSITION,
+                          opacity: { duration: 0.2 },
+                        }
+                  }
+                  style={{
+                    overflow: "hidden",
+                    flexShrink: 0,
+                    pointerEvents: showSummaryChatRail ? "auto" : "none",
+                  }}
+                >
+                  <motion.div
+                    className="meeting-detail-split__rail-bundle"
+                    style={{
+                      width: isNarrowSplit ? "100%" : railOuterWidthPx,
+                      minWidth: isNarrowSplit ? 0 : railOuterWidthPx,
+                      boxSizing: "border-box",
+                    }}
+                    initial={false}
+                    animate={{
+                      x: isNarrowSplit
+                        ? 0
+                        : showSummaryChatRail
+                          ? 0
+                          : Math.min(18, railOuterWidthPx * 0.04),
+                    }}
+                    transition={RAIL_PANEL_TRANSITION}
+                  >
+                    <div
+                      className="meeting-detail-split__gutter"
+                      role="separator"
+                      aria-orientation={
+                        isNarrowSplit ? "horizontal" : "vertical"
+                      }
+                    >
+                      <motion.button
+                        type="button"
+                        className="meeting-detail-split__divider-btn"
+                        onClick={() => setIsChatRailOpen(false)}
+                        title="Collapse Q&A"
+                        aria-label="Collapse Q&A"
+                        whileHover={{ scale: 1.08 }}
+                        whileTap={{ scale: 0.9 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 28,
+                        }}
                       >
-                        Send
-                      </button>
-                    </form>
-                  </div>
-                </aside>
+                        <ChevronRight size={14} strokeWidth={2} />
+                      </motion.button>
+                    </div>
+                    <aside className="meeting-detail-rail">
+                      <div className="meeting-detail-rail__header">
+                        <span className="meeting-detail-rail__label">
+                          <MessageCircle
+                            size={12}
+                            style={{ verticalAlign: -2, marginRight: 4 }}
+                          />
+                          Q&A
+                        </span>
+                        <p className="meeting-detail-rail__hint">
+                          Ask about this meeting. Use suggested questions or
+                          type your own.
+                        </p>
+                      </div>
+                      <div className="meeting-detail-rail__section">
+                        <div className="meeting-detail-rail__section-title">
+                          Suggested questions
+                        </div>
+                        {isLoadingSuggestedQuestions ? (
+                          <p className="meeting-detail-rail__suggestions-loading">
+                            Loading…
+                          </p>
+                        ) : (
+                          (suggestedQuestions && suggestedQuestions.length > 0
+                            ? suggestedQuestions
+                            : DEFAULT_SUGGESTED_QUESTIONS
+                          ).map((q) => (
+                            <button
+                              key={q}
+                              type="button"
+                              className="meeting-detail-rail__chip"
+                              onClick={() =>
+                                handleSendChatMessage(undefined, q)
+                              }
+                              disabled={
+                                !activeSummary ||
+                                isSendingChat ||
+                                isThisMeetingRecording
+                              }
+                            >
+                              {q}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                      <div className="meeting-detail-rail__section meeting-detail-rail__section--conversation">
+                        <div className="meeting-detail-rail__section-title">
+                          Conversation
+                        </div>
+                        {chatMessages.length === 0 && !isSendingChat ? (
+                          <div className="meeting-detail-rail__empty-with-form">
+                            <p className="meeting-detail-rail__empty">
+                              Your questions and answers appear here.
+                            </p>
+                            {chatInputForm}
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              ref={chatScrollRef}
+                              className="meeting-detail-rail__messages"
+                            >
+                              {chatMessages.map((msg) => (
+                                <div
+                                  key={msg.id}
+                                  className={`meeting-detail-rail__msg meeting-detail-rail__msg--${msg.role}`}
+                                >
+                                  <div className="meeting-detail-rail__msg-body">
+                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                  </div>
+                                </div>
+                              ))}
+                              {isSendingChat && (
+                                <div className="meeting-detail-rail__msg meeting-detail-rail__msg--assistant meeting-detail-rail__msg--loading">
+                                  <span className="meeting-detail-rail__loading-dots" />
+                                </div>
+                              )}
+                            </div>
+                            {chatInputForm}
+                          </>
+                        )}
+                      </div>
+                    </aside>
+                  </motion.div>
+                </motion.div>
               )}
             </motion.div>
           )}

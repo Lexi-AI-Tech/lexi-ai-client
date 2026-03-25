@@ -6,6 +6,7 @@ import {
   Mic,
   Power,
   Keyboard,
+  Atom,
   ChevronDown,
   Check,
   RefreshCw,
@@ -22,7 +23,7 @@ import { useAuthStore } from "../store/authStore";
 import { useUpdaterStore } from "../store/updaterStore";
 import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 
 type DefaultHotkeysResponse = {
   hotkeys: string[];
@@ -467,7 +468,7 @@ export const SettingsPage: React.FC = () => {
     return (
       <div className="page">
         <h2 className="page__title">Settings</h2>
-        <PageLoader className="page__empty" />
+        <ScreenSkeleton variant="settings" className="page__empty" />
       </div>
     );
   }
@@ -732,6 +733,7 @@ export const SettingsPage: React.FC = () => {
               <div className="mb-16">
                 <HotkeySelector
                   label="Action Hotkeys"
+                  titleIcon={<Atom size={16} strokeWidth={2} />}
                   description={`Hold ${currentActionHotkeys.hotkeys.length > 0 && !currentActionHotkeys.hotkeys[0].includes("+") ? "this key" : "this hotkey combination"} to record a voice command for actions`}
                   value={currentActionHotkeys}
                   onChange={setCurrentActionHotkeys}

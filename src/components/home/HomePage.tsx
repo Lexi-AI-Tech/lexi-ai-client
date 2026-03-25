@@ -18,7 +18,6 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 import type { HotkeyConfig } from "../../types";
-import { PageLoader } from "../ui/PageLoader";
 import "./home.css";
 
 // Analytics interfaces
@@ -200,6 +199,10 @@ interface PeriodButtonProps {
   onClick: () => void;
 }
 
+interface HomePageProps {
+  onViewAllTranscripts?: () => void;
+}
+
 const PeriodButton: React.FC<PeriodButtonProps> = ({
   label,
   active,
@@ -214,9 +217,89 @@ const PeriodButton: React.FC<PeriodButtonProps> = ({
   </button>
 );
 
-export const HomePage: React.FC = () => {
+const SkBlock: React.FC<{
+  className?: string;
+  style?: React.CSSProperties;
+}> = ({ className, style }) => (
+  <div className={`skeleton-block ${className ?? ""}`.trim()} style={style} />
+);
+
+const HomeStatsSkeleton: React.FC = () => (
+  <div className="home-stats-skeleton" aria-hidden>
+    {Array.from({ length: 3 }).map((_, i) => (
+      <div key={i} className="home-stats-skeleton__card">
+        <SkBlock className="home-stats-skeleton__icon" />
+        <div className="home-stats-skeleton__lines">
+          <SkBlock style={{ height: 28, width: "55%", borderRadius: 8 }} />
+          <SkBlock style={{ height: 14, width: "42%", borderRadius: 6 }} />
+          <SkBlock style={{ height: 12, width: "68%", borderRadius: 6 }} />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const HomeBillingSkeleton: React.FC = () => (
+  <div className="home-billing-skeleton" aria-hidden>
+    {Array.from({ length: 3 }).map((_, i) => (
+      <div key={i} className="home-billing-skeleton__row">
+        <SkBlock
+          style={{
+            height: 12,
+            width: "38%",
+            borderRadius: 6,
+            marginBottom: 10,
+          }}
+        />
+        <SkBlock
+          style={{ height: 14, width: "72%", borderRadius: 8, marginBottom: 8 }}
+        />
+        <SkBlock style={{ height: 10, width: "48%", borderRadius: 6 }} />
+      </div>
+    ))}
+  </div>
+);
+
+const HomeAnalyticsSkeleton: React.FC = () => {
+  const barHeights = [28, 52, 36, 64, 44, 58, 32, 48, 40, 56];
+  return (
+    <div className="home-analytics-skeleton" aria-hidden>
+      <div className="home-analytics-skeleton__main">
+        <SkBlock style={{ width: 48, height: 48, borderRadius: 12 }} />
+        <SkBlock style={{ height: 40, width: "45%", borderRadius: 10 }} />
+        <SkBlock style={{ height: 12, width: "62%", borderRadius: 6 }} />
+      </div>
+      <div className="home-analytics-skeleton__chart">
+        <div className="home-analytics-skeleton__bars">
+          {barHeights.map((h, i) => (
+            <SkBlock
+              key={i}
+              className="home-analytics-skeleton__bar"
+              style={{ height: h }}
+            />
+          ))}
+        </div>
+        <div className="home-analytics-skeleton__labels">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <SkBlock key={i} style={{ flex: 1, height: 10, borderRadius: 4 }} />
+          ))}
+        </div>
+      </div>
+      <div className="home-analytics-skeleton__insights">
+        <SkBlock style={{ height: 12, width: "100%", borderRadius: 6 }} />
+        <SkBlock style={{ height: 12, width: "88%", borderRadius: 6 }} />
+      </div>
+    </div>
+  );
+};
+
+export const HomePage: React.FC<HomePageProps> = ({
+  onViewAllTranscripts: _onViewAllTranscripts,
+}) => {
   const { user, isAuthenticated, tokens } = useAuthStore();
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [chartLoading, setChartLoading] = useState(false);
   const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
   const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(
     [],
@@ -266,47 +349,63 @@ export const HomePage: React.FC = () => {
     [isAuthenticated, tokens?.access_token],
   );
 
-  // Initial load: fetch all dashboard data once, then show content
   useEffect(() => {
     if (!isAuthenticated || !tokens?.access_token) {
-      setInitialLoadDone(true);
+      setBillingLoading(false);
+      setStatsLoading(false);
       return;
     }
     let cancelled = false;
+    setBillingLoading(true);
     (async () => {
       try {
-        await Promise.all([
-          fetchBillingUsage(),
-          fetchStats(),
-          fetchChart("7d"),
-        ]);
-      } catch {
-        /* individual handlers log */
+        await fetchBillingUsage();
+      } finally {
+        if (!cancelled) setBillingLoading(false);
       }
-      if (!cancelled) setInitialLoadDone(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [
-    isAuthenticated,
-    tokens?.access_token,
-    fetchBillingUsage,
-    fetchStats,
-    fetchChart,
-  ]);
+  }, [isAuthenticated, tokens?.access_token, fetchBillingUsage]);
 
-  // Refetch chart when period changes (after initial load)
   useEffect(() => {
-    if (!initialLoadDone || !isAuthenticated || !tokens?.access_token) return;
-    fetchChart(activePeriod);
-  }, [
-    initialLoadDone,
-    activePeriod,
-    fetchChart,
-    isAuthenticated,
-    tokens?.access_token,
-  ]);
+    if (!isAuthenticated || !tokens?.access_token) {
+      setStatsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setStatsLoading(true);
+    (async () => {
+      try {
+        await fetchStats();
+      } finally {
+        if (!cancelled) setStatsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, tokens?.access_token, fetchStats]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !tokens?.access_token) {
+      setChartLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setChartLoading(true);
+    (async () => {
+      try {
+        await fetchChart(activePeriod);
+      } finally {
+        if (!cancelled) setChartLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, tokens?.access_token, activePeriod, fetchChart]);
 
   useEffect(() => {
     const fetchHotkey = async () => {
@@ -334,28 +433,17 @@ export const HomePage: React.FC = () => {
     data: [],
     total_transcriptions: 0,
   };
+  const planUsageRows = useMemo(
+    () =>
+      billingUsage?.features
+        ? sortPlanUsageFeatures(billingUsage.features)
+        : ([] as FeatureUsageEntry[]),
+    [billingUsage],
+  );
   const maxChartValue = useMemo(
     () => Math.max(...resolvedChartData.data, 1),
     [resolvedChartData.data],
   );
-
-  if (!initialLoadDone) {
-    return (
-      <div className="home-container">
-        <header className="home-header">
-          <div className="greeting-section">
-            <h1 className="greeting-text">
-              {getGreeting()}, <span className="user-name">{userName}</span>
-            </h1>
-            <p className="greeting-sub">
-              Ready to transform your voice into text?
-            </p>
-          </div>
-        </header>
-        <PageLoader className="home-loading-full" />
-      </div>
-    );
-  }
 
   return (
     <motion.div
@@ -398,32 +486,36 @@ export const HomePage: React.FC = () => {
       )}
 
       <motion.section className="stats-section" variants={itemVariants}>
-        <div className="stats-grid">
-          <StatCard
-            icon={FileText}
-            label="Words Typed"
-            value={resolvedStats.words_typed_this_week.toLocaleString()}
-            subValue="this week"
-            accentColor="var(--lexi-primary-muted)"
-            iconColor="var(--lexi-primary)"
-          />
-          <StatCard
-            icon={Clock}
-            label="Time Saved"
-            value={`${resolvedStats.time_saved_minutes}m`}
-            subValue="vs typing"
-            accentColor="var(--lexi-primary-muted)"
-            iconColor="var(--lexi-primary)"
-          />
-          <StatCard
-            icon={Flame}
-            label="Streak"
-            value={`${resolvedStats.current_streak}`}
-            subValue="days"
-            accentColor="rgba(245, 158, 11, 0.2)"
-            iconColor="#d97706"
-          />
-        </div>
+        {isAuthenticated && statsLoading ? (
+          <HomeStatsSkeleton />
+        ) : (
+          <div className="stats-grid">
+            <StatCard
+              icon={FileText}
+              label="Words Typed"
+              value={resolvedStats.words_typed_this_week.toLocaleString()}
+              subValue="this week"
+              accentColor="var(--lexi-primary-muted)"
+              iconColor="var(--lexi-primary)"
+            />
+            <StatCard
+              icon={Clock}
+              label="Time Saved"
+              value={`${resolvedStats.time_saved_minutes}m`}
+              subValue="vs typing"
+              accentColor="var(--lexi-primary-muted)"
+              iconColor="var(--lexi-primary)"
+            />
+            <StatCard
+              icon={Flame}
+              label="Streak"
+              value={`${resolvedStats.current_streak}`}
+              subValue="days"
+              accentColor="rgba(245, 158, 11, 0.2)"
+              iconColor="#d97706"
+            />
+          </div>
+        )}
       </motion.section>
 
       <div className="home-grid">
@@ -449,66 +541,63 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          {!billingUsage ? (
-            <p className="billing-usage-empty">
-              Could not load usage. Check your connection and try again.
-            </p>
-          ) : (
-            <ul className="billing-feature-list">
-              {sortPlanUsageFeatures(billingUsage.features).map((f) => {
-                const pro = isProPlan(billingUsage.plan_type);
-                return (
-                  <li key={f.feature_key} className="billing-feature-row">
-                    <div className="billing-feature-info">
-                      <span className="billing-feature-name">
-                        {featureLabel(f.feature_key)}
-                      </span>
-                      {!f.enabled && (
-                        <span className="billing-feature-disabled">
-                          Not on plan
-                        </span>
-                      )}
-                    </div>
-                    <div className="billing-feature-usage">
-                      {pro ? (
-                        <div
-                          className="billing-usage-numbers billing-usage-numbers--infinity"
-                          aria-label={`${f.used} out of unlimited`}
-                        >
-                          {f.used} /{" "}
-                          <span className="billing-infinity" title="Unlimited">
-                            ∞
-                          </span>
-                        </div>
-                      ) : f.metered && f.limit_value != null ? (
-                        <>
-                          <div className="billing-usage-numbers">
-                            {f.used} / {f.limit_value}
-                          </div>
-                          <div className="billing-usage-bar">
-                            <div
-                              className="billing-usage-bar-fill"
-                              style={{
-                                width: `${Math.min(
-                                  100,
-                                  (f.used / Math.max(f.limit_value, 1)) * 100,
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <span className="billing-usage-unlimited">
-                          {f.used > 0 ? `${f.used} used` : "—"}
-                          {!f.metered && " · Unlimited"}
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <div className="transcriptions-list">
+            {isAuthenticated && billingLoading ? (
+              <HomeBillingSkeleton />
+            ) : !isAuthenticated ? (
+              <div className="empty-state">
+                <div className="empty-icon">
+                  <FileText size={32} />
+                </div>
+                <p className="empty-title">Plan usage</p>
+                <p className="empty-sub">
+                  Sign in to see limits and usage for your plan.
+                </p>
+              </div>
+            ) : !billingUsage ? (
+              <div className="empty-state">
+                <div className="empty-icon">
+                  <FileText size={32} />
+                </div>
+                <p className="empty-title">Couldn&apos;t load plan usage</p>
+                <p className="empty-sub">
+                  Check your connection and try again.
+                </p>
+              </div>
+            ) : planUsageRows.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">
+                  <FileText size={32} />
+                </div>
+                <p className="empty-title">No plan usage yet</p>
+                <p className="empty-sub">
+                  Usage will appear once activity starts.
+                </p>
+              </div>
+            ) : (
+              planUsageRows.map((feature) => (
+                <motion.div
+                  key={feature.feature_key}
+                  className="transcript-card"
+                  whileHover={{ scale: 1.01 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="transcript-card-header"></div>
+                  <p className="transcript-preview">
+                    {featureLabel(feature.feature_key)}
+                  </p>
+                  <div className="transcript-meta">
+                    <span>{feature.used}</span>
+                    <span>used</span>
+                    {feature.limit_value !== null && (
+                      <span>• {feature.limit_value} limit</span>
+                    )}
+                    <span>• {feature.enabled ? "Enabled" : "Disabled"}</span>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </div>
         </motion.section>
 
         <motion.section className="analytics-section" variants={itemVariants}>
@@ -534,69 +623,75 @@ export const HomePage: React.FC = () => {
           </div>
 
           <div className="analytics-content">
-            <div className="analytics-main-stat">
-              <div className="analytics-icon">
-                <TrendingUp size={24} />
-              </div>
-              <div className="analytics-value">
-                {resolvedChartData.total_transcriptions}
-              </div>
-              <div className="analytics-label">
-                Transcriptions in{" "}
-                {activePeriod === "1d"
-                  ? "24 hours"
-                  : activePeriod === "7d"
-                    ? "7 days"
-                    : "30 days"}
-              </div>
-            </div>
+            {isAuthenticated && chartLoading ? (
+              <HomeAnalyticsSkeleton />
+            ) : (
+              <>
+                <div className="analytics-main-stat">
+                  <div className="analytics-icon">
+                    <TrendingUp size={24} />
+                  </div>
+                  <div className="analytics-value">
+                    {resolvedChartData.total_transcriptions}
+                  </div>
+                  <div className="analytics-label">
+                    Transcriptions in{" "}
+                    {activePeriod === "1d"
+                      ? "24 hours"
+                      : activePeriod === "7d"
+                        ? "7 days"
+                        : "30 days"}
+                  </div>
+                </div>
 
-            <div className="analytics-chart">
-              <div className="chart-bars">
-                {resolvedChartData.data.map((value, i) => (
-                  <div
-                    key={i}
-                    className="chart-bar"
-                    style={
-                      {
-                        ["--chart-height" as string]: `${(value / maxChartValue) * 100}%`,
-                        ["--chart-opacity" as string]:
-                          i === resolvedChartData.data.length - 1 ? 1 : 0.5,
-                        ["--chart-min-height" as string]:
-                          value > 0 ? "4px" : "0",
-                      } as React.CSSProperties
-                    }
-                    title={`${value} transcriptions`}
-                  />
-                ))}
-              </div>
-              <div className="chart-labels">
-                {resolvedChartData.labels.map((label, i) => (
-                  <span key={i}>{label}</span>
-                ))}
-              </div>
-            </div>
+                <div className="analytics-chart">
+                  <div className="chart-bars">
+                    {resolvedChartData.data.map((value, i) => (
+                      <div
+                        key={i}
+                        className="chart-bar"
+                        style={
+                          {
+                            ["--chart-height" as string]: `${(value / maxChartValue) * 100}%`,
+                            ["--chart-opacity" as string]:
+                              i === resolvedChartData.data.length - 1 ? 1 : 0.5,
+                            ["--chart-min-height" as string]:
+                              value > 0 ? "4px" : "0",
+                          } as React.CSSProperties
+                        }
+                        title={`${value} transcriptions`}
+                      />
+                    ))}
+                  </div>
+                  <div className="chart-labels">
+                    {resolvedChartData.labels.map((label, i) => (
+                      <span key={i}>{label}</span>
+                    ))}
+                  </div>
+                </div>
 
-            <div className="analytics-insights">
-              <div className="insight-item">
-                <span className="insight-dot success" />
-                <span className="insight-text">
-                  {resolvedChartData.total_transcriptions} successful this
-                  period
-                </span>
-              </div>
-              <div className="insight-item">
-                <span className="insight-dot info" />
-                <span className="insight-text">
-                  Avg.{" "}
-                  {Math.round(
-                    resolvedStats.words_typed_this_week /
-                      Math.max(resolvedChartData.total_transcriptions, 1),
-                  )}{" "}
-                  words per session
-                </span>
-              </div>
-            </div>
+                <div className="analytics-insights">
+                  <div className="insight-item">
+                    <span className="insight-dot success" />
+                    <span className="insight-text">
+                      {resolvedChartData.total_transcriptions} successful this
+                      period
+                    </span>
+                  </div>
+                  <div className="insight-item">
+                    <span className="insight-dot info" />
+                    <span className="insight-text">
+                      Avg.{" "}
+                      {Math.round(
+                        resolvedStats.words_typed_this_week /
+                          Math.max(resolvedChartData.total_transcriptions, 1),
+                      )}{" "}
+                      words per session
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </motion.section>
       </div>

@@ -6,6 +6,7 @@
 //! Only runtime state that needs to be in-memory (like task handles, recording state) is stored here.
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokio::sync::{mpsc, watch};
@@ -18,6 +19,9 @@ pub struct HotkeyWatchState(pub watch::Sender<Vec<String>>);
 
 /// State for watch sender (to broadcast action hotkey changes)
 pub struct ActionHotkeyWatchState(pub watch::Sender<Vec<String>>);
+
+/// When true, recording stop does not call transcription / action / doc processors (onboarding hotkey test).
+pub struct OnboardingRecordingDryRun(pub Arc<AtomicBool>);
 
 /// In-memory shortcuts command cache used by transcription pipeline.
 ///

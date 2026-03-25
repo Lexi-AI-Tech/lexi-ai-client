@@ -18,9 +18,7 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
-    sans-serif;
+  font-family: var(--lexi-font-body);
 }
 
 .docs-page__header {
@@ -831,12 +829,13 @@
 }
 
 .docs-editor-actions .docs-btn-delete {
-  background: #fef2f2;
-  color: #dc2626;
+  background: var(--lexi-surface-overlay);
+  color: var(--lexi-text-muted);
 }
 
 .docs-editor-actions .docs-btn-delete:hover {
-  background: #fee2e2;
+  background: var(--lexi-danger-muted);
+  color: var(--lexi-danger);
 }
 
 .docs-modal-overlay {
@@ -900,12 +899,15 @@
 }
 
 .docs-modal-btn-delete {
-  background: #dc2626;
-  color: #fff;
+  background: transparent;
+  border: 1px solid var(--lexi-border);
+  color: var(--lexi-text-muted);
 }
 
-.docs-modal-btn-delete:hover {
-  background: #b91c1c;
+.docs-modal-btn-delete:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
 }
 
 .docs-modal-btn-delete:disabled {

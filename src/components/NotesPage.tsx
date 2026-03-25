@@ -1,18 +1,11 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  Search,
-  LayoutGrid,
-  RefreshCw,
-  Edit,
-  Trash2,
-  X,
-  Copy,
-  Check,
-} from "lucide-react";
+import { LayoutGrid, RefreshCw, Edit, Trash2, Copy, Check } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
+import { formatAppDateTime } from "../lib/dateUtils";
 import "./home/home.css";
 
 type ViewMode = "list" | "grid";
@@ -23,8 +16,6 @@ export const NotesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hoveredNoteId, setHoveredNoteId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -150,34 +141,26 @@ export const NotesPage: React.FC = () => {
     }
   };
 
-  // Filter notes based on search query
-  const filteredNotes = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return notes;
-    }
-    const query = searchQuery.toLowerCase();
-    return notes.filter((note) => note.content.toLowerCase().includes(query));
-  }, [notes, searchQuery]);
-
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === "list" ? "grid" : "list"));
   };
 
-  const handleSearchClick = () => {
-    setShowSearch((prev) => !prev);
-    if (showSearch) {
-      setSearchQuery("");
-    }
+  const NOTES_GRID_VARIANTS = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.06, delayChildren: 0.08 },
+    },
   };
 
-  if (loading) {
-    return (
-      <div className="page">
-        <h2 className="page__title">Notes</h2>
-        <PageLoader className="page__empty" />
-      </div>
-    );
-  }
+  const NOTES_CARD_VARIANTS = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: [0.22, 0.61, 0.36, 1] as const },
+    },
+  };
 
   return (
     <div
@@ -185,14 +168,13 @@ export const NotesPage: React.FC = () => {
         padding: "2rem 2.5rem",
         background: "#ffffff",
         minHeight: "100vh",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        fontFamily: "var(--lexi-font-body)",
       }}
     >
       <h2
         style={{
           margin: 0,
-          marginBottom: "2rem",
+          marginBottom: "0.25rem",
           fontSize: "24px",
           fontWeight: 600,
           color: "#111827",
@@ -201,6 +183,15 @@ export const NotesPage: React.FC = () => {
       >
         Notes
       </h2>
+      {loading && notes.length === 0 ? (
+        <p className="app-page-subtitle" style={{ marginBottom: "1.75rem" }}>
+          Loading…
+        </p>
+      ) : notes.length > 0 ? (
+        <p className="app-page-subtitle" style={{ marginBottom: "1.75rem" }}>
+          {notes.length} {notes.length === 1 ? "note" : "notes"}
+        </p>
+      ) : null}
       {/* Quick Thoughts Section */}
       <div style={{ marginBottom: "48px" }}>
         <h2
@@ -323,36 +314,6 @@ export const NotesPage: React.FC = () => {
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <button
               type="button"
-              onClick={handleSearchClick}
-              style={{
-                background: showSearch ? "#f3f4f6" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: showSearch ? "#111827" : "#9ca3af",
-                padding: "4px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "4px",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!showSearch) {
-                  e.currentTarget.style.backgroundColor = "#f3f4f6";
-                  e.currentTarget.style.color = "#111827";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!showSearch) {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "#9ca3af";
-                }
-              }}
-            >
-              <Search size={16} />
-            </button>
-            <button
-              type="button"
               onClick={toggleViewMode}
               style={{
                 background: viewMode === "grid" ? "#f3f4f6" : "transparent",
@@ -410,90 +371,28 @@ export const NotesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Search Input */}
-        {showSearch && (
-          <div
-            style={{
-              marginBottom: "16px",
-              position: "relative",
-            }}
-          >
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search notes..."
-              autoFocus
-              style={{
-                width: "100%",
-                padding: "10px 40px 10px 12px",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                fontSize: "14px",
-                fontFamily: "inherit",
-                outline: "none",
-                transition: "all 0.2s ease",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#d1d5db";
-                e.currentTarget.style.boxShadow =
-                  "0 0 0 3px rgba(0, 0, 0, 0.05)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                style={{
-                  position: "absolute",
-                  right: "8px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "#9ca3af",
-                  padding: "4px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f3f4f6";
-                  e.currentTarget.style.color = "#111827";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "#9ca3af";
-                }}
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Notes List */}
-        {filteredNotes.length === 0 ? (
-          <div
+        {loading && notes.length === 0 ? (
+          <ScreenSkeleton variant="notes" className="notes-loading-inline" />
+        ) : notes.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35, ease: [0.22, 0.61, 0.36, 1] }}
             style={{
               textAlign: "center",
               padding: "60px 20px",
               color: "#9ca3af",
             }}
           >
-            <p style={{ margin: 0, fontSize: "14px" }}>
-              {searchQuery ? "No notes match your search" : "No notes found"}
-            </p>
-          </div>
+            <p style={{ margin: 0, fontSize: "14px" }}>No notes found</p>
+          </motion.div>
         ) : (
-          <div
+          <motion.div
+            key={viewMode}
+            variants={NOTES_GRID_VARIANTS}
+            initial="hidden"
+            animate="visible"
             style={{
               display: viewMode === "grid" ? "grid" : "flex",
               flexDirection: viewMode === "list" ? "column" : undefined,
@@ -504,9 +403,10 @@ export const NotesPage: React.FC = () => {
               gap: "12px",
             }}
           >
-            {filteredNotes.map((note) => (
-              <div
+            {notes.map((note) => (
+              <motion.div
                 key={note.id}
+                variants={NOTES_CARD_VARIANTS}
                 style={{
                   backgroundColor: "#ffffff",
                   border:
@@ -564,29 +464,7 @@ export const NotesPage: React.FC = () => {
                     type="button"
                     onClick={() => openDeleteConfirm(note.id)}
                     disabled={!!deletingId}
-                    style={{
-                      padding: "6px",
-                      backgroundColor: "#fef2f2",
-                      border: "none",
-                      borderRadius: "4px",
-                      cursor: deletingId ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#ef4444",
-                      transition: "all 0.2s ease",
-                      opacity: deletingId ? 0.6 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!deletingId) {
-                        e.currentTarget.style.backgroundColor = "#fee2e2";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!deletingId) {
-                        e.currentTarget.style.backgroundColor = "#fef2f2";
-                      }
-                    }}
+                    className="btn btn--icon-sm btn--icon-danger"
                     title="Delete note"
                   >
                     <Trash2 size={14} />
@@ -620,15 +498,11 @@ export const NotesPage: React.FC = () => {
                     paddingTop: "8px",
                   }}
                 >
-                  {new Date(note.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {formatAppDateTime(note.created_at)}
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
 

@@ -30,14 +30,43 @@
 }
 
 .auth-button.google-login {
-  background: #fff;
-  color: #333;
-  border: 1px solid #dadce0;
+  background: var(--lexi-surface-elevated);
+  color: var(--lexi-text);
+  border: 1px solid var(--lexi-border);
+  box-shadow: var(--lexi-shadow-sm);
+  border-radius: 0.75rem;
+  font-family: var(--lexi-font-body);
 }
 
 .auth-button.google-login:hover:not(:disabled) {
-  background: #f8f9fa;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: color-mix(
+    in srgb,
+    var(--lexi-primary-muted) 50%,
+    var(--lexi-surface-elevated)
+  );
+  border-color: color-mix(in srgb, var(--lexi-primary) 40%, var(--lexi-border));
+  box-shadow: var(--lexi-shadow-md);
+}
+
+.auth-button.google-login:active:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--lexi-primary-muted) 65%,
+    var(--lexi-surface-elevated)
+  );
+}
+
+.auth-button.google-login:focus-visible {
+  outline: 2px solid var(--lexi-primary);
+  outline-offset: 2px;
+}
+
+.auth-button.google-login .google-icon {
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(46, 59, 47, 0.08);
 }
 
 .auth-button.secondary {
@@ -53,6 +82,7 @@
 
 .google-icon {
   flex-shrink: 0;
+  display: block;
 }
 
 .auth-spinner {
