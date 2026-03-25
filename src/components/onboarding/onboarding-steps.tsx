@@ -57,7 +57,8 @@ async function resolveHotkeysForTryItStep(): Promise<DefaultHotkeysResponse> {
     // Same path as Rust `local_onboarding_hotkey_fallback`
   }
   if (!hotkeys.length) hotkeys = [...LOCAL_HOTKEY_FALLBACK.hotkeys];
-  if (!action_hotkeys.length) action_hotkeys = [...LOCAL_HOTKEY_FALLBACK.action_hotkeys];
+  if (!action_hotkeys.length)
+    action_hotkeys = [...LOCAL_HOTKEY_FALLBACK.action_hotkeys];
   return { hotkeys, action_hotkeys };
 }
 
@@ -520,8 +521,7 @@ export function SetupStep({
     };
   }, []);
 
-  const verifiedCount =
-    (transcriptionTested ? 1 : 0) + (actionTested ? 1 : 0);
+  const verifiedCount = (transcriptionTested ? 1 : 0) + (actionTested ? 1 : 0);
   const canContinue =
     !configLoading &&
     transcriptionHotkeys.length > 0 &&
@@ -540,12 +540,15 @@ export function SetupStep({
       <div className="step-header">
         <h1 className="step-title">Try your shortcuts</h1>
         <p className="step-description">
-          These are Lexi’s default shortcuts (what most people use
-          after setup). Press and hold each once — your mic turns on, then release
-          to stop. Nothing is sent for transcription or voice actions during this
-          step; we only verify the keys work.
+          These are Lexi’s default shortcuts (what most people use after setup).
+          Press and hold each once — your mic turns on, then release to stop.
+          Nothing is sent for transcription or voice actions during this step;
+          we only verify the keys work.
         </p>
-        <div className="permissions-progress hotkey-test-progress" aria-label="Shortcut test progress">
+        <div
+          className="permissions-progress hotkey-test-progress"
+          aria-label="Shortcut test progress"
+        >
           <div className="permissions-progress__track">
             <div
               className="permissions-progress__fill"
@@ -750,8 +753,7 @@ export function TryItStep({
     };
   }, []);
 
-  const triedCount =
-    (transcriptionDone ? 1 : 0) + (actionDone ? 1 : 0);
+  const triedCount = (transcriptionDone ? 1 : 0) + (actionDone ? 1 : 0);
   const canComplete = transcriptionDone || actionDone;
 
   const finaleChild = {
@@ -826,7 +828,11 @@ export function TryItStep({
             variants={finaleChild}
             initial="initial"
             animate="animate"
-            transition={{ duration: 0.5, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+            transition={{
+              duration: 0.5,
+              delay: 0.06,
+              ease: [0.22, 1, 0.36, 1],
+            }}
           >
             <div className="tryit-finale-card__glow" aria-hidden />
             <div className="tryit-finale-card__head">
@@ -901,9 +907,16 @@ export function TryItStep({
             variants={finaleChild}
             initial="initial"
             animate="animate"
-            transition={{ duration: 0.5, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            transition={{
+              duration: 0.5,
+              delay: 0.12,
+              ease: [0.22, 1, 0.36, 1],
+            }}
           >
-            <div className="tryit-finale-card__glow tryit-finale-card__glow--b" aria-hidden />
+            <div
+              className="tryit-finale-card__glow tryit-finale-card__glow--b"
+              aria-hidden
+            />
             <div className="tryit-finale-card__head">
               <div
                 className="tryit-finale-card__icon tryit-finale-card__icon--action"
@@ -934,7 +947,7 @@ export function TryItStep({
             <div className="tryit-textarea-wrapper tryit-finale-textarea-wrap">
               <textarea
                 className="tryit-textarea tryit-finale-textarea"
-                placeholder='Try saying e.g. “Write a poem in spanish”'
+                placeholder="Try saying e.g. “Write a poem in spanish”"
                 defaultValue=""
                 spellCheck={false}
               />
@@ -1088,23 +1101,50 @@ function OnboardingAbstractVisual({
             .join(" ")}
           aria-hidden
         />
-        <div className="visual-welcome-glow visual-welcome-glow--a" aria-hidden />
-        <div className="visual-welcome-glow visual-welcome-glow--b" aria-hidden />
-        <div className="visual-welcome-glow visual-welcome-glow--c" aria-hidden />
+        <div
+          className="visual-welcome-glow visual-welcome-glow--a"
+          aria-hidden
+        />
+        <div
+          className="visual-welcome-glow visual-welcome-glow--b"
+          aria-hidden
+        />
+        <div
+          className="visual-welcome-glow visual-welcome-glow--c"
+          aria-hidden
+        />
         {elevated && (
-          <div className="visual-welcome-glow visual-welcome-glow--d" aria-hidden />
+          <div
+            className="visual-welcome-glow visual-welcome-glow--d"
+            aria-hidden
+          />
         )}
         {peak && (
           <>
-            <div className="visual-welcome-glow visual-welcome-glow--e" aria-hidden />
-            <div className="visual-welcome-glow visual-welcome-glow--f" aria-hidden />
+            <div
+              className="visual-welcome-glow visual-welcome-glow--e"
+              aria-hidden
+            />
+            <div
+              className="visual-welcome-glow visual-welcome-glow--f"
+              aria-hidden
+            />
           </>
         )}
         {ultra && (
           <>
-            <div className="visual-welcome-glow visual-welcome-glow--g" aria-hidden />
-            <div className="visual-welcome-glow visual-welcome-glow--h" aria-hidden />
-            <div className="visual-welcome-glow visual-welcome-glow--i" aria-hidden />
+            <div
+              className="visual-welcome-glow visual-welcome-glow--g"
+              aria-hidden
+            />
+            <div
+              className="visual-welcome-glow visual-welcome-glow--h"
+              aria-hidden
+            />
+            <div
+              className="visual-welcome-glow visual-welcome-glow--i"
+              aria-hidden
+            />
           </>
         )}
         <svg
@@ -1196,23 +1236,33 @@ function OnboardingAbstractVisual({
 
 export function VisualSide({ step }: { step: number }) {
   if (step === 0) {
-    return <OnboardingAbstractVisual variant="welcome" motionKey="welcome-visual" />;
+    return (
+      <OnboardingAbstractVisual variant="welcome" motionKey="welcome-visual" />
+    );
   }
 
   if (step === 1) {
     return (
-      <OnboardingAbstractVisual variant="permissions" motionKey="permissions-visual" />
+      <OnboardingAbstractVisual
+        variant="permissions"
+        motionKey="permissions-visual"
+      />
     );
   }
 
   if (step === 2) {
     return (
-      <OnboardingAbstractVisual variant="shortcuts" motionKey="shortcuts-visual" />
+      <OnboardingAbstractVisual
+        variant="shortcuts"
+        motionKey="shortcuts-visual"
+      />
     );
   }
 
   if (step === 3) {
-    return <OnboardingAbstractVisual variant="finale" motionKey="finale-visual" />;
+    return (
+      <OnboardingAbstractVisual variant="finale" motionKey="finale-visual" />
+    );
   }
 
   return null;

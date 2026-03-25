@@ -316,8 +316,7 @@ pub fn spawn_recording_thread(
                                                     .emit("transcription_success", "");
                                             }
                                             RecordingMode::Action => {
-                                                let _ =
-                                                    app_handle_done.emit("action_success", "");
+                                                let _ = app_handle_done.emit("action_success", "");
                                             }
                                             RecordingMode::Doc => {
                                                 let _ = app_handle_done

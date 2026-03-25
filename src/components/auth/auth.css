@@ -44,11 +44,7 @@
     var(--lexi-primary-muted) 50%,
     var(--lexi-surface-elevated)
   );
-  border-color: color-mix(
-    in srgb,
-    var(--lexi-primary) 40%,
-    var(--lexi-border)
-  );
+  border-color: color-mix(in srgb, var(--lexi-primary) 40%, var(--lexi-border));
   box-shadow: var(--lexi-shadow-md);
 }
 

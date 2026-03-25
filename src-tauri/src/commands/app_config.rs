@@ -15,8 +15,8 @@ use crate::api_endpoints::app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::commands::shortcuts::Shortcut;
 use crate::state::{ActionHotkeyWatchState, HotkeyWatchState, OnboardingRecordingDryRun};
-use std::sync::atomic::Ordering;
 use crate::utils;
+use std::sync::atomic::Ordering;
 
 /// Application configuration structure
 ///
