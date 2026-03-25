@@ -38,7 +38,7 @@ const Q_A_RAIL_OUTER_WIDTH_PX = 504;
 const SPLIT_MIN_SUMMARY_WIDTH_PX = 260;
 
 const RAIL_PANEL_TRANSITION = {
-  duration: 0.45,
+  duration: 0.68,
   ease: [0.16, 1, 0.3, 1] as const,
 };
 
@@ -881,7 +881,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     isNarrowSplit
                       ? {
                           maxHeight: RAIL_PANEL_TRANSITION,
-                          opacity: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+                          opacity: { duration: 0.42, ease: [0.16, 1, 0.3, 1] },
                         }
                       : {
                           width: RAIL_PANEL_TRANSITION,
