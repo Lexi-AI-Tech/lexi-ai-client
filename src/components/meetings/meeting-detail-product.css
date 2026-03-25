@@ -332,6 +332,7 @@
   align-items: stretch;
   gap: 0;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, 0.06);
@@ -341,6 +342,7 @@
 }
 
 .meeting-detail-split__rail-host {
+  flex-grow: 0;
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -351,17 +353,28 @@
   align-items: stretch;
   height: 100%;
   flex-shrink: 0;
+  min-width: 0;
+  box-sizing: border-box;
+  /* One continuous Q&A surface (gutter + panel) — no white strip beside the divider */
+  background: radial-gradient(
+    circle at top,
+    rgba(15, 23, 42, 0.06),
+    transparent 65%
+  );
+  border-top-right-radius: 16px;
+  border-bottom-right-radius: 16px;
 }
 
 .meeting-detail-split__rail-bundle > .meeting-detail-split__gutter {
   flex: 0 0 24px;
   width: 24px;
+  min-width: 24px;
 }
 
 .meeting-detail-split__rail-bundle > .meeting-detail-rail {
   flex: 1 1 auto;
-  min-width: 260px;
-  max-width: 480px;
+  min-width: 0;
+  max-width: none;
 }
 
 .meeting-detail-split__gutter {
@@ -499,29 +512,28 @@
   box-shadow: none;
 }
 
-/* Right rail (Q&A) – left edge is .meeting-detail-split__gutter */
+/* Q&A column — background lives on .meeting-detail-split__rail-bundle */
 .meeting-detail-rail {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
   padding: 14px 16px 16px;
-  background: radial-gradient(
-    circle at top,
-    rgba(15, 23, 42, 0.06),
-    transparent 65%
-  );
-  border-top-right-radius: 16px;
-  border-bottom-right-radius: 16px;
+  background: transparent;
+  border-radius: 0;
 }
 
 @media (max-width: 900px) {
-  .meeting-detail-rail {
-    border-radius: 0 0 16px 16px;
+  .meeting-detail-split__rail-bundle {
+    border-radius: 0 0 15px 15px;
   }
 }
 
 .meeting-detail-rail__header {
   flex-shrink: 0;
+  min-width: 0;
   margin-bottom: 12px;
 }
 
@@ -541,11 +553,13 @@
   font-size: 12px;
   color: var(--lexi-text-muted);
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .meeting-detail-rail__section {
   margin-top: 14px;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 .meeting-detail-rail__section--conversation {
@@ -579,6 +593,9 @@
   align-items: center;
   justify-content: flex-start;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 8px 10px;
   margin-bottom: 6px;
   border-radius: 999px;
@@ -589,6 +606,7 @@
   font-weight: 500;
   cursor: pointer;
   text-align: left;
+  overflow-wrap: anywhere;
   transition:
     background 0.15s ease,
     transform 0.15s ease,
@@ -942,13 +960,13 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .meeting-detail-transcript__scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 1rem 1.125rem;
   background: linear-gradient(
     180deg,
     rgba(249, 250, 251, 0.5) 0%,
@@ -959,9 +977,13 @@
 }
 
 .meeting-detail-transcript__segment {
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.65rem;
   display: flex;
   flex-direction: column;
+}
+
+.meeting-detail-transcript__segment:last-child {
+  margin-bottom: 0;
 }
 
 .meeting-detail-transcript__segment--user {
@@ -972,12 +994,24 @@
   align-items: flex-start;
 }
 
-.meeting-detail-transcript__bubble {
+.meeting-detail-transcript__segment--unknown {
+  align-items: flex-start;
+}
+
+/* Sizes to the bubble; subtitle padding matches bubble horizontal padding so time aligns with text */
+.meeting-detail-transcript__block {
+  display: flex;
+  flex-direction: column;
   max-width: 82%;
-  padding: 0.875rem 1.125rem;
-  border-radius: 14px;
-  font-size: 0.9375rem;
-  line-height: 1.6;
+  width: fit-content;
+}
+
+.meeting-detail-transcript__bubble {
+  max-width: 100%;
+  padding: 0.5625rem 1rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  line-height: 1.45;
 }
 
 .meeting-detail-transcript__bubble--user {
@@ -993,11 +1027,23 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.meeting-detail-transcript__time {
-  font-size: 0.6875rem;
-  opacity: 0.85;
-  margin-bottom: 0.35rem;
+.meeting-detail-transcript__time-subtitle {
+  font-size: 0.625rem;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #9ca3af;
+  margin-top: 0.0625rem;
+  padding: 0 1rem;
   letter-spacing: 0.02em;
+}
+
+.meeting-detail-transcript__segment--user .meeting-detail-transcript__time-subtitle {
+  text-align: right;
+}
+
+.meeting-detail-transcript__segment--system .meeting-detail-transcript__time-subtitle,
+.meeting-detail-transcript__segment--unknown .meeting-detail-transcript__time-subtitle {
+  text-align: left;
 }
 
 .meeting-detail-transcript__empty {

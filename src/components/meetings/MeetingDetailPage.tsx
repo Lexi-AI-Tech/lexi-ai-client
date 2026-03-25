@@ -1,6 +1,7 @@
 import React, {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useMemo,
   useCallback,
@@ -33,6 +34,8 @@ import { formatLocaleTimeWithSeconds } from "../../lib/dateUtils";
 
 /** Gutter (24px) + max Q&A column (480px) — used for slide animation */
 const Q_A_RAIL_OUTER_WIDTH_PX = 504;
+/** Summary column should keep at least this width; rail outer width = split width − this (capped at 504). */
+const SPLIT_MIN_SUMMARY_WIDTH_PX = 260;
 
 const RAIL_PANEL_TRANSITION = {
   duration: 0.45,
@@ -520,6 +523,28 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   const hasSummaryContent = activeSummary || isGeneratingSummary;
   const showSummaryChatRail = hasSummaryContent && isChatRailOpen;
   const isNarrowSplit = useMediaQuery("(max-width: 900px)");
+  const summarySplitRef = useRef<HTMLDivElement>(null);
+  const [railOuterWidthPx, setRailOuterWidthPx] = useState(
+    Q_A_RAIL_OUTER_WIDTH_PX,
+  );
+
+  useLayoutEffect(() => {
+    if (activeTab !== "summary") return;
+    const el = summarySplitRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.getBoundingClientRect().width;
+      const inner = Math.max(0, Math.floor(w - SPLIT_MIN_SUMMARY_WIDTH_PX));
+      const cap = Math.min(Q_A_RAIL_OUTER_WIDTH_PX, inner);
+      setRailOuterWidthPx(
+        Number.isFinite(cap) ? cap : Q_A_RAIL_OUTER_WIDTH_PX,
+      );
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [activeTab, hasSummaryContent]);
 
   return (
     <motion.div
@@ -662,13 +687,15 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                       key={seg.id ?? idx}
                       className={`meeting-detail-transcript__segment meeting-detail-transcript__segment--${segmentAlign}`}
                     >
-                      <div
-                        className={`meeting-detail-transcript__bubble meeting-detail-transcript__bubble--${bubbleVariant}`}
-                      >
-                        <span className="meeting-detail-transcript__time">
-                          [{timeString}]
+                      <div className="meeting-detail-transcript__block">
+                        <div
+                          className={`meeting-detail-transcript__bubble meeting-detail-transcript__bubble--${bubbleVariant}`}
+                        >
+                          <span>{seg.text}</span>
+                        </div>
+                        <span className="meeting-detail-transcript__time-subtitle">
+                          {timeString}
                         </span>
-                        <span>{seg.text}</span>
                       </div>
                     </div>
                   );
@@ -705,6 +732,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
           {activeTab === "summary" && (
             <motion.div
               key="summary"
+              ref={summarySplitRef}
               className="meeting-detail-split"
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
@@ -820,7 +848,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                           width: "100%",
                         }
                       : {
-                          width: showSummaryChatRail ? Q_A_RAIL_OUTER_WIDTH_PX : 0,
+                          width: showSummaryChatRail ? railOuterWidthPx : 0,
                           opacity: 1,
                         }
                   }
@@ -837,14 +865,16 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                   }
                   style={{
                     overflow: "hidden",
+                    flexShrink: 0,
                     pointerEvents: showSummaryChatRail ? "auto" : "none",
                   }}
                 >
                   <motion.div
                     className="meeting-detail-split__rail-bundle"
                     style={{
-                      width: isNarrowSplit ? "100%" : Q_A_RAIL_OUTER_WIDTH_PX,
-                      minWidth: isNarrowSplit ? 0 : Q_A_RAIL_OUTER_WIDTH_PX,
+                      width: isNarrowSplit ? "100%" : railOuterWidthPx,
+                      minWidth: isNarrowSplit ? 0 : railOuterWidthPx,
+                      boxSizing: "border-box",
                     }}
                     initial={false}
                     animate={{
@@ -852,7 +882,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         ? 0
                         : showSummaryChatRail
                           ? 0
-                          : 18,
+                          : Math.min(18, railOuterWidthPx * 0.04),
                     }}
                     transition={RAIL_PANEL_TRANSITION}
                   >
