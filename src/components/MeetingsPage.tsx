@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
@@ -59,6 +59,10 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     null,
   );
   const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
+  const [isEditingMeetingTitle, setIsEditingMeetingTitle] = useState(false);
+  const [meetingTitleDraft, setMeetingTitleDraft] = useState("");
+  const [isSavingMeetingTitle, setIsSavingMeetingTitle] = useState(false);
+  const skipTitleBlurSaveRef = useRef(false);
 
   const selectedMeeting = selectedMeetingId
     ? (meetings.find((m) => m.id === selectedMeetingId) ?? null)
@@ -208,6 +212,60 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     ? formatAppDateTime(selectedMeeting.created_at)
     : "";
 
+  useEffect(() => {
+    setIsEditingMeetingTitle(false);
+  }, [selectedMeetingId]);
+
+  useEffect(() => {
+    if (!isEditingMeetingTitle && selectedMeeting) {
+      setMeetingTitleDraft(selectedMeeting.name || "");
+    }
+  }, [selectedMeetingId, selectedMeeting, isEditingMeetingTitle]);
+
+  const cancelMeetingTitleEdit = useCallback(() => {
+    if (selectedMeeting) {
+      setMeetingTitleDraft(selectedMeeting.name || "");
+    }
+    setIsEditingMeetingTitle(false);
+  }, [selectedMeeting]);
+
+  const saveMeetingTitle = useCallback(async () => {
+    if (!selectedMeetingId || !selectedMeeting) return;
+    const trimmed = meetingTitleDraft.trim();
+    if (!trimmed) {
+      setMeetingTitleDraft(selectedMeeting.name || "");
+      setIsEditingMeetingTitle(false);
+      return;
+    }
+    if (trimmed === (selectedMeeting.name || "").trim()) {
+      setIsEditingMeetingTitle(false);
+      return;
+    }
+    setIsSavingMeetingTitle(true);
+    try {
+      await invoke("update_meeting", {
+        meetingId: selectedMeetingId,
+        name: trimmed,
+      });
+      setMeetings((prev) =>
+        prev.map((m) =>
+          m.id === selectedMeetingId ? { ...m, name: trimmed } : m,
+        ),
+      );
+      setIsEditingMeetingTitle(false);
+    } catch (error) {
+      console.error("Failed to update meeting title:", error);
+      setMeetingTitleDraft(selectedMeeting.name || "");
+      setIsEditingMeetingTitle(false);
+    } finally {
+      setIsSavingMeetingTitle(false);
+    }
+  }, [
+    selectedMeetingId,
+    selectedMeeting,
+    meetingTitleDraft,
+  ]);
+
   return (
     <div className={`page ${selectedMeetingId ? "page--meetings-detail" : ""}`}>
       {selectedMeetingId && selectedMeeting && (
@@ -224,8 +282,45 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
             <ArrowLeft size={20} strokeWidth={2} />
             <span>Meetings</span>
           </button>
-          <div className="meetings-page-header__title">
-            {selectedMeeting.name || "Untitled Meeting"}
+          <div className="meetings-page-header__title meetings-page-header__title--editable">
+            {isEditingMeetingTitle ? (
+              <input
+                type="text"
+                className="meetings-page-header__title-input"
+                value={meetingTitleDraft}
+                onChange={(e) => setMeetingTitleDraft(e.target.value)}
+                disabled={isSavingMeetingTitle}
+                autoFocus
+                aria-label="Meeting title"
+                onBlur={() => {
+                  requestAnimationFrame(() => {
+                    if (skipTitleBlurSaveRef.current) {
+                      skipTitleBlurSaveRef.current = false;
+                      return;
+                    }
+                    void saveMeetingTitle();
+                  });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    skipTitleBlurSaveRef.current = true;
+                    cancelMeetingTitleEdit();
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="meetings-page-header__title-text"
+                onClick={() => setIsEditingMeetingTitle(true)}
+              >
+                {selectedMeeting.name || "Untitled Meeting"}
+              </button>
+            )}
           </div>
           <div className="meetings-page-header__meta">
             {recordingMeetingId === selectedMeetingId && (

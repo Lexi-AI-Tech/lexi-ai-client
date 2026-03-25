@@ -6,40 +6,44 @@
   color: var(--lexi-text);
 }
 
-.actions-page__title {
-  margin: 0 0 2rem 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--lexi-text);
-  letter-spacing: -0.025em;
+.actions-page__content {
+  margin-top: 1.75rem;
 }
 
-.actions-page__section-title {
-  margin: 0 0 1.5rem 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--lexi-text);
-}
-
-.actions-page__empty {
-  padding: 3rem 1rem;
-  text-align: center;
-  color: var(--lexi-text-muted);
-  font-size: 0.875rem;
-  background: var(--lexi-surface-elevated);
-  border: 1px solid var(--lexi-border);
-  border-radius: 0.75rem;
-  box-shadow: var(--lexi-shadow-sm);
-}
-
-.actions-history {
+.actions-history-block {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0;
+}
+
+.actions-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.actions-loading-inline {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.actions-empty-wrap {
+  text-align: center;
+  padding: 24px;
+  color: var(--lexi-text-muted);
+}
+
+.actions-empty-sub {
+  font-size: 11px;
+  margin-top: 8px;
+  opacity: 0.7;
 }
 
 .action-card {
-  padding: 1.25rem;
+  padding: 0.75rem;
   background: var(--lexi-surface-elevated);
   border: 1px solid var(--lexi-border);
   border-radius: 0.75rem;
@@ -56,19 +60,61 @@
   transform: translateY(-1px);
 }
 
+.action-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.35rem;
+}
+
+.action-card__date {
+  font-size: 10px;
+  color: var(--lexi-text-muted);
+  white-space: nowrap;
+}
+
+.action-card__header-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.action-card__type {
+  font-size: 10px;
+  color: var(--lexi-text-faint);
+  text-transform: capitalize;
+}
+
+.action-card__app-pill {
+  font-size: 10px;
+  color: var(--lexi-text-muted);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .action-card__top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 0.75rem;
+  gap: 10px;
+  margin-bottom: 0.35rem;
+}
+
+.action-card__command-wrap {
+  flex: 1;
+  min-width: 0;
 }
 
 .action-card__command {
   font-size: 0.9375rem;
   color: var(--lexi-text);
   font-weight: 600;
-  margin-bottom: 0.25rem;
+  line-height: 1.35;
 }
 
 .action-card__context {
@@ -88,8 +134,20 @@
 
 .action-card__divider {
   border-top: 1px solid var(--lexi-border);
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.action-card__divider--output {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.action-card__audio-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .action-card__label {
@@ -112,14 +170,13 @@
   -webkit-box-orient: vertical;
 }
 
-.action-card__bottom {
-  display: flex;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  color: var(--lexi-text-faint);
-  border-top: 1px solid var(--lexi-border);
-  padding-top: 0.75rem;
-  margin-top: 0.75rem;
+.action-card__text--clamp {
+  -webkit-line-clamp: 3;
+}
+
+.action-card__text--output {
+  flex: 1;
+  min-width: 0;
 }
 
 .action-delete-btn {
@@ -150,8 +207,8 @@
 }
 
 .action-audio-btn {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
   border: 1px solid var(--lexi-border);
   background: var(--lexi-surface-overlay);
@@ -180,11 +237,29 @@
   border-color: transparent;
 }
 
+.action-audio-btn__ring {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  transform: rotate(-90deg);
+}
+
+.action-audio-btn .icon-play-offset {
+  margin-left: 2px;
+}
+
+.actions-cards .action-audio-btn,
+.actions-cards .action-audio-btn__ring {
+  width: 26px;
+  height: 26px;
+}
+
 .action-pagination {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 0.5rem;
-  margin-top: 2rem;
+  margin-top: 1.75rem;
 }
 
 .action-pagination__btn {
@@ -221,4 +296,3 @@
   color: var(--lexi-text-muted);
   margin-bottom: 16px;
 }
-

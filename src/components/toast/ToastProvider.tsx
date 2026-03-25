@@ -7,16 +7,19 @@ export function ToastProvider() {
     <Toaster
       position="top-center"
       theme="light"
-      richColors
+      richColors={false}
       expand
       closeButton
       toastOptions={{
         style: {
           fontSize: "14px",
           padding: "16px",
-          borderRadius: "8px",
-          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-          border: "1px solid rgba(0, 0, 0, 0.1)",
+          borderRadius: "12px",
+          boxShadow: "var(--lexi-shadow-md)",
+          border: "1px solid var(--lexi-border)",
+          background: "var(--lexi-surface-elevated)",
+          color: "var(--lexi-text)",
+          fontFamily: "var(--lexi-font-body)",
         },
         classNames: {
           toast: "sonner-toast",

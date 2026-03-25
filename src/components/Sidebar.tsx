@@ -108,6 +108,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Transcripts</span>
         </button>
 
+        {/* Docs */}
+        <button
+          className={`sidebar-item ${currentPage === "docs" ? "active" : ""}`}
+          onClick={() => onNavigate("docs")}
+        >
+          <BookText size={18} strokeWidth={2} />
+          <span>Docs</span>
+        </button>
+
         {/* Shortcuts */}
         <button
           className={`sidebar-item ${
@@ -147,15 +156,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Languages size={18} strokeWidth={2} />
           <span>Vocabulary</span>
-        </button>
-
-        {/* Docs */}
-        <button
-          className={`sidebar-item ${currentPage === "docs" ? "active" : ""}`}
-          onClick={() => onNavigate("docs")}
-        >
-          <BookText size={18} strokeWidth={2} />
-          <span>Docs</span>
         </button>
 
         {/* Settings */}

@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  Search,
   LayoutGrid,
   RefreshCw,
   Edit,
   Trash2,
-  X,
   Copy,
   Check,
 } from "lucide-react";
@@ -24,8 +22,6 @@ export const NotesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hoveredNoteId, setHoveredNoteId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -151,24 +147,8 @@ export const NotesPage: React.FC = () => {
     }
   };
 
-  // Filter notes based on search query
-  const filteredNotes = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return notes;
-    }
-    const query = searchQuery.toLowerCase();
-    return notes.filter((note) => note.content.toLowerCase().includes(query));
-  }, [notes, searchQuery]);
-
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === "list" ? "grid" : "list"));
-  };
-
-  const handleSearchClick = () => {
-    setShowSearch((prev) => !prev);
-    if (showSearch) {
-      setSearchQuery("");
-    }
   };
 
   if (loading) {
@@ -323,36 +303,6 @@ export const NotesPage: React.FC = () => {
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <button
               type="button"
-              onClick={handleSearchClick}
-              style={{
-                background: showSearch ? "#f3f4f6" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: showSearch ? "#111827" : "#9ca3af",
-                padding: "4px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "4px",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!showSearch) {
-                  e.currentTarget.style.backgroundColor = "#f3f4f6";
-                  e.currentTarget.style.color = "#111827";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!showSearch) {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "#9ca3af";
-                }
-              }}
-            >
-              <Search size={16} />
-            </button>
-            <button
-              type="button"
               onClick={toggleViewMode}
               style={{
                 background: viewMode === "grid" ? "#f3f4f6" : "transparent",
@@ -410,77 +360,8 @@ export const NotesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Search Input */}
-        {showSearch && (
-          <div
-            style={{
-              marginBottom: "16px",
-              position: "relative",
-            }}
-          >
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search notes..."
-              autoFocus
-              style={{
-                width: "100%",
-                padding: "10px 40px 10px 12px",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                fontSize: "14px",
-                fontFamily: "inherit",
-                outline: "none",
-                transition: "all 0.2s ease",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#d1d5db";
-                e.currentTarget.style.boxShadow =
-                  "0 0 0 3px rgba(0, 0, 0, 0.05)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                style={{
-                  position: "absolute",
-                  right: "8px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "#9ca3af",
-                  padding: "4px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f3f4f6";
-                  e.currentTarget.style.color = "#111827";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "#9ca3af";
-                }}
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Notes List */}
-        {filteredNotes.length === 0 ? (
+        {notes.length === 0 ? (
           <div
             style={{
               textAlign: "center",
@@ -488,9 +369,7 @@ export const NotesPage: React.FC = () => {
               color: "#9ca3af",
             }}
           >
-            <p style={{ margin: 0, fontSize: "14px" }}>
-              {searchQuery ? "No notes match your search" : "No notes found"}
-            </p>
+            <p style={{ margin: 0, fontSize: "14px" }}>No notes found</p>
           </div>
         ) : (
           <div
@@ -504,7 +383,7 @@ export const NotesPage: React.FC = () => {
               gap: "12px",
             }}
           >
-            {filteredNotes.map((note) => (
+            {notes.map((note) => (
               <div
                 key={note.id}
                 style={{

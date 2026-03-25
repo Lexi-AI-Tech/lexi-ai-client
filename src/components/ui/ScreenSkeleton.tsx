@@ -297,15 +297,52 @@ export const ScreenSkeleton: React.FC<{
   if (variant === "actionsHistory") {
     return (
       <div className={cls}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Block key={i} width="100%" height={118} radius={14} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                borderRadius: 14,
+                padding: 14,
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <Block width="48%" height={12} radius={8} />
+                <Block width={120} height={14} radius={8} />
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                  <Block width="85%" height={14} radius={10} />
+                  <Block width="55%" height={12} radius={10} />
+                </div>
+                <Block width={28} height={28} radius={8} />
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <Block width={26} height={26} radius={999} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                  <Block width="92%" height={12} radius={10} />
+                  <Block width="70%" height={12} radius={10} />
+                </div>
+              </div>
+            </div>
           ))}
-          <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-            <Block width={110} height={34} radius={12} />
-            <Block width="70%" height={34} radius={12} />
-            <Block width={110} height={34} radius={12} />
-          </div>
         </div>
       </div>
     );

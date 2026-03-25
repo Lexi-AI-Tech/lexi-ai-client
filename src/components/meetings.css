@@ -60,12 +60,6 @@
   background: var(--lexi-surface-overlay);
 }
 
-.meetings-page-header__title {
-  flex: 1;
-  min-width: 0;
-  text-align: center;
-}
-
 .meetings-page-header .meetings-page-header__meta {
   flex-shrink: 0;
 }
@@ -75,7 +69,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--lexi-text-faint);
 }
 
 .meetings-page-header__badge {
@@ -111,11 +105,80 @@
 }
 
 .meetings-page-header__title {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
   font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.025em;
-  color: #111827;
+  color: var(--lexi-text);
   line-height: 1.1;
+  font-family: var(--lexi-font-display);
+}
+
+.meetings-page-header__title--editable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.meetings-page-header__title-text {
+  margin: 0;
+  padding: 0.2rem 0.5rem;
+  max-width: min(100%, 42rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+  font-family: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: text;
+  text-align: center;
+  transition: background 0.15s ease;
+}
+
+.meetings-page-header__title-text:hover {
+  background: var(--lexi-surface-overlay);
+}
+
+.meetings-page-header__title-input {
+  width: 100%;
+  max-width: min(100%, 42rem);
+  margin: 0 auto;
+  padding: 0.2rem 0.65rem;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  font-family: var(--lexi-font-display);
+  color: var(--lexi-text);
+  text-align: center;
+  background: var(--lexi-surface-elevated);
+  border: 1px solid var(--lexi-border);
+  border-radius: 8px;
+  outline: none;
+  box-sizing: border-box;
+  box-shadow: var(--lexi-shadow-sm);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.meetings-page-header__title-input:focus {
+  border-color: var(--lexi-primary);
+  box-shadow:
+    var(--lexi-shadow-sm),
+    0 0 0 2px var(--lexi-primary-muted);
+}
+
+.meetings-page-header__title-input:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 
 .meetings-breadcrumbs {

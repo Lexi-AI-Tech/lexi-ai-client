@@ -2,13 +2,11 @@ import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Play, Pause, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
+import type { PaginatedActionHistoryResponse } from "../types";
 import { formatAppDateTime } from "../lib/dateUtils";
-import { KEY_SYMBOLS } from "../lib/keySymbols";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
-import "../styles/components/hotkey-selector.css";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 import "./actions/actions.css";
@@ -18,7 +16,6 @@ export const ActionsPage: React.FC = () => {
   const toast = useToast();
   const [actionHistory, setActionHistory] =
     useState<PaginatedActionHistoryResponse | null>(null);
-  const [actionHotkeys, setActionHotkeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -27,11 +24,24 @@ export const ActionsPage: React.FC = () => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Track which action IDs are newly added so we animate them in.
-  const prevActionIdsRef = useRef<Set<string>>(new Set());
-  const [enteringActionOrder, setEnteringActionOrder] = useState<string[]>([]);
-
   const pageSize = 20;
+
+  const GRID_VARIANTS = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.06, delayChildren: 0.08 },
+    },
+  };
+
+  const CARD_VARIANTS = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: [0.22, 0.61, 0.36, 1] as const },
+    },
+  };
 
   const openDeleteConfirm = (actionId: string) => {
     setDeleteConfirmId(actionId);
@@ -137,50 +147,21 @@ export const ActionsPage: React.FC = () => {
     }
   };
 
-  // Load app config (for hotkey)
-  const loadConfig = async () => {
-    try {
-      const config = await invoke<AppConfig>("get_app_config");
-      setActionHotkeys(config.action_hotkeys || []);
-    } catch (err) {
-      console.error("Failed to load app config:", err);
-    }
-  };
-
   useEffect(() => {
     if (authStore.isInitialized) {
       loadActionHistory();
     }
   }, [page, authStore.isAuthenticated, authStore.isInitialized]);
 
-  useEffect(() => {
-    loadConfig();
-  }, []);
-
-  useEffect(() => {
-    const nextIds = new Set((actionHistory?.actions ?? []).map((a) => a.id));
-    const newlyAdded: string[] = [];
-    for (const a of actionHistory?.actions ?? []) {
-      if (!prevActionIdsRef.current.has(a.id)) newlyAdded.push(a.id);
-    }
-
-    prevActionIdsRef.current = nextIds;
-    if (newlyAdded.length === 0) return;
-
-    setEnteringActionOrder(newlyAdded);
-    const id = window.setTimeout(() => setEnteringActionOrder([]), 700);
-    return () => window.clearTimeout(id);
-  }, [actionHistory]);
-
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
-      <div className="page">
-        <h2 className="page__title">Actions</h2>
-        <ScreenSkeleton
-          variant="actions"
-          className="page__empty"
-        />
+      <div className="actions-page">
+        <h2 className="transcripts-page-title">Actions</h2>
+        <p className="app-page-subtitle">Loading…</p>
+        <div className="actions-page__content">
+          <ScreenSkeleton variant="actionsHistory" className="actions-loading-inline" />
+        </div>
       </div>
     );
   }
@@ -189,7 +170,7 @@ export const ActionsPage: React.FC = () => {
   if (!authStore.isAuthenticated) {
     return (
       <div className="actions-page">
-        <h2 className="actions-page__title">Actions</h2>
+        <h2 className="transcripts-page-title">Actions</h2>
         <div className="actions-login">
           <p className="actions-login__hint">Sign in to access your actions</p>
           <GoogleLoginButton
@@ -203,284 +184,250 @@ export const ActionsPage: React.FC = () => {
     );
   }
 
+  const totalActions = actionHistory?.total ?? 0;
+
   return (
     <div className="actions-page">
-      <h2 className="actions-page__title">Actions</h2>
+      <h2 className="transcripts-page-title">Actions</h2>
+      {isLoading ? (
+        <p className="app-page-subtitle">Loading…</p>
+      ) : totalActions > 0 ? (
+        <p className="app-page-subtitle">
+          {totalActions} {totalActions === 1 ? "action" : "actions"} performed
+        </p>
+      ) : null}
 
-      {/* Global Hotkey Section */}
-      <div style={{ marginBottom: "3rem" }}>
-        <div className="hotkey-selector">
-          <div className="hotkey-selector__header">
-            <label className="hotkey-selector__label">Action Hotkeys</label>
-            <p className="hotkey-selector__description">
-              {`Hold ${actionHotkeys.length > 0 && !actionHotkeys[0].includes("+") ? "this key" : "this hotkey combination"} to record a voice command for actions`}
-            </p>
-          </div>
+      <div className="actions-page__content">
+        <AnimatePresence mode="wait">
+          {isLoading && (
+            <motion.div
+              key="actions-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ScreenSkeleton
+                variant="actionsHistory"
+                className="actions-loading-inline"
+              />
+            </motion.div>
+          )}
 
-          <div className="hotkey-selector__chips">
-            {actionHotkeys.length > 0 ? (
-              actionHotkeys.map((hotkey, index) => {
-                const keys = hotkey.split("+");
-                return (
-                  <div
-                    key={`hotkey-${index}-${hotkey}`}
-                    className="hotkey-selector__chip-wrapper"
-                    style={{ paddingRight: 0 }}
-                  >
-                    <div className="hotkey-selector__chip">
-                      {keys.map((key, keyIndex) => {
-                        const keyName = key.trim().toLowerCase();
-                        const keyInfo = KEY_SYMBOLS[keyName];
-                        return (
-                          <span
-                            key={`${keyIndex}-${key}`}
-                            className="hotkey-selector__key-row"
-                          >
-                            <span className="hotkey-selector__key-cap">
-                              {keyInfo && (
-                                <span className="hotkey-selector__key-symbol">
-                                  {keyInfo.symbol}
-                                </span>
-                              )}
-                              <span className="hotkey-selector__key-label">
-                                {keyInfo ? keyInfo.label : key.trim()}
-                              </span>
-                            </span>
-                            {keyIndex < keys.length - 1 && (
-                              <span className="hotkey-selector__plus">+</span>
-                            )}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div
-                style={{
-                  color: "#9ca3af",
-                  fontSize: "14px",
-                  padding: "12px 16px",
-                }}
+          {!isLoading &&
+            (!actionHistory || actionHistory.actions.length === 0) && (
+              <motion.div
+                key="actions-empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
               >
-                No action hotkeys configured.
-              </div>
+                <div className="actions-empty-wrap">
+                  <p>No actions yet.</p>
+                  <p className="actions-empty-sub">
+                    Voice actions you run will show up here.
+                  </p>
+                </div>
+              </motion.div>
             )}
-          </div>
-        </div>
-      </div>
 
-      {/* Action History Section */}
-      <div>
-        <h3 className="actions-page__section-title">Action History</h3>
-
-        {isLoading ? (
-          <ScreenSkeleton variant="actionsHistory" />
-        ) : !actionHistory || actionHistory.actions.length === 0 ? (
-          <div className="actions-page__empty">
-            No action history yet. Actions will appear here as you use them.
-          </div>
-        ) : (
-          <>
-            <div className="actions-history">
-              <AnimatePresence initial={false}>
-                {actionHistory.actions.map((action) => {
-                  const enterIdx = enteringActionOrder.indexOf(action.id);
-                  const isEntering = enterIdx !== -1;
-                  return (
-                    <motion.div
-                      key={action.id}
-                      className="action-card"
-                      initial={isEntering ? { opacity: 0, y: 8 } : false}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        duration: 0.22,
-                        delay: isEntering ? Math.min(enterIdx, 24) * 0.03 : 0,
-                      }}
-                      layout
-                      exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
-                    >
-                  <div className="action-card__top">
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="action-card__command">
-                        {action.action_command}
-                      </div>
-                      {action.app_name && (
-                        <div className="action-card__context">
-                          <span className="action-card__context-dot" />
-                          Context: {action.app_name}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => openDeleteConfirm(action.id)}
-                      disabled={!!deletingId}
-                      className="action-delete-btn"
-                      title="Delete action"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-
-                  {action.selected_text && (
-                    <div className="action-card__divider">
-                      <div className="action-card__label">Input</div>
-                      <div
-                        className="action-card__text"
-                        style={{ WebkitLineClamp: 3 }}
+          {!isLoading &&
+            actionHistory &&
+            actionHistory.actions.length > 0 && (
+              <motion.div
+                key="actions-cards"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="actions-history-block"
+              >
+                <motion.div
+                  className="actions-cards"
+                  variants={GRID_VARIANTS}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {actionHistory.actions.map((action) => (
+                      <motion.div
+                        key={action.id}
+                        className="action-card"
+                        variants={CARD_VARIANTS}
                       >
-                        {action.selected_text}
-                      </div>
-                    </div>
-                  )}
+                        <div className="action-card__header">
+                          <div className="action-card__date">
+                            {formatAppDateTime(action.created_at)}
+                          </div>
+                          <div className="action-card__header-meta">
+                            <span className="action-card__type">
+                              {action.action_type.replace("_", " ")}
+                            </span>
+                            {action.app_name ? (
+                              <span className="action-card__app-pill">
+                                {action.app_name}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
 
-                  {/* Text action: show output value. Voice action: show output value + audio player (transcripts-style) */}
-                  {(action.output_value || action.output_audio_file_url) && (
-                    <div className="action-card__divider">
-                      {action.output_audio_file_url && (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            flexShrink: 0,
-                          }}
-                        >
+                        <div className="action-card__top">
+                          <div className="action-card__command-wrap">
+                            <div className="action-card__command">
+                              {action.action_command}
+                            </div>
+                          </div>
                           <button
-                            onClick={() =>
-                              handlePlayActionAudio(
-                                action.id,
-                                action.output_audio_file_url!,
-                              )
-                            }
-                            className={`action-audio-btn ${playingId === action.id ? "action-audio-btn--playing" : ""}`}
-                            title={
-                              playingId === action.id ? "Pause" : "Play audio"
-                            }
+                            type="button"
+                            onClick={() => openDeleteConfirm(action.id)}
+                            disabled={!!deletingId}
+                            className="action-delete-btn"
+                            title="Delete action"
                           >
-                            {playingId === action.id && (
-                              <svg
-                                style={{
-                                  position: "absolute",
-                                  width: "28px",
-                                  height: "28px",
-                                  transform: "rotate(-90deg)",
-                                }}
-                              >
-                                <circle
-                                  cx="14"
-                                  cy="14"
-                                  r="12"
-                                  fill="none"
-                                  stroke="rgba(255,255,255,0.2)"
-                                  strokeWidth="2"
-                                />
-                                <circle
-                                  cx="14"
-                                  cy="14"
-                                  r="12"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeDasharray={`${audioProgress * 0.754} 75.4`}
-                                  strokeLinecap="round"
-                                />
-                              </svg>
-                            )}
-                            {playingId === action.id ? (
-                              <Pause size={12} fill="currentColor" />
-                            ) : (
-                              <Play
-                                size={12}
-                                fill="currentColor"
-                                style={{ marginLeft: "2px" }}
-                              />
-                            )}
+                            <Trash2 size={14} />
                           </button>
                         </div>
-                      )}
-                      {action.output_value && (
-                        <div className="action-card__text">
-                          {action.output_value}
-                        </div>
-                      )}
+
+                        {action.selected_text ? (
+                          <div className="action-card__divider">
+                            <div className="action-card__label">Input</div>
+                            <div className="action-card__text action-card__text--clamp">
+                              {action.selected_text}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {(action.output_value || action.output_audio_file_url) && (
+                          <div className="action-card__divider action-card__divider--output">
+                            {action.output_audio_file_url ? (
+                              <div className="action-card__audio-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handlePlayActionAudio(
+                                      action.id,
+                                      action.output_audio_file_url!,
+                                    )
+                                  }
+                                  className={`action-audio-btn ${playingId === action.id ? "action-audio-btn--playing" : ""}`}
+                                  title={
+                                    playingId === action.id
+                                      ? "Pause"
+                                      : "Play audio"
+                                  }
+                                >
+                                  {playingId === action.id && (
+                                    <svg
+                                      className="action-audio-btn__ring"
+                                      aria-hidden
+                                    >
+                                      <circle
+                                        cx="14"
+                                        cy="14"
+                                        r="12"
+                                        fill="none"
+                                        stroke="rgba(255,255,255,0.2)"
+                                        strokeWidth="2"
+                                      />
+                                      <circle
+                                        cx="14"
+                                        cy="14"
+                                        r="12"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeDasharray={`${audioProgress * 0.754} 75.4`}
+                                        strokeLinecap="round"
+                                      />
+                                    </svg>
+                                  )}
+                                  {playingId === action.id ? (
+                                    <Pause size={12} fill="currentColor" />
+                                  ) : (
+                                    <Play
+                                      size={12}
+                                      fill="currentColor"
+                                      className="icon-play-offset"
+                                    />
+                                  )}
+                                </button>
+                              </div>
+                            ) : null}
+                            {action.output_value ? (
+                              <div className="action-card__text action-card__text--output">
+                                {action.output_value}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                </motion.div>
+
+                {actionHistory.total_pages > 1 ? (
+                  <div className="action-pagination">
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="action-pagination__btn"
+                    >
+                      Previous
+                    </button>
+                    <div className="action-pagination__label">
+                      Page {page} of {actionHistory.total_pages}
                     </div>
-                  )}
-
-                  <div className="action-card__bottom">
-                    <span>{formatAppDateTime(action.created_at)}</span>
-                    <span>•</span>
-                    <span style={{ textTransform: "capitalize" }}>
-                      {action.action_type.replace("_", " ")}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((p) =>
+                          Math.min(actionHistory.total_pages, p + 1),
+                        )
+                      }
+                      disabled={page === actionHistory.total_pages}
+                      className="action-pagination__btn"
+                    >
+                      Next
+                    </button>
                   </div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
-
-            {/* Pagination */}
-            {actionHistory.total_pages > 1 && (
-              <div className="action-pagination">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="action-pagination__btn"
-                >
-                  Previous
-                </button>
-                <div className="action-pagination__label">
-                  Page {page} of {actionHistory.total_pages}
-                </div>
-                <button
-                  onClick={() =>
-                    setPage((p) => Math.min(actionHistory.total_pages, p + 1))
-                  }
-                  disabled={page === actionHistory.total_pages}
-                  className="action-pagination__btn"
-                >
-                  Next
-                </button>
-              </div>
+                ) : null}
+              </motion.div>
             )}
-          </>
-        )}
+        </AnimatePresence>
+      </div>
 
-        {deleteConfirmId && (
-          <div className="delete-modal-overlay" onClick={closeDeleteConfirm}>
-            <div
-              className="delete-modal-content"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3>Delete action?</h3>
-              <p>
-                This action cannot be undone. The action history entry will be
-                permanently removed.
-              </p>
-              <div className="delete-modal-actions">
-                <button
-                  type="button"
-                  className="delete-modal-btn-cancel"
-                  onClick={closeDeleteConfirm}
-                  disabled={!!deletingId}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="delete-modal-btn-delete"
-                  onClick={handleConfirmDeleteAction}
-                  disabled={!!deletingId}
-                >
-                  {deletingId ? "Deleting..." : "Delete"}
-                </button>
-              </div>
+      {deleteConfirmId ? (
+        <div className="delete-modal-overlay" onClick={closeDeleteConfirm}>
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Delete action?</h3>
+            <p>
+              This action cannot be undone. The action history entry will be
+              permanently removed.
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={closeDeleteConfirm}
+                disabled={!!deletingId}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleConfirmDeleteAction}
+                disabled={!!deletingId}
+              >
+                {deletingId ? "Deleting..." : "Delete"}
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 };
