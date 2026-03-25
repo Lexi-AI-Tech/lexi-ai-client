@@ -182,23 +182,27 @@
 
 .action-delete-btn {
   padding: 6px;
-  background: var(--lexi-danger-muted);
-  border: 1px solid rgba(220, 38, 38, 0.18);
+  background: var(--lexi-surface-elevated);
+  border: 1px solid var(--lexi-border);
   border-radius: 8px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--lexi-danger);
+  color: var(--lexi-text-muted);
   transition:
     background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
     transform 150ms ease;
   flex-shrink: 0;
   opacity: 1;
 }
 
 .action-delete-btn:hover:not(:disabled) {
-  background: rgba(220, 38, 38, 0.12);
+  background: var(--lexi-danger-muted);
+  border-color: rgba(220, 38, 38, 0.22);
+  color: var(--lexi-danger);
   transform: translateY(-1px);
 }
 

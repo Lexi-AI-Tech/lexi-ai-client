@@ -955,12 +955,13 @@ textarea.form-input {
 }
 
 .btn--icon-danger {
-  background: var(--lexi-danger-muted);
-  color: var(--lexi-danger);
+  background: var(--lexi-surface-overlay);
+  color: var(--lexi-text-muted);
 }
 
 .btn--icon-danger:hover:not(:disabled) {
-  background: #fee2e2;
+  background: var(--lexi-danger-muted);
+  color: var(--lexi-danger);
 }
 
 .vocab-item__body {
@@ -2388,9 +2389,9 @@ textarea.form-input {
 }
 
 .delete-modal-btn-delete {
-  background: #dc2626;
-  border: 1px solid #dc2626;
-  color: var(--lexi-primary-foreground);
+  background: transparent;
+  border: 1px solid var(--lexi-border);
+  color: var(--lexi-text-muted);
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 13px;
@@ -2400,8 +2401,9 @@ textarea.form-input {
 }
 
 .delete-modal-btn-delete:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
 }
 
 .delete-modal-btn-delete:disabled {

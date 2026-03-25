@@ -290,11 +290,12 @@
 }
 
 .meetings-detail__delete {
-  color: #ef4444;
+  color: var(--lexi-text-muted);
 }
 
 .meetings-detail__delete:hover {
-  background-color: #fee2e2;
+  color: var(--lexi-danger);
+  background-color: var(--lexi-danger-muted);
 }
 
 .meetings-content {
@@ -367,12 +368,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ef4444;
+  color: var(--lexi-text-muted);
   transition: all 0.2s ease;
 }
 
 .meeting-item__delete:hover:not(:disabled) {
-  background-color: #fee2e2;
+  color: var(--lexi-danger);
+  background-color: var(--lexi-danger-muted);
 }
 
 .meeting-item__delete:disabled {

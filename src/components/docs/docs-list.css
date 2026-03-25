@@ -330,14 +330,20 @@
   font-size: 14px;
   font-weight: 500;
   border-radius: 8px;
-  border: none;
-  background: #dc2626;
-  color: #fff;
+  border: 1px solid var(--lexi-border);
+  background: transparent;
+  color: var(--lexi-text-muted);
   cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .docs-list-page__delete-btn-delete:hover:not(:disabled) {
-  background: #b91c1c;
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
 }
 
 .docs-list-page__delete-btn-delete:disabled,

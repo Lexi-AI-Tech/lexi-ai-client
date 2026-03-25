@@ -546,6 +546,31 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     return () => ro.disconnect();
   }, [activeTab, hasSummaryContent]);
 
+  const chatInputForm = (
+    <form
+      onSubmit={handleSendChatMessage}
+      className="meeting-detail-rail__form"
+    >
+      <input
+        type="text"
+        className="meeting-detail-rail__input"
+        value={chatInput}
+        onChange={(e) => setChatInput(e.target.value)}
+        placeholder="Ask a question..."
+        disabled={isSendingChat || isThisMeetingRecording}
+      />
+      <button
+        type="submit"
+        className="meeting-detail-btn meeting-detail-btn--primary meeting-detail-rail__submit"
+        disabled={
+          isSendingChat || !chatInput.trim() || isThisMeetingRecording
+        }
+      >
+        Send
+      </button>
+    </form>
+  );
+
   return (
     <motion.div
       className="meeting-detail-product"
@@ -953,16 +978,19 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     <div className="meeting-detail-rail__section-title">
                       Conversation
                     </div>
-                    <div
-                      ref={chatScrollRef}
-                      className="meeting-detail-rail__messages"
-                    >
-                      {chatMessages.length === 0 && !isSendingChat ? (
+                    {chatMessages.length === 0 && !isSendingChat ? (
+                      <div className="meeting-detail-rail__empty-with-form">
                         <p className="meeting-detail-rail__empty">
                           Your questions and answers appear here.
                         </p>
-                      ) : (
-                        <>
+                        {chatInputForm}
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          ref={chatScrollRef}
+                          className="meeting-detail-rail__messages"
+                        >
                           {chatMessages.map((msg) => (
                             <div
                               key={msg.id}
@@ -978,33 +1006,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                               <span className="meeting-detail-rail__loading-dots" />
                             </div>
                           )}
-                        </>
-                      )}
-                    </div>
-                    <form
-                      onSubmit={handleSendChatMessage}
-                      className="meeting-detail-rail__form"
-                    >
-                      <input
-                        type="text"
-                        className="meeting-detail-rail__input"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="Ask a question..."
-                        disabled={isSendingChat || isThisMeetingRecording}
-                      />
-                      <button
-                        type="submit"
-                        className="meeting-detail-btn meeting-detail-btn--primary meeting-detail-rail__submit"
-                        disabled={
-                          isSendingChat ||
-                          !chatInput.trim() ||
-                          isThisMeetingRecording
-                        }
-                      >
-                        Send
-                      </button>
-                    </form>
+                        </div>
+                        {chatInputForm}
+                      </>
+                    )}
                   </div>
                 </aside>
                   </motion.div>
