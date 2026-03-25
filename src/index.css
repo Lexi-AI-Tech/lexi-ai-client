@@ -8,42 +8,83 @@
    - Rose:   --lexi-primary: #e11d48; --lexi-primary-hover: #be123c; --lexi-primary-muted: #ffe4e6;
    ============================================================================= */
 :root {
-  /* Primary brand – main actions, active states, logo, focus */
-  --lexi-primary: #0d9488;
-  --lexi-primary-hover: #0f766e;
-  --lexi-primary-muted: #ccfbf1;
+  /* =============================================================================
+     Lexi AI design tokens (Sage theme)
+     Inspired by the shared dashboard reference.
+     ============================================================================= */
+
+  /* Fonts (Option A) */
+  --lexi-font-display:
+    "Cabinet Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --lexi-font-body:
+    "Satoshi", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --lexi-font-mono:
+    "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+
+  /* Primary brand – main actions, focus rings, subtle highlights */
+  --lexi-primary: #6b8f6e;
+  --lexi-primary-hover: #587a5b;
+  --lexi-primary-muted: #d4e2d4;
   --lexi-primary-foreground: #ffffff;
 
-  /* Secondary – outline-of-primary style (teal border + text, light fill on hover) for Create doc, Regenerate, etc. */
-  --lexi-secondary: #0d9488;
-  --lexi-secondary-hover: #0f766e;
-  --lexi-secondary-muted: #ccfbf1;
-  --lexi-secondary-foreground: #0d9488;
+  /* Secondary (outline-of-primary) */
+  --lexi-secondary: #6b8f6e;
+  --lexi-secondary-hover: #587a5b;
+  --lexi-secondary-muted: #d4e2d4;
+  --lexi-secondary-foreground: #6b8f6e;
 
   /* Surfaces */
-  --lexi-surface: #f8fafc;
-  --lexi-surface-elevated: #ffffff;
-  --lexi-surface-overlay: #f1f5f9;
+  --lexi-surface: #f5f7f4; /* app background */
+  --lexi-surface-elevated: #ffffff; /* cards/panels */
+  --lexi-surface-overlay: #eaefe8; /* sidebar + soft fills */
 
   /* Text */
-  --lexi-text: #0f172a;
-  --lexi-text-muted: #475569;
-  --lexi-text-faint: #94a3b8;
+  --lexi-text: #2e3b2f;
+  --lexi-text-muted: #5a6e5c;
+  --lexi-text-faint: #8fa48f;
 
   /* Borders */
-  --lexi-border: #e2e8f0;
-  --lexi-border-subtle: #f1f5f9;
+  --lexi-border: #e4eae1;
+  --lexi-border-subtle: #dce4d9;
+
+  /* Sidebar + navigation */
+  --lexi-sidebar-bg: #eaefe8;
+  --lexi-sidebar-border: #dce4d9;
+  --lexi-nav-active-bg: #ddeadc;
+  --lexi-nav-hover-bg: #d4e2d4;
+  --lexi-tooltip-bg: #1f2a20;
+  --lexi-tooltip-fg: #f5f7f4;
 
   /* Semantic */
-  --lexi-success: #0d9488;
-  --lexi-success-hover: #0f766e;
+  --lexi-success: #6b8f6e;
+  --lexi-success-hover: #587a5b;
   --lexi-danger: #dc2626;
   --lexi-danger-muted: #fef2f2;
 
-  /* Shadows (optional – for cards, dropdowns) */
-  --lexi-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  /* Shadows (soft, airy like the reference) */
+  --lexi-shadow-sm: 0 1px 2px rgba(46, 59, 47, 0.06);
   --lexi-shadow-md:
-    0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+    0 10px 30px rgba(46, 59, 47, 0.08), 0 2px 6px rgba(46, 59, 47, 0.06);
+  --lexi-shadow-lg:
+    0 10px 30px rgba(46, 59, 47, 0.12), 0 4px 12px rgba(46, 59, 47, 0.08);
+
+  /* Toasts (Sonner) — derived from Lexi tokens */
+  --lexi-toast-success-bg: var(--lexi-primary-muted);
+  --lexi-toast-success-text: var(--lexi-primary-hover);
+  --lexi-toast-success-border: #c5d4c5;
+
+  --lexi-toast-error-bg: var(--lexi-danger-muted);
+  --lexi-toast-error-text: var(--lexi-danger);
+  --lexi-toast-error-border: #fecaca;
+
+  --lexi-toast-warning-bg: #fefce8;
+  --lexi-toast-warning-text: #a16207;
+  --lexi-toast-warning-border: #fde68a;
+
+  --lexi-toast-info-bg: var(--lexi-surface-overlay);
+  --lexi-toast-info-text: var(--lexi-text);
+  --lexi-toast-info-border: var(--lexi-border);
 }
 
 * {
@@ -52,11 +93,45 @@
   box-sizing: border-box;
 }
 
+/* ==========================
+   Screen Skeleton (loading)
+   ========================== */
+.skeleton-screen {
+  width: 100%;
+  padding: 0;
+}
+
+.skeleton-block {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 225, 0.55) 0%,
+    rgba(212, 226, 212, 0.95) 35%,
+    rgba(226, 232, 225, 0.55) 70%
+  );
+  background-size: 300% 100%;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+  box-shadow: inset 0 0 0 1px rgba(228, 234, 225, 0.35);
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 110% 0;
+  }
+  100% {
+    background-position: -10% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+  }
+}
+
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
-    sans-serif;
-  background: var(--lexi-surface-elevated);
+  font-family: var(--lexi-font-body);
+  background: var(--lexi-surface);
   color: var(--lexi-text);
   height: 100vh;
   overflow: hidden;
@@ -159,26 +234,21 @@ body {
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 32px;
-  font-family:
-    "SF Pro Display",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--lexi-font-display);
   color: var(--lexi-text);
 }
 
 .sidebar {
   width: 200px;
-  background: var(--lexi-surface-elevated);
-  border-right: 1px solid var(--lexi-border-subtle);
+  background: var(--lexi-sidebar-bg);
+  border-right: 1px solid var(--lexi-sidebar-border);
   display: flex;
   flex-direction: column;
   height: 100%;
   padding: 16px 0;
   flex-shrink: 0;
   border-radius: 12px;
-  box-shadow: var(--lexi-shadow-md);
+  box-shadow: var(--lexi-shadow-lg);
 }
 
 .sidebar-nav {
@@ -196,12 +266,12 @@ body {
   gap: 10px;
   margin: 8px 8px 8px 8px;
   padding: 10px 14px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--lexi-sidebar-border);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #111827;
+  color: var(--lexi-text);
   font-size: 13px;
   font-weight: 500;
   text-align: left;
@@ -209,14 +279,14 @@ body {
 }
 
 .sidebar-update-banner:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.75);
+  border-color: var(--lexi-border);
+  box-shadow: 0 6px 18px rgba(46, 59, 47, 0.08);
 }
 
 .sidebar-update-banner svg {
   flex-shrink: 0;
-  color: #111827;
+  color: var(--lexi-primary-hover);
   animation: sidebar-update-bounce 2s infinite;
 }
 
@@ -244,8 +314,8 @@ body {
   bottom: calc(100% + 12px);
   left: 0;
   width: 240px;
-  background: #111827;
-  color: #f9fafb;
+  background: var(--lexi-tooltip-bg);
+  color: var(--lexi-tooltip-fg);
   padding: 12px 14px;
   border-radius: 8px;
   font-size: 12px;
@@ -274,7 +344,7 @@ body {
   left: 20px;
   width: 8px;
   height: 8px;
-  background: #111827;
+  background: var(--lexi-tooltip-bg);
   transform: rotate(45deg);
 }
 
@@ -294,7 +364,7 @@ body {
 .sidebar-update-banner__title {
   font-weight: 600;
   font-size: 13px;
-  color: #111827;
+  color: var(--lexi-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -302,7 +372,7 @@ body {
 
 .sidebar-update-banner__size {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--lexi-text-faint);
 }
 
 .sidebar-version {
@@ -331,14 +401,14 @@ body {
 }
 
 .sidebar-item:hover {
-  background: var(--lexi-primary-muted);
-  color: var(--lexi-primary-hover);
+  background: var(--lexi-nav-hover-bg);
+  color: var(--lexi-text);
 }
 
 .sidebar-item.active {
-  background: var(--lexi-primary);
-  color: var(--lexi-primary-foreground);
-  border: none;
+  background: var(--lexi-nav-active-bg);
+  color: var(--lexi-text);
+  border: 1px solid var(--lexi-sidebar-border);
 }
 
 .sidebar-item svg {
@@ -406,9 +476,7 @@ body::before {
   padding: 2rem 2.5rem;
   background: var(--lexi-surface-elevated);
   min-height: 100vh;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
-    sans-serif;
+  font-family: var(--lexi-font-body);
 }
 
 .page__title {
@@ -874,12 +942,13 @@ textarea.form-input {
 }
 
 .btn--icon-danger {
-  background: var(--lexi-danger-muted);
-  color: var(--lexi-danger);
+  background: var(--lexi-surface-overlay);
+  color: var(--lexi-text-muted);
 }
 
 .btn--icon-danger:hover:not(:disabled) {
-  background: #fee2e2;
+  background: var(--lexi-danger-muted);
+  color: var(--lexi-danger);
 }
 
 .vocab-item__body {
@@ -1198,9 +1267,7 @@ textarea.form-input {
   margin-left: 8px;
   font-size: 12px;
   opacity: 0.8;
-  font-family:
-    "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New",
-    monospace;
+  font-family: var(--lexi-font-mono);
 }
 
 .status.recording {
@@ -1490,9 +1557,7 @@ textarea.form-input {
   background: var(--lexi-surface-overlay);
   padding: 4px 8px;
   border-radius: 6px;
-  font-family:
-    "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New",
-    monospace;
+  font-family: var(--lexi-font-mono);
   font-size: 11px;
   border: 1px solid var(--lexi-border);
   color: var(--lexi-text);
@@ -1648,24 +1713,47 @@ textarea.form-input {
   padding: 2rem 2.5rem;
   background: var(--lexi-surface-elevated);
   min-height: 100vh;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
-    sans-serif;
+  font-family: var(--lexi-font-body);
 }
 
 .transcripts-page-title {
   margin: 0;
-  margin-bottom: 2rem;
+  margin-bottom: 0.25rem;
   font-size: 24px;
   font-weight: 600;
   color: var(--lexi-text);
   letter-spacing: -0.025em;
 }
 
+.transcripts-page-title--with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.transcripts-page-title__icon {
+  flex-shrink: 0;
+  color: var(--lexi-primary);
+}
+
 .transcripts-page-title-count {
   font-size: 14px;
   font-weight: normal;
   color: var(--lexi-text-muted);
+}
+
+.app-page-subtitle {
+  font-size: 0.875rem;
+  color: var(--lexi-text-muted);
+  margin: 0;
+  font-weight: 400;
+}
+
+.transcripts-page-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--lexi-text-muted);
+  font-weight: 400;
 }
 
 .transcripts-login-wrap {
@@ -1680,7 +1768,18 @@ textarea.form-input {
 .transcripts-loading-inline {
   width: 100%;
   flex: 1;
+  display: flex;
+  flex-direction: column;
   justify-content: center;
+  padding: 6px 0;
+}
+
+.notes-loading-inline {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 0;
 }
 
 .transcripts-empty-wrap {
@@ -1693,6 +1792,140 @@ textarea.form-input {
   font-size: 11px;
   margin-top: 8px;
   opacity: 0.7;
+}
+
+/* ==========================
+   Transcripts Card List View
+   ========================== */
+.transcripts-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.transcripts-page__content {
+  margin-top: 1.75rem;
+}
+
+.transcript-card {
+  background: var(--lexi-surface-elevated);
+  border: 1px solid var(--lexi-border);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  box-shadow: var(--lexi-shadow-sm);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.transcript-card:hover {
+  border-color: var(--lexi-border-subtle);
+  box-shadow: var(--lexi-shadow-md);
+  transform: translateY(-1px);
+}
+
+.transcript-card__header {
+  margin-bottom: 0.35rem;
+}
+
+/* Time + focused app grouped on the left (not split across the card above actions). */
+.transcript-card__meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.transcript-card__date {
+  font-size: 10px;
+  color: var(--lexi-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.transcript-card__app {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.transcript-card__body {
+  margin-bottom: 0.35rem;
+}
+
+.transcript-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Compact action buttons only for the cards list. */
+.transcripts-cards .transcript-action-btn {
+  width: 26px;
+  height: 26px;
+}
+
+/* Remove extra right padding on the transcript text/audio group in cards. */
+.transcripts-cards .transcript-display-cell {
+  padding-right: 0;
+}
+
+/* Compact play/progress UI inside cards (only impacts cards layout). */
+.transcripts-cards .transcript-play-btn {
+  width: 26px;
+  height: 26px;
+}
+
+.transcripts-cards .transcript-progress-ring {
+  width: 26px;
+  height: 26px;
+}
+
+/* When used in a card (not a table cell), remove extra right padding. */
+.transcript-display-cell--card {
+  padding-right: 0;
+}
+
+/* Compact layout: keep play/text + copy/delete in the same row. */
+.transcripts-cards .transcript-card__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.transcripts-cards .transcript-card__main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Prevent copy/delete from wrapping onto another line in compact cards. */
+.transcripts-cards .transcript-actions-cell {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+/* Subtler app label in the card header. */
+.transcripts-cards .transcript-cell-app__icon {
+  width: 16px;
+  height: 16px;
+}
+
+.transcripts-cards .transcript-cell-app__name {
+  font-size: 11px;
+  color: var(--lexi-text-faint);
+  font-weight: 500;
+}
+
+/* Clamp transcript text to 2 lines in cards to keep height compact. */
+.transcripts-cards .transcript-item-text,
+.transcripts-cards .transcript-item-empty {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .transcripts-list-wrapper {
@@ -1817,6 +2050,45 @@ textarea.form-input {
   width: 100%;
 }
 
+/* Shortcuts page (aligned with transcripts list layout & cards) */
+.shortcuts-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.shortcut-card__trigger {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lexi-text);
+  margin-bottom: 4px;
+}
+
+.shortcut-card__value {
+  font-size: 14px;
+  color: var(--lexi-text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.shortcut-card--editing .panel__label {
+  margin-top: 0;
+}
+
+.shortcut-card--editing .panel__label:not(:first-child) {
+  margin-top: 12px;
+}
+
+.shortcut-card--editing .form-input--lg {
+  margin-bottom: 0;
+}
+
+.shortcut-card--editing textarea.form-input--lg {
+  margin-bottom: 12px;
+}
+
 /* Transcripts List Styles - fill remaining height and scroll inside (consistent with loading state) */
 .transcripts-list {
   display: flex;
@@ -1898,12 +2170,15 @@ textarea.form-input {
 .transcripts-table-row {
   display: grid;
   grid-template-columns: 100px 1fr 130px 150px;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
 }
 
 .transcript-cell {
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .transcript-cell-date {
@@ -1942,6 +2217,7 @@ textarea.form-input {
 
 .transcript-cell-text {
   color: var(--lexi-text);
+  align-items: flex-start;
 }
 
 .transcript-cell-meta {
@@ -1952,7 +2228,7 @@ textarea.form-input {
 /* Transcript display cell: text + enhanced badges */
 .transcript-display-cell {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-direction: row;
   gap: 10px;
   padding-right: 32px;
@@ -2111,9 +2387,9 @@ textarea.form-input {
 }
 
 .delete-modal-btn-delete {
-  background: #dc2626;
-  border: 1px solid #dc2626;
-  color: var(--lexi-primary-foreground);
+  background: transparent;
+  border: 1px solid var(--lexi-border);
+  color: var(--lexi-text-muted);
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 13px;
@@ -2123,8 +2399,9 @@ textarea.form-input {
 }
 
 .delete-modal-btn-delete:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
 }
 
 .delete-modal-btn-delete:disabled {
@@ -2148,26 +2425,51 @@ textarea.form-input {
 }
 
 /* Sonner toast variants (used by ToastProvider) */
+.sonner-toast {
+  font-family: var(--lexi-font-body);
+}
+
 .sonner-toast-success {
-  background: #ecfdf5 !important;
-  color: #065f46 !important;
-  border-color: #a7f3d0 !important;
+  background: var(--lexi-toast-success-bg) !important;
+  color: var(--lexi-toast-success-text) !important;
+  border-color: var(--lexi-toast-success-border) !important;
+}
+
+.sonner-toast-success [data-icon] {
+  color: var(--lexi-toast-success-text) !important;
 }
 
 .sonner-toast-error {
-  background: var(--lexi-danger-muted) !important;
-  color: #991b1b !important;
-  border-color: #fecaca !important;
+  background: var(--lexi-toast-error-bg) !important;
+  color: var(--lexi-toast-error-text) !important;
+  border-color: var(--lexi-toast-error-border) !important;
+}
+
+.sonner-toast-error [data-icon] {
+  color: var(--lexi-toast-error-text) !important;
 }
 
 .sonner-toast-warning {
-  background: #fffbeb !important;
-  color: #92400e !important;
-  border-color: #fde68a !important;
+  background: var(--lexi-toast-warning-bg) !important;
+  color: var(--lexi-toast-warning-text) !important;
+  border-color: var(--lexi-toast-warning-border) !important;
+}
+
+.sonner-toast-warning [data-icon] {
+  color: var(--lexi-toast-warning-text) !important;
 }
 
 .sonner-toast-info {
-  background: #eff6ff !important;
-  color: #1e40af !important;
-  border-color: #bfdbfe !important;
+  background: var(--lexi-toast-info-bg) !important;
+  color: var(--lexi-toast-info-text) !important;
+  border-color: var(--lexi-toast-info-border) !important;
+}
+
+.sonner-toast-info [data-icon] {
+  color: var(--lexi-primary) !important;
+}
+
+.sonner-toast [data-description] {
+  color: var(--lexi-text-muted) !important;
+  opacity: 1;
 }

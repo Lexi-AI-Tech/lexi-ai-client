@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Search, RefreshCw, Plus, X, Trash2, Edit } from "lucide-react";
+import { RefreshCw, Plus, Trash2, Edit } from "lucide-react";
 import type { TauriAppConfig } from "../types";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
+import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 
 export const VocabularyPage: React.FC = () => {
@@ -13,8 +13,6 @@ export const VocabularyPage: React.FC = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [newVocabularyValue, setNewVocabularyValue] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
   const [deleteConfirmValue, setDeleteConfirmValue] = useState<string | null>(
     null,
   );
@@ -42,22 +40,6 @@ export const VocabularyPage: React.FC = () => {
 
     loadConfig();
   }, []);
-
-  // Filter vocabulary based on search query
-  const filteredVocabulary = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return vocabulary;
-    }
-    const query = searchQuery.toLowerCase();
-    return vocabulary.filter((item) => item.toLowerCase().includes(query));
-  }, [vocabulary, searchQuery]);
-
-  const handleSearchClick = () => {
-    setShowSearch((prev) => !prev);
-    if (showSearch) {
-      setSearchQuery("");
-    }
-  };
 
   // Update config function
   const updateConfig = async (updates: Partial<TauriAppConfig>) => {
@@ -165,7 +147,7 @@ export const VocabularyPage: React.FC = () => {
     return (
       <div className="page">
         <h2 className="page__title">Vocabulary</h2>
-        <PageLoader className="page__empty" />
+        <ScreenSkeleton variant="vocabulary" className="page__empty" />
       </div>
     );
   }
@@ -225,14 +207,6 @@ export const VocabularyPage: React.FC = () => {
           <div className="vocab-actions">
             <button
               type="button"
-              onClick={handleSearchClick}
-              className={`btn btn--icon ${showSearch ? "active" : ""}`}
-              aria-label="Search"
-            >
-              <Search size={16} />
-            </button>
-            <button
-              type="button"
               onClick={async () => {
                 setIsLoading(true);
                 try {
@@ -265,40 +239,16 @@ export const VocabularyPage: React.FC = () => {
           </div>
         </div>
 
-        {showSearch && (
-          <div className="search-wrap">
-            <input
-              type="text"
-              className="form-input form-input--with-clear"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search vocabulary..."
-              autoFocus
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="search-clear"
-                aria-label="Clear search"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-        )}
-
-        {filteredVocabulary.length === 0 ? (
+        {vocabulary.length === 0 ? (
           <div className="page__empty page__empty--sm">
             <p>
-              {searchQuery
-                ? "No vocabulary terms match your search"
-                : "No vocabulary items yet. Add vocabulary terms to improve transcription accuracy."}
+              No vocabulary items yet. Add vocabulary terms to improve
+              transcription accuracy.
             </p>
           </div>
         ) : (
           <div className="vocab-list">
-            {filteredVocabulary.map((item, index) => (
+            {vocabulary.map((item, index) => (
               <div key={`${item}-${index}`} className="vocab-item">
                 <div className="vocab-item__actions">
                   {editingValue !== item ? (

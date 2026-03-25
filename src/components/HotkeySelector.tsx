@@ -1,4 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
@@ -12,6 +18,8 @@ interface HotkeySelectorProps {
   disabled?: boolean;
   label?: string;
   description?: string;
+  /** e.g. Lucide `Atom` for action hotkeys */
+  titleIcon?: ReactNode;
 }
 
 /** Canonical modifier order for storage (Control+Option+Command+Shift+Key, Fn first when present) */
@@ -24,6 +32,7 @@ export function HotkeySelector({
   disabled = false,
   label = "Hotkeys",
   description,
+  titleIcon,
 }: HotkeySelectorProps) {
   const [hotkeys, setHotkeys] = useState<string[]>(value.hotkeys);
   const [isRecording, setIsRecording] = useState(false);
@@ -206,7 +215,14 @@ export function HotkeySelector({
   return (
     <div className="hotkey-selector">
       <div className="hotkey-selector__header">
-        <label className="hotkey-selector__label">{label}</label>
+        <div className="hotkey-selector__title-row">
+          {titleIcon ? (
+            <span className="hotkey-selector__title-icon" aria-hidden>
+              {titleIcon}
+            </span>
+          ) : null}
+          <label className="hotkey-selector__label">{label}</label>
+        </div>
         <p className="hotkey-selector__description">{determineDescription()}</p>
       </div>
 

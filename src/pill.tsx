@@ -1204,8 +1204,7 @@ const PillApp: React.FC = () => {
         display: "flex",
         alignItems: "flex-end", // Align to bottom so pill expands upward
         justifyContent: "center",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "var(--lexi-font-body)",
         overflow: "hidden",
         pointerEvents: "none",
         position: "absolute",

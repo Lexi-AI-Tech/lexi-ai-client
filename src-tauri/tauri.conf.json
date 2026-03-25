@@ -28,7 +28,22 @@
       "providerShortName": null,
       "signingIdentity": "Developer ID Application: Satyasai Vallampati (FWLCJN85BF)",
       "infoPlist": "Info.plist",
-      "hardenedRuntime": true
+      "hardenedRuntime": true,
+      "dmg": {
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        },
+        "background": "images/dmg-background.png"
+      }
     }
   },
   "app": {
@@ -50,7 +65,7 @@
         "decorations": true,
         "transparent": false,
         "url": "index.html",
-        "devtools": true,
+        "devtools": false,
         "visible": true,
         "titleBarStyle": "Transparent"
       }
@@ -64,7 +79,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM2ODlFRTZFRTYzMTQyRjgKUldUNFFqSG1idTZKTm1aVTEvbjRYL2ZjdWNoMU1lNEM3MFFOb3hXeFZpbzNISk1TSVlvL0trUTMK",
       "endpoints": [
-        "https://dev-server.speaklexi.com/api/v1/updates/latest?version={{current_version}}&target={{target}}"
+        "https://server.speaklexi.com/api/v1/updates/latest?version={{current_version}}&target={{target}}"
       ]
     }
   }

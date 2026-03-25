@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { MeetingsListPage, type Meeting } from "./meetings/MeetingsListPage";
 import { MeetingDetailPage } from "./meetings/MeetingDetailPage";
 import "./meetings.css";
+import { formatAppDateTime } from "../lib/dateUtils";
 
 interface TranscriptSegment {
   id: string;
@@ -58,6 +59,13 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     null,
   );
   const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
+  const [isEditingMeetingTitle, setIsEditingMeetingTitle] = useState(false);
+  const [meetingTitleDraft, setMeetingTitleDraft] = useState("");
+  const [isSavingMeetingTitle, setIsSavingMeetingTitle] = useState(false);
+  const skipTitleBlurSaveRef = useRef(false);
+  const [focusedAppIconUrl, setFocusedAppIconUrl] = useState<string | null>(
+    null,
+  );
 
   const selectedMeeting = selectedMeetingId
     ? (meetings.find((m) => m.id === selectedMeetingId) ?? null)
@@ -80,6 +88,26 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
       fetchMeetings();
     }
   }, [tokens, fetchMeetings]);
+
+  const focusedAppName = (selectedMeeting?.platform ?? "").trim();
+
+  useEffect(() => {
+    if (!focusedAppName) {
+      setFocusedAppIconUrl(null);
+      return;
+    }
+    let cancelled = false;
+    invoke<string | null>("get_app_icon", { appName: focusedAppName })
+      .then((url) => {
+        if (!cancelled) setFocusedAppIconUrl(url ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setFocusedAppIconUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedAppName]);
 
   // Keep recording state stable across page unmount/remount by syncing from app-level state.
   useEffect(() => {
@@ -203,21 +231,59 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     setLiveSegments((prev) => [...prev, segment]);
   }, []);
 
-  const formatMeetingDate = (m: Meeting | null) => {
-    if (!m?.created_at) return null;
-    try {
-      const d = new Date(m.created_at);
-      return d.toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return null;
+  const selectedMeetingDateLabel = selectedMeeting
+    ? formatAppDateTime(selectedMeeting.created_at)
+    : "";
+
+  useEffect(() => {
+    setIsEditingMeetingTitle(false);
+  }, [selectedMeetingId]);
+
+  useEffect(() => {
+    if (!isEditingMeetingTitle && selectedMeeting) {
+      setMeetingTitleDraft(selectedMeeting.name || "");
     }
-  };
+  }, [selectedMeetingId, selectedMeeting, isEditingMeetingTitle]);
+
+  const cancelMeetingTitleEdit = useCallback(() => {
+    if (selectedMeeting) {
+      setMeetingTitleDraft(selectedMeeting.name || "");
+    }
+    setIsEditingMeetingTitle(false);
+  }, [selectedMeeting]);
+
+  const saveMeetingTitle = useCallback(async () => {
+    if (!selectedMeetingId || !selectedMeeting) return;
+    const trimmed = meetingTitleDraft.trim();
+    if (!trimmed) {
+      setMeetingTitleDraft(selectedMeeting.name || "");
+      setIsEditingMeetingTitle(false);
+      return;
+    }
+    if (trimmed === (selectedMeeting.name || "").trim()) {
+      setIsEditingMeetingTitle(false);
+      return;
+    }
+    setIsSavingMeetingTitle(true);
+    try {
+      await invoke("update_meeting", {
+        meetingId: selectedMeetingId,
+        name: trimmed,
+      });
+      setMeetings((prev) =>
+        prev.map((m) =>
+          m.id === selectedMeetingId ? { ...m, name: trimmed } : m,
+        ),
+      );
+      setIsEditingMeetingTitle(false);
+    } catch (error) {
+      console.error("Failed to update meeting title:", error);
+      setMeetingTitleDraft(selectedMeeting.name || "");
+      setIsEditingMeetingTitle(false);
+    } finally {
+      setIsSavingMeetingTitle(false);
+    }
+  }, [selectedMeetingId, selectedMeeting, meetingTitleDraft]);
 
   return (
     <div className={`page ${selectedMeetingId ? "page--meetings-detail" : ""}`}>
@@ -235,8 +301,45 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
             <ArrowLeft size={20} strokeWidth={2} />
             <span>Meetings</span>
           </button>
-          <div className="meetings-page-header__title">
-            {selectedMeeting.name || "Untitled Meeting"}
+          <div className="meetings-page-header__title meetings-page-header__title--editable">
+            {isEditingMeetingTitle ? (
+              <input
+                type="text"
+                className="meetings-page-header__title-input"
+                value={meetingTitleDraft}
+                onChange={(e) => setMeetingTitleDraft(e.target.value)}
+                disabled={isSavingMeetingTitle}
+                autoFocus
+                aria-label="Meeting title"
+                onBlur={() => {
+                  requestAnimationFrame(() => {
+                    if (skipTitleBlurSaveRef.current) {
+                      skipTitleBlurSaveRef.current = false;
+                      return;
+                    }
+                    void saveMeetingTitle();
+                  });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    skipTitleBlurSaveRef.current = true;
+                    cancelMeetingTitleEdit();
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="meetings-page-header__title-text"
+                onClick={() => setIsEditingMeetingTitle(true)}
+              >
+                {selectedMeeting.name || "Untitled Meeting"}
+              </button>
+            )}
           </div>
           <div className="meetings-page-header__meta">
             {recordingMeetingId === selectedMeetingId && (
@@ -245,11 +348,33 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                 Live
               </span>
             )}
-            {formatMeetingDate(selectedMeeting) && (
-              <span className="meetings-page-header__date">
-                {formatMeetingDate(selectedMeeting)}
+            {focusedAppName ? (
+              <span
+                className="meetings-page-header__focused-app"
+                title={`Meeting detected in ${focusedAppName}`}
+              >
+                {focusedAppIconUrl ? (
+                  <img
+                    src={focusedAppIconUrl}
+                    alt=""
+                    className="meetings-page-header__focused-app-icon"
+                  />
+                ) : null}
+                <span className="meetings-page-header__focused-app-text">
+                  <span className="meetings-page-header__focused-app-kicker meetings-page-header__focused-app-kicker--phrase">
+                    Meeting detected in
+                  </span>
+                  <span className="meetings-page-header__focused-app-name">
+                    {focusedAppName}
+                  </span>
+                </span>
               </span>
-            )}
+            ) : null}
+            {selectedMeetingDateLabel ? (
+              <span className="meetings-page-header__date">
+                {selectedMeetingDateLabel}
+              </span>
+            ) : null}
           </div>
         </div>
       )}

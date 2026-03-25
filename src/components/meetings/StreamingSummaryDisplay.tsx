@@ -7,6 +7,13 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
+
+/** Avoid invalid `<p>` inside `<h2>`, `<h3>`, `<li>`, or nested `<p>`. */
+const SUMMARY_INLINE_MD_COMPONENTS: Components = {
+  p: ({ children }) => <>{children}</>,
+};
 
 export type SummaryLine = {
   id: string;
@@ -55,6 +62,14 @@ const LINE_ANIMATION = {
 
 const DELAY_PER_LINE_MS = 85;
 const SECTION_BREAK_MS = 180;
+
+function SummaryLineMarkdown({ text }: { text: string }) {
+  return (
+    <ReactMarkdown components={SUMMARY_INLINE_MD_COMPONENTS}>
+      {text}
+    </ReactMarkdown>
+  );
+}
 
 export const StreamingSummaryDisplay: React.FC<
   StreamingSummaryDisplayProps
@@ -142,7 +157,7 @@ export const StreamingSummaryDisplay: React.FC<
             }
             className="meetings-summary-stream__h2"
           >
-            {line.content}
+            <SummaryLineMarkdown text={line.content} />
           </motion.h2>
         );
       case "h3":
@@ -155,7 +170,7 @@ export const StreamingSummaryDisplay: React.FC<
             }
             className="meetings-summary-stream__h3"
           >
-            {line.content}
+            <SummaryLineMarkdown text={line.content} />
           </motion.h3>
         );
       case "bullet":
@@ -168,7 +183,7 @@ export const StreamingSummaryDisplay: React.FC<
             }
             className="meetings-summary-stream__bullet"
           >
-            {line.content}
+            <SummaryLineMarkdown text={line.content} />
           </motion.li>
         );
       case "paragraph":
@@ -182,7 +197,7 @@ export const StreamingSummaryDisplay: React.FC<
             }
             className="meetings-summary-stream__paragraph"
           >
-            {line.content}
+            <SummaryLineMarkdown text={line.content} />
           </motion.p>
         );
     }

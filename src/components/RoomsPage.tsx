@@ -10,6 +10,7 @@ import { Room } from "../types";
 import { RoomLiveView } from "./RoomLiveView";
 import { useToast } from "./toast/useToast";
 import { PageLoader } from "./ui/PageLoader";
+import { formatAppDateTime } from "../lib/dateUtils";
 
 export const RoomsPage: React.FC = () => {
   const toast = useToast();
@@ -51,21 +52,6 @@ export const RoomsPage: React.FC = () => {
     } catch (err: any) {
       console.error("Failed to create room:", err);
       toast.error(err.message || "Failed to create room");
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return (
-        new Date(dateString).toLocaleDateString() +
-        " " +
-        new Date(dateString).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
-    } catch (e) {
-      return dateString;
     }
   };
 
@@ -227,7 +213,7 @@ export const RoomsPage: React.FC = () => {
                   <div
                     style={{ fontSize: "12px", opacity: 0.6, marginTop: "4px" }}
                   >
-                    {formatDate(room.created_at)}
+                    {formatAppDateTime(room.created_at)}
                   </div>
                 </div>
               </div>
