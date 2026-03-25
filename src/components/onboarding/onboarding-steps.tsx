@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   Volume2,
   AudioWaveform,
+  Loader2,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -263,7 +264,7 @@ export function PermissionsStep({
     {
       icon: Mic,
       title: "Microphone",
-      desc: "For audio recording",
+      desc: "Record your voice for transcription",
       state: microphone,
       request: requestMicrophone,
     },
@@ -290,27 +291,48 @@ export function PermissionsStep({
     },
   ];
 
+  const grantedCount = permissions.filter((p) => p.state.granted).length;
+
   return (
     <motion.div
       variants={stepVariants}
       initial="initial"
       animate="animate"
       exit="exit"
-      className="onboarding-step-content"
+      className="onboarding-step-content onboarding-step-content--permissions"
     >
       <div className="step-header">
         <h1 className="step-title">Permissions</h1>
         <p className="step-description">
-          Lexi AI needs a few permissions to function as your system-wide
-          assistant.
+          Lexi AI needs access to these controls so it can listen, capture
+          meetings, and type for you system-wide.
         </p>
+        <div className="permissions-progress" aria-label="Permission progress">
+          <div className="permissions-progress__track">
+            <div
+              className="permissions-progress__fill"
+              style={{
+                width: `${(grantedCount / permissions.length) * 100}%`,
+              }}
+            />
+          </div>
+          <span className="permissions-progress__label">
+            {grantedCount} of {permissions.length} allowed
+          </span>
+        </div>
       </div>
 
       <div className="permissions-list">
         {permissions.map((item, i) => (
           <div
             key={i}
-            className={`permission-card ${!item.state.granted ? "permission-card--clickable" : ""}`}
+            className={[
+              "permission-card",
+              item.state.granted ? "permission-card--granted" : "",
+              !item.state.granted ? "permission-card--clickable" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             role={!item.state.granted ? "button" : undefined}
             tabIndex={!item.state.granted ? 0 : undefined}
             onClick={!item.state.granted ? item.request : undefined}
@@ -337,13 +359,16 @@ export function PermissionsStep({
             </div>
             {item.state.granted ? (
               <div className="permission-granted">
-                <Check className="check-icon" /> Allowed
+                <Check className="check-icon" strokeWidth={2.5} /> Allowed
               </div>
+            ) : item.state.checking ? (
+              <span className="permission-allow-hint permission-allow-hint--loading">
+                <Loader2 className="permission-spinner" aria-hidden />
+                Opening settings…
+              </span>
             ) : (
               <span className="permission-allow-hint">
-                {item.state.checking
-                  ? "..."
-                  : "Click to open system permission"}
+                Click to allow in System Settings
               </span>
             )}
           </div>
@@ -553,54 +578,113 @@ export function TryItStep({
   );
 }
 
-// Visual Side Component — step 0 is intentionally soft; later steps add focal icons + energy
+/** Same abstract “card + grid + aura + curves” as sign-in; permissions uses elevated styling in CSS. */
+function OnboardingAbstractVisual({
+  variant,
+  motionKey,
+}: {
+  variant: "welcome" | "permissions";
+  motionKey: string;
+}) {
+  const elevated = variant === "permissions";
+
+  return (
+    <div
+      className={[
+        "visual-side",
+        "visual-side--welcome",
+        elevated ? "visual-side--permissions-panel" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <motion.div
+        key={motionKey}
+        initial={{ opacity: 0, y: elevated ? 8 : 0 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: elevated ? 0.55 : 0.6,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className={[
+          "visual-welcome",
+          elevated ? "visual-welcome--permissions" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        {elevated && <div className="visual-welcome-rim" aria-hidden />}
+        <div
+          className={[
+            "visual-welcome-grid",
+            elevated ? "visual-welcome-grid--permissions" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-hidden
+        />
+        <div className="visual-welcome-glow visual-welcome-glow--a" aria-hidden />
+        <div className="visual-welcome-glow visual-welcome-glow--b" aria-hidden />
+        <div className="visual-welcome-glow visual-welcome-glow--c" aria-hidden />
+        {elevated && (
+          <div className="visual-welcome-glow visual-welcome-glow--d" aria-hidden />
+        )}
+        <svg
+          className={[
+            "visual-welcome-curve",
+            elevated ? "visual-welcome-curve--permissions" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          viewBox="0 0 400 200"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden
+        >
+          <path
+            d="M0 120 C 80 40, 160 180, 200 100 S 320 20, 400 80"
+            stroke="currentColor"
+            strokeWidth={elevated ? "1.55" : "1.25"}
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+          <path
+            d="M0 140 C 100 200, 200 60, 280 130 S 360 160, 400 100"
+            stroke="currentColor"
+            strokeWidth={elevated ? "1.05" : "0.75"}
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+          {elevated && (
+            <path
+              d="M40 95 Q 120 25, 200 88 T 380 72"
+              stroke="currentColor"
+              strokeWidth="0.9"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+        </svg>
+      </motion.div>
+    </div>
+  );
+}
+
+// Visual Side — steps 0/1 share abstract panel (permissions is more intense); 2–3 keep emoji focal
 export function VisualSide({ step }: { step: number }) {
-  const icons: [string, string, string] = ["🔐", "⌨️", "✨"];
+  const icons: [string, string] = ["⌨️", "✨"];
 
   if (step === 0) {
+    return <OnboardingAbstractVisual variant="welcome" motionKey="welcome-visual" />;
+  }
+
+  if (step === 1) {
     return (
-      <div className="visual-side visual-side--welcome">
-        <motion.div
-          key="welcome-visual"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="visual-welcome"
-        >
-          <div className="visual-welcome-grid" aria-hidden />
-          <div className="visual-welcome-glow visual-welcome-glow--a" aria-hidden />
-          <div className="visual-welcome-glow visual-welcome-glow--b" aria-hidden />
-          <div className="visual-welcome-glow visual-welcome-glow--c" aria-hidden />
-          <svg
-            className="visual-welcome-curve"
-            viewBox="0 0 400 200"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden
-          >
-            <path
-              d="M0 120 C 80 40, 160 180, 200 100 S 320 20, 400 80"
-              stroke="currentColor"
-              strokeWidth="1.25"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-              opacity="0.35"
-            />
-            <path
-              d="M0 140 C 100 200, 200 60, 280 130 S 360 160, 400 100"
-              stroke="currentColor"
-              strokeWidth="0.75"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-              opacity="0.22"
-            />
-          </svg>
-        </motion.div>
-      </div>
+      <OnboardingAbstractVisual variant="permissions" motionKey="permissions-visual" />
     );
   }
 
-  const focalIndex = step - 1;
+  const focalIndex = step - 2;
   const emoji = icons[focalIndex] ?? "✨";
 
   return (
