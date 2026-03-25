@@ -353,7 +353,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts }) => {
 
           <div className="transcriptions-list">
             {loading ? (
-              <PageLoader />
+              <ScreenSkeleton variant="home" className="home-loading-full" />
             ) : transcripts.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">
