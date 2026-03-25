@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Pause, Trash2, Copy, Check } from "lucide-react";
+import { Play, Pause, Trash2, Copy, Check, Atom } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { PaginatedActionHistoryResponse } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
@@ -188,7 +188,15 @@ export const ActionsPage: React.FC = () => {
   if (!authStore.isInitialized) {
     return (
       <div className="actions-page">
-        <h2 className="transcripts-page-title">Actions</h2>
+        <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+          <Atom
+            className="transcripts-page-title__icon"
+            size={22}
+            strokeWidth={2}
+            aria-hidden
+          />
+          Actions
+        </h2>
         <p className="app-page-subtitle">Loading…</p>
         <div className="actions-page__content">
           <ScreenSkeleton
@@ -204,7 +212,15 @@ export const ActionsPage: React.FC = () => {
   if (!authStore.isAuthenticated) {
     return (
       <div className="actions-page">
-        <h2 className="transcripts-page-title">Actions</h2>
+        <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+          <Atom
+            className="transcripts-page-title__icon"
+            size={22}
+            strokeWidth={2}
+            aria-hidden
+          />
+          Actions
+        </h2>
         <div className="actions-login">
           <p className="actions-login__hint">Sign in to access your actions</p>
           <GoogleLoginButton
@@ -222,7 +238,15 @@ export const ActionsPage: React.FC = () => {
 
   return (
     <div className="actions-page">
-      <h2 className="transcripts-page-title">Actions</h2>
+      <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+        <Atom
+          className="transcripts-page-title__icon"
+          size={22}
+          strokeWidth={2}
+          aria-hidden
+        />
+        Actions
+      </h2>
       {isLoading && (!actionHistory || actionHistory.actions.length === 0) ? (
         <p className="app-page-subtitle">Loading…</p>
       ) : totalActions > 0 ? (
@@ -259,6 +283,9 @@ export const ActionsPage: React.FC = () => {
                 transition={{ duration: 0.4 }}
               >
                 <div className="actions-empty-wrap">
+                  <div className="actions-empty-icon" aria-hidden>
+                    <Atom size={36} strokeWidth={1.75} />
+                  </div>
                   <p>No actions yet.</p>
                   <p className="actions-empty-sub">
                     Voice actions you run will show up here.

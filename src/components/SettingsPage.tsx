@@ -6,6 +6,7 @@ import {
   Mic,
   Power,
   Keyboard,
+  Atom,
   ChevronDown,
   Check,
   RefreshCw,
@@ -732,6 +733,7 @@ export const SettingsPage: React.FC = () => {
               <div className="mb-16">
                 <HotkeySelector
                   label="Action Hotkeys"
+                  titleIcon={<Atom size={16} strokeWidth={2} />}
                   description={`Hold ${currentActionHotkeys.hotkeys.length > 0 && !currentActionHotkeys.hotkeys[0].includes("+") ? "this key" : "this hotkey combination"} to record a voice command for actions`}
                   value={currentActionHotkeys}
                   onChange={setCurrentActionHotkeys}

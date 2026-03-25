@@ -36,6 +36,15 @@
   color: var(--lexi-text-muted);
 }
 
+.actions-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  color: var(--lexi-primary);
+  opacity: 0.85;
+}
+
 .actions-empty-sub {
   font-size: 11px;
   margin-top: 8px;

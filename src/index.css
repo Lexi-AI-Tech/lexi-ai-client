@@ -1725,6 +1725,17 @@ textarea.form-input {
   letter-spacing: -0.025em;
 }
 
+.transcripts-page-title--with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.transcripts-page-title__icon {
+  flex-shrink: 0;
+  color: var(--lexi-primary);
+}
+
 .transcripts-page-title-count {
   font-size: 14px;
   font-weight: normal;
