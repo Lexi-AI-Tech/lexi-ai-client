@@ -334,7 +334,6 @@ export const DocsPage: React.FC<DocsPageProps> = ({
       {showListView ? (
         <DocsListPage
           docs={docs}
-          onRefreshDocs={fetchDocs}
           onSelectDoc={setSelectedId}
           onCreateDoc={handleCreateDoc}
           onDeleteDoc={async (docId) => {

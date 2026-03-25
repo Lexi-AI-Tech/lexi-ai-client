@@ -9,7 +9,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  ArrowLeft,
   FileText,
   FilePlus,
   MessageCircle,
@@ -74,7 +73,7 @@ interface MeetingDetailPageProps {
 export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   meetingId,
   meeting,
-  onBackToList,
+  onBackToList: _onBackToList,
   onMeetingDeleted,
   onMeetingsUpdated,
   isThisMeetingRecording,
@@ -470,22 +469,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     // Auto-run the same "End" flow used by the End button.
     handleEndMeeting();
   }, [triggerAutoEndMeetingFromReminder]);
-
-  const formatMeetingDate = (createdAt: string) => {
-    try {
-      if (!createdAt) return "";
-      const d = new Date(createdAt);
-      return d.toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "";
-    }
-  };
 
   const PAGE_VARIANTS = {
     hidden: { opacity: 0 },

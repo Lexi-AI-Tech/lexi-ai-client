@@ -36,7 +36,6 @@ function docContentToPlainText(contentJson: string | undefined): string {
 
 interface DocsListPageProps {
   docs: Doc[];
-  onRefreshDocs: () => void;
   onSelectDoc: (docId: string) => void;
   onCreateDoc: () => void;
   onDeleteDoc: (docId: string) => Promise<void>;
@@ -45,7 +44,6 @@ interface DocsListPageProps {
 
 export const DocsListPage: React.FC<DocsListPageProps> = ({
   docs,
-  onRefreshDocs,
   onSelectDoc,
   onCreateDoc,
   onDeleteDoc,

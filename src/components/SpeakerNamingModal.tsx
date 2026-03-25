@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Room, RoomTranscriptSegment } from "../types";
+import { Room } from "../types";
 import { useToast } from "./toast/useToast";
 
 interface SpeakerNamingModalProps {

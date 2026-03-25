@@ -14,7 +14,7 @@ export async function checkNetworkConnectivity(): Promise<boolean> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-    const response = await fetch("https://www.google.com/favicon.ico", {
+    await fetch("https://www.google.com/favicon.ico", {
       method: "HEAD",
       mode: "no-cors",
       signal: controller.signal,

@@ -39,9 +39,6 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
     useState<StreamingTranscript | null>(null);
   const [segments, setSegments] = useState<RoomTranscriptSegment[]>([]);
   const [showSpeakerNaming, setShowSpeakerNaming] = useState(false);
-  const [recordingStartTime, setRecordingStartTime] = useState<number | null>(
-    null,
-  );
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Refs for cleanup
@@ -135,7 +132,6 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
 
     setIsRecording(false);
     setLiveTranscript(null);
-    setRecordingStartTime(null);
     console.log("🛑 Stopping recording and preserving local segments...");
 
     // Do NOT fetch room details here immediately.
@@ -232,7 +228,6 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
       console.log("🚀 Invoking start_room_recording...");
       await invoke("start_room_recording", { roomId });
       setIsRecording(true);
-      setRecordingStartTime(Date.now());
       console.log("✅ Recording started successfully");
     } catch (err) {
       console.error("Failed to start recording:", err);
