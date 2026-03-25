@@ -24,8 +24,9 @@ import { MeetingsPage } from "./components/MeetingsPage";
 import { DocsPage } from "./components/docs/DocsPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
-import { useAutoUpdater } from "./hooks/useAutoUpdater";
-import { AnimatePresence, motion } from "framer-motion";
+import { useAutoUpdater, checkUpdateDetails } from "./hooks/useAutoUpdater";
+import { useUpdaterStore } from "./store/updaterStore";
+import { useToast } from "./components/toast/useToast";
 
 const ONBOARDING_VERSION = 1;
 
@@ -41,6 +42,21 @@ type Page =
   | "docs";
 
 const LOADING_DELAY_MS = 150; // Only show loading spinner if init takes longer than this (avoids brief flash on first load)
+const MEETING_REMINDER_INTERVAL_MINUTES = 45;
+
+function formatMeetingDuration(totalMinutes: number): string {
+  const safeMinutes = Math.max(0, Math.floor(totalMinutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const minutes = safeMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+  if (minutes === 0) {
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  return `${hours} hour${hours === 1 ? "" : "s"} ${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
 
 const PAGE_TRANSITION_VARIANTS = {
   initial: { opacity: 0, y: 8 },
@@ -59,6 +75,7 @@ function App() {
   const [onboardingSyncDone, setOnboardingSyncDone] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const prevCompletedRef = useRef(isCompleted);
+  const toast = useToast();
 
   // Initialize auto-updating background worker
   useAutoUpdater();
@@ -67,6 +84,15 @@ function App() {
   // 1. Switch to the Meetings page
   // 2. Focus that specific meeting and show its transcript tab
   const [pillMeetingId, setPillMeetingId] = useState<string | null>(null);
+  const [meetingReminderModal, setMeetingReminderModal] = useState<{
+    meetingId: string;
+    readableDuration: string;
+  } | null>(null);
+  const [pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
+    useState<string | null>(null);
+  const [activeRecordingMeetingId, setActiveRecordingMeetingId] = useState<
+    string | null
+  >(null);
 
   // When not authenticated, reset sync flag so we sync again after next login
   useEffect(() => {
@@ -185,14 +211,52 @@ function App() {
     };
   }, []);
 
-  // Listen for meeting started events (pill, tray, or elsewhere)
+  // Listen for "Check for Updates" from system tray
   useEffect(() => {
     let cancelled = false;
     let unlistenFn: (() => void) | undefined;
 
     const setup = async () => {
       const { listen } = await import("@tauri-apps/api/event");
-      const unlisten = await listen<{ meetingId: string }>(
+      const unlisten = await listen("check-updates-from-tray", async () => {
+        if (cancelled) return;
+        try {
+          const { check } = await import("@tauri-apps/plugin-updater");
+          const update = await check();
+          if (update) {
+            const details = await checkUpdateDetails();
+            useUpdaterStore.getState().setUpdate(update, details);
+            useUpdaterStore.getState().openModal();
+          } else {
+            toast.info("Lexi AI is up to date");
+          }
+        } catch (e) {
+          console.error("Tray update check failed:", e);
+          toast.error("Update check failed");
+        }
+      });
+      unlistenFn = unlisten;
+    };
+
+    setup().catch((e) => {
+      console.error("Failed to set up check-updates-from-tray listener:", e);
+    });
+
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, [toast]);
+
+  // Listen for meeting recording lifecycle events globally so active
+  // recording state survives page navigation.
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenFn: (() => void) | undefined;
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlistenStarted = await listen<{ meetingId: string }>(
         "meeting-recording-started",
         (event) => {
           if (cancelled) return;
@@ -202,18 +266,26 @@ function App() {
               ? payload.meetingId
               : null;
           if (!id) return;
+          setActiveRecordingMeetingId(id);
           setPillMeetingId(id);
           setCurrentPage("meetings");
         },
       );
-      unlistenFn = unlisten;
+      const unlistenStopped = await listen<{ meetingId?: string }>(
+        "meeting-recording-stopped",
+        () => {
+          if (cancelled) return;
+          setActiveRecordingMeetingId(null);
+        },
+      );
+      unlistenFn = () => {
+        unlistenStarted();
+        unlistenStopped();
+      };
     };
 
     setup().catch((e) => {
-      console.error(
-        "Failed to set up meeting-recording-started listener:",
-        e,
-      );
+      console.error("Failed to set up meeting-recording-started listener:", e);
     });
 
     return () => {
@@ -222,8 +294,62 @@ function App() {
     };
   }, []);
 
+  // Periodic safety reminder for long-running meetings (every 45 minutes)
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenFn: (() => void) | undefined;
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen<{ meetingId: string; minutes: number }>(
+        "meeting-duration-reminder",
+        async (event) => {
+          if (cancelled) return;
+          const payload = (event.payload || {}) as any;
+          const meetingId =
+            payload && typeof payload.meetingId === "string"
+              ? payload.meetingId
+              : null;
+          const minutes =
+            payload && typeof payload.minutes === "number"
+              ? payload.minutes
+              : MEETING_REMINDER_INTERVAL_MINUTES;
+          const readableDuration = formatMeetingDuration(minutes);
+          if (meetingId) {
+            setMeetingReminderModal({ meetingId, readableDuration });
+          }
+        },
+      );
+      unlistenFn = unlisten;
+    };
+
+    setup().catch((e) => {
+      console.error("Failed to set up meeting-duration-reminder listener:", e);
+    });
+
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
+
+  const handleKeepMeetingRunning = () => {
+    setMeetingReminderModal(null);
+  };
+
+  const handleEndMeetingFromReminder = () => {
+    if (!meetingReminderModal?.meetingId) return;
+    // Run the same full end flow as the Meetings "End" button:
+    // stop recording, switch to summary tab, and generate summary.
+    setPendingReminderAutoEndMeetingId(meetingReminderModal.meetingId);
+    setCurrentPage("meetings");
+    setMeetingReminderModal(null);
+  };
+
   // Navigate to docs page, optionally opening a specific doc (e.g. after creating from meeting)
-  const [selectedDocIdToOpen, setSelectedDocIdToOpen] = useState<string | null>(null);
+  const [selectedDocIdToOpen, setSelectedDocIdToOpen] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     const handleNavigateToDocs = () => {
@@ -359,6 +485,40 @@ function App() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {meetingReminderModal && (
+        <div
+          className="delete-modal-overlay"
+          onClick={handleKeepMeetingRunning}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Meeting still running?</h3>
+            <p>
+              The meeting has been running for{" "}
+              {meetingReminderModal.readableDuration}. Is it still running?
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={handleKeepMeetingRunning}
+              >
+                Keep Running
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={handleEndMeetingFromReminder}
+              >
+                End Meeting
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

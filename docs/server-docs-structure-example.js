@@ -12,7 +12,7 @@
  * Set: process.env.OPENAI_API_KEY
  */
 
-const { OpenAI } = require('openai');
+const { OpenAI } = require("openai");
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -29,22 +29,22 @@ Rules:
 async function structureDocContent(req, res) {
   try {
     const { transcript } = req.body;
-    if (!transcript || typeof transcript !== 'string') {
-      return res.status(400).json({ error: 'Missing or invalid transcript' });
+    if (!transcript || typeof transcript !== "string") {
+      return res.status(400).json({ error: "Missing or invalid transcript" });
     }
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: transcript.trim() },
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: transcript.trim() },
       ],
       temperature: 0.2,
     });
 
     const raw = completion.choices[0]?.message?.content?.trim();
     if (!raw) {
-      return res.status(500).json({ error: 'Empty LLM response' });
+      return res.status(500).json({ error: "Empty LLM response" });
     }
 
     // Strip optional markdown code block
@@ -55,14 +55,18 @@ async function structureDocContent(req, res) {
 
     // Validate it parses and has doc shape
     const parsed = JSON.parse(jsonStr);
-    if (parsed.type !== 'doc' || !Array.isArray(parsed.content)) {
-      return res.status(500).json({ error: 'LLM did not return a valid TipTap doc' });
+    if (parsed.type !== "doc" || !Array.isArray(parsed.content)) {
+      return res
+        .status(500)
+        .json({ error: "LLM did not return a valid TipTap doc" });
     }
 
     return res.json({ content: JSON.stringify(parsed) });
   } catch (err) {
-    console.error('structure-doc-content error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to structure content' });
+    console.error("structure-doc-content error:", err);
+    return res
+      .status(500)
+      .json({ error: err.message || "Failed to structure content" });
   }
 }
 

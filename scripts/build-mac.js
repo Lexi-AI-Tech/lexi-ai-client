@@ -12,7 +12,7 @@ function parseDotenv(contents) {
     const key = line.slice(0, eq).trim();
     let value = line.slice(eq + 1).trim();
     if (
-      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1);
@@ -46,7 +46,7 @@ function main() {
         "Env loading order (does not override already-set env):",
         "  1) .env.build.mac (preferred)",
         "  2) .env",
-      ].join("\n")
+      ].join("\n"),
     );
     process.exit(0);
   }
@@ -78,7 +78,9 @@ function main() {
     "APPLE_TEAM_ID",
   ];
 
-  const missing = required.filter((k) => !process.env[k] || String(process.env[k]).trim() === "");
+  const missing = required.filter(
+    (k) => !process.env[k] || String(process.env[k]).trim() === "",
+  );
   if (missing.length > 0) {
     console.error(
       [
@@ -86,7 +88,7 @@ function main() {
         ...missing.map((k) => `- ${redactKey(k)}`),
         "",
         "Set them in your shell or add them to `.env.build.mac` (preferred) or `.env`.",
-      ].join("\n")
+      ].join("\n"),
     );
     process.exit(1);
   }
@@ -102,4 +104,3 @@ function main() {
 }
 
 main();
-

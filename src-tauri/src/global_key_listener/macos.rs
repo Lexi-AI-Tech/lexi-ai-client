@@ -126,7 +126,10 @@ unsafe extern "C-unwind" fn raw_callback(
             if let Some(state) = lock_guard.as_ref() {
                 if let Some(tap) = state.tap.as_ref() {
                     CGEvent::tap_enable(&*tap, true);
-                    eprintln!("⚠️  CGEventTap was disabled; re-enabled automatically ({:?})", _type);
+                    eprintln!(
+                        "⚠️  CGEventTap was disabled; re-enabled automatically ({:?})",
+                        _type
+                    );
                 } else {
                     eprintln!("⚠️  CGEventTap disabled but tap not set ({:?})", _type);
                 }
@@ -174,8 +177,11 @@ unsafe extern "C-unwind" fn raw_callback(
     // Process safely without keeping the lock too long
     if let Ok(mut lock_guard) = GLOBAL_STATE.try_lock() {
         if let Some(state) = lock_guard.as_mut() {
-            let is_recording_mode =
-                state.recording_state.try_lock().map(|g| *g).unwrap_or(false);
+            let is_recording_mode = state
+                .recording_state
+                .try_lock()
+                .map(|g| *g)
+                .unwrap_or(false);
 
             if is_recording_mode {
                 let app_clone = state.app.clone();

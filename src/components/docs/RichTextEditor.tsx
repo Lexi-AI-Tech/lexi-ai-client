@@ -110,7 +110,10 @@ const parseContent = (content: string | undefined): Content | undefined => {
   }
 };
 
-export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(function RichTextEditor(
+export const RichTextEditor = forwardRef<
+  RichTextEditorRef,
+  RichTextEditorProps
+>(function RichTextEditor(
   {
     content,
     placeholder = "Start writing…",
@@ -153,7 +156,10 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         class: "docs-editor-content",
       },
       handleKeyDown: (view, event) => {
-        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          event.key.toLowerCase() === "k"
+        ) {
           const state = view.state;
           const { from, to } = state.selection;
           const doc = state.doc;
@@ -193,7 +199,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           // Add inline highlight decoration while Ask Lexi is open
           view.dispatch(
             state.tr.setMeta(
-              (AskLexiHighlight as any).storage?.pluginKey || "askLexiHighlight",
+              (AskLexiHighlight as any).storage?.pluginKey ||
+                "askLexiHighlight",
               { from, to },
             ),
           );
@@ -258,9 +265,13 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     const next = parseContent(content);
     const current = editor.getJSON();
     const currentStr = JSON.stringify(current);
-    const nextStr = next ? JSON.stringify(next) : '{"type":"doc","content":[{"type":"paragraph"}]}';
+    const nextStr = next
+      ? JSON.stringify(next)
+      : '{"type":"doc","content":[{"type":"paragraph"}]}';
     if (currentStr !== nextStr) {
-      editor.commands.setContent(next ?? { type: "doc", content: [{ type: "paragraph" }] });
+      editor.commands.setContent(
+        next ?? { type: "doc", content: [{ type: "paragraph" }] },
+      );
     }
   }, [editor, content]);
 
@@ -275,52 +286,66 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     onTitleChange?.(t);
   }, [title, onTitleChange]);
 
-  useImperativeHandle(ref, () => ({
-    insertStructuredContent(json: string) {
-      if (!editor) return;
-      try {
-        const parsed = JSON.parse(json) as { type?: string; content?: Content[] };
-        const nodes = parsed?.type === "doc" && Array.isArray(parsed.content)
-          ? parsed.content
-          : [parsed as Content];
-        editor.chain().focus().insertContent(nodes).run();
-        const newJson = JSON.stringify(editor.getJSON());
-        onUpdateRef.current?.(newJson);
-      } catch {
+  useImperativeHandle(
+    ref,
+    () => ({
+      insertStructuredContent(json: string) {
+        if (!editor) return;
         try {
-          editor.chain().focus().insertContent([{ type: "paragraph", content: [{ type: "text", text: json }] }]).run();
+          const parsed = JSON.parse(json) as {
+            type?: string;
+            content?: Content[];
+          };
+          const nodes =
+            parsed?.type === "doc" && Array.isArray(parsed.content)
+              ? parsed.content
+              : [parsed as Content];
+          editor.chain().focus().insertContent(nodes).run();
           const newJson = JSON.stringify(editor.getJSON());
           onUpdateRef.current?.(newJson);
-        } catch (_) {}
-      }
-    },
-    getSelection(): DocSelection | null {
-      if (!editor) return null;
-      const { from, to } = editor.state.selection;
-      if (from === to) return null;
-      const text = editor.state.doc.textBetween(from, to, "\n");
-      if (!text.trim()) return null;
-      return { from, to, text };
-    },
-    replaceRange(from: number, to: number, newText: string) {
-      if (!editor) return;
-      const trimmed = newText.trim();
-      if (!trimmed) return;
-      const blocks = trimmed.split(/\n\n+/).filter(Boolean);
-      const content: Content[] = blocks.map((block) => ({
-        type: "paragraph",
-        content: [{ type: "text", text: block }],
-      })) as Content[];
-      editor
-        .chain()
-        .focus()
-        .deleteRange({ from, to })
-        .insertContentAt(from, content)
-        .run();
-      const newJson = JSON.stringify(editor.getJSON());
-      onUpdateRef.current?.(newJson);
-    },
-  }), [editor]);
+        } catch {
+          try {
+            editor
+              .chain()
+              .focus()
+              .insertContent([
+                { type: "paragraph", content: [{ type: "text", text: json }] },
+              ])
+              .run();
+            const newJson = JSON.stringify(editor.getJSON());
+            onUpdateRef.current?.(newJson);
+          } catch (_) {}
+        }
+      },
+      getSelection(): DocSelection | null {
+        if (!editor) return null;
+        const { from, to } = editor.state.selection;
+        if (from === to) return null;
+        const text = editor.state.doc.textBetween(from, to, "\n");
+        if (!text.trim()) return null;
+        return { from, to, text };
+      },
+      replaceRange(from: number, to: number, newText: string) {
+        if (!editor) return;
+        const trimmed = newText.trim();
+        if (!trimmed) return;
+        const blocks = trimmed.split(/\n\n+/).filter(Boolean);
+        const content: Content[] = blocks.map((block) => ({
+          type: "paragraph",
+          content: [{ type: "text", text: block }],
+        })) as Content[];
+        editor
+          .chain()
+          .focus()
+          .deleteRange({ from, to })
+          .insertContentAt(from, content)
+          .run();
+        const newJson = JSON.stringify(editor.getJSON());
+        onUpdateRef.current?.(newJson);
+      },
+    }),
+    [editor],
+  );
 
   if (!editor) {
     return (
@@ -362,16 +387,24 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           </button>
           <button
             type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={editor.isActive("heading", { level: 1 }) ? "is-active" : ""}
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 1 }).run()
+            }
+            className={
+              editor.isActive("heading", { level: 1 }) ? "is-active" : ""
+            }
             title="Heading 1"
           >
             <Heading1 size={16} />
           </button>
           <button
             type="button"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={editor.isActive("heading", { level: 2 }) ? "is-active" : ""}
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 2 }).run()
+            }
+            className={
+              editor.isActive("heading", { level: 2 }) ? "is-active" : ""
+            }
             title="Heading 2"
           >
             <Heading2 size={16} />
@@ -449,12 +482,15 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                   if (!askLexiSelection) return;
                   setAskLexiSubmitting(true);
                   try {
-                    const content = await invoke<string>("rewrite_doc_section", {
-                      text: askLexiSelection.text,
-                      instructions: askLexiInstructions.trim(),
-                      contextBefore: askLexiSelection.contextBefore ?? "",
-                      contextAfter: askLexiSelection.contextAfter ?? "",
-                    });
+                    const content = await invoke<string>(
+                      "rewrite_doc_section",
+                      {
+                        text: askLexiSelection.text,
+                        instructions: askLexiInstructions.trim(),
+                        contextBefore: askLexiSelection.contextBefore ?? "",
+                        contextAfter: askLexiSelection.contextAfter ?? "",
+                      },
+                    );
                     const trimmed = content.trim();
                     if (trimmed) {
                       const blocks = trimmed.split(/\n\n+/).filter(Boolean);
@@ -475,16 +511,11 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                         })
                         .insertContentAt(askLexiSelection.from, nodes)
                         .run();
-                      onUpdateRef.current?.(
-                        JSON.stringify(editor.getJSON()),
-                      );
+                      onUpdateRef.current?.(JSON.stringify(editor.getJSON()));
                     }
                     // Clear inline highlight decoration
                     editor.view.dispatch(
-                      editor.state.tr.setMeta(
-                        "askLexiHighlight",
-                        "clear",
-                      ),
+                      editor.state.tr.setMeta("askLexiHighlight", "clear"),
                     );
                     setAskLexiOpen(false);
                     setAskLexiSelection(null);

@@ -78,7 +78,10 @@ use audio::thread::spawn_recording_thread;
 use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 
-use state::{ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, RoomState};
+use state::{
+    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, MeetingState, RoomState,
+    ShortcutCommandsCache, ShortcutCommandsState,
+};
 use window::show_and_focus_main_window;
 
 use permissions::{
@@ -98,23 +101,19 @@ use commands::auth::{
     get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
     store_auth_data,
 };
-use commands::hotkey::{
-    get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
-};
+use commands::billing::get_billing_usage;
 use commands::docs::{
     create_doc, delete_doc, get_doc, get_docs, rewrite_doc_section, start_doc_recording,
     stop_doc_recording, structure_doc_content, update_doc,
+};
+use commands::hotkey::{
+    get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
 use commands::notes::{create_note, delete_note, get_note, get_notes, update_note};
 use commands::onboarding::{
     complete_onboarding, complete_server_onboarding, get_onboarding_state,
     get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
     set_onboarding_step,
-};
-use meetings::commands::{
-    add_meeting_note, create_meeting, get_meeting_details, get_meeting_suggested_questions,
-    list_meetings, send_meeting_chat, start_meeting_recording, stream_meeting_summary,
-    stop_meeting_recording, update_meeting, delete_meeting, create_doc_from_meeting,
 };
 use commands::rooms::{
     create_room, get_room_details, list_rooms, start_room_recording,
@@ -124,6 +123,11 @@ use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, updat
 use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type};
 use commands::window::{open_devtools, show_main_window};
+use meetings::commands::{
+    add_meeting_note, create_doc_from_meeting, create_meeting, delete_meeting, get_meeting_details,
+    get_meeting_suggested_questions, list_meetings, send_meeting_chat, start_meeting_recording,
+    stop_meeting_recording, stream_meeting_summary, update_meeting,
+};
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
 /// Command to control recording state
@@ -275,6 +279,7 @@ pub fn main() {
             delete_transcript,
             get_analytics_stats,
             get_analytics_chart,
+            get_billing_usage,
             get_action_history,
             delete_action_history,
             get_shortcuts,
@@ -387,6 +392,12 @@ pub fn main() {
             let recording_state_arc = Arc::new(Mutex::new(false));
             app.manage(HotkeyWatchState(config_tx));
             app.manage(ActionHotkeyWatchState(action_hotkey_tx));
+            app.manage(ShortcutCommandsState(Arc::new(Mutex::new(
+                ShortcutCommandsCache {
+                    commands: std::collections::HashMap::new(),
+                    last_refreshed_at: None,
+                },
+            ))));
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });
@@ -396,7 +407,7 @@ pub fn main() {
                 command_tx: Mutex::new(None),
             });
 
-            app.manage(crate::state::MeetingState {
+            app.manage(MeetingState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
                 system_stop_tx: Mutex::new(None),
@@ -404,6 +415,8 @@ pub fn main() {
                 meeting_ws_close_tx: Mutex::new(None),
                 tray_start_meeting: Mutex::new(Some(start_meeting_menu_item)),
                 meeting_recording_tx: Mutex::new(meeting_recording_tx),
+                current_meeting_id: Mutex::new(None),
+                reminder_task: Mutex::new(None),
             });
 
             // Fetch config in background after state is managed to ensure channels get updated

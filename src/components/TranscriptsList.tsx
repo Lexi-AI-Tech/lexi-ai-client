@@ -368,7 +368,9 @@ export const TranscriptsList: React.FC = () => {
                 <div className="transcript-cell transcript-cell-app">
                   {(() => {
                     const appName = transcript.focused_app || "";
-                    const iconUrl = appName ? appIcons[appName] ?? undefined : undefined;
+                    const iconUrl = appName
+                      ? (appIcons[appName] ?? undefined)
+                      : undefined;
                     return (
                       <div className="transcript-cell-app__content">
                         {iconUrl ? (

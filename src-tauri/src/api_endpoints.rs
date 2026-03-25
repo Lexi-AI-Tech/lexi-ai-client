@@ -114,12 +114,7 @@ pub mod docs {
     pub const REWRITE_SECTION: &str = "/docs/rewrite-section";
 
     pub fn list_url() -> String {
-        format!(
-            "{}{}{}",
-            config::api_base_url(),
-            super::API_V1_PREFIX,
-            LIST
-        )
+        format!("{}{}{}", config::api_base_url(), super::API_V1_PREFIX, LIST)
     }
 
     pub fn doc_url(doc_id: &str) -> String {

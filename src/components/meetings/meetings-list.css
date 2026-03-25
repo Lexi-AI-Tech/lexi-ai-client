@@ -225,15 +225,24 @@
   color: var(--lexi-text-muted);
 }
 
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown {
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown {
   margin: 0;
   padding: 0;
 }
 
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown h1,
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown h2,
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown h3,
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown h4 {
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  h1,
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  h2,
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  h3,
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  h4 {
   margin: 0 0 0.15em 0;
   padding: 0;
   font-size: 0.8125rem;
@@ -242,9 +251,15 @@
   line-height: 1.5;
 }
 
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown p,
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown ul,
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown ol {
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  p,
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  ul,
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  ol {
   margin: 0 0 0.15em 0;
   padding: 0;
   font-size: inherit;
@@ -252,15 +267,21 @@
   line-height: 1.5;
 }
 
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown li {
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  li {
   margin: 0 0 0 0.5em;
   padding: 0;
   font-size: inherit;
   list-style: disc;
 }
 
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown ul,
-.meetings-list-page__card-summary--preview .meetings-list-page__card-summary-markdown ol {
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  ul,
+.meetings-list-page__card-summary--preview
+  .meetings-list-page__card-summary-markdown
+  ol {
   padding-left: 1em;
 }
 
@@ -286,7 +307,9 @@
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--lexi-primary);
-  transition: gap 0.2s ease, color 0.2s ease;
+  transition:
+    gap 0.2s ease,
+    color 0.2s ease;
 }
 
 .meetings-list-page__card-link-arrow {
@@ -335,7 +358,11 @@
   padding: 4rem 2rem;
   text-align: center;
   background:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(13, 148, 136, 0.06) 0%, transparent 55%),
+    radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      rgba(13, 148, 136, 0.06) 0%,
+      transparent 55%
+    ),
     transparent;
 }
 

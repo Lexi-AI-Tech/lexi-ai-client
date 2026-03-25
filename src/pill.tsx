@@ -254,8 +254,7 @@ export const Pill: React.FC = () => {
               const idleX = idlePositionRef.current.x;
               const idleY = idlePositionRef.current.y;
 
-              const recX =
-                idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
+              const recX = idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
               const recY = idleY - HEIGHT_DIFF;
 
               await window.setSize(
@@ -276,8 +275,7 @@ export const Pill: React.FC = () => {
             if (!idlePositionRef.current) return;
             const idleX = idlePositionRef.current.x;
             const idleY = idlePositionRef.current.y;
-            const procX =
-              idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
+            const procX = idleX - (PROCESSING_SIZE.width - IDLE_SIZE.width) / 2;
             const procY = idleY - HEIGHT_DIFF;
             await window.setSize(
               new LogicalSize(PROCESSING_SIZE.width, PROCESSING_SIZE.height),
