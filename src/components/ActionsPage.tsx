@@ -10,6 +10,7 @@ import { useToast } from "./toast/useToast";
 import "../styles/components/hotkey-selector.css";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
+import "./actions/actions.css";
 
 export const ActionsPage: React.FC = () => {
   const authStore = useAuthStore();
@@ -167,36 +168,10 @@ export const ActionsPage: React.FC = () => {
   // Show login prompt if not authenticated
   if (!authStore.isAuthenticated) {
     return (
-      <div
-        style={{
-          padding: "2rem 2.5rem",
-          background: "#ffffff",
-          minHeight: "100vh",
-          fontFamily: "var(--lexi-font-body)",
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: "2rem",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#111827",
-            letterSpacing: "-0.025em",
-          }}
-        >
-          Actions
-        </h2>
-        <div style={{ textAlign: "center", padding: "16px 0" }}>
-          <p
-            style={{
-              fontSize: "0.875rem",
-              color: "#6b7280",
-              marginBottom: "16px",
-            }}
-          >
-            Sign in to access your actions
-          </p>
+      <div className="actions-page">
+        <h2 className="actions-page__title">Actions</h2>
+        <div className="actions-login">
+          <p className="actions-login__hint">Sign in to access your actions</p>
           <GoogleLoginButton
             onSuccess={() => {
               // Actions will be loaded automatically via useEffect
@@ -209,26 +184,8 @@ export const ActionsPage: React.FC = () => {
   }
 
   return (
-    <div
-      style={{
-        padding: "2rem 2.5rem",
-        background: "#ffffff",
-        minHeight: "100vh",
-        fontFamily: "var(--lexi-font-body)",
-      }}
-    >
-      <h2
-        style={{
-          margin: 0,
-          marginBottom: "2rem",
-          fontSize: "24px",
-          fontWeight: 600,
-          color: "#111827",
-          letterSpacing: "-0.025em",
-        }}
-      >
-        Actions
-      </h2>
+    <div className="actions-page">
+      <h2 className="actions-page__title">Actions</h2>
 
       {/* Global Hotkey Section */}
       <div style={{ marginBottom: "3rem" }}>
@@ -296,102 +253,27 @@ export const ActionsPage: React.FC = () => {
 
       {/* Action History Section */}
       <div>
-        <h3
-          style={{
-            margin: 0,
-            marginBottom: "1.5rem",
-            fontSize: "18px",
-            fontWeight: 500,
-            color: "#111827",
-          }}
-        >
-          Action History
-        </h3>
+        <h3 className="actions-page__section-title">Action History</h3>
 
         {isLoading ? (
           <ScreenSkeleton variant="actionsHistory" />
         ) : !actionHistory || actionHistory.actions.length === 0 ? (
-          <div
-            style={{
-              padding: "3rem 1rem",
-              textAlign: "center",
-              color: "#6b7280",
-              fontSize: "0.875rem",
-              background: "#ffffff",
-              border: "1px solid #f3f4f6",
-              borderRadius: "0.75rem",
-            }}
-          >
+          <div className="actions-page__empty">
             No action history yet. Actions will appear here as you use them.
           </div>
         ) : (
           <>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.75rem",
-              }}
-            >
+            <div className="actions-history">
               {actionHistory.actions.map((action) => (
-                <div
-                  key={action.id}
-                  style={{
-                    padding: "1.25rem",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "0.75rem",
-                    transition: "all 0.2s ease",
-                    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#d1d5db";
-                    e.currentTarget.style.boxShadow =
-                      "0 4px 12px rgba(0, 0, 0, 0.08)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.boxShadow =
-                      "0 1px 2px rgba(0, 0, 0, 0.05)";
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: "0.75rem",
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: "0.9375rem",
-                          color: "#111827",
-                          fontWeight: 500,
-                          marginBottom: "0.25rem",
-                        }}
-                      >
+                <div key={action.id} className="action-card">
+                  <div className="action-card__top">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="action-card__command">
                         {action.action_command}
                       </div>
                       {action.app_name && (
-                        <div
-                          style={{
-                            fontSize: "0.8125rem",
-                            color: "#6b7280",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem",
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: "6px",
-                              height: "6px",
-                              borderRadius: "50%",
-                              backgroundColor: "#e5e7eb",
-                            }}
-                          />
+                        <div className="action-card__context">
+                          <span className="action-card__context-dot" />
                           Context: {action.app_name}
                         </div>
                       )}
@@ -399,30 +281,7 @@ export const ActionsPage: React.FC = () => {
                     <button
                       onClick={() => openDeleteConfirm(action.id)}
                       disabled={!!deletingId}
-                      style={{
-                        padding: "6px",
-                        backgroundColor: "#fef2f2",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: deletingId ? "not-allowed" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#ef4444",
-                        transition: "all 0.2s ease",
-                        marginLeft: "1rem",
-                        opacity: deletingId ? 0.6 : 1,
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!deletingId) {
-                          e.currentTarget.style.backgroundColor = "#fee2e2";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!deletingId) {
-                          e.currentTarget.style.backgroundColor = "#fef2f2";
-                        }
-                      }}
+                      className="action-delete-btn"
                       title="Delete action"
                     >
                       <Trash2 size={14} />
@@ -430,36 +289,11 @@ export const ActionsPage: React.FC = () => {
                   </div>
 
                   {action.selected_text && (
-                    <div
-                      style={{
-                        marginTop: "0.5rem",
-                        paddingTop: "0.5rem",
-                        borderTop: "1px solid #f3f4f6",
-                      }}
-                    >
+                    <div className="action-card__divider">
+                      <div className="action-card__label">Input</div>
                       <div
-                        style={{
-                          fontSize: "0.75rem",
-                          color: "#9ca3af",
-                          fontWeight: 500,
-                          marginBottom: "0.25rem",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.025em",
-                        }}
-                      >
-                        Input
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.8125rem",
-                          color: "#4b5563",
-                          lineHeight: 1.5,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: "vertical" as const,
-                        }}
+                        className="action-card__text"
+                        style={{ WebkitLineClamp: 3 }}
                       >
                         {action.selected_text}
                       </div>
@@ -468,16 +302,7 @@ export const ActionsPage: React.FC = () => {
 
                   {/* Text action: show output value. Voice action: show output value + audio player (transcripts-style) */}
                   {(action.output_value || action.output_audio_file_url) && (
-                    <div
-                      style={{
-                        marginTop: "0.75rem",
-                        paddingTop: "0.75rem",
-                        borderTop: "1px solid #f3f4f6",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: "10px",
-                      }}
-                    >
+                    <div className="action-card__divider">
                       {action.output_audio_file_url && (
                         <div
                           style={{
@@ -494,35 +319,7 @@ export const ActionsPage: React.FC = () => {
                                 action.output_audio_file_url!,
                               )
                             }
-                            style={{
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "50%",
-                              border: "none",
-                              background:
-                                playingId === action.id ? "#1a1a1a" : "#f3f4f6",
-                              color:
-                                playingId === action.id ? "#fff" : "#6b7280",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                              position: "relative",
-                              overflow: "hidden",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (playingId !== action.id) {
-                                e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.color = "#374151";
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (playingId !== action.id) {
-                                e.currentTarget.style.background = "#f3f4f6";
-                                e.currentTarget.style.color = "#6b7280";
-                              }
-                            }}
+                            className={`action-audio-btn ${playingId === action.id ? "action-audio-btn--playing" : ""}`}
                             title={
                               playingId === action.id ? "Pause" : "Play audio"
                             }
@@ -549,7 +346,7 @@ export const ActionsPage: React.FC = () => {
                                   cy="14"
                                   r="12"
                                   fill="none"
-                                  stroke="#fff"
+                                  stroke="currentColor"
                                   strokeWidth="2"
                                   strokeDasharray={`${audioProgress * 0.754} 75.4`}
                                   strokeLinecap="round"
@@ -569,37 +366,14 @@ export const ActionsPage: React.FC = () => {
                         </div>
                       )}
                       {action.output_value && (
-                        <div
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            fontSize: "0.8125rem",
-                            color: "#4b5563",
-                            lineHeight: 1.5,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            display: "-webkit-box",
-                            WebkitLineClamp: 4,
-                            WebkitBoxOrient: "vertical" as const,
-                          }}
-                        >
+                        <div className="action-card__text">
                           {action.output_value}
                         </div>
                       )}
                     </div>
                   )}
 
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "0.5rem",
-                      fontSize: "0.75rem",
-                      color: "#9ca3af",
-                      borderTop: "1px solid #f3f4f6",
-                      paddingTop: "0.75rem",
-                      marginTop: "0.75rem",
-                    }}
-                  >
+                  <div className="action-card__bottom">
                     <span>{formatDateTime(action.created_at)}</span>
                     <span>•</span>
                     <span style={{ textTransform: "capitalize" }}>
@@ -612,38 +386,15 @@ export const ActionsPage: React.FC = () => {
 
             {/* Pagination */}
             {actionHistory.total_pages > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: "0.5rem",
-                  marginTop: "2rem",
-                }}
-              >
+              <div className="action-pagination">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    fontSize: "0.875rem",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "0.5rem",
-                    background: page === 1 ? "#f3f4f6" : "#ffffff",
-                    color: page === 1 ? "#9ca3af" : "#374151",
-                    cursor: page === 1 ? "not-allowed" : "pointer",
-                  }}
+                  className="action-pagination__btn"
                 >
                   Previous
                 </button>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    padding: "0 1rem",
-                    fontSize: "0.875rem",
-                    color: "#6b7280",
-                  }}
-                >
+                <div className="action-pagination__label">
                   Page {page} of {actionHistory.total_pages}
                 </div>
                 <button
@@ -651,24 +402,7 @@ export const ActionsPage: React.FC = () => {
                     setPage((p) => Math.min(actionHistory.total_pages, p + 1))
                   }
                   disabled={page === actionHistory.total_pages}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    fontSize: "0.875rem",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "0.5rem",
-                    background:
-                      page === actionHistory.total_pages
-                        ? "#f3f4f6"
-                        : "#ffffff",
-                    color:
-                      page === actionHistory.total_pages
-                        ? "#9ca3af"
-                        : "#374151",
-                    cursor:
-                      page === actionHistory.total_pages
-                        ? "not-allowed"
-                        : "pointer",
-                  }}
+                  className="action-pagination__btn"
                 >
                   Next
                 </button>
