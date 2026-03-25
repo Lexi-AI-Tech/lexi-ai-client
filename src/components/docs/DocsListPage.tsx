@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, FileText, Plus, Trash2 } from "lucide-react";
+import { BookText, ChevronRight, FileText, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
 import { formatAppDateTime } from "../../lib/dateUtils";
 import { ScreenSkeleton } from "../ui/ScreenSkeleton";
@@ -117,7 +117,7 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
           className="docs-list-page__cta"
           onClick={onCreateDoc}
         >
-          <Plus size={18} strokeWidth={2} />
+          <BookText size={18} strokeWidth={2} />
           New doc
         </button>
       </header>

@@ -315,22 +315,24 @@ export const TranscriptsList: React.FC = () => {
                     variants={CARD_VARIANTS}
                   >
                     <div className="transcript-card__header">
-                      <div className="transcript-card__date">
-                        {formatDateRelative(transcript.created_at)}
-                      </div>
-                      <div className="transcript-card__app">
-                        <div className="transcript-cell-app__content">
-                          {iconUrl ? (
-                            <img
-                              src={iconUrl}
-                              alt=""
-                              className="transcript-cell-app__icon"
-                              title={appName || undefined}
-                            />
-                          ) : null}
-                          <span className="transcript-cell-app__name">
-                            {appName || "—"}
-                          </span>
+                      <div className="transcript-card__meta">
+                        <div className="transcript-card__date">
+                          {formatDateRelative(transcript.created_at)}
+                        </div>
+                        <div className="transcript-card__app">
+                          <div className="transcript-cell-app__content">
+                            {iconUrl ? (
+                              <img
+                                src={iconUrl}
+                                alt=""
+                                className="transcript-cell-app__icon"
+                                title={appName || undefined}
+                              />
+                            ) : null}
+                            <span className="transcript-cell-app__name">
+                              {appName || "—"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
