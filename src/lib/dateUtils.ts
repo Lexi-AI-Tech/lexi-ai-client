@@ -53,10 +53,7 @@ export function parseServerDate(input: string | null | undefined): Date | null {
     const d = new Date(s);
     if (!Number.isNaN(d.getTime())) return d;
     // Legacy: trim extra sub-ms digits only (Python µs, etc.)
-    s = s.replace(
-      /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3})\d+/,
-      "$1",
-    );
+    s = s.replace(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3})\d+/, "$1");
   }
 
   const d = new Date(s);
@@ -67,7 +64,9 @@ export function parseServerDate(input: string | null | undefined): Date | null {
  * Standard list/card timestamp: weekday, month, day, and time — same style as
  * the Meetings list. Uses the user's locale and local timezone.
  */
-export function formatAppDateTime(isoString: string | null | undefined): string {
+export function formatAppDateTime(
+  isoString: string | null | undefined,
+): string {
   const date = parseServerDate(isoString);
   if (!date) return "";
   try {

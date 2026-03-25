@@ -243,8 +243,17 @@ const HomeBillingSkeleton: React.FC = () => (
   <div className="home-billing-skeleton" aria-hidden>
     {Array.from({ length: 3 }).map((_, i) => (
       <div key={i} className="home-billing-skeleton__row">
-        <SkBlock style={{ height: 12, width: "38%", borderRadius: 6, marginBottom: 10 }} />
-        <SkBlock style={{ height: 14, width: "72%", borderRadius: 8, marginBottom: 8 }} />
+        <SkBlock
+          style={{
+            height: 12,
+            width: "38%",
+            borderRadius: 6,
+            marginBottom: 10,
+          }}
+        />
+        <SkBlock
+          style={{ height: 14, width: "72%", borderRadius: 8, marginBottom: 8 }}
+        />
         <SkBlock style={{ height: 10, width: "48%", borderRadius: 6 }} />
       </div>
     ))}
@@ -396,12 +405,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [
-    isAuthenticated,
-    tokens?.access_token,
-    activePeriod,
-    fetchChart,
-  ]);
+  }, [isAuthenticated, tokens?.access_token, activePeriod, fetchChart]);
 
   useEffect(() => {
     const fetchHotkey = async () => {
@@ -546,7 +550,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <FileText size={32} />
                 </div>
                 <p className="empty-title">Plan usage</p>
-                <p className="empty-sub">Sign in to see limits and usage for your plan.</p>
+                <p className="empty-sub">
+                  Sign in to see limits and usage for your plan.
+                </p>
               </div>
             ) : !billingUsage ? (
               <div className="empty-state">
@@ -554,7 +560,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <FileText size={32} />
                 </div>
                 <p className="empty-title">Couldn&apos;t load plan usage</p>
-                <p className="empty-sub">Check your connection and try again.</p>
+                <p className="empty-sub">
+                  Check your connection and try again.
+                </p>
               </div>
             ) : planUsageRows.length === 0 ? (
               <div className="empty-state">
@@ -562,7 +570,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <FileText size={32} />
                 </div>
                 <p className="empty-title">No plan usage yet</p>
-                <p className="empty-sub">Usage will appear once activity starts.</p>
+                <p className="empty-sub">
+                  Usage will appear once activity starts.
+                </p>
               </div>
             ) : (
               planUsageRows.map((feature) => (
@@ -582,9 +592,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     {feature.limit_value !== null && (
                       <span>• {feature.limit_value} limit</span>
                     )}
-                    <span>
-                      • {feature.enabled ? "Enabled" : "Disabled"}
-                    </span>
+                    <span>• {feature.enabled ? "Enabled" : "Disabled"}</span>
                   </div>
                 </motion.div>
               ))

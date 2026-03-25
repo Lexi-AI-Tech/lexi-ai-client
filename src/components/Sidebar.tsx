@@ -2,7 +2,13 @@ import React, { useState, useEffect } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useUpdaterStore } from "../store/updaterStore";
 import ReactMarkdown from "react-markdown";
-import { Atom, AudioLines, StickyNote, Languages, BookText } from "lucide-react";
+import {
+  Atom,
+  AudioLines,
+  StickyNote,
+  Languages,
+  BookText,
+} from "lucide-react";
 
 import type { SidebarProps } from "../types";
 

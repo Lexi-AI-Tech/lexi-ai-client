@@ -49,7 +49,13 @@ export const ScreenSkeleton: React.FC<{
       <div className={cls} style={{ minHeight: "calc(100vh - 190px)" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Stats cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 14,
+            }}
+          >
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
@@ -61,7 +67,14 @@ export const ScreenSkeleton: React.FC<{
                 }}
               >
                 <Block width="48px" height={48} radius={14} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    flex: 1,
+                  }}
+                >
                   <Block width="65%" height={26} radius={10} />
                   <Block width="45%" height={12} radius={10} />
                   <Block width="70%" height={10} radius={10} />
@@ -71,17 +84,34 @@ export const ScreenSkeleton: React.FC<{
           </div>
 
           {/* Two main panels */}
-          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 14 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.5fr 1fr",
+              gap: 14,
+            }}
+          >
             {/* Recent Transcriptions */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <Block width="45%" height={14} radius={8} />
                 <Block width="90px" height={28} radius={12} />
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              >
                 {Array.from({ length: 7 }).map((_, i) => (
-                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div
+                    key={i}
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                  >
                     <Block width="100%" height={74} radius={14} />
                   </div>
                 ))}
@@ -90,7 +120,13 @@ export const ScreenSkeleton: React.FC<{
 
             {/* Analytics */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <Block width="30%" height={14} radius={8} />
                 <div style={{ display: "flex", gap: 8 }}>
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -99,7 +135,9 @@ export const ScreenSkeleton: React.FC<{
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 14 }}
+              >
                 {/* Main analytics stat */}
                 <div style={{ padding: 18, borderRadius: 14 }}>
                   <Block width="52px" height={52} radius={14} />
@@ -111,7 +149,14 @@ export const ScreenSkeleton: React.FC<{
 
                 {/* Chart */}
                 <div style={{ padding: 10, borderRadius: 14 }}>
-                  <div style={{ display: "flex", gap: 10, alignItems: "flex-end", height: 90 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "flex-end",
+                      height: 90,
+                    }}
+                  >
                     {Array.from({ length: 10 }).map((_, i) => (
                       <Block
                         key={i}
@@ -130,9 +175,19 @@ export const ScreenSkeleton: React.FC<{
                 </div>
 
                 {/* Insights */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 6 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    paddingTop: 6,
+                  }}
+                >
                   {Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <div
+                      key={i}
+                      style={{ display: "flex", gap: 10, alignItems: "center" }}
+                    >
                       <Block width="10px" height="10px" radius={999} />
                       <Block width="100%" height={12} radius={10} />
                     </div>
@@ -183,14 +238,23 @@ export const ScreenSkeleton: React.FC<{
                 }}
               >
                 <Block width={28} height={28} radius={999} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    flex: 1,
+                  }}
+                >
                   <Block width="95%" height={14} radius={10} />
                   <Block width="88%" height={14} radius={10} />
                 </div>
               </div>
 
               {/* Actions row */}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <div
+                style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}
+              >
                 <Block width={28} height={28} radius={8} />
                 <Block width={28} height={28} radius={8} />
               </div>
@@ -216,20 +280,35 @@ export const ScreenSkeleton: React.FC<{
                 gap: 10,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                }}
+              >
                 <Block width="50%" height={12} radius={8} />
                 <Block width={84} height={14} radius={8} />
               </div>
 
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <Block width={28} height={28} radius={999} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    flex: 1,
+                  }}
+                >
                   <Block width="92%" height={14} radius={10} />
                   <Block width="82%" height={14} radius={10} />
                 </div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <div
+                style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}
+              >
                 <Block width={28} height={28} radius={8} />
               </div>
             </div>
@@ -277,7 +356,9 @@ export const ScreenSkeleton: React.FC<{
     return (
       <div className={cls}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+          >
             <Block width="100%" height={72} radius={14} />
             <Block width="100%" height={72} radius={14} />
           </div>
@@ -328,7 +409,14 @@ export const ScreenSkeleton: React.FC<{
                   gap: 10,
                 }}
               >
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    flex: 1,
+                  }}
+                >
                   <Block width="85%" height={14} radius={10} />
                   <Block width="55%" height={12} radius={10} />
                 </div>
@@ -336,7 +424,14 @@ export const ScreenSkeleton: React.FC<{
               </div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <Block width={26} height={26} radius={999} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    flex: 1,
+                  }}
+                >
                   <Block width="92%" height={12} radius={10} />
                   <Block width="70%" height={12} radius={10} />
                 </div>
@@ -383,7 +478,9 @@ export const ScreenSkeleton: React.FC<{
   // docs (default)
   return (
     <div className={cls}>
-      <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 14 }}>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 14 }}
+      >
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <Block key={i} width="100%" height={96} radius={14} />
@@ -398,4 +495,3 @@ export const ScreenSkeleton: React.FC<{
     </div>
   );
 };
-

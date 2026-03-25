@@ -96,8 +96,11 @@ export const OnboardingFlow: React.FC = () => {
         </main>
       </div>
 
-      {/* Visual Area */}
-      <div className="onboarding-visual-area">
+      {/* Visual Area — intensity ramps per step */}
+      <div
+        className="onboarding-visual-area"
+        data-onboarding-step={currentStepIndex}
+      >
         <VisualSide step={currentStepIndex} />
       </div>
     </div>

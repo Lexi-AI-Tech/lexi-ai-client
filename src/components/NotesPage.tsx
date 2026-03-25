@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  LayoutGrid,
-  RefreshCw,
-  Edit,
-  Trash2,
-  Copy,
-  Check,
-} from "lucide-react";
+import { LayoutGrid, RefreshCw, Edit, Trash2, Copy, Check } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";

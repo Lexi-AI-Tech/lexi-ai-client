@@ -229,10 +229,7 @@ export const TranscriptsList: React.FC = () => {
       {!showContent && (
         <div className="transcripts-page">
           <h2 className="transcripts-page-title">Transcripts</h2>
-          <ScreenSkeleton
-            variant="transcripts"
-            className="page__empty"
-          />
+          <ScreenSkeleton variant="transcripts" className="page__empty" />
         </div>
       )}
 
@@ -262,22 +259,25 @@ export const TranscriptsList: React.FC = () => {
             </motion.div>
           )}
 
-          {showContent && !showLogin && !loading && transcripts.length === 0 && (
-            <motion.div
-              key="transcripts-empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }}
-            >
-              <div className="transcripts-empty-wrap">
-                <p>No transcripts yet.</p>
-                <p className="transcripts-empty-sub">
-                  Start recording to create your first transcript!
-                </p>
-              </div>
-            </motion.div>
-          )}
+          {showContent &&
+            !showLogin &&
+            !loading &&
+            transcripts.length === 0 && (
+              <motion.div
+                key="transcripts-empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                <div className="transcripts-empty-wrap">
+                  <p>No transcripts yet.</p>
+                  <p className="transcripts-empty-sub">
+                    Start recording to create your first transcript!
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
           {showContent && !showLogin && transcripts.length > 0 && (
             <motion.div
@@ -291,7 +291,7 @@ export const TranscriptsList: React.FC = () => {
                 const isLastElement = index === transcripts.length - 1;
                 const appName = (transcript.focused_app || "").trim();
                 const iconUrl = appName
-                  ? appIcons[appName] ?? undefined
+                  ? (appIcons[appName] ?? undefined)
                   : undefined;
 
                 const isEnhanced =
@@ -416,10 +416,7 @@ export const TranscriptsList: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleCopyToClipboard(
-                                    copyText,
-                                    transcript.id,
-                                  )
+                                  handleCopyToClipboard(copyText, transcript.id)
                                 }
                                 className={`transcript-action-btn transcript-action-btn--copy ${
                                   copiedId === transcript.id ? "copied" : ""
@@ -440,9 +437,7 @@ export const TranscriptsList: React.FC = () => {
 
                             <button
                               type="button"
-                              onClick={() =>
-                                openDeleteConfirm(transcript.id)
-                              }
+                              onClick={() => openDeleteConfirm(transcript.id)}
                               disabled={!!deletingId}
                               className="transcript-action-btn transcript-action-btn--delete"
                               title="Delete transcript"

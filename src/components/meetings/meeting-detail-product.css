@@ -1038,12 +1038,15 @@
   letter-spacing: 0.02em;
 }
 
-.meeting-detail-transcript__segment--user .meeting-detail-transcript__time-subtitle {
+.meeting-detail-transcript__segment--user
+  .meeting-detail-transcript__time-subtitle {
   text-align: right;
 }
 
-.meeting-detail-transcript__segment--system .meeting-detail-transcript__time-subtitle,
-.meeting-detail-transcript__segment--unknown .meeting-detail-transcript__time-subtitle {
+.meeting-detail-transcript__segment--system
+  .meeting-detail-transcript__time-subtitle,
+.meeting-detail-transcript__segment--unknown
+  .meeting-detail-transcript__time-subtitle {
   text-align: left;
 }
 

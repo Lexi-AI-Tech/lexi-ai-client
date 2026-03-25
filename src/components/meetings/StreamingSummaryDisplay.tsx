@@ -65,7 +65,9 @@ const SECTION_BREAK_MS = 180;
 
 function SummaryLineMarkdown({ text }: { text: string }) {
   return (
-    <ReactMarkdown components={SUMMARY_INLINE_MD_COMPONENTS}>{text}</ReactMarkdown>
+    <ReactMarkdown components={SUMMARY_INLINE_MD_COMPONENTS}>
+      {text}
+    </ReactMarkdown>
   );
 }
 

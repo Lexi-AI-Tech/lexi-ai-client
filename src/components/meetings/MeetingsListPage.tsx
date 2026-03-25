@@ -84,8 +84,8 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
       <p className="app-page-subtitle">Loading…</p>
     ) : meetings.length > 0 ? (
       <p className="app-page-subtitle">
-        {meetings.length}{" "}
-        {meetings.length === 1 ? "meeting" : "meetings"} captured
+        {meetings.length} {meetings.length === 1 ? "meeting" : "meetings"}{" "}
+        captured
       </p>
     ) : null;
 
@@ -148,7 +148,8 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                 No captured meetings yet
               </p>
               <p className="meetings-list-page__empty-hint">
-                Start a meeting to capture transcripts and generate AI summaries.
+                Start a meeting to capture transcripts and generate AI
+                summaries.
               </p>
             </motion.div>
           ) : showGrid ? (

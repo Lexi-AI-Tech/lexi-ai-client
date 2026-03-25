@@ -216,8 +216,7 @@ export const ShortcutsPage: React.FC = () => {
         <p className="app-page-subtitle">Loading…</p>
       ) : authStore.isInitialized && shortcuts.length > 0 ? (
         <p className="app-page-subtitle">
-          {shortcuts.length}{" "}
-          {shortcuts.length === 1 ? "shortcut" : "shortcuts"}
+          {shortcuts.length} {shortcuts.length === 1 ? "shortcut" : "shortcuts"}
         </p>
       ) : null}
 
@@ -305,23 +304,20 @@ export const ShortcutsPage: React.FC = () => {
         )}
 
         <AnimatePresence mode="wait">
-          {showContent &&
-            !showLogin &&
-            isLoading &&
-            shortcuts.length === 0 && (
-              <motion.div
-                key="shortcuts-loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <ScreenSkeleton
-                  variant="shortcuts"
-                  className="transcripts-loading-inline"
-                />
-              </motion.div>
-            )}
+          {showContent && !showLogin && isLoading && shortcuts.length === 0 && (
+            <motion.div
+              key="shortcuts-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ScreenSkeleton
+                variant="shortcuts"
+                className="transcripts-loading-inline"
+              />
+            </motion.div>
+          )}
 
           {showContent && !showLogin && listEmpty && (
             <motion.div
@@ -340,107 +336,105 @@ export const ShortcutsPage: React.FC = () => {
             </motion.div>
           )}
 
-          {showContent &&
-            !showLogin &&
-            shortcuts.length > 0 && (
-              <motion.div
-                key="shortcuts-cards"
-                className="transcripts-cards"
-                variants={GRID_VARIANTS}
-                initial="hidden"
-                animate="visible"
-              >
-                {shortcuts.map((shortcut) => {
-                  const isEditing = editingShortcut?.id === shortcut.id;
-                  return (
-                    <motion.div
-                      key={shortcut.id}
-                      className={`transcript-card ${isEditing ? "shortcut-card--editing" : ""}`}
-                      variants={CARD_VARIANTS}
-                    >
-                      {isEditing && editingShortcut ? (
-                        <>
-                          <div className="panel__label">Shortcut</div>
-                          <input
-                            type="text"
-                            className="form-input form-input--lg"
-                            value={editingShortcut.shortcut}
-                            onChange={(e) =>
-                              setEditingShortcut({
-                                ...editingShortcut,
-                                shortcut: e.target.value,
-                              })
-                            }
-                          />
-                          <div className="panel__label">Value</div>
-                          <textarea
-                            className="form-input form-input--lg"
-                            value={editingShortcut.value}
-                            onChange={(e) =>
-                              setEditingShortcut({
-                                ...editingShortcut,
-                                value: e.target.value,
-                              })
-                            }
-                            rows={4}
-                          />
-                          <div className="btn-row">
-                            <button
-                              type="button"
-                              onClick={() => setEditingShortcut(null)}
-                              className="btn btn--secondary"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateShortcut(shortcut)}
-                              className="btn btn--primary"
-                            >
-                              Save
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="transcript-card__body">
-                          <div className="transcript-card__row">
-                            <div className="transcript-card__main">
-                              <div className="shortcut-card__trigger">
-                                {shortcut.shortcut}
-                              </div>
-                              <div className="shortcut-card__value">
-                                → {shortcut.value}
-                              </div>
+          {showContent && !showLogin && shortcuts.length > 0 && (
+            <motion.div
+              key="shortcuts-cards"
+              className="transcripts-cards"
+              variants={GRID_VARIANTS}
+              initial="hidden"
+              animate="visible"
+            >
+              {shortcuts.map((shortcut) => {
+                const isEditing = editingShortcut?.id === shortcut.id;
+                return (
+                  <motion.div
+                    key={shortcut.id}
+                    className={`transcript-card ${isEditing ? "shortcut-card--editing" : ""}`}
+                    variants={CARD_VARIANTS}
+                  >
+                    {isEditing && editingShortcut ? (
+                      <>
+                        <div className="panel__label">Shortcut</div>
+                        <input
+                          type="text"
+                          className="form-input form-input--lg"
+                          value={editingShortcut.shortcut}
+                          onChange={(e) =>
+                            setEditingShortcut({
+                              ...editingShortcut,
+                              shortcut: e.target.value,
+                            })
+                          }
+                        />
+                        <div className="panel__label">Value</div>
+                        <textarea
+                          className="form-input form-input--lg"
+                          value={editingShortcut.value}
+                          onChange={(e) =>
+                            setEditingShortcut({
+                              ...editingShortcut,
+                              value: e.target.value,
+                            })
+                          }
+                          rows={4}
+                        />
+                        <div className="btn-row">
+                          <button
+                            type="button"
+                            onClick={() => setEditingShortcut(null)}
+                            className="btn btn--secondary"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateShortcut(shortcut)}
+                            className="btn btn--primary"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="transcript-card__body">
+                        <div className="transcript-card__row">
+                          <div className="transcript-card__main">
+                            <div className="shortcut-card__trigger">
+                              {shortcut.shortcut}
                             </div>
-                            <div className="transcript-card__actions">
-                              <div className="transcript-actions-cell">
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateShortcut(shortcut)}
-                                  className="transcript-action-btn"
-                                  title="Edit shortcut"
-                                >
-                                  <Edit size={16} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openDeleteConfirm(shortcut.id)}
-                                  disabled={!!deletingId}
-                                  className="transcript-action-btn transcript-action-btn--delete"
-                                  title="Delete shortcut"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
+                            <div className="shortcut-card__value">
+                              → {shortcut.value}
+                            </div>
+                          </div>
+                          <div className="transcript-card__actions">
+                            <div className="transcript-actions-cell">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateShortcut(shortcut)}
+                                className="transcript-action-btn"
+                                title="Edit shortcut"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openDeleteConfirm(shortcut.id)}
+                                disabled={!!deletingId}
+                                className="transcript-action-btn transcript-action-btn--delete"
+                                title="Delete shortcut"
+                              >
+                                <Trash2 size={16} />
+                              </button>
                             </div>
                           </div>
                         </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
-              </motion.div>
-            )}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 

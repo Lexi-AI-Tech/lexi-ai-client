@@ -2,14 +2,14 @@
    LEXI AI ONBOARDING - Minimalist Design
    ============================================ */
 
-/* Base Layout */
+/* Base Layout — aligned with app --lexi-* theme */
 .onboarding-container {
   min-height: 100vh;
   width: 100vw;
   display: flex;
-  background: #ffffff;
+  background: var(--lexi-surface-elevated);
   font-family: var(--lexi-font-body);
-  color: #111827;
+  color: var(--lexi-text);
 }
 
 /* Left Panel - Form Area */
@@ -17,7 +17,7 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #f3f4f6;
+  border-right: 1px solid var(--lexi-border);
 }
 
 @media (min-width: 1024px) {
@@ -49,12 +49,12 @@
   border-radius: 9999px;
   transition: all 0.5s ease;
   width: 0.375rem;
-  background: #e5e7eb;
+  background: var(--lexi-border-subtle);
 }
 
 .step-dot.active {
   width: 1.5rem;
-  background: #000000;
+  background: var(--lexi-primary);
 }
 
 /* Main Content */
@@ -96,13 +96,68 @@
   color: #111827;
 }
 
-/* Right Panel - Visual Area */
+/* Right Panel - Visual Area (intensity increases with data-onboarding-step) */
 .onboarding-visual-area {
   display: none;
   flex: 1;
   position: relative;
-  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
   overflow: hidden;
+  transition:
+    background 0.7s ease,
+    box-shadow 0.7s ease;
+}
+
+.onboarding-visual-area[data-onboarding-step="0"] {
+  background: linear-gradient(
+    160deg,
+    var(--lexi-surface) 0%,
+    var(--lexi-surface-overlay) 45%,
+    var(--lexi-surface) 100%
+  );
+}
+
+.onboarding-visual-area[data-onboarding-step="1"] {
+  background: radial-gradient(
+      ellipse 90% 70% at 70% 35%,
+      color-mix(in srgb, var(--lexi-primary-muted) 75%, transparent) 0%,
+      transparent 58%
+    ),
+    linear-gradient(
+      165deg,
+      var(--lexi-surface-overlay) 0%,
+      var(--lexi-surface) 100%
+    );
+  box-shadow: inset 0 0 80px color-mix(in srgb, var(--lexi-primary) 6%, transparent);
+}
+
+.onboarding-visual-area[data-onboarding-step="2"] {
+  background: radial-gradient(
+      ellipse 85% 65% at 25% 60%,
+      color-mix(in srgb, var(--lexi-primary-muted) 90%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 85% 25%,
+      color-mix(in srgb, var(--lexi-primary) 12%, transparent) 0%,
+      transparent 50%
+    ),
+    linear-gradient(175deg, var(--lexi-surface) 0%, var(--lexi-primary-muted) 100%);
+  box-shadow: inset 0 0 100px color-mix(in srgb, var(--lexi-primary) 10%, transparent);
+}
+
+.onboarding-visual-area[data-onboarding-step="3"] {
+  background: radial-gradient(
+      circle at 50% 45%,
+      color-mix(in srgb, var(--lexi-primary-muted) 100%, transparent) 0%,
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 100% 80% at 50% 100%,
+      color-mix(in srgb, var(--lexi-primary) 18%, transparent) 0%,
+      transparent 45%
+    ),
+    linear-gradient(185deg, var(--lexi-surface-overlay) 0%, var(--lexi-surface) 40%);
+  box-shadow: inset 0 0 120px color-mix(in srgb, var(--lexi-primary) 14%, transparent);
 }
 
 @media (min-width: 1024px) {
@@ -120,6 +175,93 @@
   padding: 5rem;
 }
 
+/* Welcome (step 0): calm abstract field — no emoji / mic */
+.visual-side--welcome {
+  padding: 4rem;
+}
+
+.visual-welcome {
+  position: relative;
+  width: min(100%, 28rem);
+  aspect-ratio: 4 / 3;
+  border-radius: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--lexi-border) 70%, transparent);
+  background: color-mix(in srgb, var(--lexi-surface-elevated) 82%, transparent);
+  box-shadow: var(--lexi-shadow-md);
+  overflow: hidden;
+}
+
+.visual-welcome-grid {
+  position: absolute;
+  inset: -1px;
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--lexi-border-subtle) 55%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--lexi-border-subtle) 55%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 32px 32px;
+  opacity: 0.4;
+  mask-image: radial-gradient(
+    ellipse 75% 70% at 50% 45%,
+    black 0%,
+    transparent 72%
+  );
+}
+
+.visual-welcome-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(48px);
+  pointer-events: none;
+}
+
+.visual-welcome-glow--a {
+  width: 55%;
+  height: 55%;
+  top: -8%;
+  left: -5%;
+  background: color-mix(in srgb, var(--lexi-primary-muted) 55%, transparent);
+  opacity: 0.55;
+}
+
+.visual-welcome-glow--b {
+  width: 45%;
+  height: 45%;
+  bottom: -5%;
+  right: -8%;
+  background: color-mix(in srgb, var(--lexi-primary) 14%, transparent);
+  opacity: 0.5;
+}
+
+.visual-welcome-glow--c {
+  width: 35%;
+  height: 35%;
+  top: 42%;
+  left: 38%;
+  background: color-mix(in srgb, var(--lexi-surface-overlay) 90%, transparent);
+  opacity: 0.85;
+}
+
+.visual-welcome-curve {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 18%;
+  height: 42%;
+  color: var(--lexi-primary);
+}
+
+.visual-side--step-3 .visual-icon {
+  filter: grayscale(0%) brightness(1.05) contrast(1);
+  opacity: 0.95;
+  text-shadow: 0 0 48px color-mix(in srgb, var(--lexi-primary) 35%, transparent);
+}
+
 .visual-content {
   position: relative;
 }
@@ -132,12 +274,43 @@
   border-radius: 50%;
 }
 
+.visual-blur--step {
+  background: color-mix(in srgb, var(--lexi-primary) 8%, transparent);
+  filter: blur(80px);
+}
+
+.visual-side--step-1 .visual-blur--step {
+  opacity: 0.85;
+}
+
+.visual-side--step-2 .visual-blur--step {
+  opacity: 1;
+  background: color-mix(in srgb, var(--lexi-primary) 12%, transparent);
+}
+
+.visual-side--step-3 .visual-blur--step {
+  opacity: 1;
+  background: color-mix(in srgb, var(--lexi-primary) 18%, transparent);
+  filter: blur(64px);
+}
+
 .visual-icon {
   font-size: 12rem;
   position: relative;
   z-index: 10;
-  filter: grayscale(20%) brightness(1.1) contrast(0.9);
-  opacity: 0.8;
+  filter: grayscale(25%) brightness(1.08) contrast(0.92);
+  opacity: 0.82;
+  line-height: 1;
+}
+
+.visual-side--step-2 .visual-icon {
+  font-size: 13rem;
+  filter: grayscale(12%) brightness(1.05);
+  opacity: 0.88;
+}
+
+.visual-side--step-3 .visual-icon {
+  font-size: 14rem;
 }
 
 /* ============================================
@@ -160,17 +333,49 @@
   font-size: 2rem;
   font-weight: 600;
   letter-spacing: -0.025em;
-  color: #000000;
+  color: var(--lexi-text);
   margin: 0;
   line-height: 1.2;
 }
 
 .step-description {
   font-size: 1.125rem;
-  color: #6b7280;
+  color: var(--lexi-text-muted);
   line-height: 1.6;
   max-width: 28rem;
   margin: 0;
+}
+
+.step-description--typewriter {
+  max-width: 32rem;
+  min-height: 3.25rem;
+}
+
+.typewriter-prefix {
+  color: var(--lexi-text-muted);
+}
+
+.typewriter-dynamic {
+  display: inline-block;
+  min-width: 7.5ch;
+  font-weight: 600;
+  color: var(--lexi-primary-hover);
+}
+
+.typewriter-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.15em;
+  margin-left: 2px;
+  background: var(--lexi-primary);
+  vertical-align: text-bottom;
+  animation: onboarding-cursor-blink 1s steps(1, end) infinite;
+}
+
+@keyframes onboarding-cursor-blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 /* Feature List (Welcome Step) */
@@ -180,25 +385,42 @@
   gap: 0.75rem;
 }
 
+.features-list--welcome .feature-item {
+  border-color: var(--lexi-border);
+  background: color-mix(in srgb, var(--lexi-surface) 90%, transparent);
+}
+
 .feature-item {
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 1rem;
   border-radius: 0.75rem;
-  border: 1px solid #efefef;
-  background: rgba(249, 250, 251, 0.3);
+  border: 1px solid var(--lexi-border-subtle);
+  background: color-mix(in srgb, var(--lexi-surface-overlay) 35%, transparent);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.feature-item:hover {
+  border-color: var(--lexi-border);
+  background: color-mix(in srgb, var(--lexi-primary-muted) 40%, transparent);
 }
 
 .feature-icon {
   width: 1.25rem;
   height: 1.25rem;
-  color: #9ca3af;
+  color: var(--lexi-text-faint);
+}
+
+.features-list--welcome .feature-icon {
+  color: var(--lexi-primary-hover);
 }
 
 .feature-title {
   font-weight: 500;
-  color: #111827;
+  color: var(--lexi-text);
   margin: 0;
   font-size: 0.9375rem;
 }
@@ -225,12 +447,12 @@
 .btn-primary {
   height: 3rem;
   border-radius: 0.75rem;
-  background: #000000;
-  color: #ffffff;
+  background: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.9);
+  background: var(--lexi-primary-hover);
 }
 
 .btn-primary:disabled {
@@ -241,13 +463,13 @@
 .btn-outline {
   height: 3rem;
   border-radius: 0.75rem;
-  background: #ffffff;
-  color: #000000;
-  border: 1px solid #e5e7eb;
+  background: var(--lexi-surface-elevated);
+  color: var(--lexi-text);
+  border: 1px solid var(--lexi-border);
 }
 
 .btn-outline:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--lexi-surface-overlay);
 }
 
 .btn-icon {

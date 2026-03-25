@@ -283,11 +283,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     } finally {
       setIsSavingMeetingTitle(false);
     }
-  }, [
-    selectedMeetingId,
-    selectedMeeting,
-    meetingTitleDraft,
-  ]);
+  }, [selectedMeetingId, selectedMeeting, meetingTitleDraft]);
 
   return (
     <div className={`page ${selectedMeetingId ? "page--meetings-detail" : ""}`}>

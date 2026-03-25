@@ -536,9 +536,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       const w = el.getBoundingClientRect().width;
       const inner = Math.max(0, Math.floor(w - SPLIT_MIN_SUMMARY_WIDTH_PX));
       const cap = Math.min(Q_A_RAIL_OUTER_WIDTH_PX, inner);
-      setRailOuterWidthPx(
-        Number.isFinite(cap) ? cap : Q_A_RAIL_OUTER_WIDTH_PX,
-      );
+      setRailOuterWidthPx(Number.isFinite(cap) ? cap : Q_A_RAIL_OUTER_WIDTH_PX);
     };
     update();
     const ro = new ResizeObserver(update);
@@ -562,9 +560,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       <button
         type="submit"
         className="meeting-detail-btn meeting-detail-btn--primary meeting-detail-rail__submit"
-        disabled={
-          isSendingChat || !chatInput.trim() || isThisMeetingRecording
-        }
+        disabled={isSendingChat || !chatInput.trim() || isThisMeetingRecording}
       >
         Send
       </button>
@@ -782,7 +778,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                           title="Show Q&A"
                           initial={{ opacity: 0, x: 10 }}
                           animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                          transition={{
+                            duration: 0.25,
+                            ease: [0.16, 1, 0.3, 1],
+                          }}
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.97 }}
                         >
@@ -926,92 +925,98 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         aria-label="Collapse Q&A"
                         whileHover={{ scale: 1.08 }}
                         whileTap={{ scale: 0.9 }}
-                        transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 28,
+                        }}
                       >
                         <ChevronRight size={14} strokeWidth={2} />
                       </motion.button>
                     </div>
                     <aside className="meeting-detail-rail">
-                  <div className="meeting-detail-rail__header">
-                    <span className="meeting-detail-rail__label">
-                      <MessageCircle
-                        size={12}
-                        style={{ verticalAlign: -2, marginRight: 4 }}
-                      />
-                      Q&A
-                    </span>
-                    <p className="meeting-detail-rail__hint">
-                      Ask about this meeting. Use suggested questions or type
-                      your own.
-                    </p>
-                  </div>
-                  <div className="meeting-detail-rail__section">
-                    <div className="meeting-detail-rail__section-title">
-                      Suggested questions
-                    </div>
-                    {isLoadingSuggestedQuestions ? (
-                      <p className="meeting-detail-rail__suggestions-loading">
-                        Loading…
-                      </p>
-                    ) : (
-                      (suggestedQuestions && suggestedQuestions.length > 0
-                        ? suggestedQuestions
-                        : DEFAULT_SUGGESTED_QUESTIONS
-                      ).map((q) => (
-                        <button
-                          key={q}
-                          type="button"
-                          className="meeting-detail-rail__chip"
-                          onClick={() => handleSendChatMessage(undefined, q)}
-                          disabled={
-                            !activeSummary ||
-                            isSendingChat ||
-                            isThisMeetingRecording
-                          }
-                        >
-                          {q}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                  <div className="meeting-detail-rail__section meeting-detail-rail__section--conversation">
-                    <div className="meeting-detail-rail__section-title">
-                      Conversation
-                    </div>
-                    {chatMessages.length === 0 && !isSendingChat ? (
-                      <div className="meeting-detail-rail__empty-with-form">
-                        <p className="meeting-detail-rail__empty">
-                          Your questions and answers appear here.
+                      <div className="meeting-detail-rail__header">
+                        <span className="meeting-detail-rail__label">
+                          <MessageCircle
+                            size={12}
+                            style={{ verticalAlign: -2, marginRight: 4 }}
+                          />
+                          Q&A
+                        </span>
+                        <p className="meeting-detail-rail__hint">
+                          Ask about this meeting. Use suggested questions or
+                          type your own.
                         </p>
-                        {chatInputForm}
                       </div>
-                    ) : (
-                      <>
-                        <div
-                          ref={chatScrollRef}
-                          className="meeting-detail-rail__messages"
-                        >
-                          {chatMessages.map((msg) => (
-                            <div
-                              key={msg.id}
-                              className={`meeting-detail-rail__msg meeting-detail-rail__msg--${msg.role}`}
-                            >
-                              <div className="meeting-detail-rail__msg-body">
-                                <ReactMarkdown>{msg.content}</ReactMarkdown>
-                              </div>
-                            </div>
-                          ))}
-                          {isSendingChat && (
-                            <div className="meeting-detail-rail__msg meeting-detail-rail__msg--assistant meeting-detail-rail__msg--loading">
-                              <span className="meeting-detail-rail__loading-dots" />
-                            </div>
-                          )}
+                      <div className="meeting-detail-rail__section">
+                        <div className="meeting-detail-rail__section-title">
+                          Suggested questions
                         </div>
-                        {chatInputForm}
-                      </>
-                    )}
-                  </div>
-                </aside>
+                        {isLoadingSuggestedQuestions ? (
+                          <p className="meeting-detail-rail__suggestions-loading">
+                            Loading…
+                          </p>
+                        ) : (
+                          (suggestedQuestions && suggestedQuestions.length > 0
+                            ? suggestedQuestions
+                            : DEFAULT_SUGGESTED_QUESTIONS
+                          ).map((q) => (
+                            <button
+                              key={q}
+                              type="button"
+                              className="meeting-detail-rail__chip"
+                              onClick={() =>
+                                handleSendChatMessage(undefined, q)
+                              }
+                              disabled={
+                                !activeSummary ||
+                                isSendingChat ||
+                                isThisMeetingRecording
+                              }
+                            >
+                              {q}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                      <div className="meeting-detail-rail__section meeting-detail-rail__section--conversation">
+                        <div className="meeting-detail-rail__section-title">
+                          Conversation
+                        </div>
+                        {chatMessages.length === 0 && !isSendingChat ? (
+                          <div className="meeting-detail-rail__empty-with-form">
+                            <p className="meeting-detail-rail__empty">
+                              Your questions and answers appear here.
+                            </p>
+                            {chatInputForm}
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              ref={chatScrollRef}
+                              className="meeting-detail-rail__messages"
+                            >
+                              {chatMessages.map((msg) => (
+                                <div
+                                  key={msg.id}
+                                  className={`meeting-detail-rail__msg meeting-detail-rail__msg--${msg.role}`}
+                                >
+                                  <div className="meeting-detail-rail__msg-body">
+                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                  </div>
+                                </div>
+                              ))}
+                              {isSendingChat && (
+                                <div className="meeting-detail-rail__msg meeting-detail-rail__msg--assistant meeting-detail-rail__msg--loading">
+                                  <span className="meeting-detail-rail__loading-dots" />
+                                </div>
+                              )}
+                            </div>
+                            {chatInputForm}
+                          </>
+                        )}
+                      </div>
+                    </aside>
                   </motion.div>
                 </motion.div>
               )}

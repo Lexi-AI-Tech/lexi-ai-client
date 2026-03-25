@@ -191,7 +191,10 @@ export const ActionsPage: React.FC = () => {
         <h2 className="transcripts-page-title">Actions</h2>
         <p className="app-page-subtitle">Loading…</p>
         <div className="actions-page__content">
-          <ScreenSkeleton variant="actionsHistory" className="actions-loading-inline" />
+          <ScreenSkeleton
+            variant="actionsHistory"
+            className="actions-loading-inline"
+          />
         </div>
       </div>
     );
@@ -220,8 +223,7 @@ export const ActionsPage: React.FC = () => {
   return (
     <div className="actions-page">
       <h2 className="transcripts-page-title">Actions</h2>
-      {isLoading &&
-      (!actionHistory || actionHistory.actions.length === 0) ? (
+      {isLoading && (!actionHistory || actionHistory.actions.length === 0) ? (
         <p className="app-page-subtitle">Loading…</p>
       ) : totalActions > 0 ? (
         <p className="app-page-subtitle">
@@ -233,19 +235,19 @@ export const ActionsPage: React.FC = () => {
         <AnimatePresence mode="wait">
           {isLoading &&
             (!actionHistory || actionHistory.actions.length === 0) && (
-            <motion.div
-              key="actions-loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <ScreenSkeleton
-                variant="actionsHistory"
-                className="actions-loading-inline"
-              />
-            </motion.div>
-          )}
+              <motion.div
+                key="actions-loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ScreenSkeleton
+                  variant="actionsHistory"
+                  className="actions-loading-inline"
+                />
+              </motion.div>
+            )}
 
           {!isLoading &&
             (!actionHistory || actionHistory.actions.length === 0) && (
@@ -265,207 +267,205 @@ export const ActionsPage: React.FC = () => {
               </motion.div>
             )}
 
-          {actionHistory &&
-            actionHistory.actions.length > 0 && (
+          {actionHistory && actionHistory.actions.length > 0 && (
+            <motion.div
+              key="actions-cards"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="actions-history-block"
+            >
               <motion.div
-                key="actions-cards"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="actions-history-block"
+                className="actions-cards"
+                variants={GRID_VARIANTS}
+                initial="hidden"
+                animate="visible"
               >
-                <motion.div
-                  className="actions-cards"
-                  variants={GRID_VARIANTS}
-                  initial="hidden"
-                  animate="visible"
-                >
-                  {actionHistory.actions.map((action) => {
-                    const appName = (action.app_name || "").trim();
-                    const iconUrl = appName
-                      ? appIcons[appName] ?? undefined
-                      : undefined;
+                {actionHistory.actions.map((action) => {
+                  const appName = (action.app_name || "").trim();
+                  const iconUrl = appName
+                    ? (appIcons[appName] ?? undefined)
+                    : undefined;
 
-                    return (
-                      <motion.div
-                        key={action.id}
-                        className="action-card"
-                        variants={CARD_VARIANTS}
-                      >
-                        <div className="action-card__header">
-                          <div className="transcript-card__meta">
-                            <div className="transcript-card__date">
-                              {formatDateRelative(action.created_at)}
-                            </div>
-                            <div className="transcript-card__app">
-                              <div className="transcript-cell-app__content">
-                                {iconUrl ? (
-                                  <img
-                                    src={iconUrl}
-                                    alt=""
-                                    className="transcript-cell-app__icon"
-                                    title={appName || undefined}
-                                  />
-                                ) : null}
-                                <span className="transcript-cell-app__name">
-                                  {appName || "—"}
-                                </span>
-                              </div>
+                  return (
+                    <motion.div
+                      key={action.id}
+                      className="action-card"
+                      variants={CARD_VARIANTS}
+                    >
+                      <div className="action-card__header">
+                        <div className="transcript-card__meta">
+                          <div className="transcript-card__date">
+                            {formatDateRelative(action.created_at)}
+                          </div>
+                          <div className="transcript-card__app">
+                            <div className="transcript-cell-app__content">
+                              {iconUrl ? (
+                                <img
+                                  src={iconUrl}
+                                  alt=""
+                                  className="transcript-cell-app__icon"
+                                  title={appName || undefined}
+                                />
+                              ) : null}
+                              <span className="transcript-cell-app__name">
+                                {appName || "—"}
+                              </span>
                             </div>
                           </div>
                         </div>
+                      </div>
 
-                        <div className="action-card__top">
-                          <div className="action-card__command-wrap">
-                            <div className="action-card__command">
-                              {action.action_command}
-                            </div>
+                      <div className="action-card__top">
+                        <div className="action-card__command-wrap">
+                          <div className="action-card__command">
+                            {action.action_command}
                           </div>
-                          <div className="action-card__actions">
-                            {action.output_value ? (
+                        </div>
+                        <div className="action-card__actions">
+                          {action.output_value ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCopyOutput(
+                                  action.output_value!,
+                                  action.id,
+                                )
+                              }
+                              className={`transcript-action-btn transcript-action-btn--copy ${
+                                copiedOutputId === action.id ? "copied" : ""
+                              }`}
+                              title={
+                                copiedOutputId === action.id
+                                  ? "Copied!"
+                                  : "Copy result"
+                              }
+                            >
+                              {copiedOutputId === action.id ? (
+                                <Check size={16} strokeWidth={2.5} />
+                              ) : (
+                                <Copy size={16} />
+                              )}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => openDeleteConfirm(action.id)}
+                            disabled={!!deletingId}
+                            className="action-delete-btn"
+                            title="Delete action"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {(action.output_value ||
+                        action.output_audio_file_url) && (
+                        <div className="action-card__block action-card__block--output">
+                          {action.output_audio_file_url ? (
+                            <div className="action-card__audio-wrap">
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleCopyOutput(
-                                    action.output_value!,
+                                  handlePlayActionAudio(
                                     action.id,
+                                    action.output_audio_file_url!,
                                   )
                                 }
-                                className={`transcript-action-btn transcript-action-btn--copy ${
-                                  copiedOutputId === action.id ? "copied" : ""
-                                }`}
+                                className={`action-audio-btn ${playingId === action.id ? "action-audio-btn--playing" : ""}`}
                                 title={
-                                  copiedOutputId === action.id
-                                    ? "Copied!"
-                                    : "Copy result"
+                                  playingId === action.id
+                                    ? "Pause"
+                                    : "Play audio"
                                 }
                               >
-                                {copiedOutputId === action.id ? (
-                                  <Check size={16} strokeWidth={2.5} />
+                                {playingId === action.id && (
+                                  <svg
+                                    className="action-audio-btn__ring"
+                                    aria-hidden
+                                  >
+                                    <circle
+                                      cx="14"
+                                      cy="14"
+                                      r="12"
+                                      fill="none"
+                                      stroke="rgba(255,255,255,0.2)"
+                                      strokeWidth="2"
+                                    />
+                                    <circle
+                                      cx="14"
+                                      cy="14"
+                                      r="12"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeDasharray={`${audioProgress * 0.754} 75.4`}
+                                      strokeLinecap="round"
+                                    />
+                                  </svg>
+                                )}
+                                {playingId === action.id ? (
+                                  <Pause size={12} fill="currentColor" />
                                 ) : (
-                                  <Copy size={16} />
+                                  <Play
+                                    size={12}
+                                    fill="currentColor"
+                                    className="icon-play-offset"
+                                  />
                                 )}
                               </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => openDeleteConfirm(action.id)}
-                              disabled={!!deletingId}
-                              className="action-delete-btn"
-                              title="Delete action"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            </div>
+                          ) : null}
+                          {action.output_value ? (
+                            <div className="action-card__output-text">
+                              {action.output_value}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+
+                      {action.selected_text ? (
+                        <div className="action-card__block">
+                          <div className="action-card__label">Context</div>
+                          <div className="action-card__text action-card__text--clamp">
+                            {action.selected_text}
                           </div>
                         </div>
-
-                        {(action.output_value || action.output_audio_file_url) && (
-                          <div className="action-card__block action-card__block--output">
-                            {action.output_audio_file_url ? (
-                              <div className="action-card__audio-wrap">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handlePlayActionAudio(
-                                      action.id,
-                                      action.output_audio_file_url!,
-                                    )
-                                  }
-                                  className={`action-audio-btn ${playingId === action.id ? "action-audio-btn--playing" : ""}`}
-                                  title={
-                                    playingId === action.id
-                                      ? "Pause"
-                                      : "Play audio"
-                                  }
-                                >
-                                  {playingId === action.id && (
-                                    <svg
-                                      className="action-audio-btn__ring"
-                                      aria-hidden
-                                    >
-                                      <circle
-                                        cx="14"
-                                        cy="14"
-                                        r="12"
-                                        fill="none"
-                                        stroke="rgba(255,255,255,0.2)"
-                                        strokeWidth="2"
-                                      />
-                                      <circle
-                                        cx="14"
-                                        cy="14"
-                                        r="12"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeDasharray={`${audioProgress * 0.754} 75.4`}
-                                        strokeLinecap="round"
-                                      />
-                                    </svg>
-                                  )}
-                                  {playingId === action.id ? (
-                                    <Pause size={12} fill="currentColor" />
-                                  ) : (
-                                    <Play
-                                      size={12}
-                                      fill="currentColor"
-                                      className="icon-play-offset"
-                                    />
-                                  )}
-                                </button>
-                              </div>
-                            ) : null}
-                            {action.output_value ? (
-                              <div className="action-card__output-text">
-                                {action.output_value}
-                              </div>
-                            ) : null}
-                          </div>
-                        )}
-
-                        {action.selected_text ? (
-                          <div className="action-card__block">
-                            <div className="action-card__label">Context</div>
-                            <div className="action-card__text action-card__text--clamp">
-                              {action.selected_text}
-                            </div>
-                          </div>
-                        ) : null}
-                      </motion.div>
-                    );
-                  })}
-                </motion.div>
-
-                {actionHistory.total_pages > 1 ? (
-                  <div className="action-pagination">
-                    <button
-                      type="button"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="action-pagination__btn"
-                    >
-                      Previous
-                    </button>
-                    <div className="action-pagination__label">
-                      Page {page} of {actionHistory.total_pages}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPage((p) =>
-                          Math.min(actionHistory.total_pages, p + 1),
-                        )
-                      }
-                      disabled={page === actionHistory.total_pages}
-                      className="action-pagination__btn"
-                    >
-                      Next
-                    </button>
-                  </div>
-                ) : null}
+                      ) : null}
+                    </motion.div>
+                  );
+                })}
               </motion.div>
-            )}
+
+              {actionHistory.total_pages > 1 ? (
+                <div className="action-pagination">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="action-pagination__btn"
+                  >
+                    Previous
+                  </button>
+                  <div className="action-pagination__label">
+                    Page {page} of {actionHistory.total_pages}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((p) => Math.min(actionHistory.total_pages, p + 1))
+                    }
+                    disabled={page === actionHistory.total_pages}
+                    className="action-pagination__btn"
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : null}
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 

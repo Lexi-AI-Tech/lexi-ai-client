@@ -162,10 +162,10 @@ function App() {
     invoke<boolean>("check_input_monitoring_permission")
       .then((granted) => {
         if (granted) {
-          invoke("start_global_key_listener").catch(() => { });
+          invoke("start_global_key_listener").catch(() => {});
         }
       })
-      .catch(() => { });
+      .catch(() => {});
   }, [isCompleted]);
 
   // Listen for "Start Meeting" from system tray
@@ -525,11 +525,6 @@ function App() {
 }
 
 export default App;
-
-
-
-
-
 
 // export const sage = {
 //   bg: "#f5f7f4",

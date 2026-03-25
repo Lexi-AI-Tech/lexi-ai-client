@@ -132,7 +132,10 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <ScreenSkeleton variant="docs" className="docs-list-page__skeleton" />
+              <ScreenSkeleton
+                variant="docs"
+                className="docs-list-page__skeleton"
+              />
             </motion.div>
           ) : showEmpty ? (
             <motion.div

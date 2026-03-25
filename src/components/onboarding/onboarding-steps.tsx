@@ -8,6 +8,7 @@ import {
   Monitor,
   ChevronLeft,
   Volume2,
+  AudioWaveform,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -20,6 +21,13 @@ const stepVariants = {
   exit: { opacity: 0, x: -10 },
 };
 
+const TYPEWRITER_WORDS = ["Thought.", "Speech.", "Sound.", "Voice."];
+
+const TYPE_MS = 82;
+const DELETE_MS = 42;
+const PAUSE_MS = 2200;
+const BETWEEN_MS = 320;
+
 // Step 1: Welcome
 export function WelcomeStep({
   onNext,
@@ -31,6 +39,33 @@ export function WelcomeStep({
   showBack?: boolean;
 }) {
   const { isAuthenticated } = useAuthStore();
+  const [wordIdx, setWordIdx] = useState(0);
+  const [charIdx, setCharIdx] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const word = TYPEWRITER_WORDS[wordIdx];
+    let timeout: ReturnType<typeof setTimeout>;
+
+    if (!deleting) {
+      if (charIdx < word.length) {
+        timeout = setTimeout(() => setCharIdx((c) => c + 1), TYPE_MS);
+      } else {
+        timeout = setTimeout(() => setDeleting(true), PAUSE_MS);
+      }
+    } else if (charIdx > 0) {
+      timeout = setTimeout(() => setCharIdx((c) => c - 1), DELETE_MS);
+    } else {
+      timeout = setTimeout(() => {
+        setDeleting(false);
+        setWordIdx((i) => (i + 1) % TYPEWRITER_WORDS.length);
+      }, BETWEEN_MS);
+    }
+
+    return () => clearTimeout(timeout);
+  }, [charIdx, wordIdx, deleting]);
+
+  const typedWord = TYPEWRITER_WORDS[wordIdx].slice(0, charIdx);
 
   return (
     <motion.div
@@ -43,15 +78,28 @@ export function WelcomeStep({
       <div className="step-header">
         <h1 className="step-title">Welcome to Lexi AI</h1>
         <p className="step-description">
-          A minimalist voice assistant that helps you type anywhere on your Mac.
+          The voice-first OS that works across every app on your Mac.
+        </p>
+        <p className="step-description">
+          Dictate, meet, write, act — all connected through your voice.
+        </p>
+        <p
+          className="step-description step-description--typewriter"
+          aria-label="Your work at the speed of thought, speech, sound, and voice."
+        >
+          <span className="typewriter-prefix">Your Work. At the Speed of </span>
+          <span className="typewriter-dynamic">
+            {typedWord}
+            <span className="typewriter-cursor" aria-hidden />
+          </span>
         </p>
       </div>
 
-      <div className="features-list">
+      <div className="features-list features-list--welcome">
         {[
-          { icon: Keyboard, text: "Global Shortcut" },
-          { icon: Mic, text: "Natural Speech" },
-          { icon: Sparkles, text: "Instant Result" },
+          { icon: Keyboard, text: "Global shortcut" },
+          { icon: AudioWaveform, text: "Voice to text" },
+          { icon: Sparkles, text: "Instant results" },
         ].map((item, i) => (
           <div key={i} className="feature-item">
             <item.icon className="feature-icon" />
@@ -505,21 +553,67 @@ export function TryItStep({
   );
 }
 
-// Visual Side Component
+// Visual Side Component — step 0 is intentionally soft; later steps add focal icons + energy
 export function VisualSide({ step }: { step: number }) {
-  const icons = ["🎤", "🔐", "⌨️", "✨"];
+  const icons: [string, string, string] = ["🔐", "⌨️", "✨"];
+
+  if (step === 0) {
+    return (
+      <div className="visual-side visual-side--welcome">
+        <motion.div
+          key="welcome-visual"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="visual-welcome"
+        >
+          <div className="visual-welcome-grid" aria-hidden />
+          <div className="visual-welcome-glow visual-welcome-glow--a" aria-hidden />
+          <div className="visual-welcome-glow visual-welcome-glow--b" aria-hidden />
+          <div className="visual-welcome-glow visual-welcome-glow--c" aria-hidden />
+          <svg
+            className="visual-welcome-curve"
+            viewBox="0 0 400 200"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden
+          >
+            <path
+              d="M0 120 C 80 40, 160 180, 200 100 S 320 20, 400 80"
+              stroke="currentColor"
+              strokeWidth="1.25"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              opacity="0.35"
+            />
+            <path
+              d="M0 140 C 100 200, 200 60, 280 130 S 360 160, 400 100"
+              stroke="currentColor"
+              strokeWidth="0.75"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              opacity="0.22"
+            />
+          </svg>
+        </motion.div>
+      </div>
+    );
+  }
+
+  const focalIndex = step - 1;
+  const emoji = icons[focalIndex] ?? "✨";
 
   return (
-    <div className="visual-side">
+    <div className={`visual-side visual-side--step visual-side--step-${step}`}>
       <motion.div
         key={step}
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.92 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.45 }}
         className="visual-content"
       >
-        <div className="visual-blur" />
-        <div className="visual-icon">{icons[step] || "🎤"}</div>
+        <div className="visual-blur visual-blur--step" />
+        <div className="visual-icon">{emoji}</div>
       </motion.div>
     </div>
   );
