@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronRight, Mic, Trash2 } from "lucide-react";
+import { ChevronRight, Video, Trash2 } from "lucide-react";
 import "./meetings-list.css";
 
 export interface Meeting {
@@ -105,7 +105,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
             <header className="meetings-list-page__header">
               <div className="meetings-list-page__header-inner">
                 <h1 className="meetings-list-page__title">Meetings</h1>
-                <p className="meetings-list-page__subtitle">Loading…</p>
+                <p className="app-page-subtitle">Loading…</p>
               </div>
               <button
                 type="button"
@@ -113,7 +113,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                 onClick={onStartNewMeeting}
                 disabled={true}
               >
-                <Mic size={18} strokeWidth={2} />
+                <Video size={18} strokeWidth={2} />
                 Start New Meeting
               </button>
             </header>
@@ -142,7 +142,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
             transition={{ duration: 0.4 }}
           >
             <div className="meetings-list-page__empty-icon">
-              <Mic size={40} strokeWidth={1.5} />
+              <Video size={40} strokeWidth={1.5} />
             </div>
             <p className="meetings-list-page__empty-text">
               No captured meetings yet
@@ -156,7 +156,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
               onClick={onStartNewMeeting}
               disabled={isRecording || isGeneratingSummary}
             >
-              <Mic size={18} strokeWidth={2} />
+              <Video size={18} strokeWidth={2} />
               Start New Meeting
             </button>
           </motion.div>
@@ -165,7 +165,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
             <header className="meetings-list-page__header">
               <div className="meetings-list-page__header-inner">
                 <h1 className="meetings-list-page__title">Meetings</h1>
-                <p className="meetings-list-page__subtitle">
+                <p className="app-page-subtitle">
                   {meetings.length}{" "}
                   {meetings.length === 1 ? "meeting" : "meetings"} captured
                 </p>
@@ -176,7 +176,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                 onClick={onStartNewMeeting}
                 disabled={isRecording || isGeneratingSummary}
               >
-                <Mic size={18} strokeWidth={2} />
+                <Video size={18} strokeWidth={2} />
                 Start New Meeting
               </button>
             </header>

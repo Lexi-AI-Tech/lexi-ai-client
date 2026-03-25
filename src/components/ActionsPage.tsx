@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Play, Pause, Trash2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
 import { formatDateTime } from "../lib/dateUtils";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
@@ -25,6 +26,10 @@ export const ActionsPage: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Track which action IDs are newly added so we animate them in.
+  const prevActionIdsRef = useRef<Set<string>>(new Set());
+  const [enteringActionOrder, setEnteringActionOrder] = useState<string[]>([]);
 
   const pageSize = 20;
 
@@ -152,6 +157,21 @@ export const ActionsPage: React.FC = () => {
     loadConfig();
   }, []);
 
+  useEffect(() => {
+    const nextIds = new Set((actionHistory?.actions ?? []).map((a) => a.id));
+    const newlyAdded: string[] = [];
+    for (const a of actionHistory?.actions ?? []) {
+      if (!prevActionIdsRef.current.has(a.id)) newlyAdded.push(a.id);
+    }
+
+    prevActionIdsRef.current = nextIds;
+    if (newlyAdded.length === 0) return;
+
+    setEnteringActionOrder(newlyAdded);
+    const id = window.setTimeout(() => setEnteringActionOrder([]), 700);
+    return () => window.clearTimeout(id);
+  }, [actionHistory]);
+
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
@@ -264,8 +284,23 @@ export const ActionsPage: React.FC = () => {
         ) : (
           <>
             <div className="actions-history">
-              {actionHistory.actions.map((action) => (
-                <div key={action.id} className="action-card">
+              <AnimatePresence initial={false}>
+                {actionHistory.actions.map((action) => {
+                  const enterIdx = enteringActionOrder.indexOf(action.id);
+                  const isEntering = enterIdx !== -1;
+                  return (
+                    <motion.div
+                      key={action.id}
+                      className="action-card"
+                      initial={isEntering ? { opacity: 0, y: 8 } : false}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.22,
+                        delay: isEntering ? Math.min(enterIdx, 24) * 0.03 : 0,
+                      }}
+                      layout
+                      exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+                    >
                   <div className="action-card__top">
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="action-card__command">
@@ -380,8 +415,10 @@ export const ActionsPage: React.FC = () => {
                       {action.action_type.replace("_", " ")}
                     </span>
                   </div>
-                </div>
-              ))}
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             </div>
 
             {/* Pagination */}

@@ -149,37 +149,51 @@ export const ScreenSkeleton: React.FC<{
   if (variant === "transcripts") {
     return (
       <div className={cls}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "110px 1fr 140px 110px",
-              gap: 10,
-              alignItems: "center",
-              padding: "0 2px",
-            }}
-          >
-            <Block width="90%" height={12} radius={8} />
-            <Block width="70%" height={12} radius={8} />
-            <Block width="70%" height={12} radius={8} />
-            <Block width="80%" height={12} radius={8} />
-          </div>
-
-          {Array.from({ length: 7 }).map((_, i) => (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
               style={{
-                display: "grid",
-                gridTemplateColumns: "110px 1fr 140px 110px",
+                borderRadius: 14,
+                padding: 14,
+                display: "flex",
+                flexDirection: "column",
                 gap: 10,
-                alignItems: "center",
-                padding: "10px 2px",
               }}
             >
-              <Block width="90%" height={12} radius={8} />
-              <Block width="95%" height={16} radius={10} />
-              <Block width="70%" height={14} radius={10} />
-              <Block width="55%" height={14} radius={10} />
+              {/* Header row */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <Block width="52%" height={12} radius={8} />
+                <Block width={90} height={14} radius={8} />
+              </div>
+
+              {/* Body row: play button + text */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                }}
+              >
+                <Block width={28} height={28} radius={999} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                  <Block width="95%" height={14} radius={10} />
+                  <Block width="88%" height={14} radius={10} />
+                </div>
+              </div>
+
+              {/* Actions row */}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <Block width={28} height={28} radius={8} />
+                <Block width={28} height={28} radius={8} />
+              </div>
             </div>
           ))}
         </div>
@@ -191,21 +205,33 @@ export const ScreenSkeleton: React.FC<{
     return (
       <div className={cls}>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
               style={{
-                display: "grid",
-                gridTemplateColumns: "110px 1fr 140px 110px",
+                borderRadius: 14,
+                padding: 14,
+                display: "flex",
+                flexDirection: "column",
                 gap: 10,
-                alignItems: "center",
-                padding: "10px 2px",
               }}
             >
-              <Block width="90%" height={12} radius={8} />
-              <Block width="95%" height={16} radius={10} />
-              <Block width="70%" height={14} radius={10} />
-              <Block width="55%" height={14} radius={10} />
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                <Block width="50%" height={12} radius={8} />
+                <Block width={84} height={14} radius={8} />
+              </div>
+
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <Block width={28} height={28} radius={999} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                  <Block width="92%" height={14} radius={10} />
+                  <Block width="82%" height={14} radius={10} />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <Block width={28} height={28} radius={8} />
+              </div>
             </div>
           ))}
         </div>
