@@ -322,28 +322,46 @@ export const ActionsPage: React.FC = () => {
                               {action.action_command}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => openDeleteConfirm(action.id)}
-                            disabled={!!deletingId}
-                            className="action-delete-btn"
-                            title="Delete action"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <div className="action-card__actions">
+                            {action.output_value ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopyOutput(
+                                    action.output_value!,
+                                    action.id,
+                                  )
+                                }
+                                className={`transcript-action-btn transcript-action-btn--copy ${
+                                  copiedOutputId === action.id ? "copied" : ""
+                                }`}
+                                title={
+                                  copiedOutputId === action.id
+                                    ? "Copied!"
+                                    : "Copy result"
+                                }
+                              >
+                                {copiedOutputId === action.id ? (
+                                  <Check size={16} strokeWidth={2.5} />
+                                ) : (
+                                  <Copy size={16} />
+                                )}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => openDeleteConfirm(action.id)}
+                              disabled={!!deletingId}
+                              className="action-delete-btn"
+                              title="Delete action"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
 
-                        {action.selected_text ? (
-                          <div className="action-card__divider">
-                            <div className="action-card__label">Context</div>
-                            <div className="action-card__text action-card__text--clamp">
-                              {action.selected_text}
-                            </div>
-                          </div>
-                        ) : null}
-
                         {(action.output_value || action.output_audio_file_url) && (
-                          <div className="action-card__divider action-card__divider--output">
+                          <div className="action-card__block action-card__block--output">
                             {action.output_audio_file_url ? (
                               <div className="action-card__audio-wrap">
                                 <button
@@ -399,37 +417,21 @@ export const ActionsPage: React.FC = () => {
                               </div>
                             ) : null}
                             {action.output_value ? (
-                              <div className="action-card__output-main">
-                                <div className="action-card__text action-card__text--output">
-                                  {action.output_value}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleCopyOutput(
-                                      action.output_value!,
-                                      action.id,
-                                    )
-                                  }
-                                  className={`transcript-action-btn transcript-action-btn--copy ${
-                                    copiedOutputId === action.id ? "copied" : ""
-                                  }`}
-                                  title={
-                                    copiedOutputId === action.id
-                                      ? "Copied!"
-                                      : "Copy result"
-                                  }
-                                >
-                                  {copiedOutputId === action.id ? (
-                                    <Check size={16} strokeWidth={2.5} />
-                                  ) : (
-                                    <Copy size={16} />
-                                  )}
-                                </button>
+                              <div className="action-card__output-text">
+                                {action.output_value}
                               </div>
                             ) : null}
                           </div>
                         )}
+
+                        {action.selected_text ? (
+                          <div className="action-card__block">
+                            <div className="action-card__label">Context</div>
+                            <div className="action-card__text action-card__text--clamp">
+                              {action.selected_text}
+                            </div>
+                          </div>
+                        ) : null}
                       </motion.div>
                     );
                   })}

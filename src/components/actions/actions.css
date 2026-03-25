@@ -98,6 +98,13 @@
   min-width: 0;
 }
 
+.action-card__actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .action-card__command {
   font-size: 0.9375rem;
   color: var(--lexi-text);
@@ -120,29 +127,27 @@
   background: var(--lexi-border-subtle);
 }
 
-.action-card__divider {
-  border-top: 1px solid var(--lexi-border);
+.action-card__block {
   margin-top: 0.5rem;
-  padding-top: 0.5rem;
 }
 
-.action-card__divider--output {
+.action-card__block--output {
   display: flex;
   align-items: flex-start;
   gap: 8px;
 }
 
-.action-card__output-main {
+.action-card__output-text {
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.action-card__output-main .action-card__text--output {
-  flex: 1;
-  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--lexi-text-muted);
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
 }
 
 .action-card__audio-wrap {
@@ -173,11 +178,6 @@
 
 .action-card__text--clamp {
   -webkit-line-clamp: 3;
-}
-
-.action-card__text--output {
-  flex: 1;
-  min-width: 0;
 }
 
 .action-delete-btn {

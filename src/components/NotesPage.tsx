@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import {
   LayoutGrid,
@@ -149,6 +150,23 @@ export const NotesPage: React.FC = () => {
 
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === "list" ? "grid" : "list"));
+  };
+
+  const NOTES_GRID_VARIANTS = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.06, delayChildren: 0.08 },
+    },
+  };
+
+  const NOTES_CARD_VARIANTS = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: [0.22, 0.61, 0.36, 1] as const },
+    },
   };
 
   return (
@@ -364,7 +382,10 @@ export const NotesPage: React.FC = () => {
         {loading && notes.length === 0 ? (
           <ScreenSkeleton variant="notes" className="notes-loading-inline" />
         ) : notes.length === 0 ? (
-          <div
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35, ease: [0.22, 0.61, 0.36, 1] }}
             style={{
               textAlign: "center",
               padding: "60px 20px",
@@ -372,9 +393,13 @@ export const NotesPage: React.FC = () => {
             }}
           >
             <p style={{ margin: 0, fontSize: "14px" }}>No notes found</p>
-          </div>
+          </motion.div>
         ) : (
-          <div
+          <motion.div
+            key={viewMode}
+            variants={NOTES_GRID_VARIANTS}
+            initial="hidden"
+            animate="visible"
             style={{
               display: viewMode === "grid" ? "grid" : "flex",
               flexDirection: viewMode === "list" ? "column" : undefined,
@@ -386,8 +411,9 @@ export const NotesPage: React.FC = () => {
             }}
           >
             {notes.map((note) => (
-              <div
+              <motion.div
                 key={note.id}
+                variants={NOTES_CARD_VARIANTS}
                 style={{
                   backgroundColor: "#ffffff",
                   border:
@@ -481,9 +507,9 @@ export const NotesPage: React.FC = () => {
                 >
                   {formatAppDateTime(note.created_at)}
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
 
