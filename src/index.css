@@ -1956,12 +1956,15 @@ textarea.form-input {
 .transcripts-table-row {
   display: grid;
   grid-template-columns: 100px 1fr 130px 150px;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
 }
 
 .transcript-cell {
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .transcript-cell-date {
@@ -2000,6 +2003,7 @@ textarea.form-input {
 
 .transcript-cell-text {
   color: var(--lexi-text);
+  align-items: flex-start;
 }
 
 .transcript-cell-meta {
@@ -2010,7 +2014,7 @@ textarea.form-input {
 /* Transcript display cell: text + enhanced badges */
 .transcript-display-cell {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-direction: row;
   gap: 10px;
   padding-right: 32px;
