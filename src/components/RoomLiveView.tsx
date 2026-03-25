@@ -14,6 +14,7 @@ import { Room, RoomTranscriptSegment } from "../types";
 import { SpeakerNamingModal } from "./SpeakerNamingModal";
 import { useToast } from "./toast/useToast";
 import { PageLoader } from "./ui/PageLoader";
+import { formatLocaleTimeWithSeconds } from "../lib/dateUtils";
 
 interface RoomLiveViewProps {
   roomId: string;
@@ -245,27 +246,6 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
     return room?.speaker_map?.[label] || label.replace("speaker_", "Speaker ");
   };
 
-  const formatTime = (isoString: string) => {
-    try {
-      if (!isoString) return "00:00";
-      // Handle Python isoformat with microseconds (6 digits) -> JS (3 digits)
-      // e.g. 2023-10-10T10:10:10.123456 -> 2023-10-10T10:10:10.123
-      const cleanIso =
-        isoString.length > 23 ? isoString.substring(0, 23) : isoString;
-
-      const date = new Date(cleanIso);
-      if (isNaN(date.getTime())) return "00:00";
-      return date.toLocaleTimeString([], {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-    } catch (e) {
-      return "00:00";
-    }
-  };
-
   if (loading && !room) {
     return (
       <div
@@ -409,7 +389,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
                   marginTop: "4px",
                 }}
               >
-                {formatTime(seg.start_time)}
+                {formatLocaleTimeWithSeconds(seg.start_time)}
               </div>
             </div>
           ))}

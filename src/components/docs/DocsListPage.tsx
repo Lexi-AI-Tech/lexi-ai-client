@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, FileText, Plus, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
+import { formatAppDateTime } from "../../lib/dateUtils";
 import "./docs-list.css";
 
 const PREVIEW_MAX_LENGTH = 140;
@@ -68,22 +69,6 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
   const openDeleteConfirm = (e: React.MouseEvent, docId: string) => {
     e.stopPropagation();
     setDeleteConfirmId(docId);
-  };
-
-  const formatDateShort = (updatedAt: string) => {
-    try {
-      if (!updatedAt) return "";
-      const d = new Date(updatedAt);
-      return d.toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "";
-    }
   };
 
   const GRID_VARIANTS = {
@@ -174,9 +159,9 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
                   >
                     <div className="docs-list-page__card-body">
                       <div className="docs-list-page__card-meta-row">
-                        {formatDateShort(doc.updated_at) && (
+                        {formatAppDateTime(doc.updated_at) && (
                           <span className="docs-list-page__card-date">
-                            {formatDateShort(doc.updated_at)}
+                            {formatAppDateTime(doc.updated_at)}
                           </span>
                         )}
                       </div>

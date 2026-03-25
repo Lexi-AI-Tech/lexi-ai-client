@@ -29,6 +29,7 @@ import {
 import "../meetings.css";
 import "./meetings-list.css";
 import "./meeting-detail-product.css";
+import { formatLocaleTimeWithSeconds } from "../../lib/dateUtils";
 
 interface TranscriptSegment {
   id: string;
@@ -471,22 +472,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     handleEndMeeting();
   }, [triggerAutoEndMeetingFromReminder]);
 
-  const formatMeetingDate = (createdAt: string) => {
-    try {
-      if (!createdAt) return "";
-      const d = new Date(createdAt);
-      return d.toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "";
-    }
-  };
-
   const PAGE_VARIANTS = {
     hidden: { opacity: 0 },
     visible: {
@@ -623,19 +608,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                   </p>
                 ) : null}
                 {segments.map((seg, idx) => {
-                  let timeString = "00:00:00";
-                  try {
-                    if (seg.start_time) {
-                      const d = new Date(seg.start_time);
-                      timeString = d.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      });
-                    }
-                  } catch {
-                    // ignore
-                  }
+                  const timeString = seg.start_time
+                    ? formatLocaleTimeWithSeconds(seg.start_time)
+                    : "00:00:00";
                   const msgType = seg.message_type;
                   const isUser =
                     msgType === "user_audio" || msgType === "user_note";

@@ -5,6 +5,7 @@ import { useAuthStore } from "../store/authStore";
 import { MeetingsListPage, type Meeting } from "./meetings/MeetingsListPage";
 import { MeetingDetailPage } from "./meetings/MeetingDetailPage";
 import "./meetings.css";
+import { formatAppDateTime } from "../lib/dateUtils";
 
 interface TranscriptSegment {
   id: string;
@@ -203,21 +204,9 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     setLiveSegments((prev) => [...prev, segment]);
   }, []);
 
-  const formatMeetingDate = (m: Meeting | null) => {
-    if (!m?.created_at) return null;
-    try {
-      const d = new Date(m.created_at);
-      return d.toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return null;
-    }
-  };
+  const selectedMeetingDateLabel = selectedMeeting
+    ? formatAppDateTime(selectedMeeting.created_at)
+    : "";
 
   return (
     <div className={`page ${selectedMeetingId ? "page--meetings-detail" : ""}`}>
@@ -245,11 +234,11 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                 Live
               </span>
             )}
-            {formatMeetingDate(selectedMeeting) && (
+            {selectedMeetingDateLabel ? (
               <span className="meetings-page-header__date">
-                {formatMeetingDate(selectedMeeting)}
+                {selectedMeetingDateLabel}
               </span>
-            )}
+            ) : null}
           </div>
         </div>
       )}

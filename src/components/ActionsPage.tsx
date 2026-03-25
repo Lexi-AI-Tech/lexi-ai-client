@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Play, Pause, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { PaginatedActionHistoryResponse, AppConfig } from "../types";
-import { formatDateTime } from "../lib/dateUtils";
+import { formatAppDateTime } from "../lib/dateUtils";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
@@ -409,7 +409,7 @@ export const ActionsPage: React.FC = () => {
                   )}
 
                   <div className="action-card__bottom">
-                    <span>{formatDateTime(action.created_at)}</span>
+                    <span>{formatAppDateTime(action.created_at)}</span>
                     <span>•</span>
                     <span style={{ textTransform: "capitalize" }}>
                       {action.action_type.replace("_", " ")}

@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight, Video, Trash2 } from "lucide-react";
 import "./meetings-list.css";
+import { formatAppDateTime } from "../../lib/dateUtils";
 
 export interface Meeting {
   id: string;
@@ -55,22 +56,6 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
   const openDeleteConfirm = (e: React.MouseEvent, meetingId: string) => {
     e.stopPropagation();
     setDeleteConfirmId(meetingId);
-  };
-
-  const formatDateShort = (createdAt: string) => {
-    try {
-      if (!createdAt) return "";
-      const d = new Date(createdAt);
-      return d.toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "";
-    }
   };
 
   const GRID_VARIANTS = {
@@ -214,9 +199,9 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                             Live
                           </span>
                         )}
-                        {formatDateShort(m.created_at) && (
+                        {formatAppDateTime(m.created_at) && (
                           <span className="meetings-list-page__card-date">
-                            {formatDateShort(m.created_at)}
+                            {formatAppDateTime(m.created_at)}
                           </span>
                         )}
                       </div>

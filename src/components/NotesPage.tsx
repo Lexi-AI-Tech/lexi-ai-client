@@ -13,6 +13,7 @@ import {
 import { Note, PaginatedNotesResponse } from "../types";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
+import { formatAppDateTime } from "../lib/dateUtils";
 import "./home/home.css";
 
 type ViewMode = "list" | "grid";
@@ -619,11 +620,7 @@ export const NotesPage: React.FC = () => {
                     paddingTop: "8px",
                   }}
                 >
-                  {new Date(note.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {formatAppDateTime(note.created_at)}
                 </div>
               </div>
             ))}
