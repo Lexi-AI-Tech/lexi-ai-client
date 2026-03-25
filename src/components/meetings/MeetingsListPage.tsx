@@ -75,97 +75,85 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
     },
   };
 
+  const showInitialSkeleton = isLoading && meetings.length === 0;
+  const showEmpty = !isLoading && meetings.length === 0;
+  const showGrid = meetings.length > 0;
+
+  const subtitle =
+    isLoading && meetings.length === 0 ? (
+      <p className="app-page-subtitle">Loading…</p>
+    ) : meetings.length > 0 ? (
+      <p className="app-page-subtitle">
+        {meetings.length}{" "}
+        {meetings.length === 1 ? "meeting" : "meetings"} captured
+      </p>
+    ) : null;
+
   return (
     <div className="meetings-list-page">
-      <AnimatePresence mode="wait">
-        {isLoading ? (
-          <motion.div
-            key="loading"
-            className="meetings-list-page__loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <header className="meetings-list-page__header">
-              <div className="meetings-list-page__header-inner">
-                <h1 className="meetings-list-page__title">Meetings</h1>
-                <p className="app-page-subtitle">Loading…</p>
-              </div>
-              <button
-                type="button"
-                className="meetings-list-page__cta"
-                onClick={onStartNewMeeting}
-                disabled={true}
-              >
-                <Video size={18} strokeWidth={2} />
-                Start New Meeting
-              </button>
-            </header>
+      <header className="meetings-list-page__header">
+        <div className="meetings-list-page__header-inner">
+          <h1 className="meetings-list-page__title">Meetings</h1>
+          {subtitle}
+        </div>
+        <button
+          type="button"
+          className="meetings-list-page__cta"
+          onClick={onStartNewMeeting}
+          disabled={isRecording || isGeneratingSummary}
+        >
+          <Video size={18} strokeWidth={2} />
+          Start New Meeting
+        </button>
+      </header>
 
-            <div className="meetings-list-page__grid">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="meetings-list-page__card meetings-list-page__card--skeleton"
-                >
-                  <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--sm" />
-                  <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--md" />
-                  <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--lg" />
-                  <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--lg" />
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        ) : meetings.length === 0 ? (
-          <motion.div
-            key="empty"
-            className="meetings-list-page__empty"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className="meetings-list-page__empty-icon">
-              <Video size={40} strokeWidth={1.5} />
-            </div>
-            <p className="meetings-list-page__empty-text">
-              No captured meetings yet
-            </p>
-            <p className="meetings-list-page__empty-hint">
-              Start a meeting to capture transcripts and generate AI summaries.
-            </p>
-            <button
-              type="button"
-              className="meetings-list-page__cta"
-              onClick={onStartNewMeeting}
-              disabled={isRecording || isGeneratingSummary}
-            >
-              <Video size={18} strokeWidth={2} />
-              Start New Meeting
-            </button>
-          </motion.div>
-        ) : (
-          <>
-            <header className="meetings-list-page__header">
-              <div className="meetings-list-page__header-inner">
-                <h1 className="meetings-list-page__title">Meetings</h1>
-                <p className="app-page-subtitle">
-                  {meetings.length}{" "}
-                  {meetings.length === 1 ? "meeting" : "meetings"} captured
-                </p>
-              </div>
-              <button
-                type="button"
-                className="meetings-list-page__cta"
-                onClick={onStartNewMeeting}
-                disabled={isRecording || isGeneratingSummary}
-              >
-                <Video size={18} strokeWidth={2} />
-                Start New Meeting
-              </button>
-            </header>
+      <div className="meetings-list-page__content">
+        <AnimatePresence mode="wait">
+          {showInitialSkeleton ? (
             <motion.div
+              key="meetings-loading-content"
+              className="meetings-list-page__loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="meetings-list-page__grid">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="meetings-list-page__card meetings-list-page__card--skeleton"
+                  >
+                    <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--sm" />
+                    <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--md" />
+                    <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--lg" />
+                    <div className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--lg" />
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          ) : showEmpty ? (
+            <motion.div
+              key="meetings-empty"
+              className="meetings-list-page__empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <div className="meetings-list-page__empty-icon">
+                <Video size={40} strokeWidth={1.5} />
+              </div>
+              <p className="meetings-list-page__empty-text">
+                No captured meetings yet
+              </p>
+              <p className="meetings-list-page__empty-hint">
+                Start a meeting to capture transcripts and generate AI summaries.
+              </p>
+            </motion.div>
+          ) : showGrid ? (
+            <motion.div
+              key="meetings-grid"
               className="meetings-list-page__grid"
               variants={GRID_VARIANTS}
               initial="hidden"
@@ -247,9 +235,9 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                 );
               })}
             </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+          ) : null}
+        </AnimatePresence>
+      </div>
 
       {deleteConfirmId && (
         <div

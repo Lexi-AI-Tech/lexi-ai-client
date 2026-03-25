@@ -151,15 +151,6 @@ export const NotesPage: React.FC = () => {
     setViewMode((prev) => (prev === "list" ? "grid" : "list"));
   };
 
-  if (loading) {
-    return (
-      <div className="page">
-        <h2 className="page__title">Notes</h2>
-        <ScreenSkeleton variant="notes" className="page__empty" />
-      </div>
-    );
-  }
-
   return (
     <div
       style={{
@@ -172,7 +163,7 @@ export const NotesPage: React.FC = () => {
       <h2
         style={{
           margin: 0,
-          marginBottom: "2rem",
+          marginBottom: "0.25rem",
           fontSize: "24px",
           fontWeight: 600,
           color: "#111827",
@@ -181,6 +172,15 @@ export const NotesPage: React.FC = () => {
       >
         Notes
       </h2>
+      {loading && notes.length === 0 ? (
+        <p className="app-page-subtitle" style={{ marginBottom: "1.75rem" }}>
+          Loading…
+        </p>
+      ) : notes.length > 0 ? (
+        <p className="app-page-subtitle" style={{ marginBottom: "1.75rem" }}>
+          {notes.length} {notes.length === 1 ? "note" : "notes"}
+        </p>
+      ) : null}
       {/* Quick Thoughts Section */}
       <div style={{ marginBottom: "48px" }}>
         <h2
@@ -361,7 +361,9 @@ export const NotesPage: React.FC = () => {
         </div>
 
         {/* Notes List */}
-        {notes.length === 0 ? (
+        {loading && notes.length === 0 ? (
+          <ScreenSkeleton variant="notes" className="notes-loading-inline" />
+        ) : notes.length === 0 ? (
           <div
             style={{
               textAlign: "center",

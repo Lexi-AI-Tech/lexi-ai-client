@@ -11,6 +11,17 @@
   padding: 0 0.5rem;
 }
 
+.docs-list-page__content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.docs-list-page__skeleton {
+  width: 100%;
+}
+
 .docs-list-page__header {
   display: flex;
   align-items: center;

@@ -189,7 +189,8 @@ export const ActionsPage: React.FC = () => {
   return (
     <div className="actions-page">
       <h2 className="transcripts-page-title">Actions</h2>
-      {isLoading ? (
+      {isLoading &&
+      (!actionHistory || actionHistory.actions.length === 0) ? (
         <p className="app-page-subtitle">Loading…</p>
       ) : totalActions > 0 ? (
         <p className="app-page-subtitle">
@@ -199,7 +200,8 @@ export const ActionsPage: React.FC = () => {
 
       <div className="actions-page__content">
         <AnimatePresence mode="wait">
-          {isLoading && (
+          {isLoading &&
+            (!actionHistory || actionHistory.actions.length === 0) && (
             <motion.div
               key="actions-loading"
               initial={{ opacity: 0 }}
@@ -232,8 +234,7 @@ export const ActionsPage: React.FC = () => {
               </motion.div>
             )}
 
-          {!isLoading &&
-            actionHistory &&
+          {actionHistory &&
             actionHistory.actions.length > 0 && (
               <motion.div
                 key="actions-cards"

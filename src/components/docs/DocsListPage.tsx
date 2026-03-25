@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, FileText, Plus, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
 import { formatAppDateTime } from "../../lib/dateUtils";
+import { ScreenSkeleton } from "../ui/ScreenSkeleton";
 import "./docs-list.css";
 
 const PREVIEW_MAX_LENGTH = 140;
@@ -37,6 +38,8 @@ function docContentToPlainText(contentJson: string | undefined): string {
 
 interface DocsListPageProps {
   docs: Doc[];
+  /** When true and there are no docs yet, only the list body shows a skeleton. */
+  isLoading?: boolean;
   onRefreshDocs: () => void;
   onSelectDoc: (docId: string) => void;
   onCreateDoc: () => void;
@@ -46,7 +49,8 @@ interface DocsListPageProps {
 
 export const DocsListPage: React.FC<DocsListPageProps> = ({
   docs,
-  onRefreshDocs,
+  isLoading = false,
+  onRefreshDocs: _onRefreshDocs,
   onSelectDoc,
   onCreateDoc,
   onDeleteDoc,
@@ -88,53 +92,68 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
     },
   };
 
+  const showListSkeleton = isLoading && docs.length === 0;
+  const showEmpty = !isLoading && docs.length === 0;
+  const showGrid = docs.length > 0;
+
+  const subtitle =
+    isLoading && docs.length === 0 ? (
+      <p className="app-page-subtitle">Loading…</p>
+    ) : docs.length > 0 ? (
+      <p className="app-page-subtitle">
+        {docs.length} {docs.length === 1 ? "document" : "documents"}
+      </p>
+    ) : null;
+
   return (
     <div className="docs-list-page">
-      <AnimatePresence mode="wait">
-        {docs.length === 0 ? (
-          <motion.div
-            key="empty"
-            className="docs-list-page__empty"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className="docs-list-page__empty-icon">
-              <FileText size={40} strokeWidth={1.5} />
-            </div>
-            <p className="docs-list-page__empty-text">No documents yet</p>
-            <p className="docs-list-page__empty-hint">
-              Create a doc to capture notes, briefs, and structured content.
-            </p>
-            <button
-              type="button"
-              className="docs-list-page__cta"
-              onClick={onCreateDoc}
-            >
-              <Plus size={18} strokeWidth={2} />
-              New doc
-            </button>
-          </motion.div>
-        ) : (
-          <>
-            <header className="docs-list-page__header">
-              <div className="docs-list-page__header-inner">
-                <h1 className="docs-list-page__title">Docs</h1>
-                <p className="docs-list-page__subtitle">
-                  {docs.length} {docs.length === 1 ? "document" : "documents"}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="docs-list-page__cta"
-                onClick={onCreateDoc}
-              >
-                <Plus size={18} strokeWidth={2} />
-                New doc
-              </button>
-            </header>
+      <header className="docs-list-page__header">
+        <div className="docs-list-page__header-inner">
+          <h1 className="docs-list-page__title">Docs</h1>
+          {subtitle}
+        </div>
+        <button
+          type="button"
+          className="docs-list-page__cta"
+          onClick={onCreateDoc}
+        >
+          <Plus size={18} strokeWidth={2} />
+          New doc
+        </button>
+      </header>
+
+      <div className="docs-list-page__content">
+        <AnimatePresence mode="wait">
+          {showListSkeleton ? (
             <motion.div
+              key="docs-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ScreenSkeleton variant="docs" className="docs-list-page__skeleton" />
+            </motion.div>
+          ) : showEmpty ? (
+            <motion.div
+              key="empty"
+              className="docs-list-page__empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <div className="docs-list-page__empty-icon">
+                <FileText size={40} strokeWidth={1.5} />
+              </div>
+              <p className="docs-list-page__empty-text">No documents yet</p>
+              <p className="docs-list-page__empty-hint">
+                Create a doc to capture notes, briefs, and structured content.
+              </p>
+            </motion.div>
+          ) : showGrid ? (
+            <motion.div
+              key="docs-grid"
               className="docs-list-page__grid"
               variants={GRID_VARIANTS}
               initial="hidden"
@@ -197,9 +216,9 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
                 );
               })}
             </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+          ) : null}
+        </AnimatePresence>
+      </div>
 
       {deleteConfirmId && (
         <div
