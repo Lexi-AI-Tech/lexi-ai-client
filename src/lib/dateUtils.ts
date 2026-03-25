@@ -102,26 +102,66 @@ export function formatLocaleTimeWithSeconds(
   }
 }
 
+/** Start of the given instant’s calendar day in the local timezone. */
+function startOfLocalDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function capitalizeFirstLetter(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toLocaleUpperCase(undefined) + s.slice(1);
+}
+
+/** Whole calendar days between `earlier` and `later` (local dates), both inclusive of their midnights. */
+function localCalendarDaysBetween(earlier: Date, later: Date): number {
+  const a = startOfLocalDay(earlier).getTime();
+  const b = startOfLocalDay(later).getTime();
+  return Math.round((b - a) / 86400000);
+}
+
 /**
- * Format a date string as relative time (e.g. "Just now", "5 minutes ago", "2 hours ago").
- * For dates older than 7 days, uses {@link formatAppDateTime} in the user's locale.
+ * Human-friendly list/card timestamp: relative only for **today** (same local calendar day);
+ * **yesterday** as localized “yesterday” + time; **two or more days ago** (and future instants)
+ * as {@link formatAppDateTime}.
  */
 export function formatDateRelative(dateString: string): string {
   try {
     const date = parseServerDate(dateString);
     if (!date) return dateString;
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60)
-      return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
-    if (diffHours < 24)
+    if (date.getTime() > now.getTime()) {
+      return formatAppDateTime(dateString);
+    }
+
+    const dayDiff = localCalendarDaysBetween(date, now);
+
+    if (dayDiff === 0) {
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      if (diffMins < 1) return "Just now";
+      if (diffMins < 60) {
+        return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
+      }
       return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+    }
+
+    if (dayDiff === 1) {
+      const timePart = date.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      const yesterdayLabel = capitalizeFirstLetter(
+        new Intl.RelativeTimeFormat(undefined, {
+          numeric: "auto",
+        }).format(-1, "day"),
+      );
+      return `${yesterdayLabel} at ${timePart}`;
+    }
+
     return formatAppDateTime(dateString);
   } catch {
     return dateString;

@@ -31,6 +31,28 @@ import "./meetings-list.css";
 import "./meeting-detail-product.css";
 import { formatLocaleTimeWithSeconds } from "../../lib/dateUtils";
 
+/** Gutter (24px) + max Q&A column (480px) — used for slide animation */
+const Q_A_RAIL_OUTER_WIDTH_PX = 504;
+
+const RAIL_PANEL_TRANSITION = {
+  duration: 0.45,
+  ease: [0.16, 1, 0.3, 1] as const,
+};
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(query).matches : false,
+  );
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const handler = () => setMatches(m.matches);
+    m.addEventListener("change", handler);
+    setMatches(m.matches);
+    return () => m.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
+
 interface TranscriptSegment {
   id: string;
   segment_index: number;
@@ -497,6 +519,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
   const hasSummaryContent = activeSummary || isGeneratingSummary;
   const showSummaryChatRail = hasSummaryContent && isChatRailOpen;
+  const isNarrowSplit = useMediaQuery("(max-width: 900px)");
 
   return (
     <motion.div
@@ -682,7 +705,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
           {activeTab === "summary" && (
             <motion.div
               key="summary"
-              className={`meeting-detail-split ${showSummaryChatRail ? "" : "meeting-detail-split--no-rail"}`}
+              className="meeting-detail-split"
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
@@ -699,11 +722,16 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     </h3>
                     <div className="meeting-detail-summary-panel__actions">
                       {hasSummaryContent && !isChatRailOpen && (
-                        <button
+                        <motion.button
                           type="button"
                           className="meeting-detail-btn meeting-detail-btn--secondary"
                           onClick={() => setIsChatRailOpen(true)}
                           title="Show Q&A"
+                          initial={{ opacity: 0, x: 10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.97 }}
                         >
                           <MessageCircle
                             size={14}
@@ -711,7 +739,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                             aria-hidden
                           />
                           Q&A
-                        </button>
+                        </motion.button>
                       )}
                       {activeSummary && (
                         <button
@@ -780,25 +808,75 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                   </div>
                 </div>
               </div>
-              {showSummaryChatRail && (
-                <div
-                  className="meeting-detail-split__gutter"
-                  role="separator"
-                  aria-orientation="vertical"
+              {hasSummaryContent && (
+                <motion.div
+                  className="meeting-detail-split__rail-host"
+                  initial={false}
+                  animate={
+                    isNarrowSplit
+                      ? {
+                          maxHeight: showSummaryChatRail ? 9999 : 0,
+                          opacity: showSummaryChatRail ? 1 : 0,
+                          width: "100%",
+                        }
+                      : {
+                          width: showSummaryChatRail ? Q_A_RAIL_OUTER_WIDTH_PX : 0,
+                          opacity: 1,
+                        }
+                  }
+                  transition={
+                    isNarrowSplit
+                      ? {
+                          maxHeight: RAIL_PANEL_TRANSITION,
+                          opacity: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+                        }
+                      : {
+                          width: RAIL_PANEL_TRANSITION,
+                          opacity: { duration: 0.2 },
+                        }
+                  }
+                  style={{
+                    overflow: "hidden",
+                    pointerEvents: showSummaryChatRail ? "auto" : "none",
+                  }}
                 >
-                  <button
-                    type="button"
-                    className="meeting-detail-split__divider-btn"
-                    onClick={() => setIsChatRailOpen(false)}
-                    title="Collapse Q&A"
-                    aria-label="Collapse Q&A"
+                  <motion.div
+                    className="meeting-detail-split__rail-bundle"
+                    style={{
+                      width: isNarrowSplit ? "100%" : Q_A_RAIL_OUTER_WIDTH_PX,
+                      minWidth: isNarrowSplit ? 0 : Q_A_RAIL_OUTER_WIDTH_PX,
+                    }}
+                    initial={false}
+                    animate={{
+                      x: isNarrowSplit
+                        ? 0
+                        : showSummaryChatRail
+                          ? 0
+                          : 18,
+                    }}
+                    transition={RAIL_PANEL_TRANSITION}
                   >
-                    <ChevronRight size={14} strokeWidth={2} />
-                  </button>
-                </div>
-              )}
-              {showSummaryChatRail && (
-                <aside className="meeting-detail-rail">
+                    <div
+                      className="meeting-detail-split__gutter"
+                      role="separator"
+                      aria-orientation={
+                        isNarrowSplit ? "horizontal" : "vertical"
+                      }
+                    >
+                      <motion.button
+                        type="button"
+                        className="meeting-detail-split__divider-btn"
+                        onClick={() => setIsChatRailOpen(false)}
+                        title="Collapse Q&A"
+                        aria-label="Collapse Q&A"
+                        whileHover={{ scale: 1.08 }}
+                        whileTap={{ scale: 0.9 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                      >
+                        <ChevronRight size={14} strokeWidth={2} />
+                      </motion.button>
+                    </div>
+                    <aside className="meeting-detail-rail">
                   <div className="meeting-detail-rail__header">
                     <span className="meeting-detail-rail__label">
                       <MessageCircle
@@ -899,6 +977,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     </form>
                   </div>
                 </aside>
+                  </motion.div>
+                </motion.div>
               )}
             </motion.div>
           )}

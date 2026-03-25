@@ -325,10 +325,11 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
 
-/* Summary | 1px line + centered handle | Q&A (IDE-style splitter) */
+/* Summary + animated rail (flex so Q&A width can tween smoothly) */
 .meeting-detail-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 24px minmax(260px, 480px);
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   gap: 0;
   flex: 1;
   min-height: 0;
@@ -339,8 +340,28 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.meeting-detail-split--no-rail {
-  grid-template-columns: 1fr;
+.meeting-detail-split__rail-host {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.meeting-detail-split__rail-bundle {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.meeting-detail-split__rail-bundle > .meeting-detail-split__gutter {
+  flex: 0 0 24px;
+  width: 24px;
+}
+
+.meeting-detail-split__rail-bundle > .meeting-detail-rail {
+  flex: 1 1 auto;
+  min-width: 260px;
+  max-width: 480px;
 }
 
 .meeting-detail-split__gutter {
@@ -406,17 +427,29 @@
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 1) inset,
     0 2px 8px rgba(15, 23, 42, 0.14);
-  transform: scale(1.05);
-}
-
-.meeting-detail-split__divider-btn:active {
-  transform: scale(0.98);
 }
 
 @media (max-width: 900px) {
-  .meeting-detail-split:not(.meeting-detail-split--no-rail) {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto minmax(200px, 1fr);
+  .meeting-detail-split {
+    flex-direction: column;
+  }
+
+  .meeting-detail-split__rail-bundle {
+    flex-direction: column;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .meeting-detail-split__rail-bundle > .meeting-detail-split__gutter {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 28px;
+  }
+
+  .meeting-detail-split__rail-bundle > .meeting-detail-rail {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
   }
 
   .meeting-detail-split__gutter {
@@ -443,6 +476,7 @@
 }
 
 .meeting-detail-main {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
