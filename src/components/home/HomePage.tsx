@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import type { Transcript, HotkeyConfig } from "../../types";
+import type { HotkeyConfig } from "../../types";
 import { ScreenSkeleton } from "../ui/ScreenSkeleton";
 import "./home.css";
 
@@ -200,6 +200,10 @@ interface PeriodButtonProps {
   onClick: () => void;
 }
 
+interface HomePageProps {
+  onViewAllTranscripts?: () => void;
+}
+
 const PeriodButton: React.FC<PeriodButtonProps> = ({
   label,
   active,
@@ -214,7 +218,9 @@ const PeriodButton: React.FC<PeriodButtonProps> = ({
   </button>
 );
 
-export const HomePage: React.FC = () => {
+export const HomePage: React.FC<HomePageProps> = ({
+  onViewAllTranscripts: _onViewAllTranscripts,
+}) => {
   const { user, isAuthenticated, tokens } = useAuthStore();
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
@@ -334,6 +340,13 @@ export const HomePage: React.FC = () => {
     data: [],
     total_transcriptions: 0,
   };
+  const planUsageRows = useMemo(
+    () =>
+      billingUsage?.features
+        ? sortPlanUsageFeatures(billingUsage.features)
+        : ([] as FeatureUsageEntry[]),
+    [billingUsage],
+  );
   const maxChartValue = useMemo(
     () => Math.max(...resolvedChartData.data, 1),
     [resolvedChartData.data],
@@ -450,43 +463,37 @@ export const HomePage: React.FC = () => {
           </div>
 
           <div className="transcriptions-list">
-            {loading ? (
+            {!billingUsage ? (
               <ScreenSkeleton variant="home" className="home-loading-full" />
-            ) : transcripts.length === 0 ? (
+            ) : planUsageRows.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">
                   <FileText size={32} />
                 </div>
-                <p className="empty-title">No transcriptions yet</p>
-                <p className="empty-sub">
-                  {transcriptionHotkeys.length > 0
-                    ? `Hold ${transcriptionHotkeys.join(" or ")} and speak to create your first transcription`
-                    : "Use your shortcut to create your first transcription"}
-                </p>
+                <p className="empty-title">No plan usage yet</p>
+                <p className="empty-sub">Usage will appear once activity starts.</p>
               </div>
             ) : (
-              transcripts.map((transcript) => (
+              planUsageRows.map((feature) => (
                 <motion.div
-                  key={transcript.id}
+                  key={feature.feature_key}
                   className="transcript-card"
                   whileHover={{ scale: 1.01 }}
                   transition={{ duration: 0.2 }}
                 >
                   <div className="transcript-card-header"></div>
                   <p className="transcript-preview">
-                    {transcript.original_text
-                      ? transcript.original_text.length > 120
-                        ? `${transcript.original_text.slice(0, 120)}...`
-                        : transcript.original_text
-                      : "Processing..."}
+                    {featureLabel(feature.feature_key)}
                   </p>
                   <div className="transcript-meta">
-                    <span>
-                      {transcript.original_text_word_count || 0} words
-                    </span>
-                    {transcript.focused_app && (
-                      <span>• {transcript.focused_app}</span>
+                    <span>{feature.used}</span>
+                    <span>used</span>
+                    {feature.limit_value !== null && (
+                      <span>• {feature.limit_value} limit</span>
                     )}
+                    <span>
+                      • {feature.enabled ? "Enabled" : "Disabled"}
+                    </span>
                   </div>
                 </motion.div>
               ))
