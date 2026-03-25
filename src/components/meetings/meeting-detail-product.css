@@ -325,10 +325,10 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
 
-/* Two-column layout: one card with full border (Summary + Q&A), right side rounded for Q&A */
+/* Summary | 1px line + centered handle | Q&A (IDE-style splitter) */
 .meeting-detail-split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 480px;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(260px, 480px);
   gap: 0;
   flex: 1;
   min-height: 0;
@@ -343,9 +343,102 @@
   grid-template-columns: 1fr;
 }
 
+.meeting-detail-split__gutter {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+  z-index: 1;
+  cursor: default;
+}
+
+/* Single vertical hairline */
+.meeting-detail-split__gutter::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  margin-left: -0.5px;
+  background: rgba(15, 23, 42, 0.12);
+  pointer-events: none;
+  transition: background 0.15s ease;
+}
+
+.meeting-detail-split__gutter:hover::before {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+/* Round handle on the line (VS Code / Notion–style) */
+.meeting-detail-split__divider-btn {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  color: var(--lexi-text-muted);
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset,
+    0 1px 3px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.meeting-detail-split__divider-btn:hover {
+  color: var(--lexi-text);
+  border-color: rgba(15, 23, 42, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 1) inset,
+    0 2px 8px rgba(15, 23, 42, 0.14);
+  transform: scale(1.05);
+}
+
+.meeting-detail-split__divider-btn:active {
+  transform: scale(0.98);
+}
+
 @media (max-width: 900px) {
-  .meeting-detail-split {
+  .meeting-detail-split:not(.meeting-detail-split--no-rail) {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(200px, 1fr);
+  }
+
+  .meeting-detail-split__gutter {
+    width: 100%;
+    min-height: 28px;
+    cursor: default;
+  }
+
+  .meeting-detail-split__gutter::before {
+    left: 0;
+    right: 0;
+    top: 50%;
+    bottom: auto;
+    width: auto;
+    height: 1px;
+    margin-left: 0;
+    margin-top: -0.5px;
+  }
+
+  .meeting-detail-split__divider-btn {
+    width: 24px;
+    height: 24px;
   }
 }
 
@@ -372,7 +465,7 @@
   box-shadow: none;
 }
 
-/* Right rail (Q&A) – divider only; outer border/radius from .meeting-detail-split */
+/* Right rail (Q&A) – left edge is .meeting-detail-split__gutter */
 .meeting-detail-rail {
   display: flex;
   flex-direction: column;
@@ -383,62 +476,19 @@
     rgba(15, 23, 42, 0.06),
     transparent 65%
   );
-  border-left: 1px solid rgba(15, 23, 42, 0.06);
   border-top-right-radius: 16px;
   border-bottom-right-radius: 16px;
 }
 
 @media (max-width: 900px) {
   .meeting-detail-rail {
-    border-left: none;
+    border-radius: 0 0 16px 16px;
   }
 }
 
 .meeting-detail-rail__header {
   flex-shrink: 0;
   margin-bottom: 12px;
-}
-
-.meeting-detail-rail__header--row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.meeting-detail-rail__header-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.meeting-detail-rail__header--row .meeting-detail-rail__hint {
-  margin-top: 6px;
-}
-
-.meeting-detail-rail__collapse {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  margin-top: -2px;
-  padding: 0;
-  color: var(--lexi-text-muted);
-  background: rgba(15, 23, 42, 0.04);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 8px;
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.meeting-detail-rail__collapse:hover {
-  color: var(--lexi-text);
-  background: rgba(15, 23, 42, 0.07);
-  border-color: rgba(15, 23, 42, 0.12);
 }
 
 .meeting-detail-rail__label {

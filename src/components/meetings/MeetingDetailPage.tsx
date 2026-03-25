@@ -793,7 +793,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     title="Collapse Q&A"
                     aria-label="Collapse Q&A"
                   >
-                    <ChevronRight size={18} strokeWidth={2} />
+                    <ChevronRight size={14} strokeWidth={2} />
                   </button>
                 </div>
               )}
