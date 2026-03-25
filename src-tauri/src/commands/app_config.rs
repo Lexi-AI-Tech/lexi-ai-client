@@ -14,7 +14,8 @@ use tauri_plugin_autostart::ManagerExt;
 use crate::api_endpoints::app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::commands::shortcuts::Shortcut;
-use crate::state::{ActionHotkeyWatchState, HotkeyWatchState};
+use crate::state::{ActionHotkeyWatchState, HotkeyWatchState, OnboardingRecordingDryRun};
+use std::sync::atomic::Ordering;
 use crate::utils;
 
 /// Application configuration structure
@@ -471,4 +472,67 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(),
             Err(format!("Network error: {}", e))
         }
     }
+}
+
+/// Fallback when server default-hotkeys API is unavailable (typical macOS defaults).
+fn local_onboarding_hotkey_fallback() -> DefaultHotkeysResponse {
+    DefaultHotkeysResponse {
+        hotkeys: vec!["Fn".to_string()],
+        action_hotkeys: vec!["Fn+Control".to_string()],
+    }
+}
+
+/// Onboarding hotkey step: avoid transcription/actions API on recording stop; listener uses server defaults (or local fallback).
+#[tauri::command]
+pub async fn begin_onboarding_hotkey_dry_run(
+    app: AppHandle,
+    dry_run: tauri::State<'_, OnboardingRecordingDryRun>,
+) -> Result<DefaultHotkeysResponse, String> {
+    dry_run.0.store(true, Ordering::SeqCst);
+
+    let defaults = match get_default_hotkeys(app.clone()).await {
+        Ok(d) => d,
+        Err(e) => {
+            println!(
+                "⚠️  begin_onboarding_hotkey_dry_run: using local fallback ({})",
+                e
+            );
+            local_onboarding_hotkey_fallback()
+        }
+    };
+
+    if let Some(hotkey_state) = app.try_state::<HotkeyWatchState>() {
+        let _ = hotkey_state.0.send(defaults.hotkeys.clone());
+    }
+    if let Some(action_state) = app.try_state::<ActionHotkeyWatchState>() {
+        let _ = action_state.0.send(defaults.action_hotkeys.clone());
+    }
+
+    println!(
+        "🧪 Onboarding hotkey dry-run ON; listener defaults: {:?} / {:?}",
+        defaults.hotkeys, defaults.action_hotkeys
+    );
+
+    Ok(defaults)
+}
+
+#[tauri::command]
+pub async fn end_onboarding_hotkey_dry_run(
+    app: AppHandle,
+    dry_run: tauri::State<'_, OnboardingRecordingDryRun>,
+) -> Result<(), String> {
+    dry_run.0.store(false, Ordering::SeqCst);
+
+    match get_app_config(app.clone()).await {
+        Ok(cfg) => {
+            update_hotkey_state(&app, &cfg);
+            println!("🧪 Onboarding hotkey dry-run OFF (hotkeys restored from app config)");
+        }
+        Err(e) => println!(
+            "⚠️  end_onboarding_hotkey_dry_run: could not refresh app config: {}",
+            e
+        ),
+    }
+
+    Ok(())
 }

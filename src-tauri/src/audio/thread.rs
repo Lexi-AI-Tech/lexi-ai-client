@@ -9,7 +9,9 @@ use super::recorder::AudioRecorder;
 use crate::actions::processor::process_action_audio;
 use crate::assistant::processor::{process_audio, process_audio_for_doc};
 use crate::RecordingCommand;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
@@ -78,9 +80,11 @@ impl RecordingContext {
 /// # Arguments
 /// * `app_handle` - The Tauri AppHandle for emitting events
 /// * `recording_rx` - Receiver for recording commands (Start/Stop/ActionStart/ActionStop)
+/// * `onboarding_skip_backend` - When true, completed recordings do not call transcription/actions APIs
 pub fn spawn_recording_thread(
     app_handle: AppHandle,
     recording_rx: mpsc::Receiver<RecordingCommand>,
+    onboarding_skip_backend: Arc<AtomicBool>,
 ) {
     thread::spawn(move || {
         let mut ctx = RecordingContext::new();
@@ -295,6 +299,30 @@ pub fn spawn_recording_thread(
                                             app_handle_clone
                                                 .emit("recording_skipped", ())
                                                 .unwrap_or_default();
+                                        }
+                                    });
+                                } else if onboarding_skip_backend.load(Ordering::Acquire) {
+                                    println!(
+                                        "🧪 Onboarding hotkey dry-run: skipping backend processing (no transcription/actions)"
+                                    );
+                                    // Pill still shows recording → processing; emit the same completion
+                                    // events as a real run so the overlay returns to idle without calling APIs.
+                                    let app_handle_done = app_handle.clone();
+                                    let mode_done = ctx.mode;
+                                    tauri::async_runtime::spawn(async move {
+                                        match mode_done {
+                                            RecordingMode::Assistant => {
+                                                let _ = app_handle_done
+                                                    .emit("transcription_success", "");
+                                            }
+                                            RecordingMode::Action => {
+                                                let _ =
+                                                    app_handle_done.emit("action_success", "");
+                                            }
+                                            RecordingMode::Doc => {
+                                                let _ = app_handle_done
+                                                    .emit("doc_transcription_ready", "");
+                                            }
                                         }
                                     });
                                 } else {

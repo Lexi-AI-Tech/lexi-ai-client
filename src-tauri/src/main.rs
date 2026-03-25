@@ -38,6 +38,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc, Mutex};
 use tauri::{Emitter, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -79,8 +80,8 @@ use global_key_listener::start_listener;
 use google_oauth::OAuthState;
 
 use state::{
-    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, MeetingState, RoomState,
-    ShortcutCommandsCache, ShortcutCommandsState,
+    ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, MeetingState,
+    OnboardingRecordingDryRun, RoomState, ShortcutCommandsCache, ShortcutCommandsState,
 };
 use window::show_and_focus_main_window;
 
@@ -95,7 +96,10 @@ use actions::commands::{delete_action_history, get_action_history};
 use app_icon::get_app_icon;
 use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
-use commands::app_config::{get_app_config, get_default_hotkeys, update_app_config};
+use commands::app_config::{
+    begin_onboarding_hotkey_dry_run, end_onboarding_hotkey_dry_run, get_app_config,
+    get_default_hotkeys, update_app_config,
+};
 use commands::auth::{
     clear_auth_data, get_api_base_url, get_auth_data, get_auth_token, get_current_user,
     get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
@@ -271,6 +275,8 @@ pub fn main() {
             refresh_auth_token,
             get_app_config,
             get_default_hotkeys,
+            begin_onboarding_hotkey_dry_run,
+            end_onboarding_hotkey_dry_run,
             update_app_config,
             get_system_type,
             copy_to_clipboard,
@@ -402,6 +408,11 @@ pub fn main() {
                 is_recording: recording_state_arc.clone(),
             });
 
+            let onboarding_recording_dry_run = Arc::new(AtomicBool::new(false));
+            app.manage(OnboardingRecordingDryRun(
+                onboarding_recording_dry_run.clone(),
+            ));
+
             app.manage(RoomState {
                 is_recording: Mutex::new(false),
                 command_tx: Mutex::new(None),
@@ -445,7 +456,11 @@ pub fn main() {
             #[cfg(desktop)]
             {
                 // Spawn the unified recording thread
-                spawn_recording_thread(app_handle.clone(), recording_rx);
+                spawn_recording_thread(
+                    app_handle.clone(),
+                    recording_rx,
+                    onboarding_recording_dry_run,
+                );
                 // Start background meeting detector
                 meetings::detector::start_meeting_detector(app_handle.clone());
             }

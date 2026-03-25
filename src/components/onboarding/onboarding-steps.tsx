@@ -430,34 +430,28 @@ export function SetupStep({
     let cancelled = false;
     (async () => {
       try {
-        const cfg = await invoke<TauriAppConfig>("get_app_config");
+        const defaults = await invoke<{
+          hotkeys: string[];
+          action_hotkeys: string[];
+        }>("begin_onboarding_hotkey_dry_run");
         if (cancelled) return;
-        let th = cfg.hotkeys?.filter(Boolean) ?? [];
-        let ah = cfg.action_hotkeys?.filter(Boolean) ?? [];
-        if (th.length === 0 || ah.length === 0) {
-          try {
-            const defaults = await invoke<{
-              hotkeys: string[];
-              action_hotkeys: string[];
-            }>("get_default_hotkeys");
-            if (cancelled) return;
-            if (th.length === 0) th = defaults.hotkeys?.filter(Boolean) ?? [];
-            if (ah.length === 0)
-              ah = defaults.action_hotkeys?.filter(Boolean) ?? [];
-          } catch {
-            /* keep partial lists */
-          }
-        }
-        setTranscriptionHotkeys(th);
-        setActionHotkeys(ah);
+        setTranscriptionHotkeys(defaults.hotkeys?.filter(Boolean) ?? []);
+        setActionHotkeys(defaults.action_hotkeys?.filter(Boolean) ?? []);
       } catch (e) {
-        console.error("SetupStep: failed to load hotkeys", e);
+        console.error("SetupStep: begin_onboarding_hotkey_dry_run failed", e);
+        if (!cancelled) {
+          setTranscriptionHotkeys(["Fn"]);
+          setActionHotkeys(["Fn+Control"]);
+        }
       } finally {
         if (!cancelled) setConfigLoading(false);
       }
     })();
     return () => {
       cancelled = true;
+      void invoke("end_onboarding_hotkey_dry_run").catch((err) =>
+        console.error("SetupStep: end_onboarding_hotkey_dry_run", err),
+      );
     };
   }, []);
 
@@ -502,9 +496,10 @@ export function SetupStep({
       <div className="step-header">
         <h1 className="step-title">Try your shortcuts</h1>
         <p className="step-description">
-          Press and hold each shortcut once. Lexi should start listening — then
-          release to stop. This confirms both transcription and actions are wired
-          correctly.
+          These are Lexi’s default shortcuts (what most people use
+          after setup). Press and hold each once — your mic turns on, then release
+          to stop. Nothing is sent for transcription or voice actions during this
+          step; we only verify the keys work.
         </p>
         <div className="permissions-progress hotkey-test-progress" aria-label="Shortcut test progress">
           <div className="permissions-progress__track">
@@ -522,7 +517,7 @@ export function SetupStep({
       {configLoading ? (
         <div className="hotkey-test-loading">
           <Loader2 className="permission-spinner" aria-hidden />
-          <span>Loading your shortcuts…</span>
+          <span>Preparing shortcut test…</span>
         </div>
       ) : (
         <div className="hotkey-test-list">
