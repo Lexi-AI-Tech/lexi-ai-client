@@ -70,6 +70,61 @@
   gap: 0.5rem;
   font-size: 0.8125rem;
   color: var(--lexi-text-faint);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.meetings-page-header__focused-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: min(100%, 14rem);
+  padding: 0.2rem 0.45rem 0.2rem 0.35rem;
+  border-radius: 8px;
+  background: var(--lexi-surface-overlay);
+  border: 1px solid var(--lexi-border);
+}
+
+.meetings-page-header__focused-app-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.meetings-page-header__focused-app-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.meetings-page-header__focused-app-kicker {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lexi-text-faint);
+}
+
+/* Longer label: keep sentence case for readability */
+.meetings-page-header__focused-app-kicker--phrase {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.meetings-page-header__focused-app-name {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--lexi-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .meetings-page-header__badge {

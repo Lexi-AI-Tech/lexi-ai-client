@@ -399,6 +399,48 @@
   margin-bottom: 12px;
 }
 
+.meeting-detail-rail__header--row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.meeting-detail-rail__header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.meeting-detail-rail__header--row .meeting-detail-rail__hint {
+  margin-top: 6px;
+}
+
+.meeting-detail-rail__collapse {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-top: -2px;
+  padding: 0;
+  color: var(--lexi-text-muted);
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.meeting-detail-rail__collapse:hover {
+  color: var(--lexi-text);
+  background: rgba(15, 23, 42, 0.07);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
 .meeting-detail-rail__label {
   display: inline-flex;
   align-items: center;

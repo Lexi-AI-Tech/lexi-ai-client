@@ -63,6 +63,9 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   const [meetingTitleDraft, setMeetingTitleDraft] = useState("");
   const [isSavingMeetingTitle, setIsSavingMeetingTitle] = useState(false);
   const skipTitleBlurSaveRef = useRef(false);
+  const [focusedAppIconUrl, setFocusedAppIconUrl] = useState<string | null>(
+    null,
+  );
 
   const selectedMeeting = selectedMeetingId
     ? (meetings.find((m) => m.id === selectedMeetingId) ?? null)
@@ -85,6 +88,26 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
       fetchMeetings();
     }
   }, [tokens, fetchMeetings]);
+
+  const focusedAppName = (selectedMeeting?.platform ?? "").trim();
+
+  useEffect(() => {
+    if (!focusedAppName) {
+      setFocusedAppIconUrl(null);
+      return;
+    }
+    let cancelled = false;
+    invoke<string | null>("get_app_icon", { appName: focusedAppName })
+      .then((url) => {
+        if (!cancelled) setFocusedAppIconUrl(url ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setFocusedAppIconUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedAppName]);
 
   // Keep recording state stable across page unmount/remount by syncing from app-level state.
   useEffect(() => {
@@ -329,6 +352,28 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                 Live
               </span>
             )}
+            {focusedAppName ? (
+              <span
+                className="meetings-page-header__focused-app"
+                title={`Meeting detected in ${focusedAppName}`}
+              >
+                {focusedAppIconUrl ? (
+                  <img
+                    src={focusedAppIconUrl}
+                    alt=""
+                    className="meetings-page-header__focused-app-icon"
+                  />
+                ) : null}
+                <span className="meetings-page-header__focused-app-text">
+                  <span className="meetings-page-header__focused-app-kicker meetings-page-header__focused-app-kicker--phrase">
+                    Meeting detected in
+                  </span>
+                  <span className="meetings-page-header__focused-app-name">
+                    {focusedAppName}
+                  </span>
+                </span>
+              </span>
+            ) : null}
             {selectedMeetingDateLabel ? (
               <span className="meetings-page-header__date">
                 {selectedMeetingDateLabel}

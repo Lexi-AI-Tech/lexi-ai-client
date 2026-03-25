@@ -68,33 +68,21 @@
   margin-bottom: 0.35rem;
 }
 
-.action-card__date {
-  font-size: 10px;
-  color: var(--lexi-text-muted);
-  white-space: nowrap;
+/* Match transcript cards: icon + app name in the meta row. */
+.actions-cards .transcript-cell-app__icon {
+  width: 16px;
+  height: 16px;
 }
 
-.action-card__header-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  justify-content: flex-end;
-}
-
-.action-card__type {
-  font-size: 10px;
+.actions-cards .transcript-cell-app__name {
+  font-size: 11px;
   color: var(--lexi-text-faint);
-  text-transform: capitalize;
+  font-weight: 500;
 }
 
-.action-card__app-pill {
-  font-size: 10px;
-  color: var(--lexi-text-muted);
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.actions-cards .transcript-action-btn {
+  width: 26px;
+  height: 26px;
 }
 
 .action-card__top {
@@ -142,6 +130,19 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
+}
+
+.action-card__output-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.action-card__output-main .action-card__text--output {
+  flex: 1;
+  min-width: 0;
 }
 
 .action-card__audio-wrap {

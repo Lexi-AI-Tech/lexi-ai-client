@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Pause, Trash2 } from "lucide-react";
+import { Play, Pause, Trash2, Copy, Check } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { PaginatedActionHistoryResponse } from "../types";
-import { formatAppDateTime } from "../lib/dateUtils";
+import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
@@ -23,6 +23,9 @@ export const ActionsPage: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [copiedOutputId, setCopiedOutputId] = useState<string | null>(null);
+  const [appIcons, setAppIcons] = useState<Record<string, string | null>>({});
+  const appIconsRequestedRef = useRef<Set<string>>(new Set());
 
   const pageSize = 20;
 
@@ -153,6 +156,34 @@ export const ActionsPage: React.FC = () => {
     }
   }, [page, authStore.isAuthenticated, authStore.isInitialized]);
 
+  useEffect(() => {
+    if (!actionHistory?.actions?.length) return;
+    actionHistory.actions.forEach((action) => {
+      const name = (action.app_name || "").trim();
+      if (!name || appIconsRequestedRef.current.has(name)) return;
+      appIconsRequestedRef.current.add(name);
+      invoke<string | null>("get_app_icon", { appName: name })
+        .then((url) => {
+          setAppIcons((prev) => ({ ...prev, [name]: url ?? null }));
+        })
+        .catch(() => {
+          setAppIcons((prev) => ({ ...prev, [name]: null }));
+        });
+    });
+  }, [actionHistory]);
+
+  const handleCopyOutput = async (text: string, actionId: string) => {
+    try {
+      await invoke("copy_to_clipboard", { text });
+      setCopiedOutputId(actionId);
+      setTimeout(() => setCopiedOutputId(null), 250);
+      toast.success("Copied to clipboard");
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
   // Show loading while waiting for auth to initialize
   if (!authStore.isInitialized) {
     return (
@@ -250,25 +281,38 @@ export const ActionsPage: React.FC = () => {
                   initial="hidden"
                   animate="visible"
                 >
-                  {actionHistory.actions.map((action) => (
+                  {actionHistory.actions.map((action) => {
+                    const appName = (action.app_name || "").trim();
+                    const iconUrl = appName
+                      ? appIcons[appName] ?? undefined
+                      : undefined;
+
+                    return (
                       <motion.div
                         key={action.id}
                         className="action-card"
                         variants={CARD_VARIANTS}
                       >
                         <div className="action-card__header">
-                          <div className="action-card__date">
-                            {formatAppDateTime(action.created_at)}
-                          </div>
-                          <div className="action-card__header-meta">
-                            <span className="action-card__type">
-                              {action.action_type.replace("_", " ")}
-                            </span>
-                            {action.app_name ? (
-                              <span className="action-card__app-pill">
-                                {action.app_name}
-                              </span>
-                            ) : null}
+                          <div className="transcript-card__meta">
+                            <div className="transcript-card__date">
+                              {formatDateRelative(action.created_at)}
+                            </div>
+                            <div className="transcript-card__app">
+                              <div className="transcript-cell-app__content">
+                                {iconUrl ? (
+                                  <img
+                                    src={iconUrl}
+                                    alt=""
+                                    className="transcript-cell-app__icon"
+                                    title={appName || undefined}
+                                  />
+                                ) : null}
+                                <span className="transcript-cell-app__name">
+                                  {appName || "—"}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
@@ -291,7 +335,7 @@ export const ActionsPage: React.FC = () => {
 
                         {action.selected_text ? (
                           <div className="action-card__divider">
-                            <div className="action-card__label">Input</div>
+                            <div className="action-card__label">Context</div>
                             <div className="action-card__text action-card__text--clamp">
                               {action.selected_text}
                             </div>
@@ -355,14 +399,40 @@ export const ActionsPage: React.FC = () => {
                               </div>
                             ) : null}
                             {action.output_value ? (
-                              <div className="action-card__text action-card__text--output">
-                                {action.output_value}
+                              <div className="action-card__output-main">
+                                <div className="action-card__text action-card__text--output">
+                                  {action.output_value}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleCopyOutput(
+                                      action.output_value!,
+                                      action.id,
+                                    )
+                                  }
+                                  className={`transcript-action-btn transcript-action-btn--copy ${
+                                    copiedOutputId === action.id ? "copied" : ""
+                                  }`}
+                                  title={
+                                    copiedOutputId === action.id
+                                      ? "Copied!"
+                                      : "Copy result"
+                                  }
+                                >
+                                  {copiedOutputId === action.id ? (
+                                    <Check size={16} strokeWidth={2.5} />
+                                  ) : (
+                                    <Copy size={16} />
+                                  )}
+                                </button>
                               </div>
                             ) : null}
                           </div>
                         )}
                       </motion.div>
-                    ))}
+                    );
+                  })}
                 </motion.div>
 
                 {actionHistory.total_pages > 1 ? (

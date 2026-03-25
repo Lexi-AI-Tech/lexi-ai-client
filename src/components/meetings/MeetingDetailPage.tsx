@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  ArrowLeft,
+  ChevronRight,
   FileText,
   FilePlus,
   MessageCircle,
@@ -118,6 +118,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   );
   const [isLoadingSuggestedQuestions, setIsLoadingSuggestedQuestions] =
     useState(false);
+  /** Q&A rail on Summary tab: open by default; user can collapse to focus on notes */
+  const [isChatRailOpen, setIsChatRailOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const streamingForMeetingIdRef = useRef<string | null>(null);
@@ -174,6 +176,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
   useEffect(() => {
     setSuggestedQuestions(null);
+  }, [meetingId]);
+
+  useEffect(() => {
+    setIsChatRailOpen(true);
   }, [meetingId]);
 
   useEffect(() => {
@@ -489,6 +495,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     },
   };
 
+  const hasSummaryContent = activeSummary || isGeneratingSummary;
+  const showSummaryChatRail = hasSummaryContent && isChatRailOpen;
+
   return (
     <motion.div
       className="meeting-detail-product"
@@ -673,7 +682,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
           {activeTab === "summary" && (
             <motion.div
               key="summary"
-              className={`meeting-detail-split ${activeSummary || isGeneratingSummary ? "" : "meeting-detail-split--no-rail"}`}
+              className={`meeting-detail-split ${showSummaryChatRail ? "" : "meeting-detail-split--no-rail"}`}
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
@@ -689,6 +698,21 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                       AI Summary
                     </h3>
                     <div className="meeting-detail-summary-panel__actions">
+                      {hasSummaryContent && !isChatRailOpen && (
+                        <button
+                          type="button"
+                          className="meeting-detail-btn meeting-detail-btn--secondary"
+                          onClick={() => setIsChatRailOpen(true)}
+                          title="Show Q&A"
+                        >
+                          <MessageCircle
+                            size={14}
+                            className="meeting-detail-btn__icon"
+                            aria-hidden
+                          />
+                          Q&A
+                        </button>
+                      )}
                       {activeSummary && (
                         <button
                           type="button"
@@ -756,7 +780,24 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                   </div>
                 </div>
               </div>
-              {(activeSummary || isGeneratingSummary) && (
+              {showSummaryChatRail && (
+                <div
+                  className="meeting-detail-split__gutter"
+                  role="separator"
+                  aria-orientation="vertical"
+                >
+                  <button
+                    type="button"
+                    className="meeting-detail-split__divider-btn"
+                    onClick={() => setIsChatRailOpen(false)}
+                    title="Collapse Q&A"
+                    aria-label="Collapse Q&A"
+                  >
+                    <ChevronRight size={18} strokeWidth={2} />
+                  </button>
+                </div>
+              )}
+              {showSummaryChatRail && (
                 <aside className="meeting-detail-rail">
                   <div className="meeting-detail-rail__header">
                     <span className="meeting-detail-rail__label">
