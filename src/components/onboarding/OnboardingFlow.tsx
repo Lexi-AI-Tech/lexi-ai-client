@@ -16,7 +16,6 @@ const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];
 export const OnboardingFlow: React.FC = () => {
   const { currentStep, nextStep, previousStep, completeOnboarding } =
     useOnboardingStore();
-  const hotkey: string | null = null;
   const currentStepIndex = (() => {
     switch (currentStep) {
       case "welcome":
@@ -79,7 +78,6 @@ export const OnboardingFlow: React.FC = () => {
                   onNext={nextStep}
                   onBack={previousStep}
                   showBack={showBack}
-                  hotkey={hotkey}
                 />
               )}
               {currentStepIndex === 3 && (
@@ -88,7 +86,6 @@ export const OnboardingFlow: React.FC = () => {
                   onComplete={completeOnboarding}
                   onBack={previousStep}
                   showBack={showBack}
-                  hotkey={hotkey}
                 />
               )}
             </AnimatePresence>

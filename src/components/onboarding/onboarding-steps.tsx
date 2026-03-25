@@ -14,6 +14,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAuthStore } from "../../store/authStore";
+import type { TauriAppConfig } from "../../types";
 import { GoogleLoginButton } from "../auth/GoogleLoginButton";
 
 const stepVariants = {
@@ -407,39 +408,211 @@ export function PermissionsStep({
   );
 }
 
-// Step 3: Setup (Global Shortcut) – display only, no reassignment
+// Step 3: Hotkeys — show transcription + action combos; user must trigger each once
 export function SetupStep({
   onNext,
   onBack,
   showBack,
-  hotkey,
 }: {
   onNext: () => void | Promise<void>;
   onBack?: () => void | Promise<void>;
   showBack?: boolean;
-  hotkey: string | null;
 }) {
+  const [configLoading, setConfigLoading] = useState(true);
+  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(
+    [],
+  );
+  const [actionHotkeys, setActionHotkeys] = useState<string[]>([]);
+  const [transcriptionTested, setTranscriptionTested] = useState(false);
+  const [actionTested, setActionTested] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cfg = await invoke<TauriAppConfig>("get_app_config");
+        if (cancelled) return;
+        let th = cfg.hotkeys?.filter(Boolean) ?? [];
+        let ah = cfg.action_hotkeys?.filter(Boolean) ?? [];
+        if (th.length === 0 || ah.length === 0) {
+          try {
+            const defaults = await invoke<{
+              hotkeys: string[];
+              action_hotkeys: string[];
+            }>("get_default_hotkeys");
+            if (cancelled) return;
+            if (th.length === 0) th = defaults.hotkeys?.filter(Boolean) ?? [];
+            if (ah.length === 0)
+              ah = defaults.action_hotkeys?.filter(Boolean) ?? [];
+          } catch {
+            /* keep partial lists */
+          }
+        }
+        setTranscriptionHotkeys(th);
+        setActionHotkeys(ah);
+      } catch (e) {
+        console.error("SetupStep: failed to load hotkeys", e);
+      } finally {
+        if (!cancelled) setConfigLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let disposed = false;
+    const unsub: Array<() => void> = [];
+    listen("recording_started", () => {
+      if (!disposed) setTranscriptionTested(true);
+    }).then((u) => {
+      if (disposed) u();
+      else unsub.push(u);
+    });
+    listen("action_recording_started", () => {
+      if (!disposed) setActionTested(true);
+    }).then((u) => {
+      if (disposed) u();
+      else unsub.push(u);
+    });
+    return () => {
+      disposed = true;
+      unsub.forEach((u) => u());
+    };
+  }, []);
+
+  const verifiedCount =
+    (transcriptionTested ? 1 : 0) + (actionTested ? 1 : 0);
+  const canContinue =
+    !configLoading &&
+    transcriptionHotkeys.length > 0 &&
+    actionHotkeys.length > 0 &&
+    transcriptionTested &&
+    actionTested;
+
   return (
     <motion.div
       variants={stepVariants}
       initial="initial"
       animate="animate"
       exit="exit"
-      className="onboarding-step-content"
+      className="onboarding-step-content onboarding-step-content--hotkeys"
     >
       <div className="step-header">
-        <h1 className="step-title">Global Shortcut</h1>
+        <h1 className="step-title">Try your shortcuts</h1>
         <p className="step-description">
-          The shortcut used to activate Lexi AI while working in other apps.
+          Press and hold each shortcut once. Lexi should start listening — then
+          release to stop. This confirms both transcription and actions are wired
+          correctly.
         </p>
-      </div>
-
-      <div className="hotkey-recorder hotkey-recorder-readonly">
-        <div className="hotkey-content">
-          <div className="hotkey-label">Shortcut</div>
-          <div className="hotkey-value">{hotkey || "Fn"}</div>
+        <div className="permissions-progress hotkey-test-progress" aria-label="Shortcut test progress">
+          <div className="permissions-progress__track">
+            <div
+              className="permissions-progress__fill"
+              style={{ width: `${(verifiedCount / 2) * 100}%` }}
+            />
+          </div>
+          <span className="permissions-progress__label">
+            {verifiedCount} of 2 shortcuts verified
+          </span>
         </div>
       </div>
+
+      {configLoading ? (
+        <div className="hotkey-test-loading">
+          <Loader2 className="permission-spinner" aria-hidden />
+          <span>Loading your shortcuts…</span>
+        </div>
+      ) : (
+        <div className="hotkey-test-list">
+          <div
+            className={[
+              "hotkey-test-card",
+              transcriptionTested ? "hotkey-test-card--done" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className="hotkey-test-card__main">
+              <div className="hotkey-test-card__icon" aria-hidden>
+                <AudioWaveform className="hotkey-test-card__svg" />
+              </div>
+              <div>
+                <h3 className="hotkey-test-card__title">Transcription</h3>
+                <p className="hotkey-test-card__desc">
+                  Hold to dictate text into the active app.
+                </p>
+                <div className="hotkey-test-chips">
+                  {transcriptionHotkeys.length === 0 ? (
+                    <span className="hotkey-test-chip hotkey-test-chip--muted">
+                      Not configured
+                    </span>
+                  ) : (
+                    transcriptionHotkeys.map((h) => (
+                      <kbd key={h} className="hotkey-test-chip">
+                        {h}
+                      </kbd>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+            {transcriptionTested ? (
+              <div className="hotkey-test-status hotkey-test-status--ok">
+                <Check className="check-icon" strokeWidth={2.5} /> Detected
+              </div>
+            ) : (
+              <span className="hotkey-test-status hotkey-test-status--pending">
+                Press shortcut…
+              </span>
+            )}
+          </div>
+
+          <div
+            className={[
+              "hotkey-test-card",
+              actionTested ? "hotkey-test-card--done" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className="hotkey-test-card__main">
+              <div className="hotkey-test-card__icon" aria-hidden>
+                <Sparkles className="hotkey-test-card__svg" />
+              </div>
+              <div>
+                <h3 className="hotkey-test-card__title">Actions</h3>
+                <p className="hotkey-test-card__desc">
+                  Hold to run a voice command (tasks, search, and more).
+                </p>
+                <div className="hotkey-test-chips">
+                  {actionHotkeys.length === 0 ? (
+                    <span className="hotkey-test-chip hotkey-test-chip--muted">
+                      Not configured
+                    </span>
+                  ) : (
+                    actionHotkeys.map((h) => (
+                      <kbd key={h} className="hotkey-test-chip">
+                        {h}
+                      </kbd>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+            {actionTested ? (
+              <div className="hotkey-test-status hotkey-test-status--ok">
+                <Check className="check-icon" strokeWidth={2.5} /> Detected
+              </div>
+            ) : (
+              <span className="hotkey-test-status hotkey-test-status--pending">
+                Press shortcut…
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="step-actions">
         <div className="step-actions-row">
@@ -454,6 +627,7 @@ export function SetupStep({
             </button>
           )}
           <button
+            disabled={!canContinue}
             className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
             onClick={onNext}
           >
@@ -470,15 +644,39 @@ export function TryItStep({
   onComplete,
   onBack,
   showBack,
-  hotkey,
+  hotkey: hotkeyProp,
 }: {
   onComplete: () => void | Promise<void>;
   onBack?: () => void | Promise<void>;
   showBack?: boolean;
-  hotkey: string | null;
+  hotkey?: string | null;
 }) {
   const [isListening, setIsListening] = useState(false);
   const [setupWorking, setSetupWorking] = useState(false);
+  const [hotkeyLabel, setHotkeyLabel] = useState<string | null>(
+    hotkeyProp ?? null,
+  );
+
+  useEffect(() => {
+    if (hotkeyProp != null) setHotkeyLabel(hotkeyProp);
+  }, [hotkeyProp]);
+
+  useEffect(() => {
+    if (hotkeyProp != null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const cfg = await invoke<TauriAppConfig>("get_app_config");
+        const first = cfg.hotkeys?.find(Boolean);
+        if (!cancelled && first) setHotkeyLabel(first);
+      } catch {
+        if (!cancelled) setHotkeyLabel("Fn");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hotkeyProp]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -520,8 +718,8 @@ export function TryItStep({
         <h1 className="step-title">Give it a try</h1>
         <p className="step-description">
           Click in the box below, then hold{" "}
-          <span className="hotkey-badge">{hotkey || "Fn"}</span> and speak to
-          try a transcription.
+          <span className="hotkey-badge">{hotkeyLabel ?? "Fn"}</span> and speak
+          to try a transcription.
         </p>
       </div>
 
@@ -578,46 +776,65 @@ export function TryItStep({
   );
 }
 
-/** Same abstract “card + grid + aura + curves” as sign-in; permissions uses elevated styling in CSS. */
+/**
+ * Abstract panel: sign-in (calm) → permissions → shortcuts (most intense).
+ * Visual “growth” matches onboarding progress.
+ */
 function OnboardingAbstractVisual({
   variant,
   motionKey,
 }: {
-  variant: "welcome" | "permissions";
+  variant: "welcome" | "permissions" | "shortcuts";
   motionKey: string;
 }) {
-  const elevated = variant === "permissions";
+  const level =
+    variant === "welcome" ? 0 : variant === "permissions" ? 1 : 2;
+  const elevated = level >= 1;
+  const peak = level >= 2;
+
+  const panelClass = peak
+    ? "visual-side--shortcuts-panel"
+    : elevated
+      ? "visual-side--permissions-panel"
+      : "";
+
+  const swMain = peak ? "1.75" : elevated ? "1.55" : "1.25";
+  const swSecond = peak ? "1.2" : elevated ? "1.05" : "0.75";
 
   return (
     <div
-      className={[
-        "visual-side",
-        "visual-side--welcome",
-        elevated ? "visual-side--permissions-panel" : "",
-      ]
+      className={["visual-side", "visual-side--welcome", panelClass]
         .filter(Boolean)
         .join(" ")}
     >
       <motion.div
         key={motionKey}
-        initial={{ opacity: 0, y: elevated ? 8 : 0 }}
+        initial={{ opacity: 0, y: peak ? 12 : elevated ? 8 : 0 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{
-          duration: elevated ? 0.55 : 0.6,
+          duration: peak ? 0.5 : elevated ? 0.55 : 0.6,
           ease: [0.22, 1, 0.36, 1],
         }}
         className={[
           "visual-welcome",
-          elevated ? "visual-welcome--permissions" : "",
+          elevated && "visual-welcome--permissions",
+          peak && "visual-welcome--shortcuts",
         ]
           .filter(Boolean)
           .join(" ")}
       >
         {elevated && <div className="visual-welcome-rim" aria-hidden />}
+        {peak && (
+          <div
+            className="visual-welcome-rim visual-welcome-rim--outer"
+            aria-hidden
+          />
+        )}
         <div
           className={[
             "visual-welcome-grid",
-            elevated ? "visual-welcome-grid--permissions" : "",
+            elevated && "visual-welcome-grid--permissions",
+            peak && "visual-welcome-grid--shortcuts",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -629,10 +846,17 @@ function OnboardingAbstractVisual({
         {elevated && (
           <div className="visual-welcome-glow visual-welcome-glow--d" aria-hidden />
         )}
+        {peak && (
+          <>
+            <div className="visual-welcome-glow visual-welcome-glow--e" aria-hidden />
+            <div className="visual-welcome-glow visual-welcome-glow--f" aria-hidden />
+          </>
+        )}
         <svg
           className={[
             "visual-welcome-curve",
-            elevated ? "visual-welcome-curve--permissions" : "",
+            elevated && "visual-welcome-curve--permissions",
+            peak && "visual-welcome-curve--shortcuts",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -644,14 +868,14 @@ function OnboardingAbstractVisual({
           <path
             d="M0 120 C 80 40, 160 180, 200 100 S 320 20, 400 80"
             stroke="currentColor"
-            strokeWidth={elevated ? "1.55" : "1.25"}
+            strokeWidth={swMain}
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
           />
           <path
             d="M0 140 C 100 200, 200 60, 280 130 S 360 160, 400 100"
             stroke="currentColor"
-            strokeWidth={elevated ? "1.05" : "0.75"}
+            strokeWidth={swSecond}
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
           />
@@ -659,10 +883,28 @@ function OnboardingAbstractVisual({
             <path
               d="M40 95 Q 120 25, 200 88 T 380 72"
               stroke="currentColor"
-              strokeWidth="0.9"
+              strokeWidth={peak ? "1.05" : "0.9"}
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
             />
+          )}
+          {peak && (
+            <>
+              <path
+                d="M20 165 Q 100 100, 200 155 T 392 128"
+                stroke="currentColor"
+                strokeWidth="0.85"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+              <path
+                d="M60 55 Q 200 120, 340 48"
+                stroke="currentColor"
+                strokeWidth="0.65"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </>
           )}
         </svg>
       </motion.div>
@@ -670,10 +912,8 @@ function OnboardingAbstractVisual({
   );
 }
 
-// Visual Side — steps 0/1 share abstract panel (permissions is more intense); 2–3 keep emoji focal
+// Steps 0–2: abstract panel (intensity ramps); step 3 = try-it focal
 export function VisualSide({ step }: { step: number }) {
-  const icons: [string, string] = ["⌨️", "✨"];
-
   if (step === 0) {
     return <OnboardingAbstractVisual variant="welcome" motionKey="welcome-visual" />;
   }
@@ -684,11 +924,14 @@ export function VisualSide({ step }: { step: number }) {
     );
   }
 
-  const focalIndex = step - 2;
-  const emoji = icons[focalIndex] ?? "✨";
+  if (step === 2) {
+    return (
+      <OnboardingAbstractVisual variant="shortcuts" motionKey="shortcuts-visual" />
+    );
+  }
 
   return (
-    <div className={`visual-side visual-side--step visual-side--step-${step}`}>
+    <div className="visual-side visual-side--step visual-side--step-3">
       <motion.div
         key={step}
         initial={{ opacity: 0, scale: 0.92 }}
@@ -697,7 +940,7 @@ export function VisualSide({ step }: { step: number }) {
         className="visual-content"
       >
         <div className="visual-blur visual-blur--step" />
-        <div className="visual-icon">{emoji}</div>
+        <div className="visual-icon">✨</div>
       </motion.div>
     </div>
   );

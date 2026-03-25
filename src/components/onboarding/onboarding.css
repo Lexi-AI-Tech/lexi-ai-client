@@ -138,19 +138,30 @@
   box-shadow: inset 0 0 110px color-mix(in srgb, var(--lexi-primary) 11%, transparent);
 }
 
+/* Step 2 (hotkeys): peak energy — stronger than permissions (growth / progress) */
 .onboarding-visual-area[data-onboarding-step="2"] {
   background: radial-gradient(
-      ellipse 85% 65% at 25% 60%,
-      color-mix(in srgb, var(--lexi-primary-muted) 90%, transparent) 0%,
-      transparent 55%
+      ellipse 100% 82% at 50% 28%,
+      color-mix(in srgb, var(--lexi-primary-muted) 95%, transparent) 0%,
+      transparent 48%
     ),
     radial-gradient(
-      ellipse 70% 50% at 85% 25%,
-      color-mix(in srgb, var(--lexi-primary) 12%, transparent) 0%,
-      transparent 50%
+      ellipse 60% 55% at 12% 85%,
+      color-mix(in srgb, var(--lexi-primary) 22%, transparent) 0%,
+      transparent 58%
     ),
-    linear-gradient(175deg, var(--lexi-surface) 0%, var(--lexi-primary-muted) 100%);
-  box-shadow: inset 0 0 100px color-mix(in srgb, var(--lexi-primary) 10%, transparent);
+    radial-gradient(
+      ellipse 50% 48% at 92% 72%,
+      color-mix(in srgb, var(--lexi-primary) 14%, transparent) 0%,
+      transparent 55%
+    ),
+    linear-gradient(
+      172deg,
+      color-mix(in srgb, var(--lexi-primary-muted) 28%, var(--lexi-surface)) 0%,
+      var(--lexi-surface-overlay) 55%,
+      var(--lexi-surface) 100%
+    );
+  box-shadow: inset 0 0 140px color-mix(in srgb, var(--lexi-primary) 16%, transparent);
 }
 
 .onboarding-visual-area[data-onboarding-step="3"] {
@@ -357,8 +368,118 @@
   opacity: 0.34;
 }
 
-.visual-welcome--permissions .visual-welcome-curve path:nth-of-type(3) {
+.visual-welcome--permissions:not(.visual-welcome--shortcuts)
+  .visual-welcome-curve
+  path:nth-of-type(3) {
   opacity: 0.28;
+}
+
+/* Shortcuts step: tallest intensity on abstract card */
+.visual-side--shortcuts-panel {
+  padding: 3rem 3.5rem;
+}
+
+.visual-welcome-rim--outer {
+  inset: 4px;
+  border-radius: 1.35rem;
+  border: 1px solid color-mix(in srgb, var(--lexi-primary) 30%, transparent);
+  opacity: 0.5;
+}
+
+.visual-welcome-grid--shortcuts {
+  background-size: 20px 20px;
+  opacity: 0.62;
+  mask-image: radial-gradient(
+    ellipse 82% 78% at 50% 48%,
+    black 0%,
+    transparent 74%
+  );
+}
+
+.visual-welcome--shortcuts {
+  width: min(100%, 32rem);
+  border: 1px solid color-mix(in srgb, var(--lexi-primary) 38%, var(--lexi-border));
+  background: color-mix(
+    in srgb,
+    var(--lexi-surface-elevated) 62%,
+    var(--lexi-primary-muted)
+  );
+  box-shadow:
+    var(--lexi-shadow-lg),
+    0 0 0 1px color-mix(in srgb, var(--lexi-primary) 14%, transparent),
+    0 0 90px -8px color-mix(in srgb, var(--lexi-primary) 22%, transparent),
+    0 32px 80px -16px color-mix(in srgb, var(--lexi-primary-hover) 18%, transparent);
+}
+
+.visual-welcome--shortcuts .visual-welcome-glow--a {
+  width: 62%;
+  height: 62%;
+  opacity: 0.68;
+  filter: blur(64px);
+}
+
+.visual-welcome--shortcuts .visual-welcome-glow--b {
+  width: 52%;
+  height: 52%;
+  opacity: 0.62;
+  filter: blur(58px);
+  background: color-mix(in srgb, var(--lexi-primary) 24%, transparent);
+}
+
+.visual-welcome--shortcuts .visual-welcome-glow--c {
+  opacity: 0.55;
+  filter: blur(48px);
+}
+
+.visual-welcome--shortcuts .visual-welcome-glow--d {
+  opacity: 0.55;
+  filter: blur(40px);
+}
+
+.visual-welcome-glow--e {
+  width: 38%;
+  height: 38%;
+  bottom: 6%;
+  left: 6%;
+  background: color-mix(in srgb, var(--lexi-primary-hover) 20%, transparent);
+  opacity: 0.5;
+  filter: blur(42px);
+}
+
+.visual-welcome-glow--f {
+  width: 22%;
+  height: 22%;
+  top: 18%;
+  left: 48%;
+  background: color-mix(in srgb, var(--lexi-primary-muted) 80%, transparent);
+  opacity: 0.7;
+  filter: blur(28px);
+}
+
+.visual-welcome-curve--shortcuts {
+  height: 50%;
+  bottom: 11%;
+  color: var(--lexi-primary-hover);
+}
+
+.visual-welcome--shortcuts .visual-welcome-curve path:nth-of-type(1) {
+  opacity: 0.58;
+}
+
+.visual-welcome--shortcuts .visual-welcome-curve path:nth-of-type(2) {
+  opacity: 0.42;
+}
+
+.visual-welcome--shortcuts .visual-welcome-curve path:nth-of-type(3) {
+  opacity: 0.36;
+}
+
+.visual-welcome--shortcuts .visual-welcome-curve path:nth-of-type(4) {
+  opacity: 0.32;
+}
+
+.visual-welcome--shortcuts .visual-welcome-curve path:nth-of-type(5) {
+  opacity: 0.26;
 }
 
 .visual-side--step-3 .visual-icon {
@@ -384,11 +505,6 @@
   filter: blur(80px);
 }
 
-.visual-side--step-2 .visual-blur--step {
-  opacity: 1;
-  background: color-mix(in srgb, var(--lexi-primary) 12%, transparent);
-}
-
 .visual-side--step-3 .visual-blur--step {
   opacity: 1;
   background: color-mix(in srgb, var(--lexi-primary) 18%, transparent);
@@ -402,12 +518,6 @@
   filter: grayscale(25%) brightness(1.08) contrast(0.92);
   opacity: 0.82;
   line-height: 1;
-}
-
-.visual-side--step-2 .visual-icon {
-  font-size: 13rem;
-  filter: grayscale(12%) brightness(1.05);
-  opacity: 0.88;
 }
 
 .visual-side--step-3 .visual-icon {
@@ -662,6 +772,10 @@
   max-width: 26rem;
 }
 
+.onboarding-form-wrapper:has(.onboarding-step-content--hotkeys) {
+  max-width: 26rem;
+}
+
 .permissions-progress {
   display: flex;
   flex-direction: column;
@@ -863,6 +977,166 @@
 .check-icon-small {
   width: 1rem;
   height: 1rem;
+}
+
+/* ============================================
+   HOTKEY TEST STEP (Lexi theme)
+   ============================================ */
+
+.hotkey-test-progress {
+  padding-top: 0.125rem;
+}
+
+.hotkey-test-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  font-size: 0.9375rem;
+  color: var(--lexi-text-muted);
+  border-radius: 0.75rem;
+  border: 1px dashed var(--lexi-border);
+  background: color-mix(in srgb, var(--lexi-surface-overlay) 50%, transparent);
+}
+
+.hotkey-test-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.hotkey-test-card {
+  padding: 1.125rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--lexi-border-subtle);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  background: color-mix(in srgb, var(--lexi-surface-elevated) 92%, transparent);
+  box-shadow: var(--lexi-shadow-sm);
+  transition:
+    border-color 0.25s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.hotkey-test-card--done {
+  border-color: color-mix(in srgb, var(--lexi-primary) 34%, var(--lexi-border));
+  background: color-mix(
+    in srgb,
+    var(--lexi-primary-muted) 32%,
+    var(--lexi-surface-elevated)
+  );
+  box-shadow: var(--lexi-shadow-sm),
+    0 0 0 1px color-mix(in srgb, var(--lexi-primary) 12%, transparent);
+}
+
+.hotkey-test-card__main {
+  display: flex;
+  gap: 1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.hotkey-test-card__icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.625rem;
+  background: color-mix(in srgb, var(--lexi-surface-overlay) 88%, transparent);
+  border: 1px solid var(--lexi-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lexi-primary-hover);
+  flex-shrink: 0;
+}
+
+.hotkey-test-card--done .hotkey-test-card__icon {
+  background: color-mix(
+    in srgb,
+    var(--lexi-primary-muted) 55%,
+    var(--lexi-surface-elevated)
+  );
+  border-color: color-mix(in srgb, var(--lexi-primary) 22%, var(--lexi-border-subtle));
+  color: var(--lexi-primary);
+}
+
+.hotkey-test-card__svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.hotkey-test-card__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--lexi-text);
+}
+
+.hotkey-test-card__desc {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--lexi-text-faint);
+  line-height: 1.45;
+}
+
+.hotkey-test-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.65rem;
+}
+
+.hotkey-test-chip {
+  font-family: var(--lexi-font-mono, ui-monospace, monospace);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--lexi-surface-overlay);
+  border: 1px solid var(--lexi-border);
+  color: var(--lexi-text);
+  line-height: 1.2;
+}
+
+.hotkey-test-chip--muted {
+  font-family: var(--lexi-font-body);
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--lexi-text-faint);
+  border-style: dashed;
+}
+
+.hotkey-test-status {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  align-self: center;
+}
+
+.hotkey-test-status--pending {
+  color: var(--lexi-text-faint);
+  text-align: right;
+  max-width: 7rem;
+  line-height: 1.35;
+}
+
+.hotkey-test-status--ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--lexi-primary-hover);
+  background: var(--lexi-primary-muted);
+  border: 1px solid
+    color-mix(in srgb, var(--lexi-primary) 22%, var(--lexi-border-subtle));
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.5rem;
+}
+
+.hotkey-test-status--ok .check-icon {
+  flex-shrink: 0;
 }
 
 /* ============================================
