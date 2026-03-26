@@ -708,7 +708,7 @@ export const Pill: React.FC = () => {
     }
   };
 
-  const handleMouseDown = async (e: React.MouseEvent) => {
+  const handleMouseDown = async () => {
     // Start dragging the window when clicking on the pill
     try {
       const window = getCurrentWindow();
@@ -892,10 +892,10 @@ export const Pill: React.FC = () => {
   } else if (status === "meeting_detected") {
     baseStyle.width = "100%";
     baseStyle.height = "100%";
-    baseStyle.borderRadius = "18px";
+    baseStyle.borderRadius = "26px";
     baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
     baseStyle.boxShadow = "none";
-    baseStyle.cursor = "pointer";
+    baseStyle.cursor = "move";
   }
 
   return (
@@ -911,8 +911,8 @@ export const Pill: React.FC = () => {
           let accent: string;
           let speed: string;
           if (status === "meeting_detected") {
-            // Meeting prompt: amber
-            accent = "#f59e0b";
+            // Meeting prompt: app primary
+            accent = "var(--lexi-primary, #6b8f6e)";
             speed = "2s";
           } else if (status === "speaking") {
             // Speaking/TTS: purple
@@ -929,10 +929,10 @@ export const Pill: React.FC = () => {
             speed = "2s";
           }
 
-          // Use a single fixed viewBox so the ring is consistent across status changes.
-          // (Window size can lag behind status, causing letterboxing if viewBox varies.)
-          const VIEW_W = 100;
-          const VIEW_H = 36;
+          // Match meeting viewbox to meeting window size so corners stay crisp.
+          const VIEW_W = status === "meeting_detected" ? 130 : 100;
+          const VIEW_H = status === "meeting_detected" ? 52 : 36;
+          const RADIUS = VIEW_H / 2;
 
           const stroke = 3;
           const x = stroke / 2;
@@ -968,8 +968,8 @@ export const Pill: React.FC = () => {
                   y={y}
                   width={rw}
                   height={rh}
-                  rx={18}
-                  ry={18}
+                  rx={RADIUS}
+                  ry={RADIUS}
                   pathLength={100}
                   stroke="rgba(0, 0, 0, 0.45)"
                   strokeWidth={stroke + 1}
@@ -979,8 +979,8 @@ export const Pill: React.FC = () => {
                   y={y}
                   width={rw}
                   height={rh}
-                  rx={18}
-                  ry={18}
+                  rx={RADIUS}
+                  ry={RADIUS}
                   pathLength={100}
                   stroke="rgba(255, 255, 255, 0.18)"
                   strokeWidth={stroke}
@@ -990,16 +990,36 @@ export const Pill: React.FC = () => {
                   y={y}
                   width={rw}
                   height={rh}
-                  rx={18}
-                  ry={18}
+                  rx={RADIUS}
+                  ry={RADIUS}
                   pathLength={100}
                   stroke={accent}
                   strokeWidth={stroke}
                   strokeLinecap="round"
-                  strokeDasharray="12 88"
+                  strokeDasharray={status === "meeting_detected" ? "100" : "12 88"}
+                  strokeDashoffset={
+                    status === "meeting_detected"
+                      ? 100 *
+                        (1 -
+                          Math.max(
+                            0,
+                            Math.min(1, meetingCountdown / MEETING_COUNTDOWN_SECONDS),
+                          ))
+                      : undefined
+                  }
                   style={{
-                    animation: `dashFlow ${speed} linear infinite`,
-                    filter: `drop-shadow(0 0 2px ${accent}) drop-shadow(0 0 6px ${accent})`,
+                    animation:
+                      status === "meeting_detected"
+                        ? undefined
+                        : `dashFlow ${speed} linear infinite`,
+                    transition:
+                      status === "meeting_detected"
+                        ? "stroke-dashoffset 0.35s ease-out"
+                        : undefined,
+                    filter:
+                      status === "meeting_detected"
+                        ? `drop-shadow(0 0 3px ${accent}) drop-shadow(0 0 9px ${accent})`
+                        : `drop-shadow(0 0 2px ${accent}) drop-shadow(0 0 6px ${accent})`,
                   }}
                 />
               </svg>
@@ -1009,7 +1029,7 @@ export const Pill: React.FC = () => {
                 style={{
                   position: "absolute",
                   inset: "4px",
-                  borderRadius: "14px",
+                  borderRadius: `${Math.max(10, RADIUS - 4)}px`,
                   backgroundColor: getBackgroundColor(),
                   pointerEvents: "none",
                 }}
@@ -1037,7 +1057,7 @@ export const Pill: React.FC = () => {
           {status === "meeting_detected" ? (
             /* Meeting detected: start + dismiss icon buttons */
             (() => {
-              const pillButtonStyle: React.CSSProperties = {
+              const baseButtonStyle: React.CSSProperties = {
                 appearance: "none",
                 border: "1px solid rgba(255, 255, 255, 0.14)",
                 background: "rgba(255, 255, 255, 0.06)",
@@ -1052,7 +1072,8 @@ export const Pill: React.FC = () => {
                 outline: "none",
                 boxShadow:
                   "0 10px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)",
-                transition: "transform 0.12s ease, background 0.18s ease",
+                transition:
+                  "transform 0.12s ease, background 0.18s ease, border-color 0.18s ease",
               };
 
               const handleButtonMouseDown = (evt: React.MouseEvent) => {
@@ -1082,16 +1103,26 @@ export const Pill: React.FC = () => {
                       evt.stopPropagation();
                       await startMeetingFromPill();
                     }}
-                    style={pillButtonStyle}
+                    style={{
+                      ...baseButtonStyle,
+                      background:
+                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 24%, rgba(255,255,255,0.03))",
+                      border:
+                        "1px solid color-mix(in srgb, var(--lexi-primary, #6b8f6e) 42%, rgba(255,255,255,0.18))",
+                    }}
                     onMouseEnter={(evt) => {
                       (evt.currentTarget as HTMLButtonElement).style.background =
-                        "rgba(255, 255, 255, 0.10)";
+                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 34%, rgba(255,255,255,0.04))";
+                      (evt.currentTarget as HTMLButtonElement).style.borderColor =
+                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 58%, rgba(255,255,255,0.22))";
                       (evt.currentTarget as HTMLButtonElement).style.transform =
                         "scale(1.04)";
                     }}
                     onMouseLeave={(evt) => {
                       (evt.currentTarget as HTMLButtonElement).style.background =
-                        "rgba(255, 255, 255, 0.06)";
+                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 24%, rgba(255,255,255,0.03))";
+                      (evt.currentTarget as HTMLButtonElement).style.borderColor =
+                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 42%, rgba(255,255,255,0.18))";
                       (evt.currentTarget as HTMLButtonElement).style.transform =
                         "scale(1)";
                     }}
@@ -1108,7 +1139,7 @@ export const Pill: React.FC = () => {
                       evt.stopPropagation();
                       await resetPillToIdle();
                     }}
-                    style={pillButtonStyle}
+                    style={baseButtonStyle}
                     onMouseEnter={(evt) => {
                       (evt.currentTarget as HTMLButtonElement).style.background =
                         "rgba(255, 255, 255, 0.10)";
