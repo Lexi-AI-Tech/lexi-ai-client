@@ -184,9 +184,6 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                   >
                     <div className="meetings-list-page__card-body">
                       <div className="meetings-list-page__card-meta-row">
-                        <span className="meetings-list-page__card-badge">
-                          {m.platform || "Lexi AI"}
-                        </span>
                         {activeRecordingMeetingId === m.id && (
                           <span className="meetings-page-header__badge meetings-page-header__badge--live">
                             <span className="meetings-page-header__badge-dot" />
