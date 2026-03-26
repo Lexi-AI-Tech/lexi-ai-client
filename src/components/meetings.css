@@ -830,3 +830,86 @@
   justify-content: center;
   color: #9ca3af;
 }
+
+/* ==========================
+   Meetings Theme Alignment
+   ========================== */
+.meetings-tabs__btn {
+  color: var(--lexi-text-muted);
+  border-color: var(--lexi-border);
+  background-color: var(--lexi-surface-elevated);
+}
+
+.meetings-tabs__btn.btn--primary {
+  background-color: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
+}
+
+.meetings-actions__resume.recording {
+  background-color: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
+}
+
+.meetings-actions__end {
+  background-color: var(--lexi-danger);
+  color: #fff;
+}
+
+.meetings-transcript {
+  background-color: var(--lexi-surface-elevated);
+  border-color: var(--lexi-border);
+}
+
+.meetings-transcript__empty,
+.meetings-transcript-initializing__text,
+.meetings-transcript__time,
+.meetings-qa-messages__empty,
+.meetings-empty-state {
+  color: var(--lexi-text-faint);
+}
+
+.meetings-transcript-initializing__spinner,
+.meetings-summary-generating__spinner {
+  border-color: var(--lexi-border);
+  border-top-color: var(--lexi-primary);
+}
+
+.meetings-transcript__bubble--user,
+.meetings-qa-msg--user {
+  background-color: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
+}
+
+.meetings-transcript__bubble--system,
+.meetings-transcript__bubble--unknown,
+.meetings-qa-msg--assistant {
+  background-color: var(--lexi-surface-overlay);
+  color: var(--lexi-text);
+}
+
+.meetings-transcript-notes,
+.meetings-qa-form {
+  border-top-color: var(--lexi-border);
+}
+
+.meetings-transcript-notes__input,
+.meetings-qa-form__input {
+  border-color: var(--lexi-border);
+  background: var(--lexi-surface-elevated);
+  color: var(--lexi-text);
+}
+
+.meetings-transcript-notes__input:focus,
+.meetings-qa-form__input:focus {
+  outline: none;
+  border-color: var(--lexi-primary);
+}
+
+.meetings-qa-header {
+  border-bottom-color: var(--lexi-border);
+  background-color: var(--lexi-surface-overlay);
+}
+
+.meetings-qa-header h4 {
+  color: var(--lexi-text);
+}

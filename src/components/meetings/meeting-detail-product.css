@@ -1330,3 +1330,86 @@
   background: var(--lexi-primary-hover);
   border-color: var(--lexi-primary-hover);
 }
+
+/* ==========================
+   Meeting Detail Theme Alignment
+   ========================== */
+.meeting-detail-hero,
+.meeting-detail-toolbar {
+  background: var(--lexi-surface-elevated);
+  border-bottom-color: var(--lexi-border);
+}
+
+.meeting-detail-tabs {
+  background: var(--lexi-surface-overlay);
+}
+
+.meeting-detail-tabs__btn {
+  color: var(--lexi-text-muted);
+}
+
+.meeting-detail-tabs__btn:hover:not(:disabled),
+.meeting-detail-tabs__btn--active {
+  color: var(--lexi-text);
+  background: var(--lexi-surface-elevated);
+}
+
+.meeting-detail-controls__btn--resume,
+.meeting-detail-controls__btn--recording {
+  background: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
+  box-shadow: var(--lexi-shadow-sm);
+}
+
+.meeting-detail-controls__btn--resume:hover:not(:disabled),
+.meeting-detail-controls__btn--recording:hover:not(:disabled) {
+  background: var(--lexi-primary-hover);
+}
+
+.meeting-detail-controls__btn--end {
+  background: var(--lexi-danger-muted);
+  color: var(--lexi-danger);
+  border: 1px solid color-mix(in srgb, var(--lexi-danger) 20%, transparent);
+}
+
+.meeting-detail-controls__btn--end:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--lexi-danger-muted) 85%, var(--lexi-danger) 15%);
+}
+
+.meeting-detail-toolbar__delete {
+  color: var(--lexi-text-faint);
+}
+
+.meeting-detail-toolbar__delete:hover:not(:disabled) {
+  color: var(--lexi-danger);
+  background: var(--lexi-danger-muted);
+}
+
+.meeting-detail-card,
+.meeting-detail-summary-panel,
+.meeting-detail-chat-panel,
+.meeting-detail-transcript-panel {
+  background: var(--lexi-surface-elevated);
+  border-color: var(--lexi-border);
+}
+
+.meeting-detail-rail__input,
+.meetings-create-doc-input,
+.meetings-create-doc-textarea {
+  background: var(--lexi-surface-elevated);
+  border-color: var(--lexi-border);
+  color: var(--lexi-text);
+}
+
+.meeting-detail-rail__input::placeholder,
+.meetings-create-doc-input::placeholder,
+.meetings-create-doc-textarea::placeholder {
+  color: var(--lexi-text-faint);
+}
+
+.meeting-detail-rail__input:focus,
+.meetings-create-doc-input:focus,
+.meetings-create-doc-textarea:focus {
+  border-color: var(--lexi-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lexi-primary) 18%, transparent);
+}
