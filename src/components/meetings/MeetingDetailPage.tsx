@@ -954,7 +954,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         </div>
                         {isLoadingSuggestedQuestions ? (
                           <p className="meeting-detail-rail__suggestions-loading">
-                            Loading…
+                            <span
+                              className="skeleton-block app-page-subtitle-skeleton"
+                              style={{ width: 170, height: 12, borderRadius: 10 }}
+                            />
                           </p>
                         ) : (
                           (suggestedQuestions && suggestedQuestions.length > 0

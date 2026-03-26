@@ -13,6 +13,9 @@ interface PageLoaderProps {
 export const PageLoader: React.FC<PageLoaderProps> = ({ className }) => (
   <div className={`loading-state page-loader ${className ?? ""}`.trim()}>
     <div className="loading-spinner" />
-    <span>Loading...</span>
+    <div
+      className="skeleton-block page-loader__subtitle-skeleton"
+      style={{ width: 140, height: 12, borderRadius: 10 }}
+    />
   </div>
 );

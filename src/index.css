@@ -196,6 +196,10 @@ body {
   color: var(--lexi-text-faint);
 }
 
+.page-loader__subtitle-skeleton {
+  opacity: 0.85;
+}
+
 /* Sidebar logo block */
 .sidebar-logo {
   display: flex;
@@ -1747,6 +1751,12 @@ textarea.form-input {
   color: var(--lexi-text-muted);
   margin: 0;
   font-weight: 400;
+}
+
+.app-page-subtitle-skeleton {
+  display: inline-block;
+  vertical-align: middle;
+  opacity: 0.9;
 }
 
 .transcripts-page-subtitle {

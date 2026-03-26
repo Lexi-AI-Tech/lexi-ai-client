@@ -98,7 +98,12 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
 
   const subtitle =
     isLoading && docs.length === 0 ? (
-      <p className="app-page-subtitle">Loading…</p>
+      <p className="app-page-subtitle">
+        <span
+          className="skeleton-block app-page-subtitle-skeleton"
+          style={{ width: 150, height: 12, borderRadius: 10 }}
+        />
+      </p>
     ) : docs.length > 0 ? (
       <p className="app-page-subtitle">
         {docs.length} {docs.length === 1 ? "document" : "documents"}

@@ -185,7 +185,10 @@ export const NotesPage: React.FC = () => {
       </h2>
       {loading && notes.length === 0 ? (
         <p className="app-page-subtitle" style={{ marginBottom: "1.75rem" }}>
-          Loading…
+          <span
+            className="skeleton-block app-page-subtitle-skeleton"
+            style={{ width: 140, height: 12, borderRadius: 10 }}
+          />
         </p>
       ) : notes.length > 0 ? (
         <p className="app-page-subtitle" style={{ marginBottom: "1.75rem" }}>

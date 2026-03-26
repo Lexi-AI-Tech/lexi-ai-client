@@ -213,7 +213,12 @@ export const ShortcutsPage: React.FC = () => {
     <div className="transcripts-page">
       <h2 className="transcripts-page-title">Shortcuts</h2>
       {authStore.isInitialized && isLoading ? (
-        <p className="app-page-subtitle">Loading…</p>
+        <p className="app-page-subtitle">
+          <span
+            className="skeleton-block app-page-subtitle-skeleton"
+            style={{ width: 160, height: 12, borderRadius: 10 }}
+          />
+        </p>
       ) : authStore.isInitialized && shortcuts.length > 0 ? (
         <p className="app-page-subtitle">
           {shortcuts.length} {shortcuts.length === 1 ? "shortcut" : "shortcuts"}

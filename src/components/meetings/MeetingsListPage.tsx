@@ -81,7 +81,12 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
 
   const subtitle =
     isLoading && meetings.length === 0 ? (
-      <p className="app-page-subtitle">Loading…</p>
+      <p className="app-page-subtitle">
+        <span
+          className="skeleton-block app-page-subtitle-skeleton"
+          style={{ width: 170, height: 12, borderRadius: 10 }}
+        />
+      </p>
     ) : meetings.length > 0 ? (
       <p className="app-page-subtitle">
         {meetings.length} {meetings.length === 1 ? "meeting" : "meetings"}{" "}

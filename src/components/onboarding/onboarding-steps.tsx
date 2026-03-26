@@ -9,7 +9,7 @@ import {
   Monitor,
   ChevronLeft,
   Volume2,
-  AudioWaveform,
+  AudioLines,
   Loader2,
   Zap,
 } from "lucide-react";
@@ -145,7 +145,7 @@ export function WelcomeStep({
       <div className="features-list features-list--welcome">
         {[
           { icon: Keyboard, text: "Global shortcut" },
-          { icon: AudioWaveform, text: "Voice to text" },
+          { icon: AudioLines, text: "Voice to text" },
           { icon: Sparkles, text: "Instant results" },
         ].map((item, i) => (
           <div key={i} className="feature-item">
@@ -578,7 +578,7 @@ export function SetupStep({
           >
             <div className="hotkey-test-card__main">
               <div className="hotkey-test-card__icon" aria-hidden>
-                <AudioWaveform className="hotkey-test-card__svg" />
+                <AudioLines className="hotkey-test-card__svg" />
               </div>
               <div>
                 <h3 className="hotkey-test-card__title">Transcription</h3>
@@ -837,7 +837,7 @@ export function TryItStep({
             <div className="tryit-finale-card__glow" aria-hidden />
             <div className="tryit-finale-card__head">
               <div className="tryit-finale-card__icon" aria-hidden>
-                <AudioWaveform className="tryit-finale-card__svg" />
+                <AudioLines className="tryit-finale-card__svg" />
               </div>
               <div>
                 <h2 className="tryit-finale-card__title">Transcription</h2>

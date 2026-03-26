@@ -197,7 +197,12 @@ export const ActionsPage: React.FC = () => {
           />
           Actions
         </h2>
-        <p className="app-page-subtitle">Loading…</p>
+        <p className="app-page-subtitle">
+          <span
+            className="skeleton-block app-page-subtitle-skeleton"
+            style={{ width: 160, height: 12, borderRadius: 10 }}
+          />
+        </p>
         <div className="actions-page__content">
           <ScreenSkeleton
             variant="actionsHistory"
@@ -248,7 +253,12 @@ export const ActionsPage: React.FC = () => {
         Actions
       </h2>
       {isLoading && (!actionHistory || actionHistory.actions.length === 0) ? (
-        <p className="app-page-subtitle">Loading…</p>
+        <p className="app-page-subtitle">
+          <span
+            className="skeleton-block app-page-subtitle-skeleton"
+            style={{ width: 160, height: 12, borderRadius: 10 }}
+          />
+        </p>
       ) : totalActions > 0 ? (
         <p className="app-page-subtitle">
           {totalActions} {totalActions === 1 ? "action" : "actions"} performed

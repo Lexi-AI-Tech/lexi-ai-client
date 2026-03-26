@@ -219,7 +219,12 @@ export const TranscriptsList: React.FC = () => {
     <div className="transcripts-page">
       <h2 className="transcripts-page-title">Transcripts</h2>
       {loading ? (
-        <p className="app-page-subtitle">Loading…</p>
+        <p className="app-page-subtitle">
+          <span
+            className="skeleton-block app-page-subtitle-skeleton"
+            style={{ width: 190, height: 12, borderRadius: 10 }}
+          />
+        </p>
       ) : total > 0 ? (
         <p className="app-page-subtitle">
           {total} voice {total === 1 ? "transcription" : "transcriptions"}

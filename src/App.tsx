@@ -158,9 +158,9 @@ function App() {
     meetingId: string;
     readableDuration: string;
   } | null>(null);
-  const [pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
+  const [_pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
     useState<string | null>(null);
-  const [activeRecordingMeetingId, setActiveRecordingMeetingId] = useState<
+  const [_activeRecordingMeetingId, setActiveRecordingMeetingId] = useState<
     string | null
   >(null);
 

@@ -27,7 +27,7 @@ export const ScreenSkeleton: React.FC<{
     style,
   }: {
     width?: string | number;
-    height?: number;
+    height?: string | number;
     radius?: number;
     style?: React.CSSProperties;
   }) => (
