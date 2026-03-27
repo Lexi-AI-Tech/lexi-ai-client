@@ -60,6 +60,13 @@ const FEATURE_LABELS: Record<string, string> = {
   "actions.perform": "Actions",
 };
 
+/** Suffix after "used / limit" in plan usage metrics (e.g. "1608 / 2000 words"). */
+const FEATURE_USAGE_SUFFIX: Record<string, string> = {
+  "assistant.speech_to_text": "words",
+  "meetings.create": "sessions",
+  "actions.perform": "actions",
+};
+
 /** Display order for plan usage rows (unknown keys sort after, by key). */
 const PLAN_USAGE_FEATURE_ORDER = [
   "assistant.speech_to_text",
@@ -69,6 +76,10 @@ const PLAN_USAGE_FEATURE_ORDER = [
 
 function featureLabel(key: string): string {
   return FEATURE_LABELS[key] ?? key;
+}
+
+function featureUsageSuffix(key: string): string {
+  return FEATURE_USAGE_SUFFIX[key] ?? "used";
 }
 
 function isProPlan(planType: string): boolean {
@@ -643,9 +654,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                             <span className="billing-feature-usage">
                               <span className="billing-usage-numbers">
                                 {used} / {limit}
-                              </span>
+                              </span>{" "}
                               <span className="billing-feature-usage-suffix">
-                                used
+                                {featureUsageSuffix(feature.feature_key)}
                               </span>
                             </span>
                           )}
