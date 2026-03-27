@@ -20,7 +20,8 @@ export default defineConfig({
           if (id.includes("framer-motion")) return "motion";
           if (id.includes("@tiptap")) return "tiptap";
           if (id.includes("lucide-react")) return "icons";
-          if (id.includes("react-dom") || id.includes("/react/")) return "react-vendor";
+          if (id.includes("react-dom") || id.includes("/react/"))
+            return "react-vendor";
         },
       },
     },

@@ -1373,7 +1373,11 @@
 }
 
 .meeting-detail-controls__btn--end:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--lexi-danger-muted) 85%, var(--lexi-danger) 15%);
+  background: color-mix(
+    in srgb,
+    var(--lexi-danger-muted) 85%,
+    var(--lexi-danger) 15%
+  );
 }
 
 .meeting-detail-toolbar__delete {

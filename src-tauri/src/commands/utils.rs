@@ -66,11 +66,7 @@ pub fn open_external_url(url: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("Failed to open browser: {}", e))?;
     }
-    #[cfg(not(any(
-        target_os = "macos",
-        target_os = "windows",
-        target_os = "linux"
-    )))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
         return Err("Unsupported platform".to_string());
     }

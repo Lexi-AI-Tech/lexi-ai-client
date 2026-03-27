@@ -992,7 +992,11 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                           <p className="meeting-detail-rail__suggestions-loading">
                             <span
                               className="skeleton-block app-page-subtitle-skeleton"
-                              style={{ width: 170, height: 12, borderRadius: 10 }}
+                              style={{
+                                width: 170,
+                                height: 12,
+                                borderRadius: 10,
+                              }}
                             />
                           </p>
                         ) : (
