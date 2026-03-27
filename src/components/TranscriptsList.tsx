@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, Check, Trash2, Play, Pause } from "lucide-react";
+import { Copy, Check, Trash2, Play, Pause, AudioLines } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
@@ -217,7 +217,15 @@ export const TranscriptsList: React.FC = () => {
 
   return (
     <div className="transcripts-page">
-      <h2 className="transcripts-page-title">Transcripts</h2>
+      <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+        <AudioLines
+          className="transcripts-page-title__icon"
+          size={22}
+          strokeWidth={2}
+          aria-hidden
+        />
+        Transcripts
+      </h2>
       {loading ? (
         <p className="app-page-subtitle">
           <span
@@ -233,7 +241,15 @@ export const TranscriptsList: React.FC = () => {
 
       {!showContent && (
         <div className="transcripts-page">
-          <h2 className="transcripts-page-title">Transcripts</h2>
+          <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+        <AudioLines
+          className="transcripts-page-title__icon"
+          size={22}
+          strokeWidth={2}
+          aria-hidden
+        />
+        Transcripts
+      </h2>
           <ScreenSkeleton variant="transcripts" className="page__empty" />
         </div>
       )}

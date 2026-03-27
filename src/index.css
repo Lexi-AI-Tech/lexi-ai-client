@@ -491,6 +491,17 @@ body::before {
   letter-spacing: -0.025em;
 }
 
+.page__title--with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page__title__icon {
+  flex-shrink: 0;
+  color: var(--lexi-primary);
+}
+
 .page__empty {
   text-align: center;
   padding: 40px;

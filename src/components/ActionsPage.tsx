@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Play, Pause, Trash2, Copy, Check, Atom } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { PaginatedActionHistoryResponse } from "../types";
+import type { ActionHistory, PaginatedActionHistoryResponse } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
@@ -14,10 +14,11 @@ import "./actions/actions.css";
 export const ActionsPage: React.FC = () => {
   const authStore = useAuthStore();
   const toast = useToast();
-  const [actionHistory, setActionHistory] =
-    useState<PaginatedActionHistoryResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [actions, setActions] = useState<ActionHistory[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioProgress, setAudioProgress] = useState<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -26,8 +27,25 @@ export const ActionsPage: React.FC = () => {
   const [copiedOutputId, setCopiedOutputId] = useState<string | null>(null);
   const [appIcons, setAppIcons] = useState<Record<string, string | null>>({});
   const appIconsRequestedRef = useRef<Set<string>>(new Set());
+  const observer = useRef<IntersectionObserver | null>(null);
 
   const pageSize = 20;
+
+  const lastElementRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (isLoading) return;
+      if (observer.current) observer.current.disconnect();
+
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && page < totalPages) {
+          setPage((prevPage) => prevPage + 1);
+        }
+      });
+
+      if (node) observer.current.observe(node);
+    },
+    [isLoading, page, totalPages],
+  );
 
   const GRID_VARIANTS = {
     hidden: { opacity: 0 },
@@ -65,7 +83,8 @@ export const ActionsPage: React.FC = () => {
     try {
       await invoke("delete_action_history", { actionId: deleteConfirmId });
       setDeleteConfirmId(null);
-      await loadActionHistory();
+      setActions((prev) => prev.filter((a) => a.id !== deleteConfirmId));
+      setTotal((prev) => Math.max(0, prev - 1));
       toast.success("Action deleted");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to delete action";
@@ -111,54 +130,67 @@ export const ActionsPage: React.FC = () => {
     setAudioProgress(0);
   };
 
-  // Load action history
-  const loadActionHistory = async () => {
+  useEffect(() => {
+    if (!authStore.isInitialized) return;
     if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      setActionHistory(null);
+      setActions([]);
       setIsLoading(false);
+      setTotal(0);
+      setTotalPages(1);
+      setPage(1);
       return;
     }
 
-    try {
-      setIsLoading(true);
-      const data = await invoke<PaginatedActionHistoryResponse>(
-        "get_action_history",
-        {
-          page,
-          pageSize,
-        },
-      );
-      setActionHistory(data);
-    } catch (err: any) {
-      console.error("Failed to load action history:", err);
-      const errorMessage = err?.message || "Failed to load action history";
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("403") ||
-        errorMessage.includes("Unauthorized") ||
-        errorMessage.includes("Not authenticated");
+    setIsLoading(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await invoke<PaginatedActionHistoryResponse>(
+          "get_action_history",
+          { page, pageSize },
+        );
+        if (cancelled) return;
+        setActions((prev) => (page === 1 ? data.actions : [...prev, ...data.actions]));
+        setTotalPages(data.total_pages);
+        setTotal(data.total);
+      } catch (err: any) {
+        if (cancelled) return;
+        console.error("Failed to load action history:", err);
+        const errorMessage = err?.message || "Failed to load action history";
+        const isAuthError =
+          errorMessage.includes("401") ||
+          errorMessage.includes("403") ||
+          errorMessage.includes("Unauthorized") ||
+          errorMessage.includes("Not authenticated");
 
-      if (isAuthError) {
-        console.log("Auth error loading action history, clearing auth");
-        authStore.clearAuth();
-        setActionHistory(null);
-      } else {
-        toast.error(errorMessage);
+        if (isAuthError) {
+          console.log("Auth error loading action history, clearing auth");
+          authStore.clearAuth();
+          setActions([]);
+          setTotal(0);
+          setTotalPages(1);
+          setPage(1);
+        } else {
+          toast.error(errorMessage);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authStore.isInitialized,
+    authStore.isAuthenticated,
+    authStore.tokens?.access_token,
+    page,
+  ]);
 
   useEffect(() => {
-    if (authStore.isInitialized) {
-      loadActionHistory();
-    }
-  }, [page, authStore.isAuthenticated, authStore.isInitialized]);
-
-  useEffect(() => {
-    if (!actionHistory?.actions?.length) return;
-    actionHistory.actions.forEach((action) => {
+    if (!actions.length) return;
+    actions.forEach((action) => {
       const name = (action.app_name || "").trim();
       if (!name || appIconsRequestedRef.current.has(name)) return;
       appIconsRequestedRef.current.add(name);
@@ -170,7 +202,7 @@ export const ActionsPage: React.FC = () => {
           setAppIcons((prev) => ({ ...prev, [name]: null }));
         });
     });
-  }, [actionHistory]);
+  }, [actions]);
 
   const handleCopyOutput = async (text: string, actionId: string) => {
     try {
@@ -239,7 +271,7 @@ export const ActionsPage: React.FC = () => {
     );
   }
 
-  const totalActions = actionHistory?.total ?? 0;
+  const totalActions = total;
 
   return (
     <div className="actions-page">
@@ -252,7 +284,7 @@ export const ActionsPage: React.FC = () => {
         />
         Actions
       </h2>
-      {isLoading && (!actionHistory || actionHistory.actions.length === 0) ? (
+      {isLoading && actions.length === 0 ? (
         <p className="app-page-subtitle">
           <span
             className="skeleton-block app-page-subtitle-skeleton"
@@ -267,44 +299,42 @@ export const ActionsPage: React.FC = () => {
 
       <div className="actions-page__content">
         <AnimatePresence mode="wait">
-          {isLoading &&
-            (!actionHistory || actionHistory.actions.length === 0) && (
-              <motion.div
-                key="actions-loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <ScreenSkeleton
-                  variant="actionsHistory"
-                  className="actions-loading-inline"
-                />
-              </motion.div>
-            )}
+          {isLoading && actions.length === 0 && (
+            <motion.div
+              key="actions-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ScreenSkeleton
+                variant="actionsHistory"
+                className="actions-loading-inline"
+              />
+            </motion.div>
+          )}
 
-          {!isLoading &&
-            (!actionHistory || actionHistory.actions.length === 0) && (
-              <motion.div
-                key="actions-empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4 }}
-              >
-                <div className="actions-empty-wrap">
-                  <div className="actions-empty-icon" aria-hidden>
-                    <Atom size={36} strokeWidth={1.75} />
-                  </div>
-                  <p>No actions yet.</p>
-                  <p className="actions-empty-sub">
-                    Voice actions you run will show up here.
-                  </p>
+          {!isLoading && actions.length === 0 && (
+            <motion.div
+              key="actions-empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <div className="actions-empty-wrap">
+                <div className="actions-empty-icon" aria-hidden>
+                  <Atom size={36} strokeWidth={1.75} />
                 </div>
-              </motion.div>
-            )}
+                <p>No actions yet.</p>
+                <p className="actions-empty-sub">
+                  Voice actions you run will show up here.
+                </p>
+              </div>
+            </motion.div>
+          )}
 
-          {actionHistory && actionHistory.actions.length > 0 && (
+          {actions.length > 0 && (
             <motion.div
               key="actions-cards"
               initial={{ opacity: 0 }}
@@ -319,14 +349,16 @@ export const ActionsPage: React.FC = () => {
                 initial="hidden"
                 animate="visible"
               >
-                {actionHistory.actions.map((action) => {
+                {actions.map((action, index) => {
                   const appName = (action.app_name || "").trim();
                   const iconUrl = appName
                     ? (appIcons[appName] ?? undefined)
                     : undefined;
+                  const isLastElement = index === actions.length - 1;
 
                   return (
                     <motion.div
+                      ref={isLastElement ? lastElementRef : undefined}
                       key={action.id}
                       className="action-card"
                       variants={CARD_VARIANTS}
@@ -475,36 +507,16 @@ export const ActionsPage: React.FC = () => {
                   );
                 })}
               </motion.div>
-
-              {actionHistory.total_pages > 1 ? (
-                <div className="action-pagination">
-                  <button
-                    type="button"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="action-pagination__btn"
-                  >
-                    Previous
-                  </button>
-                  <div className="action-pagination__label">
-                    Page {page} of {actionHistory.total_pages}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPage((p) => Math.min(actionHistory.total_pages, p + 1))
-                    }
-                    disabled={page === actionHistory.total_pages}
-                    className="action-pagination__btn"
-                  >
-                    Next
-                  </button>
-                </div>
-              ) : null}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {isLoading && page > 1 && (
+        <div className="transcripts-load-more">
+          <ScreenSkeleton variant="actionsHistory" />
+        </div>
+      )}
 
       {deleteConfirmId ? (
         <div className="delete-modal-overlay" onClick={closeDeleteConfirm}>

@@ -5,9 +5,11 @@ import ReactMarkdown from "react-markdown";
 import {
   Atom,
   AudioLines,
-  StickyNote,
+  NotebookPen,
   Languages,
   BookText,
+  ArrowLeftRight,
+  LayoutDashboard,
 } from "lucide-react";
 
 import type { SidebarProps } from "../types";
@@ -36,13 +38,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-logo" onClick={() => onNavigate("home")}>
         <div className="sidebar-logo-icon">
           <svg
-            viewBox="0 0 24 24"
+            viewBox="0 0 320 320"
             fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+            xmlns="http://www.w3.org/2000/svg"
           >
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <path
+              d="m160.265 62c-8.669 0-16.983 3.4417-23.112 9.5678-6.13 6.1262-9.573 14.4351-9.573 23.0989v87.1113c0 8.664 3.443 16.972 9.573 23.099 6.129 6.126 14.443 9.567 23.112 9.567 8.668 0 16.982-3.441 23.111-9.567 6.13-6.127 9.573-14.435 9.573-23.099v-87.1113c0-8.6638-3.443-16.9727-9.573-23.0989-6.129-6.1261-14.443-9.5678-23.111-9.5678z"
+              stroke="currentColor"
+              strokeWidth="22.1429"
+            />
+            <path
+              d="m236.529 160v21.778c0 20.215-8.035 39.603-22.337 53.897-14.303 14.294-33.701 22.325-53.927 22.325-20.227 0-39.625-8.031-53.928-22.325-14.302-14.294-22.337-33.682-22.337-53.897v-21.778"
+              stroke="currentColor"
+              strokeWidth="22.1429"
+            />
           </svg>
         </div>
         <span className="sidebar-logo-text">Lexi AI</span>
@@ -55,31 +64,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={`sidebar-item ${currentPage === "home" ? "active" : ""}`}
           onClick={() => onNavigate("home")}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-          </svg>
+          <LayoutDashboard size={18} strokeWidth={2} />
           <span>Home</span>
         </button>
 
-        {/* Actions */}
+        {/* Transcripts */}
         <button
           className={`sidebar-item ${
-            currentPage === "actions" ? "active" : ""
+            currentPage === "transcripts" ? "active" : ""
           }`}
-          onClick={() => onNavigate("actions")}
+          onClick={() => onNavigate("transcripts")}
         >
-          <Atom size={18} strokeWidth={2} />
-          <span>Actions</span>
+          <AudioLines size={18} strokeWidth={2} />
+          <span>Transcriptions</span>
         </button>
 
         {/* Meetings */}
@@ -103,15 +100,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Meetings</span>
         </button>
 
-        {/* Transcripts */}
+        {/* Actions */}
         <button
           className={`sidebar-item ${
-            currentPage === "transcripts" ? "active" : ""
+            currentPage === "actions" ? "active" : ""
           }`}
-          onClick={() => onNavigate("transcripts")}
+          onClick={() => onNavigate("actions")}
         >
-          <AudioLines size={18} strokeWidth={2} />
-          <span>Transcripts</span>
+          <Atom size={18} strokeWidth={2} />
+          <span>Actions</span>
         </button>
 
         {/* Docs */}
@@ -130,19 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }`}
           onClick={() => onNavigate("shortcuts")}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
+          <ArrowLeftRight size={18} strokeWidth={1.5} />
           <span>Shortcuts</span>
         </button>
 
@@ -151,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={`sidebar-item ${currentPage === "notes" ? "active" : ""}`}
           onClick={() => onNavigate("notes")}
         >
-          <StickyNote size={18} strokeWidth={2} />
+          <NotebookPen size={18} strokeWidth={2} />
           <span>Notes</span>
         </button>
 

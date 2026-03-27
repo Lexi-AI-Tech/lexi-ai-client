@@ -14,6 +14,7 @@ import React from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { AuthUser, AuthTokens, AuthState, AuthData } from "../types";
+import { onboardingStore } from "./onboardingStore";
 
 // Store state (in-memory only)
 let isAuthenticated: boolean = false;
@@ -69,7 +70,6 @@ listen("auth_expired", async () => {
     console.error("Failed to clear auth data:", err);
   });
 
-  const { onboardingStore } = await import("./onboardingStore");
   await onboardingStore.refreshState();
 
   notifyListeners();
