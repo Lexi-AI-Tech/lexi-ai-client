@@ -1217,7 +1217,8 @@ textarea.form-input {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  /* Don’t clip help tooltips; inner .docs-page / .docs-list-page handle scrolling */
+  overflow: visible;
 }
 
 .settings-page {
@@ -1782,13 +1783,18 @@ textarea.form-input {
   outline: none;
 }
 
+/* Left-align to the trigger (narrow wrap) so the panel grows rightward. Centering with
+   translateX(-50%) put half the bubble outside the scroll/overflow ancestors and caused
+   clipping (e.g. Docs under .container--docs). */
 .transcripts-page-tooltip {
   position: absolute;
-  left: 50%;
+  left: 0;
+  right: auto;
   top: calc(100% + 10px);
   bottom: auto;
-  transform: translateX(-50%) translateY(-4px);
-  width: min(18rem, calc(100vw - 4rem));
+  transform: translateY(-4px);
+  width: min(18rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
   padding: 0.875rem 1rem;
   background: var(--lexi-surface-overlay);
   color: var(--lexi-text);
@@ -1809,17 +1815,17 @@ textarea.form-input {
     visibility 0.2s ease,
     transform 0.2s ease,
     box-shadow 0.2s ease;
-  z-index: 100;
+  z-index: 2000;
   text-align: left;
 }
 
-/* Arrow: same surface + border as panel */
+/* Arrow: point at ~center of the info button (wrap is only as wide as the trigger) */
 .transcripts-page-tooltip::after {
   content: "";
   position: absolute;
   top: -5px;
-  left: 50%;
-  margin-left: -5px;
+  left: 11px;
+  margin-left: 0;
   width: 9px;
   height: 9px;
   background: var(--lexi-surface-overlay);
@@ -1833,7 +1839,7 @@ textarea.form-input {
 .transcripts-page-tooltip-wrap:focus-within .transcripts-page-tooltip {
   opacity: 1;
   visibility: visible;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
 }
 
 .transcripts-page-title-count {
