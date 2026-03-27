@@ -8,12 +8,12 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import {
+  Atom,
   Clock,
   FileText,
   Flame,
   Mic,
   Video,
-  ArrowLeftRight,
   AudioLines,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
@@ -436,7 +436,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
           <h1 className="greeting-text">
             {getGreeting()}, <span className="user-name">{userName}</span>
           </h1>
-          <p className="greeting-sub">Ready to transform your voice into text?</p>
+          <p className="greeting-sub">Voice-first Work OS for thinking, meetings, and writing</p>
         </div>
       </motion.header>
 
@@ -462,10 +462,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
             onClick={() => onNavigate?.("docs")}
           />
           <QuickAction
-            icon={ArrowLeftRight}
-            label="Shortcuts"
-            description="Custom text expansion shortcuts"
-            onClick={() => onNavigate?.("shortcuts")}
+            icon={Atom}
+            label="Actions"
+            description="Hold Action and speak—AI output at your cursor"
+            onClick={() => onNavigate?.("actions")}
           />
         </div>
       </motion.section>
@@ -521,9 +521,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
         <motion.section className="recent-activity-section" variants={itemVariants}>
           <div className="section-header">
             <h2 className="section-title">Recent Activity</h2>
-            <button type="button" className="view-all-btn" onClick={() => onNavigate?.("transcripts")}>
-              View all
-            </button>
           </div>
 
           <div className="recent-activity-content">
