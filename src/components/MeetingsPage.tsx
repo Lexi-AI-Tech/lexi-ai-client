@@ -351,7 +351,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
             {focusedAppName ? (
               <span
                 className="meetings-page-header__focused-app"
-                title={`Meeting detected in ${focusedAppName}`}
+                title={focusedAppName}
               >
                 {focusedAppIconUrl ? (
                   <img
@@ -361,9 +361,6 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                   />
                 ) : null}
                 <span className="meetings-page-header__focused-app-text">
-                  <span className="meetings-page-header__focused-app-kicker meetings-page-header__focused-app-kicker--phrase">
-                    Meeting detected in
-                  </span>
                   <span className="meetings-page-header__focused-app-name">
                     {focusedAppName}
                   </span>

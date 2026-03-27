@@ -78,15 +78,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Home</span>
         </button>
 
-        {/* Actions */}
+        {/* Transcripts */}
         <button
           className={`sidebar-item ${
-            currentPage === "actions" ? "active" : ""
+            currentPage === "transcripts" ? "active" : ""
           }`}
-          onClick={() => onNavigate("actions")}
+          onClick={() => onNavigate("transcripts")}
         >
-          <Atom size={18} strokeWidth={2} />
-          <span>Actions</span>
+          <AudioLines size={18} strokeWidth={2} />
+          <span>Transcriptions</span>
         </button>
 
         {/* Meetings */}
@@ -110,15 +110,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Meetings</span>
         </button>
 
-        {/* Transcripts */}
+        {/* Actions */}
         <button
           className={`sidebar-item ${
-            currentPage === "transcripts" ? "active" : ""
+            currentPage === "actions" ? "active" : ""
           }`}
-          onClick={() => onNavigate("transcripts")}
+          onClick={() => onNavigate("actions")}
         >
-          <AudioLines size={18} strokeWidth={2} />
-          <span>Transcripts</span>
+          <Atom size={18} strokeWidth={2} />
+          <span>Actions</span>
         </button>
 
         {/* Docs */}
