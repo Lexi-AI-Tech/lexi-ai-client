@@ -1,6 +1,13 @@
 import React, { useEffect, useId, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, Plus, Edit, Trash2, ArrowLeftRight, Info } from "lucide-react";
+import {
+  RefreshCw,
+  Plus,
+  Edit,
+  Trash2,
+  ArrowLeftRight,
+  Info,
+} from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
@@ -33,7 +40,11 @@ function ShortcutsPageHeading() {
         >
           <Info size={16} strokeWidth={2} aria-hidden />
         </button>
-        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+        <span
+          id={tooltipId}
+          className="transcripts-page-tooltip"
+          role="tooltip"
+        >
           {SHORTCUTS_HELP}
         </span>
       </span>

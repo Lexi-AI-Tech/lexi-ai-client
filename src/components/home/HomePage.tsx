@@ -1,39 +1,28 @@
 /**
  * HomePage Component
  *
- * The main dashboard displaying greeting, usage tips, stats,
- * plan usage, and analytics.
+ * Compact dashboard: greeting, quick actions with descriptions,
+ * tabbed recent activity (transcripts, meetings, actions), and plan usage.
  */
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  Clock,
-  FileText,
-  TrendingUp,
-  Sparkles,
-  ChevronRight,
-  Flame,
-} from "lucide-react";
+import { Atom, FileText, Mic, Video, AudioLines } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import type { HotkeyConfig } from "../../types";
+import type {
+  ActionHistory,
+  PaginatedActionHistoryResponse,
+  PaginatedTranscriptsResponse,
+  Transcript,
+} from "../../types";
+import type { Meeting } from "../meetings/MeetingsListPage";
+import { formatDateRelative } from "../../lib/dateUtils";
 import "./home.css";
 
-// Analytics interfaces
-interface AnalyticsStats {
-  words_typed_this_week: number;
-  time_saved_minutes: number;
-  current_streak: number;
-}
-
-interface ChartData {
-  labels: string[];
-  data: number[];
-  total_transcriptions: number;
-}
-
-type AnalyticsPeriod = "1d" | "7d" | "30d";
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface FeatureUsageEntry {
   feature_key: string;
@@ -52,7 +41,20 @@ interface BillingUsageResponse {
   features: FeatureUsageEntry[];
 }
 
+type RecentActivityTabId = "transcripts" | "meetings" | "actions";
+
+// ---------------------------------------------------------------------------
+// Constants & Helpers
+// ---------------------------------------------------------------------------
+
+function byCreatedAtDesc<T extends { created_at: string }>(a: T, b: T): number {
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
+
 const UPGRADE_URL = "https://speaklexi.com";
+
+/** Max items per category in Recent Activity (tabs + API page size). */
+const RECENT_ACTIVITY_LIMIT = 5;
 
 const FEATURE_LABELS: Record<string, string> = {
   "assistant.speech_to_text": "Assistant",
@@ -60,14 +62,12 @@ const FEATURE_LABELS: Record<string, string> = {
   "actions.perform": "Actions",
 };
 
-/** Suffix after "used / limit" in plan usage metrics (e.g. "1608 / 2000 words"). */
 const FEATURE_USAGE_SUFFIX: Record<string, string> = {
   "assistant.speech_to_text": "words",
   "meetings.create": "sessions",
   "actions.perform": "actions",
 };
 
-/** Display order for plan usage rows (unknown keys sort after, by key). */
 const PLAN_USAGE_FEATURE_ORDER = [
   "assistant.speech_to_text",
   "meetings.create",
@@ -107,15 +107,9 @@ function sortPlanUsageFeatures<T extends { feature_key: string }>(
   });
 }
 
-/** Time until ``periodEnd``; labels like "Resets in 05d 04h 12m 03s". */
 function formatResetsInCountdown(periodEndMs: number, nowMs: number): string {
   const ms = periodEndMs - nowMs;
-  if (Number.isNaN(ms) || periodEndMs <= 0) {
-    return "Resets soon";
-  }
-  if (ms <= 0) {
-    return "Resets soon";
-  }
+  if (Number.isNaN(ms) || periodEndMs <= 0 || ms <= 0) return "Resets soon";
   const totalSec = Math.floor(ms / 1000);
   const days = Math.floor(totalSec / 86400);
   const h = Math.floor((totalSec % 86400) / 3600);
@@ -126,46 +120,14 @@ function formatResetsInCountdown(periodEndMs: number, nowMs: number): string {
   return `Resets in ${dPart}d ${p2(h)}h ${p2(m)}m ${p2(s)}s`;
 }
 
-function BillingResetCountdown({ periodEndIso }: { periodEndIso: string }) {
-  const endMs = useMemo(() => new Date(periodEndIso).getTime(), [periodEndIso]);
-  const [label, setLabel] = useState(() =>
-    formatResetsInCountdown(endMs, Date.now()),
-  );
-
-  useEffect(() => {
-    const tick = () => {
-      setLabel(formatResetsInCountdown(endMs, Date.now()));
-    };
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, [endMs]);
-
-  return <span className="billing-period">{label}</span>;
+function formatCurrentDate(): string {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 }
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.1,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const },
-  },
-};
-
-// Helper to get greeting based on time
 const getGreeting = (): string => {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -173,68 +135,66 @@ const getGreeting = (): string => {
   return "Good evening";
 };
 
-// Stats card component – accentColor = icon/badge tint; iconColor = icon stroke (theme-aligned)
-interface StatCardProps {
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function BillingResetCountdown({ periodEndIso }: { periodEndIso: string }) {
+  const endMs = useMemo(() => new Date(periodEndIso).getTime(), [periodEndIso]);
+  const [label, setLabel] = useState(() =>
+    formatResetsInCountdown(endMs, Date.now()),
+  );
+  useEffect(() => {
+    const tick = () => setLabel(formatResetsInCountdown(endMs, Date.now()));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [endMs]);
+  return <span className="billing-period">{label}</span>;
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const },
+  },
+};
+
+// Quick action with description
+const QuickAction: React.FC<{
   icon: React.ElementType;
   label: string;
-  value: string | number;
-  subValue?: string;
-  accentColor: string;
-  iconColor?: string;
-}
-
-const StatCard: React.FC<StatCardProps> = ({
-  icon: Icon,
-  label,
-  value,
-  subValue,
-  accentColor,
-  iconColor,
-}) => (
-  <motion.div
-    className="stat-card"
-    variants={itemVariants}
-    style={{
-      ["--stat-accent" as string]: accentColor,
-      ["--stat-icon-color" as string]: iconColor ?? "var(--lexi-primary)",
-    }}
-  >
-    <div className="stat-card-icon">
-      <Icon size={20} />
-    </div>
-    <div className="stat-card-content">
-      <span className="stat-card-value">{value}</span>
-      <span className="stat-card-label">{label}</span>
-      {subValue && <span className="stat-card-sub">{subValue}</span>}
-    </div>
-  </motion.div>
-);
-
-// Analytics period button
-interface PeriodButtonProps {
-  label: string;
-  active: boolean;
+  description: string;
   onClick: () => void;
-}
-
-interface HomePageProps {
-  onViewAllTranscripts?: () => void;
-}
-
-const PeriodButton: React.FC<PeriodButtonProps> = ({
-  label,
-  active,
-  onClick,
-}) => (
-  <button
-    type="button"
-    className={`period-btn ${active ? "active" : ""}`}
+}> = ({ icon: Icon, label, description, onClick }) => (
+  <motion.button
+    className="quick-action-card"
     onClick={onClick}
+    whileHover={{ y: -2 }}
+    whileTap={{ scale: 0.98 }}
+    transition={{ duration: 0.2 }}
   >
-    {label}
-  </button>
+    <div className="quick-action-icon">
+      <Icon size={18} />
+    </div>
+    <div className="quick-action-text">
+      <span className="quick-action-label">{label}</span>
+      <span className="quick-action-desc">{description}</span>
+    </div>
+  </motion.button>
 );
 
+// Skeleton helpers
 const SkBlock: React.FC<{
   className?: string;
   style?: React.CSSProperties;
@@ -242,226 +202,256 @@ const SkBlock: React.FC<{
   <div className={`skeleton-block ${className ?? ""}`.trim()} style={style} />
 );
 
-const HomeStatsSkeleton: React.FC = () => (
-  <div className="home-stats-skeleton" aria-hidden>
-    {Array.from({ length: 3 }).map((_, i) => (
-      <div key={i} className="home-stats-skeleton__card">
-        <SkBlock className="home-stats-skeleton__icon" />
-        <div className="home-stats-skeleton__lines">
-          <SkBlock style={{ height: 28, width: "55%", borderRadius: 8 }} />
-          <SkBlock style={{ height: 14, width: "42%", borderRadius: 6 }} />
-          <SkBlock style={{ height: 12, width: "68%", borderRadius: 6 }} />
+const HomeRecentSkeleton: React.FC = () => (
+  <div className="home-recent-skeleton" aria-hidden>
+    {Array.from({ length: 5 }).map((_, i) => (
+      <div key={i} className="home-recent-skeleton__row">
+        <SkBlock
+          style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }}
+        />
+        <div
+          style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}
+        >
+          <SkBlock style={{ height: 13, width: "70%", borderRadius: 5 }} />
+          <SkBlock style={{ height: 10, width: "45%", borderRadius: 4 }} />
         </div>
       </div>
     ))}
   </div>
 );
 
-const HomeBillingSkeleton: React.FC = () => (
-  <div className="home-billing-skeleton" aria-hidden>
-    {Array.from({ length: 3 }).map((_, i) => (
-      <div key={i} className="home-billing-skeleton__row">
-        <SkBlock
-          style={{
-            height: 12,
-            width: "38%",
-            borderRadius: 6,
-            marginBottom: 10,
-          }}
-        />
-        <SkBlock
-          style={{ height: 14, width: "72%", borderRadius: 8, marginBottom: 8 }}
-        />
-        <SkBlock style={{ height: 10, width: "48%", borderRadius: 6 }} />
-      </div>
-    ))}
-  </div>
-);
-
-const HomeAnalyticsSkeleton: React.FC = () => {
-  const barHeights = [28, 52, 36, 64, 44, 58, 32, 48, 40, 56];
-  return (
-    <div className="home-analytics-skeleton" aria-hidden>
-      <div className="home-analytics-skeleton__main">
-        <SkBlock style={{ width: 48, height: 48, borderRadius: 12 }} />
-        <SkBlock style={{ height: 40, width: "45%", borderRadius: 10 }} />
-        <SkBlock style={{ height: 12, width: "62%", borderRadius: 6 }} />
-      </div>
-      <div className="home-analytics-skeleton__chart">
-        <div className="home-analytics-skeleton__bars">
-          {barHeights.map((h, i) => (
-            <SkBlock
-              key={i}
-              className="home-analytics-skeleton__bar"
-              style={{ height: h }}
-            />
-          ))}
-        </div>
-        <div className="home-analytics-skeleton__labels">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <SkBlock key={i} style={{ flex: 1, height: 10, borderRadius: 4 }} />
-          ))}
-        </div>
-      </div>
-      <div className="home-analytics-skeleton__insights">
-        <SkBlock style={{ height: 12, width: "100%", borderRadius: 6 }} />
-        <SkBlock style={{ height: 12, width: "88%", borderRadius: 6 }} />
+const RecentActivityRow: React.FC<{
+  badgeClass: string;
+  icon: React.ElementType;
+  title: string;
+  subtitle: string;
+  typeLabel: string;
+  timestamp: string;
+  onRowClick: () => void;
+}> = ({
+  badgeClass,
+  icon: Icon,
+  title,
+  subtitle,
+  typeLabel,
+  timestamp,
+  onRowClick,
+}) => (
+  <li className="recent-activity-row" onClick={onRowClick}>
+    <div className={`recent-activity-badge ${badgeClass}`}>
+      <Icon size={14} />
+    </div>
+    <div className="recent-activity-info">
+      <span className="recent-activity-text">{title}</span>
+      <div className="recent-activity-meta">
+        <span className="recent-activity-type">{typeLabel}</span>
+        <span className="recent-activity-dot" />
+        <span className="recent-activity-subtitle">{subtitle}</span>
+        <span className="recent-activity-dot" />
+        <span className="recent-activity-time">
+          {formatDateRelative(timestamp)}
+        </span>
       </div>
     </div>
-  );
-};
+  </li>
+);
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
+interface HomePageProps {
+  onViewAllTranscripts?: () => void;
+  onNavigate?: (page: string) => void;
+}
 
 export const HomePage: React.FC<HomePageProps> = ({
   onViewAllTranscripts: _onViewAllTranscripts,
+  onNavigate,
 }) => {
   const { user, isAuthenticated, tokens } = useAuthStore();
+
+  const [recentActivityTab, setRecentActivityTab] =
+    useState<RecentActivityTabId>("transcripts");
+
   const [billingLoading, setBillingLoading] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [chartLoading, setChartLoading] = useState(false);
-  const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
-  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(
-    [],
-  );
-  const [stats, setStats] = useState<AnalyticsStats | null>(null);
-  const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [meetingsLoading, setMeetingsLoading] = useState(false);
+  const [actionsLoading, setActionsLoading] = useState(false);
+
   const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(
     null,
   );
+  const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [recentActions, setRecentActions] = useState<ActionHistory[]>([]);
 
+  // Data fetching
   const fetchBillingUsage = useCallback(async () => {
     if (!isAuthenticated || !tokens?.access_token) return;
     try {
-      const data = await invoke<BillingUsageResponse>("get_billing_usage");
-      setBillingUsage(data);
+      setBillingUsage(await invoke<BillingUsageResponse>("get_billing_usage"));
     } catch (err) {
       console.error("Failed to fetch billing usage:", err);
       setBillingUsage(null);
     }
   }, [isAuthenticated, tokens?.access_token]);
 
-  const fetchStats = useCallback(async () => {
+  const fetchRecentTranscripts = useCallback(async () => {
     if (!isAuthenticated || !tokens?.access_token) return;
     try {
-      const data = await invoke<AnalyticsStats>("get_analytics_stats");
-      setStats(data);
-    } catch (error: unknown) {
-      console.error("Failed to fetch analytics stats:", error);
+      const data = await invoke<PaginatedTranscriptsResponse>(
+        "get_transcripts",
+        {
+          page: 1,
+          pageSize: RECENT_ACTIVITY_LIMIT,
+        },
+      );
+      setRecentTranscripts(data.transcripts);
+    } catch (err) {
+      console.error("Failed to fetch recent transcripts:", err);
     }
   }, [isAuthenticated, tokens?.access_token]);
 
-  const fetchChart = useCallback(
-    async (period: AnalyticsPeriod) => {
-      if (!isAuthenticated || !tokens?.access_token) return;
-      try {
-        const data = await invoke<ChartData>("get_analytics_chart", {
-          period,
-        });
-        setChartData(data);
-      } catch (error: unknown) {
-        console.error(
-          `Failed to fetch analytics chart for period ${period}:`,
-          error,
-        );
-      }
-    },
-    [isAuthenticated, tokens?.access_token],
-  );
+  const fetchRecentActions = useCallback(async () => {
+    if (!isAuthenticated || !tokens?.access_token) return;
+    try {
+      const data = await invoke<PaginatedActionHistoryResponse>(
+        "get_action_history",
+        {
+          page: 1,
+          pageSize: RECENT_ACTIVITY_LIMIT,
+        },
+      );
+      setRecentActions(data.actions);
+    } catch (err) {
+      console.error("Failed to fetch recent actions:", err);
+    }
+  }, [isAuthenticated, tokens?.access_token]);
 
+  const fetchMeetings = useCallback(async () => {
+    if (!isAuthenticated || !tokens?.access_token) return;
+    try {
+      setMeetings(await invoke<Meeting[]>("list_meetings"));
+    } catch (err) {
+      console.error("Failed to fetch meetings:", err);
+    }
+  }, [isAuthenticated, tokens?.access_token]);
+
+  // Effects
   useEffect(() => {
     if (!isAuthenticated || !tokens?.access_token) {
       setBillingLoading(false);
-      setStatsLoading(false);
       return;
     }
-    let cancelled = false;
+    let c = false;
     setBillingLoading(true);
     (async () => {
       try {
         await fetchBillingUsage();
       } finally {
-        if (!cancelled) setBillingLoading(false);
+        if (!c) setBillingLoading(false);
       }
     })();
     return () => {
-      cancelled = true;
+      c = true;
     };
   }, [isAuthenticated, tokens?.access_token, fetchBillingUsage]);
 
   useEffect(() => {
     if (!isAuthenticated || !tokens?.access_token) {
-      setStatsLoading(false);
+      setRecentLoading(false);
       return;
     }
-    let cancelled = false;
-    setStatsLoading(true);
+    let c = false;
+    setRecentLoading(true);
     (async () => {
       try {
-        await fetchStats();
+        await fetchRecentTranscripts();
       } finally {
-        if (!cancelled) setStatsLoading(false);
+        if (!c) setRecentLoading(false);
       }
     })();
     return () => {
-      cancelled = true;
+      c = true;
     };
-  }, [isAuthenticated, tokens?.access_token, fetchStats]);
+  }, [isAuthenticated, tokens?.access_token, fetchRecentTranscripts]);
 
   useEffect(() => {
     if (!isAuthenticated || !tokens?.access_token) {
-      setChartLoading(false);
+      setMeetingsLoading(false);
       return;
     }
-    let cancelled = false;
-    setChartLoading(true);
+    let c = false;
+    setMeetingsLoading(true);
     (async () => {
       try {
-        await fetchChart(activePeriod);
+        await fetchMeetings();
       } finally {
-        if (!cancelled) setChartLoading(false);
+        if (!c) setMeetingsLoading(false);
       }
     })();
     return () => {
-      cancelled = true;
+      c = true;
     };
-  }, [isAuthenticated, tokens?.access_token, activePeriod, fetchChart]);
+  }, [isAuthenticated, tokens?.access_token, fetchMeetings]);
 
   useEffect(() => {
-    const fetchHotkey = async () => {
+    if (!isAuthenticated || !tokens?.access_token) {
+      setActionsLoading(false);
+      return;
+    }
+    let c = false;
+    setActionsLoading(true);
+    (async () => {
       try {
-        const hotkeyJson = await invoke<string>("get_current_hotkey");
-        const hotkeyData: HotkeyConfig = JSON.parse(hotkeyJson);
-        if (hotkeyData.hotkeys && hotkeyData.hotkeys.length > 0) {
-          setTranscriptionHotkeys(hotkeyData.hotkeys);
-        }
-      } catch (err) {
-        console.error("Failed to load global hotkey:", err);
+        await fetchRecentActions();
+      } finally {
+        if (!c) setActionsLoading(false);
       }
+    })();
+    return () => {
+      c = true;
     };
-    fetchHotkey();
-  }, []);
+  }, [isAuthenticated, tokens?.access_token, fetchRecentActions]);
 
+  // Derived
   const userName = user?.name?.split(" ")[0] || "there";
-  const resolvedStats = stats ?? {
-    words_typed_this_week: 0,
-    time_saved_minutes: 0,
-    current_streak: 0,
-  };
-  const resolvedChartData = chartData ?? {
-    labels: [],
-    data: [],
-    total_transcriptions: 0,
-  };
   const planUsageRows = useMemo(
     () =>
       billingUsage?.features
         ? sortPlanUsageFeatures(billingUsage.features)
-        : ([] as FeatureUsageEntry[]),
+        : [],
     [billingUsage],
   );
-  const maxChartValue = useMemo(
-    () => Math.max(...resolvedChartData.data, 1),
-    [resolvedChartData.data],
+
+  const recentTranscriptsSorted = useMemo(
+    () => [...recentTranscripts].sort(byCreatedAtDesc),
+    [recentTranscripts],
   );
+  const recentTranscriptsDisplayed = useMemo(
+    () => recentTranscriptsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
+    [recentTranscriptsSorted],
+  );
+  const recentMeetingsSorted = useMemo(
+    () => [...meetings].sort(byCreatedAtDesc),
+    [meetings],
+  );
+  const recentMeetingsDisplayed = useMemo(
+    () => recentMeetingsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
+    [recentMeetingsSorted],
+  );
+  const recentActionsSorted = useMemo(
+    () => [...recentActions].sort(byCreatedAtDesc),
+    [recentActions],
+  );
+  const recentActionsDisplayed = useMemo(
+    () => recentActionsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
+    [recentActionsSorted],
+  );
+
+  const recentActivityLoading =
+    recentLoading || meetingsLoading || actionsLoading;
 
   const handleUpgradeClick = useCallback(async () => {
     try {
@@ -484,82 +474,238 @@ export const HomePage: React.FC<HomePageProps> = ({
       initial="hidden"
       animate="visible"
     >
-      <motion.header className="home-header" variants={itemVariants}>
+      {/* ── Greeting ── */}
+      <motion.header className="home-greeting" variants={itemVariants}>
         <div className="greeting-section">
+          <p className="greeting-date">{formatCurrentDate()}</p>
           <h1 className="greeting-text">
             {getGreeting()}, <span className="user-name">{userName}</span>
           </h1>
           <p className="greeting-sub">
-            Ready to transform your voice into text?
+            Voice-first Work OS for thinking, meetings, and writing
           </p>
         </div>
       </motion.header>
 
-      {transcriptionHotkeys.length > 0 && (
-        <motion.div className="usage-tip" variants={itemVariants}>
-          <div className="tip-icon">
-            <Sparkles size={18} />
-          </div>
-          <div className="tip-content">
-            <span className="tip-label">Quick tip</span>
-            <p className="tip-text">
-              Hold{" "}
-              {transcriptionHotkeys.map((key, i) => (
-                <React.Fragment key={key}>
-                  {i > 0 && " or "}
-                  <kbd className="hotkey-badge">{key}</kbd>
-                </React.Fragment>
-              ))}{" "}
-              key and speak naturally — Lexi will transcribe in real-time
-            </p>
-          </div>
-          <ChevronRight className="tip-arrow" size={16} />
-        </motion.div>
-      )}
-
-      <motion.section className="stats-section" variants={itemVariants}>
-        {isAuthenticated && statsLoading ? (
-          <HomeStatsSkeleton />
-        ) : (
-          <div className="stats-grid">
-            <StatCard
-              icon={FileText}
-              label="Words Typed"
-              value={resolvedStats.words_typed_this_week.toLocaleString()}
-              subValue="this week"
-              accentColor="var(--lexi-primary-muted)"
-              iconColor="var(--lexi-primary)"
-            />
-            <StatCard
-              icon={Clock}
-              label="Time Saved"
-              value={`${resolvedStats.time_saved_minutes}m`}
-              subValue="vs typing"
-              accentColor="var(--lexi-primary-muted)"
-              iconColor="var(--lexi-primary)"
-            />
-            <StatCard
-              icon={Flame}
-              label="Streak"
-              value={`${resolvedStats.current_streak}`}
-              subValue="days"
-              accentColor="rgba(245, 158, 11, 0.2)"
-              iconColor="#d97706"
-            />
-          </div>
-        )}
+      {/* ── Quick Actions with descriptions ── */}
+      <motion.section className="quick-actions-section" variants={itemVariants}>
+        <div className="quick-actions-grid">
+          <QuickAction
+            icon={Mic}
+            label="Transcribe"
+            description="Convert speech to text instantly"
+            onClick={() => {}}
+          />
+          <QuickAction
+            icon={Video}
+            label="New Meeting"
+            description="Record and transcribe live meetings"
+            onClick={() => onNavigate?.("meetings")}
+          />
+          <QuickAction
+            icon={FileText}
+            label="Create Doc"
+            description="Draft documents with voice input"
+            onClick={() => onNavigate?.("docs")}
+          />
+          <QuickAction
+            icon={Atom}
+            label="Actions"
+            description="Hold Action and speak—AI output at your cursor"
+            onClick={() => onNavigate?.("actions")}
+          />
+        </div>
       </motion.section>
 
+      {/* ── Main Grid: Recent Activity | Plan Usage ── */}
       <div className="home-grid">
+        {/* Left: Recent Activity (tabbed) */}
+        <motion.section
+          className="recent-activity-section"
+          variants={itemVariants}
+        >
+          <div className="section-header section-header--recent-activity">
+            <h2 className="section-title">Recent Activity</h2>
+          </div>
+
+          <div className="recent-activity-content">
+            {isAuthenticated && recentActivityLoading ? (
+              <HomeRecentSkeleton />
+            ) : !isAuthenticated ? (
+              <div className="empty-state">
+                <div className="empty-icon">
+                  <AudioLines size={24} />
+                </div>
+                <p className="empty-title">No activity yet</p>
+                <p className="empty-sub">
+                  Sign in to see transcriptions, meetings, and actions.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div
+                  className="recent-activity-tabs"
+                  role="tablist"
+                  aria-label="Recent activity by category"
+                >
+                  {(
+                    [
+                      { id: "transcripts" as const, label: "Transcripts" },
+                      { id: "meetings" as const, label: "Meetings" },
+                      { id: "actions" as const, label: "Actions" },
+                    ] as const
+                  ).map(({ id, label }) => {
+                    const isActive = recentActivityTab === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        role="tab"
+                        id={`recent-activity-tab-${id}`}
+                        aria-selected={isActive}
+                        aria-controls={`recent-activity-panel-${id}`}
+                        tabIndex={isActive ? 0 : -1}
+                        className={`recent-activity-tab${isActive ? " is-active" : ""}`}
+                        onClick={() => setRecentActivityTab(id)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div
+                  id="recent-activity-panel-transcripts"
+                  role="tabpanel"
+                  aria-labelledby="recent-activity-tab-transcripts"
+                  hidden={recentActivityTab !== "transcripts"}
+                  className="recent-activity-panel"
+                >
+                  {recentTranscriptsSorted.length === 0 ? (
+                    <div className="empty-state empty-state--tab">
+                      <div className="empty-icon">
+                        <AudioLines size={24} />
+                      </div>
+                      <p className="empty-title">No transcriptions yet</p>
+                      <p className="empty-sub">
+                        Your speech-to-text history will show up here.
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="recent-activity-list">
+                      {recentTranscriptsDisplayed.map((t) => {
+                        const title =
+                          t.original_text.length > 70
+                            ? t.original_text.slice(0, 70) + "…"
+                            : t.original_text;
+                        return (
+                          <RecentActivityRow
+                            key={t.id}
+                            badgeClass="transcription"
+                            icon={AudioLines}
+                            title={title}
+                            subtitle={`${t.original_text_word_count} words`}
+                            typeLabel="Transcription"
+                            timestamp={t.created_at}
+                            onRowClick={() => onNavigate?.("transcripts")}
+                          />
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div
+                  id="recent-activity-panel-meetings"
+                  role="tabpanel"
+                  aria-labelledby="recent-activity-tab-meetings"
+                  hidden={recentActivityTab !== "meetings"}
+                  className="recent-activity-panel"
+                >
+                  {recentMeetingsSorted.length === 0 ? (
+                    <div className="empty-state empty-state--tab">
+                      <div className="empty-icon">
+                        <Video size={24} />
+                      </div>
+                      <p className="empty-title">No meetings yet</p>
+                      <p className="empty-sub">
+                        Recorded meetings will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="recent-activity-list">
+                      {recentMeetingsDisplayed.map((m) => (
+                        <RecentActivityRow
+                          key={m.id}
+                          badgeClass="meeting"
+                          icon={Video}
+                          title={m.name || "Untitled Meeting"}
+                          subtitle={m.platform ?? "Meeting"}
+                          typeLabel="Meeting"
+                          timestamp={m.created_at}
+                          onRowClick={() => onNavigate?.("meetings")}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div
+                  id="recent-activity-panel-actions"
+                  role="tabpanel"
+                  aria-labelledby="recent-activity-tab-actions"
+                  hidden={recentActivityTab !== "actions"}
+                  className="recent-activity-panel"
+                >
+                  {recentActionsSorted.length === 0 ? (
+                    <div className="empty-state empty-state--tab">
+                      <div className="empty-icon">
+                        <Atom size={24} />
+                      </div>
+                      <p className="empty-title">No actions yet</p>
+                      <p className="empty-sub">
+                        Action hotkey runs will show up here.
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="recent-activity-list">
+                      {recentActionsDisplayed.map((a) => {
+                        const cmd = a.action_command?.trim() || "Action";
+                        const title =
+                          cmd.length > 70 ? cmd.slice(0, 70) + "…" : cmd;
+                        const sub =
+                          a.app_name?.trim() || a.action_type || "Action";
+                        return (
+                          <RecentActivityRow
+                            key={a.id}
+                            badgeClass="action"
+                            icon={Atom}
+                            title={title}
+                            subtitle={sub}
+                            typeLabel="Action"
+                            timestamp={a.created_at}
+                            onRowClick={() => onNavigate?.("actions")}
+                          />
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </motion.section>
+
+        {/* Right: Plan Usage */}
         <motion.section
           className="billing-usage-section"
           variants={itemVariants}
         >
           <div className="section-header">
             <div>
-              <h2 className="section-title">Plan usage</h2>
+              <h2 className="section-title">Plan Usage</h2>
               {billingUsage && (
-                <p className="billing-usage-meta">
+                <div className="billing-usage-meta">
                   <span className="billing-plan-badge">
                     {billingUsage.plan_type}
                   </span>
@@ -568,7 +714,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                       periodEndIso={billingUsage.period_end}
                     />
                   )}
-                </p>
+                </div>
               )}
             </div>
             {showUpgradeCta && (
@@ -582,199 +728,85 @@ export const HomePage: React.FC<HomePageProps> = ({
             )}
           </div>
 
-          <div className="transcriptions-list">
-            {isAuthenticated && billingLoading ? (
-              <HomeBillingSkeleton />
-            ) : !isAuthenticated ? (
-              <div className="empty-state">
-                <div className="empty-icon">
-                  <FileText size={32} />
+          {billingLoading ? (
+            <div className="home-billing-skeleton">
+              {[80, 55, 70].map((w, i) => (
+                <div key={i} className="home-billing-skeleton__row">
+                  <SkBlock
+                    style={{
+                      height: 12,
+                      width: `${w}%`,
+                      borderRadius: 4,
+                      marginBottom: 6,
+                    }}
+                  />
+                  <SkBlock
+                    style={{ height: 6, width: "100%", borderRadius: 3 }}
+                  />
                 </div>
-                <p className="empty-title">Plan usage</p>
-                <p className="empty-sub">
-                  Sign in to see limits and usage for your plan.
-                </p>
-              </div>
-            ) : !billingUsage ? (
-              <div className="empty-state">
-                <div className="empty-icon">
-                  <FileText size={32} />
-                </div>
-                <p className="empty-title">Couldn&apos;t load plan usage</p>
-                <p className="empty-sub">
-                  Check your connection and try again.
-                </p>
-              </div>
-            ) : planUsageRows.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">
-                  <FileText size={32} />
-                </div>
-                <p className="empty-title">No plan usage yet</p>
-                <p className="empty-sub">
-                  Usage will appear once activity starts.
-                </p>
-              </div>
-            ) : (
-              <ul className="billing-feature-list">
-                {planUsageRows.map((feature) => {
-                  const limit = feature.limit_value;
-                  const isUnlimited = limit === null;
-                  const used = feature.used ?? 0;
-                  const enabled = !!feature.enabled;
-                  const pct = isUnlimited
-                    ? 0
-                    : clamp01(limit > 0 ? used / limit : used > 0 ? 1 : 0);
-
-                  return (
-                    <motion.li
-                      key={feature.feature_key}
-                      className={`billing-feature-row ${!enabled ? "is-disabled" : ""}`}
-                      whileHover={enabled ? { scale: 1.01 } : undefined}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className="billing-feature-info">
-                        <div className="billing-feature-name-wrap">
-                          <span className="billing-feature-name">
-                            {featureLabel(feature.feature_key)}
+              ))}
+            </div>
+          ) : billingUsage && planUsageRows.length > 0 ? (
+            <ul className="billing-feature-list">
+              {planUsageRows.map((feature) => {
+                const limit = feature.limit_value;
+                const isUnlimited = limit === null;
+                const used = feature.used ?? 0;
+                const pct = isUnlimited
+                  ? 0
+                  : clamp01(limit > 0 ? used / limit : used > 0 ? 1 : 0);
+                return (
+                  <li
+                    key={feature.feature_key}
+                    className={`billing-feature-row${!feature.enabled ? " is-disabled" : ""}`}
+                  >
+                    <div className="billing-feature-info">
+                      <div className="billing-feature-name-wrap">
+                        <span className="billing-feature-name">
+                          {featureLabel(feature.feature_key)}
+                        </span>
+                        {!feature.enabled && (
+                          <span className="billing-feature-disabled">
+                            Not included
                           </span>
-                          {!enabled && (
-                            <span className="billing-feature-disabled">
-                              Disabled
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="billing-feature-metrics">
+                        )}
+                      </div>
+                      <div className="billing-feature-metrics">
+                        <span className="billing-feature-usage">
                           {isUnlimited ? (
-                            <span className="billing-feature-usage billing-usage-unlimited">
+                            <span className="billing-usage-unlimited">
                               Unlimited
                             </span>
                           ) : (
-                            <span className="billing-feature-usage">
+                            <>
                               <span className="billing-usage-numbers">
                                 {used} / {limit}
                               </span>{" "}
                               <span className="billing-feature-usage-suffix">
                                 {featureUsageSuffix(feature.feature_key)}
                               </span>
-                            </span>
+                            </>
                           )}
-                        </div>
+                        </span>
                       </div>
-
-                      {!isUnlimited && feature.metered && (
-                        <div className="billing-usage-bar" aria-hidden>
-                          <div
-                            className="billing-usage-bar-fill"
-                            style={{
-                              width: `${Math.round(pct * 100)}%`,
-                              opacity: enabled ? 1 : 0.45,
-                            }}
-                          />
-                        </div>
-                      )}
-                    </motion.li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        </motion.section>
-
-        <motion.section className="analytics-section" variants={itemVariants}>
-          <div className="section-header">
-            <h2 className="section-title">Analytics</h2>
-            <div className="period-selector">
-              <PeriodButton
-                label="1D"
-                active={activePeriod === "1d"}
-                onClick={() => setActivePeriod("1d")}
-              />
-              <PeriodButton
-                label="7D"
-                active={activePeriod === "7d"}
-                onClick={() => setActivePeriod("7d")}
-              />
-              <PeriodButton
-                label="30D"
-                active={activePeriod === "30d"}
-                onClick={() => setActivePeriod("30d")}
-              />
+                    </div>
+                    {!isUnlimited && feature.metered && (
+                      <div className="billing-usage-bar">
+                        <div
+                          className="billing-usage-bar-fill"
+                          style={{ width: `${Math.round(pct * 100)}%` }}
+                        />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="empty-state">
+              <p className="empty-sub">No plan data available.</p>
             </div>
-          </div>
-
-          <div className="analytics-content">
-            {isAuthenticated && chartLoading ? (
-              <HomeAnalyticsSkeleton />
-            ) : (
-              <>
-                <div className="analytics-main-stat">
-                  <div className="analytics-icon">
-                    <TrendingUp size={24} />
-                  </div>
-                  <div className="analytics-value">
-                    {resolvedChartData.total_transcriptions}
-                  </div>
-                  <div className="analytics-label">
-                    Transcriptions in{" "}
-                    {activePeriod === "1d"
-                      ? "24 hours"
-                      : activePeriod === "7d"
-                        ? "7 days"
-                        : "30 days"}
-                  </div>
-                </div>
-
-                <div className="analytics-chart">
-                  <div className="chart-bars">
-                    {resolvedChartData.data.map((value, i) => (
-                      <div
-                        key={i}
-                        className="chart-bar"
-                        style={
-                          {
-                            ["--chart-height" as string]: `${(value / maxChartValue) * 100}%`,
-                            ["--chart-opacity" as string]:
-                              i === resolvedChartData.data.length - 1 ? 1 : 0.5,
-                            ["--chart-min-height" as string]:
-                              value > 0 ? "4px" : "0",
-                          } as React.CSSProperties
-                        }
-                        title={`${value} transcriptions`}
-                      />
-                    ))}
-                  </div>
-                  <div className="chart-labels">
-                    {resolvedChartData.labels.map((label, i) => (
-                      <span key={i}>{label}</span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="analytics-insights">
-                  <div className="insight-item">
-                    <span className="insight-dot success" />
-                    <span className="insight-text">
-                      {resolvedChartData.total_transcriptions} successful this
-                      period
-                    </span>
-                  </div>
-                  <div className="insight-item">
-                    <span className="insight-dot info" />
-                    <span className="insight-text">
-                      Avg.{" "}
-                      {Math.round(
-                        resolvedStats.words_typed_this_week /
-                          Math.max(resolvedChartData.total_transcriptions, 1),
-                      )}{" "}
-                      words per session
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          )}
         </motion.section>
       </div>
     </motion.div>

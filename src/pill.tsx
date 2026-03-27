@@ -1007,14 +1007,19 @@ export const Pill: React.FC = () => {
                   stroke={accent}
                   strokeWidth={stroke}
                   strokeLinecap="round"
-                  strokeDasharray={status === "meeting_detected" ? "100" : "12 88"}
+                  strokeDasharray={
+                    status === "meeting_detected" ? "100" : "12 88"
+                  }
                   strokeDashoffset={
                     status === "meeting_detected"
                       ? 100 *
                         (1 -
                           Math.max(
                             0,
-                            Math.min(1, meetingCountdown / MEETING_COUNTDOWN_SECONDS),
+                            Math.min(
+                              1,
+                              meetingCountdown / MEETING_COUNTDOWN_SECONDS,
+                            ),
                           ))
                       : undefined
                   }
@@ -1122,17 +1127,25 @@ export const Pill: React.FC = () => {
                         "1px solid color-mix(in srgb, var(--lexi-primary, #6b8f6e) 42%, rgba(255,255,255,0.18))",
                     }}
                     onMouseEnter={(evt) => {
-                      (evt.currentTarget as HTMLButtonElement).style.background =
+                      (
+                        evt.currentTarget as HTMLButtonElement
+                      ).style.background =
                         "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 34%, rgba(255,255,255,0.04))";
-                      (evt.currentTarget as HTMLButtonElement).style.borderColor =
+                      (
+                        evt.currentTarget as HTMLButtonElement
+                      ).style.borderColor =
                         "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 58%, rgba(255,255,255,0.22))";
                       (evt.currentTarget as HTMLButtonElement).style.transform =
                         "scale(1.04)";
                     }}
                     onMouseLeave={(evt) => {
-                      (evt.currentTarget as HTMLButtonElement).style.background =
+                      (
+                        evt.currentTarget as HTMLButtonElement
+                      ).style.background =
                         "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 24%, rgba(255,255,255,0.03))";
-                      (evt.currentTarget as HTMLButtonElement).style.borderColor =
+                      (
+                        evt.currentTarget as HTMLButtonElement
+                      ).style.borderColor =
                         "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 42%, rgba(255,255,255,0.18))";
                       (evt.currentTarget as HTMLButtonElement).style.transform =
                         "scale(1)";
@@ -1152,14 +1165,16 @@ export const Pill: React.FC = () => {
                     }}
                     style={baseButtonStyle}
                     onMouseEnter={(evt) => {
-                      (evt.currentTarget as HTMLButtonElement).style.background =
-                        "rgba(255, 255, 255, 0.10)";
+                      (
+                        evt.currentTarget as HTMLButtonElement
+                      ).style.background = "rgba(255, 255, 255, 0.10)";
                       (evt.currentTarget as HTMLButtonElement).style.transform =
                         "scale(1.04)";
                     }}
                     onMouseLeave={(evt) => {
-                      (evt.currentTarget as HTMLButtonElement).style.background =
-                        "rgba(255, 255, 255, 0.06)";
+                      (
+                        evt.currentTarget as HTMLButtonElement
+                      ).style.background = "rgba(255, 255, 255, 0.06)";
                       (evt.currentTarget as HTMLButtonElement).style.transform =
                         "scale(1)";
                     }}

@@ -446,7 +446,12 @@
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--lexi-border-subtle) 65%, transparent) 0%,
-    color-mix(in srgb, var(--lexi-primary-muted) 75%, var(--lexi-surface-elevated) 25%) 45%,
+    color-mix(
+        in srgb,
+        var(--lexi-primary-muted) 75%,
+        var(--lexi-surface-elevated) 25%
+      )
+      45%,
     color-mix(in srgb, var(--lexi-border-subtle) 65%, transparent) 100%
   );
 }

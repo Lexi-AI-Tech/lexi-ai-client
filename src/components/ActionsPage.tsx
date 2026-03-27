@@ -35,7 +35,11 @@ function ActionsPageHeading() {
         >
           <Info size={16} strokeWidth={2} aria-hidden />
         </button>
-        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+        <span
+          id={tooltipId}
+          className="transcripts-page-tooltip"
+          role="tooltip"
+        >
           {ACTIONS_HELP}
         </span>
       </span>
@@ -186,7 +190,9 @@ export const ActionsPage: React.FC = () => {
           { page, pageSize },
         );
         if (cancelled) return;
-        setActions((prev) => (page === 1 ? data.actions : [...prev, ...data.actions]));
+        setActions((prev) =>
+          page === 1 ? data.actions : [...prev, ...data.actions],
+        );
         setTotalPages(data.total_pages);
         setTotal(data.total);
       } catch (err: any) {
