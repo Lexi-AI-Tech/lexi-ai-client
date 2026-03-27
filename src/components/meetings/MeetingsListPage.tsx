@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronRight, Video, Trash2 } from "lucide-react";
+import { ChevronRight, Video, Trash2, Info } from "lucide-react";
 import "./meetings-list.css";
 import { formatAppDateTime } from "../../lib/dateUtils";
+
+const MEETINGS_HELP =
+  "Lexi runs meeting auto-detect in the background—when it recognizes a supported call, you can start capturing from the prompt. You can also start anytime from the Lexi menu bar tray (Start Meeting) or with Start New Meeting here. Open a meeting for live transcript, AI summary, and chat; end recording from the meeting view or the tray when you’re done.";
 
 export interface Meeting {
   id: string;
@@ -36,6 +39,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
   isGeneratingSummary,
   isLoading = false,
 }) => {
+  const meetingsTooltipId = useId();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -106,6 +110,23 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
               aria-hidden
             />
             Meetings
+            <span className="transcripts-page-tooltip-wrap">
+              <button
+                type="button"
+                className="transcripts-page-tooltip-trigger"
+                aria-label="How meetings work"
+                aria-describedby={meetingsTooltipId}
+              >
+                <Info size={16} strokeWidth={2} aria-hidden />
+              </button>
+              <span
+                id={meetingsTooltipId}
+                className="transcripts-page-tooltip"
+                role="tooltip"
+              >
+                {MEETINGS_HELP}
+              </span>
+            </span>
           </h1>
           {subtitle}
         </div>
