@@ -497,6 +497,7 @@ function App() {
             {currentPage === "home" && (
               <HomePage
                 onViewAllTranscripts={() => setCurrentPage("transcripts")}
+                onNavigate={(page: string) => setCurrentPage(page as Page)}
               />
             )}
             {currentPage === "transcripts" && (
