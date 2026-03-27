@@ -14,6 +14,7 @@ import {
   Sparkles,
   ChevronRight,
   Flame,
+  Home,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
@@ -459,8 +460,16 @@ export const HomePage: React.FC<HomePageProps> = ({
     >
       <motion.header className="home-header" variants={itemVariants}>
         <div className="greeting-section">
-          <h1 className="greeting-text">
-            {getGreeting()}, <span className="user-name">{userName}</span>
+          <h1 className="greeting-text greeting-text--with-icon">
+            <Home
+              className="greeting-text__icon"
+              size={28}
+              strokeWidth={2}
+              aria-hidden
+            />
+            <span>
+              {getGreeting()}, <span className="user-name">{userName}</span>
+            </span>
           </h1>
           <p className="greeting-sub">
             Ready to transform your voice into text?

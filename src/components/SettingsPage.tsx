@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Check,
   RefreshCw,
+  Settings as SettingsIcon,
 } from "lucide-react";
 
 import {
@@ -24,6 +25,8 @@ import { useUpdaterStore } from "../store/updaterStore";
 import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
+import { check } from "@tauri-apps/plugin-updater";
+import { checkUpdateDetails } from "../hooks/useAutoUpdater";
 
 type DefaultHotkeysResponse = {
   hotkeys: string[];
@@ -423,8 +426,6 @@ export const SettingsPage: React.FC = () => {
       setIsCheckingUpdate(true);
       setUpdateStatus("Checking for updates...");
 
-      const { check } = await import("@tauri-apps/plugin-updater");
-      const { checkUpdateDetails } = await import("../hooks/useAutoUpdater");
       const update = await check();
 
       if (update) {
@@ -467,7 +468,15 @@ export const SettingsPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="page">
-        <h2 className="page__title">Settings</h2>
+        <h2 className="page__title page__title--with-icon">
+          <SettingsIcon
+            className="page__title__icon"
+            size={22}
+            strokeWidth={2}
+            aria-hidden
+          />
+          Settings
+        </h2>
         <ScreenSkeleton variant="settings" className="page__empty" />
       </div>
     );
@@ -476,7 +485,15 @@ export const SettingsPage: React.FC = () => {
   if (!authStore.isAuthenticated) {
     return (
       <div className="page">
-        <h2 className="page__title">Settings</h2>
+        <h2 className="page__title page__title--with-icon">
+          <SettingsIcon
+            className="page__title__icon"
+            size={22}
+            strokeWidth={2}
+            aria-hidden
+          />
+          Settings
+        </h2>
         <div className="panel panel--center">
           <p className="panel__message">Sign in to access your settings</p>
           <GoogleLoginButton onSuccess={() => {}} onError={() => {}} />
@@ -488,14 +505,30 @@ export const SettingsPage: React.FC = () => {
   if (config === null) {
     return (
       <div className="page">
-        <h2 className="page__title">Settings</h2>
+        <h2 className="page__title page__title--with-icon">
+          <SettingsIcon
+            className="page__title__icon"
+            size={22}
+            strokeWidth={2}
+            aria-hidden
+          />
+          Settings
+        </h2>
       </div>
     );
   }
 
   return (
     <div className="page">
-      <h2 className="page__title">Settings</h2>
+      <h2 className="page__title page__title--with-icon">
+        <SettingsIcon
+          className="page__title__icon"
+          size={22}
+          strokeWidth={2}
+          aria-hidden
+        />
+        Settings
+      </h2>
 
       <div className="section-tabs">
         {[

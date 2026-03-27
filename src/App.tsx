@@ -25,6 +25,7 @@ import { MeetingsPage } from "./components/MeetingsPage";
 import { DocsPage } from "./components/docs/DocsPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
+import { check } from "@tauri-apps/plugin-updater";
 import { useAutoUpdater, checkUpdateDetails } from "./hooks/useAutoUpdater";
 import { useUpdaterStore } from "./store/updaterStore";
 import { useToast } from "./components/toast/useToast";
@@ -222,7 +223,6 @@ function App() {
       const unlisten = await listen("check-updates-from-tray", async () => {
         if (cancelled) return;
         try {
-          const { check } = await import("@tauri-apps/plugin-updater");
           const update = await check();
           if (update) {
             const details = await checkUpdateDetails();
