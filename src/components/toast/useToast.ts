@@ -1,5 +1,7 @@
 import { toast } from "sonner";
 
+import { formatUserFacingApiErrorFromUnknown } from "../../utils/userFacingApiError";
+
 export interface ToastOptions {
   duration?: number;
   description?: string;
@@ -13,8 +15,9 @@ export function useToast() {
         description: options?.description,
       });
     },
-    error: (message: string, options?: ToastOptions) => {
-      toast.error(message, {
+    error: (message: unknown, options?: ToastOptions) => {
+      const text = formatUserFacingApiErrorFromUnknown(message);
+      toast.error(text, {
         duration: options?.duration ?? 4000,
         description: options?.description,
       });

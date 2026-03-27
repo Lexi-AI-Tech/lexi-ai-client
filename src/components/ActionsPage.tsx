@@ -7,6 +7,7 @@ import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
+import { isUsageQuotaExceededError } from "../utils/userFacingApiError";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 import "./actions/actions.css";
@@ -88,6 +89,10 @@ export const ActionsPage: React.FC = () => {
       toast.success("Action deleted");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to delete action";
+      if (isUsageQuotaExceededError(errorMessage)) {
+        toast.error(errorMessage);
+        return;
+      }
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
@@ -157,6 +162,10 @@ export const ActionsPage: React.FC = () => {
         if (cancelled) return;
         console.error("Failed to load action history:", err);
         const errorMessage = err?.message || "Failed to load action history";
+        if (isUsageQuotaExceededError(errorMessage)) {
+          toast.error(errorMessage);
+          return;
+        }
         const isAuthError =
           errorMessage.includes("401") ||
           errorMessage.includes("403") ||

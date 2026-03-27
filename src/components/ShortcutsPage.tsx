@@ -6,6 +6,7 @@ import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
+import { isUsageQuotaExceededError } from "../utils/userFacingApiError";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 
@@ -40,6 +41,10 @@ export const ShortcutsPage: React.FC = () => {
     } catch (err: any) {
       console.error("Failed to load shortcuts:", err);
       const errorMessage = err?.message || "Failed to load shortcuts";
+      if (isUsageQuotaExceededError(errorMessage)) {
+        toast.error(errorMessage);
+        return;
+      }
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
@@ -89,6 +94,10 @@ export const ShortcutsPage: React.FC = () => {
       toast.success("Shortcut created");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to create shortcut";
+      if (isUsageQuotaExceededError(errorMessage)) {
+        toast.error(errorMessage);
+        return;
+      }
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
@@ -133,6 +142,10 @@ export const ShortcutsPage: React.FC = () => {
       toast.success("Shortcut updated");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to update shortcut";
+      if (isUsageQuotaExceededError(errorMessage)) {
+        toast.error(errorMessage);
+        return;
+      }
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
@@ -173,6 +186,10 @@ export const ShortcutsPage: React.FC = () => {
       toast.success("Shortcut deleted");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to delete shortcut";
+      if (isUsageQuotaExceededError(errorMessage)) {
+        toast.error(errorMessage);
+        return;
+      }
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
