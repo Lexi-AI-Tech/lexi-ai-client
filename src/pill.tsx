@@ -700,8 +700,19 @@ export const Pill: React.FC = () => {
       await invoke("show_main_window");
       // Backend hides pill on start; reset state so when pill is shown again we're idle
       await resetPillToIdle();
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Failed to start meeting from pill:", e);
+      const message =
+        e instanceof Error
+          ? e.message
+          : typeof e === "string"
+            ? e
+            : "Failed to start meeting";
+      try {
+        await emit("error", message);
+      } catch (emitErr) {
+        console.error("Failed to emit meeting error:", emitErr);
+      }
       await resetPillToIdle();
     } finally {
       startingMeetingRef.current = false;

@@ -79,7 +79,18 @@ pub async fn create_meeting(
         .map_err(|e| format!("Request failed: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        let detail = serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|v| v.get("detail").and_then(|d| d.as_str().map(str::to_string)));
+        return Err(if let Some(msg) = detail.filter(|s| !s.is_empty()) {
+            msg
+        } else if body.trim().is_empty() {
+            format!("Server error: {}", status)
+        } else {
+            format!("Server error: {} - {}", status, body)
+        });
     }
 
     let meeting: Meeting = response

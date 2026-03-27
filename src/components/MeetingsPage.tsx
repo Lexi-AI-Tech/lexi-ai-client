@@ -6,6 +6,7 @@ import { MeetingsListPage, type Meeting } from "./meetings/MeetingsListPage";
 import { MeetingDetailPage } from "./meetings/MeetingDetailPage";
 import "./meetings.css";
 import { formatAppDateTime } from "../lib/dateUtils";
+import { useToast } from "./toast/useToast";
 
 interface TranscriptSegment {
   id: string;
@@ -49,6 +50,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   onRecordingStoppedGlobal,
 }) => {
   const { tokens } = useAuthStore();
+  const toast = useToast();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isMeetingsLoading, setIsMeetingsLoading] = useState(false);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(
@@ -150,12 +152,26 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
 
       try {
         await invoke("start_meeting_recording", { meetingId: newMeeting.id });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Failed to start meeting recording:", error);
         setRecordingMeetingId(null);
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === "string"
+              ? error
+              : "Failed to start recording";
+        toast.error(message);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to create new meeting:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Failed to create meeting";
+      toast.error(message);
     }
   };
 
