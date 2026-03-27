@@ -73,6 +73,11 @@ function isProPlan(planType: string): boolean {
   return planType.trim().toLowerCase() === "pro";
 }
 
+function clamp01(n: number): number {
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
 function sortPlanUsageFeatures<T extends { feature_key: string }>(
   features: T[],
 ): T[] {
@@ -575,27 +580,68 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </p>
               </div>
             ) : (
-              planUsageRows.map((feature) => (
-                <motion.div
-                  key={feature.feature_key}
-                  className="transcript-card"
-                  whileHover={{ scale: 1.01 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="transcript-card-header"></div>
-                  <p className="transcript-preview">
-                    {featureLabel(feature.feature_key)}
-                  </p>
-                  <div className="transcript-meta">
-                    <span>{feature.used}</span>
-                    <span>used</span>
-                    {feature.limit_value !== null && (
-                      <span>• {feature.limit_value} limit</span>
-                    )}
-                    <span>• {feature.enabled ? "Enabled" : "Disabled"}</span>
-                  </div>
-                </motion.div>
-              ))
+              <ul className="billing-feature-list">
+                {planUsageRows.map((feature) => {
+                  const limit = feature.limit_value;
+                  const isUnlimited = limit === null;
+                  const used = feature.used ?? 0;
+                  const enabled = !!feature.enabled;
+                  const pct = isUnlimited
+                    ? 0
+                    : clamp01(limit > 0 ? used / limit : used > 0 ? 1 : 0);
+
+                  return (
+                    <motion.li
+                      key={feature.feature_key}
+                      className={`billing-feature-row ${!enabled ? "is-disabled" : ""}`}
+                      whileHover={enabled ? { scale: 1.01 } : undefined}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <div className="billing-feature-info">
+                        <div className="billing-feature-name-wrap">
+                          <span className="billing-feature-name">
+                            {featureLabel(feature.feature_key)}
+                          </span>
+                          {!enabled && (
+                            <span className="billing-feature-disabled">
+                              Disabled
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="billing-feature-metrics">
+                          {isUnlimited ? (
+                            <span className="billing-feature-usage billing-usage-unlimited">
+                              Unlimited
+                            </span>
+                          ) : (
+                            <span className="billing-feature-usage">
+                              <span className="billing-usage-numbers">
+                                {used} / {limit}
+                              </span>
+                              <span className="billing-feature-usage-suffix">
+                                used
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {!isUnlimited && feature.metered && (
+                        <div className="billing-usage-bar" aria-hidden>
+                          <div
+                            className="billing-usage-bar-fill"
+                            style={{
+                              width: `${Math.round(pct * 100)}%`,
+                              opacity: enabled ? 1 : 0.45,
+                            }}
+                          />
+                        </div>
+                      )}
+                    </motion.li>
+                  );
+                })}
+              </ul>
             )}
           </div>
         </motion.section>
