@@ -2,7 +2,7 @@
  * HomePage Component
  *
  * Compact dashboard: greeting, quick actions with descriptions,
- * unified stats card with plan usage, mixed recent activity feed, and analytics.
+ * unified stats card, mixed recent activity feed, and plan usage.
  */
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
@@ -10,9 +10,6 @@ import { motion } from "framer-motion";
 import {
   Clock,
   FileText,
-  TrendingUp,
-  Sparkles,
-  ChevronRight,
   Flame,
   Mic,
   Video,
@@ -21,7 +18,7 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import type { HotkeyConfig, Transcript, PaginatedTranscriptsResponse } from "../../types";
+import type { Transcript, PaginatedTranscriptsResponse } from "../../types";
 import type { Meeting } from "../meetings/MeetingsListPage";
 import "./home.css";
 
@@ -34,14 +31,6 @@ interface AnalyticsStats {
   time_saved_minutes: number;
   current_streak: number;
 }
-
-interface ChartData {
-  labels: string[];
-  data: number[];
-  total_transcriptions: number;
-}
-
-type AnalyticsPeriod = "1d" | "7d" | "30d";
 
 interface FeatureUsageEntry {
   feature_key: string;
@@ -277,10 +266,6 @@ const InlineStat: React.FC<{
   );
 };
 
-const PeriodButton: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
-  <button type="button" className={`period-btn ${active ? "active" : ""}`} onClick={onClick}>{label}</button>
-);
-
 // Quick action with description
 const QuickAction: React.FC<{
   icon: React.ElementType;
@@ -326,26 +311,6 @@ const HomeStatsSkeleton: React.FC = () => (
   </div>
 );
 
-const HomeAnalyticsSkeleton: React.FC = () => {
-  const barHeights = [28, 52, 36, 64, 44, 58, 32, 48, 40, 56];
-  return (
-    <div className="home-analytics-skeleton" aria-hidden>
-      <div className="home-analytics-skeleton__main">
-        <SkBlock style={{ width: 40, height: 40, borderRadius: 10 }} />
-        <SkBlock style={{ height: 32, width: "40%", borderRadius: 8 }} />
-        <SkBlock style={{ height: 12, width: "55%", borderRadius: 6 }} />
-      </div>
-      <div className="home-analytics-skeleton__chart">
-        <div className="home-analytics-skeleton__bars">
-          {barHeights.map((h, i) => (
-            <SkBlock key={i} className="home-analytics-skeleton__bar" style={{ height: h }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const HomeRecentSkeleton: React.FC = () => (
   <div className="home-recent-skeleton" aria-hidden>
     {Array.from({ length: 5 }).map((_, i) => (
@@ -374,14 +339,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
 
   const [billingLoading, setBillingLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
-  const [chartLoading, setChartLoading] = useState(false);
   const [recentLoading, setRecentLoading] = useState(false);
   const [meetingsLoading, setMeetingsLoading] = useState(false);
 
-  const [activePeriod, setActivePeriod] = useState<AnalyticsPeriod>("7d");
-  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>([]);
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
-  const [chartData, setChartData] = useState<ChartData | null>(null);
   const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(null);
   const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -397,12 +358,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
     if (!isAuthenticated || !tokens?.access_token) return;
     try { setStats(await invoke<AnalyticsStats>("get_analytics_stats")); }
     catch (e) { console.error("Failed to fetch analytics stats:", e); }
-  }, [isAuthenticated, tokens?.access_token]);
-
-  const fetchChart = useCallback(async (period: AnalyticsPeriod) => {
-    if (!isAuthenticated || !tokens?.access_token) return;
-    try { setChartData(await invoke<ChartData>("get_analytics_chart", { period })); }
-    catch (e) { console.error(`Failed to fetch chart for ${period}:`, e); }
   }, [isAuthenticated, tokens?.access_token]);
 
   const fetchRecentTranscripts = useCallback(async () => {
@@ -435,13 +390,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
   }, [isAuthenticated, tokens?.access_token, fetchStats]);
 
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) { setChartLoading(false); return; }
-    let c = false; setChartLoading(true);
-    (async () => { try { await fetchChart(activePeriod); } finally { if (!c) setChartLoading(false); } })();
-    return () => { c = true; };
-  }, [isAuthenticated, tokens?.access_token, activePeriod, fetchChart]);
-
-  useEffect(() => {
     if (!isAuthenticated || !tokens?.access_token) { setRecentLoading(false); return; }
     let c = false; setRecentLoading(true);
     (async () => { try { await fetchRecentTranscripts(); } finally { if (!c) setRecentLoading(false); } })();
@@ -455,25 +403,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
     return () => { c = true; };
   }, [isAuthenticated, tokens?.access_token, fetchMeetings]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const hotkeyJson = await invoke<string>("get_current_hotkey");
-        const hotkeyData: HotkeyConfig = JSON.parse(hotkeyJson);
-        if (hotkeyData.hotkeys?.length) setTranscriptionHotkeys(hotkeyData.hotkeys);
-      } catch (err) { console.error("Failed to load global hotkey:", err); }
-    })();
-  }, []);
-
   // Derived
   const userName = user?.name?.split(" ")[0] || "there";
   const resolvedStats = stats ?? { words_typed_this_week: 0, time_saved_minutes: 0, current_streak: 0 };
-  const resolvedChartData = chartData ?? { labels: [], data: [], total_transcriptions: 0 };
   const planUsageRows = useMemo(
     () => billingUsage?.features ? sortPlanUsageFeatures(billingUsage.features) : [],
     [billingUsage],
   );
-  const maxChartValue = useMemo(() => Math.max(...resolvedChartData.data, 1), [resolvedChartData.data]);
   const streakLevel = resolvedStats.current_streak >= 7 ? "high" : resolvedStats.current_streak >= 3 ? "medium" : "low";
   const activityFeed = useMemo(() => buildActivityFeed(recentTranscripts, meetings), [recentTranscripts, meetings]);
 
@@ -534,26 +470,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
         </div>
       </motion.section>
 
-      {/* ── Hotkey Tip ── */}
-      {transcriptionHotkeys.length > 0 && (
-        <motion.div className="usage-tip" variants={itemVariants}>
-          <div className="tip-icon"><Sparkles size={16} /></div>
-          <div className="tip-content">
-            <p className="tip-text">
-              Hold{" "}
-              {transcriptionHotkeys.map((key, i) => (
-                <React.Fragment key={key}>
-                  {i > 0 && " or "}
-                  <kbd className="hotkey-badge">{key}</kbd>
-                </React.Fragment>
-              ))}{" "}
-              and speak — Lexi transcribes in real-time
-            </p>
-          </div>
-          <ChevronRight className="tip-arrow" size={14} />
-        </motion.div>
-      )}
-
       {/* ── Unified Stats Card ── */}
       <motion.section className="stats-section" variants={itemVariants}>
         {isAuthenticated && (statsLoading || meetingsLoading) ? (
@@ -595,59 +511,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
                 iconColor={streakLevel === "high" ? "#dc2626" : streakLevel === "medium" ? "#d97706" : "#d4a053"}
               />
             </div>
-
-            {/* Plan usage strip inside stats card */}
-            {billingUsage && planUsageRows.length > 0 && (
-              <div className="plan-usage-strip">
-                <div className="plan-usage-strip-header">
-                  <div className="plan-usage-strip-header-left">
-                    <span className="billing-plan-badge">{billingUsage.plan_type}</span>
-                    {!isProPlan(billingUsage.plan_type) && (
-                      <BillingResetCountdown periodEndIso={billingUsage.period_end} />
-                    )}
-                  </div>
-                  {showUpgradeCta && (
-                    <button
-                      type="button"
-                      className="home-upgrade-btn"
-                      onClick={handleUpgradeClick}
-                    >
-                      Upgrade
-                    </button>
-                  )}
-                </div>
-                <div className="plan-usage-bars">
-                  {planUsageRows.map((feature) => {
-                    const limit = feature.limit_value;
-                    const isUnlimited = limit === null;
-                    const used = feature.used ?? 0;
-                    const pct = isUnlimited ? 0 : clamp01(limit > 0 ? used / limit : used > 0 ? 1 : 0);
-                    return (
-                      <div key={feature.feature_key} className="plan-usage-item">
-                        <div className="plan-usage-item-header">
-                          <span className="plan-usage-item-name">{featureLabel(feature.feature_key)}</span>
-                          <span className="plan-usage-item-value">
-                            {isUnlimited
-                              ? "Unlimited"
-                              : `${used} / ${limit} ${featureUsageSuffix(feature.feature_key)}`}
-                          </span>
-                        </div>
-                        {!isUnlimited && feature.metered && (
-                          <div className="plan-usage-bar">
-                            <div className="plan-usage-bar-fill" style={{ width: `${Math.round(pct * 100)}%` }} />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </motion.section>
 
-      {/* ── Main Grid: Recent Activity | Analytics ── */}
+      {/* ── Main Grid: Recent Activity | Plan Usage ── */}
       <div className="home-grid">
         {/* Left: Mixed Recent Activity */}
         <motion.section className="recent-activity-section" variants={itemVariants}>
@@ -695,65 +563,85 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
           </div>
         </motion.section>
 
-        {/* Right: Analytics */}
-        <motion.section className="analytics-section" variants={itemVariants}>
+        {/* Right: Plan Usage */}
+        <motion.section className="billing-usage-section" variants={itemVariants}>
           <div className="section-header">
-            <h2 className="section-title">Analytics</h2>
-            <div className="period-selector">
-              <PeriodButton label="1D" active={activePeriod === "1d"} onClick={() => setActivePeriod("1d")} />
-              <PeriodButton label="7D" active={activePeriod === "7d"} onClick={() => setActivePeriod("7d")} />
-              <PeriodButton label="30D" active={activePeriod === "30d"} onClick={() => setActivePeriod("30d")} />
+            <div>
+              <h2 className="section-title">Plan Usage</h2>
+              {billingUsage && (
+                <div className="billing-usage-meta">
+                  <span className="billing-plan-badge">{billingUsage.plan_type}</span>
+                  {!isProPlan(billingUsage.plan_type) && (
+                    <BillingResetCountdown periodEndIso={billingUsage.period_end} />
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-
-          <div className="analytics-content">
-            {isAuthenticated && chartLoading ? (
-              <HomeAnalyticsSkeleton />
-            ) : (
-              <>
-                <div className="analytics-main-stat">
-                  <div className="analytics-icon"><TrendingUp size={20} /></div>
-                  <div className="analytics-value">{resolvedChartData.total_transcriptions}</div>
-                  <div className="analytics-label">
-                    Transcriptions in {activePeriod === "1d" ? "24h" : activePeriod === "7d" ? "7 days" : "30 days"}
-                  </div>
-                </div>
-
-                <div className="analytics-chart">
-                  <div className="chart-bars">
-                    {resolvedChartData.data.map((value, i) => (
-                      <div
-                        key={i}
-                        className="chart-bar"
-                        style={{
-                          ["--chart-height" as string]: `${(value / maxChartValue) * 100}%`,
-                          ["--chart-opacity" as string]: i === resolvedChartData.data.length - 1 ? 1 : 0.5,
-                          ["--chart-min-height" as string]: value > 0 ? "4px" : "0",
-                        } as React.CSSProperties}
-                        title={`${resolvedChartData.labels[i] ?? ""}: ${value} transcriptions`}
-                      />
-                    ))}
-                  </div>
-                  <div className="chart-labels">
-                    {resolvedChartData.labels.map((label, i) => <span key={i}>{label}</span>)}
-                  </div>
-                </div>
-
-                <div className="analytics-insights">
-                  <div className="insight-item">
-                    <span className="insight-dot success" />
-                    <span className="insight-text">{resolvedChartData.total_transcriptions} successful this period</span>
-                  </div>
-                  <div className="insight-item">
-                    <span className="insight-dot info" />
-                    <span className="insight-text">
-                      Avg. {Math.round(resolvedStats.words_typed_this_week / Math.max(resolvedChartData.total_transcriptions, 1))} words per session
-                    </span>
-                  </div>
-                </div>
-              </>
+            {showUpgradeCta && (
+              <button
+                type="button"
+                className="home-upgrade-btn"
+                onClick={handleUpgradeClick}
+              >
+                Upgrade
+              </button>
             )}
           </div>
+
+          {billingLoading ? (
+            <div className="home-billing-skeleton">
+              {[80, 55, 70].map((w, i) => (
+                <div key={i} className="home-billing-skeleton__row">
+                  <SkBlock style={{ height: 12, width: `${w}%`, borderRadius: 4, marginBottom: 6 }} />
+                  <SkBlock style={{ height: 6, width: "100%", borderRadius: 3 }} />
+                </div>
+              ))}
+            </div>
+          ) : billingUsage && planUsageRows.length > 0 ? (
+            <ul className="billing-feature-list">
+              {planUsageRows.map((feature) => {
+                const limit = feature.limit_value;
+                const isUnlimited = limit === null;
+                const used = feature.used ?? 0;
+                const pct = isUnlimited ? 0 : clamp01(limit > 0 ? used / limit : used > 0 ? 1 : 0);
+                return (
+                  <li key={feature.feature_key} className={`billing-feature-row${!feature.enabled ? " is-disabled" : ""}`}>
+                    <div className="billing-feature-info">
+                      <div className="billing-feature-name-wrap">
+                        <span className="billing-feature-name">{featureLabel(feature.feature_key)}</span>
+                        {!feature.enabled && <span className="billing-feature-disabled">Not included</span>}
+                      </div>
+                      <div className="billing-feature-metrics">
+                        <span className="billing-feature-usage">
+                          {isUnlimited ? (
+                            <span className="billing-usage-unlimited">Unlimited</span>
+                          ) : (
+                            <>
+                              <span className="billing-usage-numbers">
+                                {used} / {limit}
+                              </span>{" "}
+                              <span className="billing-feature-usage-suffix">
+                                {featureUsageSuffix(feature.feature_key)}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    {!isUnlimited && feature.metered && (
+                      <div className="billing-usage-bar">
+                        <div className="billing-usage-bar-fill" style={{ width: `${Math.round(pct * 100)}%` }} />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="empty-state">
+              <p className="empty-sub">No plan data available.</p>
+            </div>
+          )}
         </motion.section>
       </div>
     </motion.div>
