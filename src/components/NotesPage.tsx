@@ -8,7 +8,7 @@ import {
   Trash2,
   Copy,
   Check,
-  StickyNote,
+  NotebookPen,
 } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
 import { useToast } from "./toast/useToast";
@@ -180,7 +180,7 @@ export const NotesPage: React.FC = () => {
       }}
     >
       <h2 className="transcripts-page-title transcripts-page-title--with-icon">
-        <StickyNote
+        <NotebookPen
           className="transcripts-page-title__icon"
           size={22}
           strokeWidth={2}

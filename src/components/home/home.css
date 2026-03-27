@@ -38,17 +38,6 @@
   line-height: 1.2;
 }
 
-.greeting-text--with-icon {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.greeting-text__icon {
-  flex-shrink: 0;
-  color: var(--lexi-primary);
-}
-
 .user-name {
   background: var(--lexi-primary);
   -webkit-background-clip: text;
