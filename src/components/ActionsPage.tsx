@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Pause, Trash2, Copy, Check, Atom } from "lucide-react";
+import { Play, Pause, Trash2, Copy, Check, Atom, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { ActionHistory, PaginatedActionHistoryResponse } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
@@ -11,6 +11,37 @@ import { isUsageQuotaExceededError } from "../utils/userFacingApiError";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 import "./actions/actions.css";
+
+const ACTIONS_HELP =
+  "Hold your Action hotkey (configure it in Settings) and speak your command. With text selected in the active app, Lexi uses that selection as context—rewrite, summarize, or build on it. With nothing selected, you get a fresh generation from scratch. Output is pasted at the cursor and saved in this list.";
+
+function ActionsPageHeading() {
+  const tooltipId = useId();
+  return (
+    <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+      <Atom
+        className="transcripts-page-title__icon"
+        size={22}
+        strokeWidth={2}
+        aria-hidden
+      />
+      Actions
+      <span className="transcripts-page-tooltip-wrap">
+        <button
+          type="button"
+          className="transcripts-page-tooltip-trigger"
+          aria-label="How actions work"
+          aria-describedby={tooltipId}
+        >
+          <Info size={16} strokeWidth={2} aria-hidden />
+        </button>
+        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+          {ACTIONS_HELP}
+        </span>
+      </span>
+    </h2>
+  );
+}
 
 export const ActionsPage: React.FC = () => {
   const authStore = useAuthStore();
@@ -229,15 +260,7 @@ export const ActionsPage: React.FC = () => {
   if (!authStore.isInitialized) {
     return (
       <div className="actions-page">
-        <h2 className="transcripts-page-title transcripts-page-title--with-icon">
-          <Atom
-            className="transcripts-page-title__icon"
-            size={22}
-            strokeWidth={2}
-            aria-hidden
-          />
-          Actions
-        </h2>
+        <ActionsPageHeading />
         <p className="app-page-subtitle">
           <span
             className="skeleton-block app-page-subtitle-skeleton"
@@ -258,15 +281,7 @@ export const ActionsPage: React.FC = () => {
   if (!authStore.isAuthenticated) {
     return (
       <div className="actions-page">
-        <h2 className="transcripts-page-title transcripts-page-title--with-icon">
-          <Atom
-            className="transcripts-page-title__icon"
-            size={22}
-            strokeWidth={2}
-            aria-hidden
-          />
-          Actions
-        </h2>
+        <ActionsPageHeading />
         <div className="actions-login">
           <p className="actions-login__hint">Sign in to access your actions</p>
           <GoogleLoginButton
@@ -284,15 +299,7 @@ export const ActionsPage: React.FC = () => {
 
   return (
     <div className="actions-page">
-      <h2 className="transcripts-page-title transcripts-page-title--with-icon">
-        <Atom
-          className="transcripts-page-title__icon"
-          size={22}
-          strokeWidth={2}
-          aria-hidden
-        />
-        Actions
-      </h2>
+      <ActionsPageHeading />
       {isLoading && actions.length === 0 ? (
         <p className="app-page-subtitle">
           <span
