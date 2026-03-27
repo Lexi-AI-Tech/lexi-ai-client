@@ -41,18 +41,6 @@ npm run build
 
 For a **notarized DMG** to distribute (avoids "can't be opened" on install), use the release script: see [Building a distributable release](#building-a-distributable-release-notarized-dmg).
 
-## Project Structure
-
-```
-lexi-ai-client/
-├── src/                   # React frontend
-├── src-tauri/             # Rust backend
-│   ├── src/               # Rust source code
-│   ├── bin/               # Whisper binary
-│   └── tauri.conf.json    # Tauri configuration
-└── public/                # Static assets
-```
-
 ## Troubleshooting
 
 ### Clearing App Configuration
