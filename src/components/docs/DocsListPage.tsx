@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookText, ChevronRight, FileText, Trash2 } from "lucide-react";
+import { BookText, ChevronRight, FileText, Info, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
 import { formatAppDateTime } from "../../lib/dateUtils";
 import { ScreenSkeleton } from "../ui/ScreenSkeleton";
 import "./docs-list.css";
+
+const DOCS_HELP =
+  "On a meeting’s detail page, use Create doc to generate a document from that meeting. Here, click New doc to start fresh, then use the mic in the editor toolbar to dictate—Lexi turns your speech into the document.";
 
 const PREVIEW_MAX_LENGTH = 140;
 
@@ -34,6 +37,34 @@ function docContentToPlainText(contentJson: string | undefined): string {
   } catch {
     return "";
   }
+}
+
+function DocsPageHeading() {
+  const tooltipId = useId();
+  return (
+    <h1 className="docs-list-page__title docs-list-page__title--with-icon">
+      <BookText
+        className="docs-list-page__title__icon"
+        size={22}
+        strokeWidth={2}
+        aria-hidden
+      />
+      Docs
+      <span className="transcripts-page-tooltip-wrap">
+        <button
+          type="button"
+          className="transcripts-page-tooltip-trigger"
+          aria-label="How docs work"
+          aria-describedby={tooltipId}
+        >
+          <Info size={16} strokeWidth={2} aria-hidden />
+        </button>
+        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+          {DOCS_HELP}
+        </span>
+      </span>
+    </h1>
+  );
 }
 
 interface DocsListPageProps {
@@ -98,7 +129,12 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
 
   const subtitle =
     isLoading && docs.length === 0 ? (
-      <p className="app-page-subtitle">Loading…</p>
+      <p className="app-page-subtitle">
+        <span
+          className="skeleton-block app-page-subtitle-skeleton"
+          style={{ width: 150, height: 12, borderRadius: 10 }}
+        />
+      </p>
     ) : docs.length > 0 ? (
       <p className="app-page-subtitle">
         {docs.length} {docs.length === 1 ? "document" : "documents"}
@@ -109,15 +145,7 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
     <div className="docs-list-page">
       <header className="docs-list-page__header">
         <div className="docs-list-page__header-inner">
-          <h1 className="docs-list-page__title docs-list-page__title--with-icon">
-            <BookText
-              className="docs-list-page__title__icon"
-              size={22}
-              strokeWidth={2}
-              aria-hidden
-            />
-            Docs
-          </h1>
+          <DocsPageHeading />
           {subtitle}
         </div>
         <button

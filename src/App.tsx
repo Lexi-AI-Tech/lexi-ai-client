@@ -78,9 +78,78 @@ function App() {
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const prevCompletedRef = useRef(isCompleted);
   const toast = useToast();
+  const lastForegroundedErrorRef = useRef<{ msg: string; at: number } | null>(
+    null,
+  );
 
   // Initialize auto-updating background worker
   useAutoUpdater();
+
+  // Global error-to-toast bridge for backend events (so we never fail silently).
+  // Brings the main window to the front so the toast is actually visible.
+  useEffect(() => {
+    let cancelled = false;
+
+    const shouldDedupe = (msg: string) => {
+      const now = Date.now();
+      const prev = lastForegroundedErrorRef.current;
+      if (prev && prev.msg === msg && now - prev.at < 3000) return true;
+      lastForegroundedErrorRef.current = { msg, at: now };
+      return false;
+    };
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+
+      const showError = async (raw: unknown, fallback: string) => {
+        if (cancelled) return;
+        const msg =
+          typeof raw === "string" && raw.trim().length > 0 ? raw : fallback;
+        if (shouldDedupe(msg)) return;
+        try {
+          await invoke("show_main_window");
+        } catch {
+          // Best-effort: if window can't be shown, still toast.
+        }
+        toast.error(msg);
+      };
+
+      const unlistenTranscription = await listen<string>(
+        "transcription_error",
+        (e) => showError(e.payload, "Transcription failed"),
+      );
+      const unlistenInjection = await listen<string>("injection_error", (e) =>
+        showError(e.payload, "Failed to insert text"),
+      );
+      const unlistenGeneric = await listen<string>("error", (e) =>
+        showError(e.payload, "Something went wrong"),
+      );
+      const unlistenAction = await listen<string>("action_error", (e) =>
+        showError(e.payload, "Action failed"),
+      );
+
+      return () => {
+        unlistenTranscription();
+        unlistenInjection();
+        unlistenGeneric();
+        unlistenAction();
+      };
+    };
+
+    let unlistenFn: (() => void) | undefined;
+    setup()
+      .then((fn) => {
+        unlistenFn = fn;
+      })
+      .catch((e) => {
+        console.error("Failed to set up global error listeners:", e);
+      });
+
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, [toast]);
 
   // When a meeting is started from the pill overlay, we want to:
   // 1. Switch to the Meetings page
@@ -90,9 +159,9 @@ function App() {
     meetingId: string;
     readableDuration: string;
   } | null>(null);
-  const [pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
+  const [_pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
     useState<string | null>(null);
-  const [activeRecordingMeetingId, setActiveRecordingMeetingId] = useState<
+  const [_activeRecordingMeetingId, setActiveRecordingMeetingId] = useState<
     string | null
   >(null);
 

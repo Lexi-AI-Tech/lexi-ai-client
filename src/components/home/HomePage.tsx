@@ -52,10 +52,19 @@ interface BillingUsageResponse {
   features: FeatureUsageEntry[];
 }
 
+const UPGRADE_URL = "https://speaklexi.com";
+
 const FEATURE_LABELS: Record<string, string> = {
   "assistant.speech_to_text": "Assistant",
   "meetings.create": "Meeting",
   "actions.perform": "Actions",
+};
+
+/** Suffix after "used / limit" in plan usage metrics (e.g. "1608 / 2000 words"). */
+const FEATURE_USAGE_SUFFIX: Record<string, string> = {
+  "assistant.speech_to_text": "words",
+  "meetings.create": "sessions",
+  "actions.perform": "actions",
 };
 
 /** Display order for plan usage rows (unknown keys sort after, by key). */
@@ -67,6 +76,10 @@ const PLAN_USAGE_FEATURE_ORDER = [
 
 function featureLabel(key: string): string {
   return FEATURE_LABELS[key] ?? key;
+}
+
+function featureUsageSuffix(key: string): string {
+  return FEATURE_USAGE_SUFFIX[key] ?? "used";
 }
 
 function isProPlan(planType: string): boolean {
@@ -450,6 +463,20 @@ export const HomePage: React.FC<HomePageProps> = ({
     [resolvedChartData.data],
   );
 
+  const handleUpgradeClick = useCallback(async () => {
+    try {
+      await invoke("open_external_url", { url: UPGRADE_URL });
+    } catch (e) {
+      console.error("Failed to open upgrade URL:", e);
+    }
+  }, []);
+
+  const showUpgradeCta =
+    isAuthenticated &&
+    billingUsage &&
+    !billingLoading &&
+    !isProPlan(billingUsage.plan_type);
+
   return (
     <motion.div
       className="home-container"
@@ -544,6 +571,15 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </p>
               )}
             </div>
+            {showUpgradeCta && (
+              <button
+                type="button"
+                className="home-upgrade-btn"
+                onClick={handleUpgradeClick}
+              >
+                Upgrade
+              </button>
+            )}
           </div>
 
           <div className="transcriptions-list">
@@ -618,9 +654,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                             <span className="billing-feature-usage">
                               <span className="billing-usage-numbers">
                                 {used} / {limit}
-                              </span>
+                              </span>{" "}
                               <span className="billing-feature-usage-suffix">
-                                used
+                                {featureUsageSuffix(feature.feature_key)}
                               </span>
                             </span>
                           )}

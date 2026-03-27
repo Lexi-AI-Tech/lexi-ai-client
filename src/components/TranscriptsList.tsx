@@ -5,9 +5,9 @@
  * Requires authentication to view transcripts.
  */
 
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef, useId } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, Check, Trash2, Play, Pause, AudioLines } from "lucide-react";
+import { Copy, Check, Trash2, Play, Pause, AudioLines, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
@@ -16,6 +16,37 @@ import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
+
+const TRANSCRIPTION_HELP =
+  "Press and hold your configured hotkey in any app while you speak. Release to stop—text is inserted at the cursor and saved here. Copy, play audio, or delete entries from the list below.";
+
+function TranscriptsPageHeading() {
+  const tooltipId = useId();
+  return (
+    <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+      <AudioLines
+        className="transcripts-page-title__icon"
+        size={22}
+        strokeWidth={2}
+        aria-hidden
+      />
+      Transcripts
+      <span className="transcripts-page-tooltip-wrap">
+        <button
+          type="button"
+          className="transcripts-page-tooltip-trigger"
+          aria-label="How transcription works"
+          aria-describedby={tooltipId}
+        >
+          <Info size={16} strokeWidth={2} aria-hidden />
+        </button>
+        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+          {TRANSCRIPTION_HELP}
+        </span>
+      </span>
+    </h2>
+  );
+}
 
 export const TranscriptsList: React.FC = () => {
   const authStore = useAuthStore();
@@ -217,17 +248,14 @@ export const TranscriptsList: React.FC = () => {
 
   return (
     <div className="transcripts-page">
-      <h2 className="transcripts-page-title transcripts-page-title--with-icon">
-        <AudioLines
-          className="transcripts-page-title__icon"
-          size={22}
-          strokeWidth={2}
-          aria-hidden
-        />
-        Transcripts
-      </h2>
+      <TranscriptsPageHeading />
       {loading ? (
-        <p className="app-page-subtitle">Loading…</p>
+        <p className="app-page-subtitle">
+          <span
+            className="skeleton-block app-page-subtitle-skeleton"
+            style={{ width: 190, height: 12, borderRadius: 10 }}
+          />
+        </p>
       ) : total > 0 ? (
         <p className="app-page-subtitle">
           {total} voice {total === 1 ? "transcription" : "transcriptions"}
@@ -236,15 +264,7 @@ export const TranscriptsList: React.FC = () => {
 
       {!showContent && (
         <div className="transcripts-page">
-          <h2 className="transcripts-page-title transcripts-page-title--with-icon">
-        <AudioLines
-          className="transcripts-page-title__icon"
-          size={22}
-          strokeWidth={2}
-          aria-hidden
-        />
-        Transcripts
-      </h2>
+          <TranscriptsPageHeading />
           <ScreenSkeleton variant="transcripts" className="page__empty" />
         </div>
       )}

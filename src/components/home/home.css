@@ -278,6 +278,30 @@
   color: var(--lexi-primary-hover);
 }
 
+.home-upgrade-btn {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 0.125rem;
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lexi-primary-foreground);
+  background: var(--lexi-primary);
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+  font-family: inherit;
+}
+
+.home-upgrade-btn:hover {
+  background: var(--lexi-primary-hover);
+}
+
+.home-upgrade-btn:active {
+  transform: scale(0.98);
+}
+
 /* ============================================
    BILLING USAGE (plan period)
    ============================================ */

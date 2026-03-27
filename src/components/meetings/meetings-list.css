@@ -432,3 +432,31 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Theme polish overrides */
+.meetings-list-page__cta {
+  box-shadow: var(--lexi-shadow-sm);
+}
+
+.meetings-list-page__cta:hover:not(:disabled) {
+  box-shadow: var(--lexi-shadow-md);
+}
+
+.meetings-list-page__skeleton-line {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--lexi-border-subtle) 65%, transparent) 0%,
+    color-mix(in srgb, var(--lexi-primary-muted) 75%, var(--lexi-surface-elevated) 25%) 45%,
+    color-mix(in srgb, var(--lexi-border-subtle) 65%, transparent) 100%
+  );
+}
+
+.meetings-list-page__empty {
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      color-mix(in srgb, var(--lexi-primary) 8%, transparent) 0%,
+      transparent 55%
+    ),
+    transparent;
+}

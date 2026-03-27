@@ -1,13 +1,45 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, Plus, Edit, Trash2, ArrowLeftRight } from "lucide-react";
+import { RefreshCw, Plus, Edit, Trash2, ArrowLeftRight, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
+import { isUsageQuotaExceededError } from "../utils/userFacingApiError";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
+
+const SHORTCUTS_HELP =
+  "Pair a spoken phrase with text Lexi inserts when that phrase shows up in your dictation. Examples: phrase “my email” → value your address; phrase “standup link” → the Zoom URL. Speak naturally—when the phrase matches, the replacement is pasted instead.";
+
+function ShortcutsPageHeading() {
+  const tooltipId = useId();
+  return (
+    <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+      <ArrowLeftRight
+        className="transcripts-page-title__icon"
+        size={20}
+        strokeWidth={1.5}
+        aria-hidden
+      />
+      Shortcuts
+      <span className="transcripts-page-tooltip-wrap">
+        <button
+          type="button"
+          className="transcripts-page-tooltip-trigger"
+          aria-label="How shortcuts work"
+          aria-describedby={tooltipId}
+        >
+          <Info size={16} strokeWidth={2} aria-hidden />
+        </button>
+        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+          {SHORTCUTS_HELP}
+        </span>
+      </span>
+    </h2>
+  );
+}
 
 export const ShortcutsPage: React.FC = () => {
   const authStore = useAuthStore();
@@ -40,6 +72,10 @@ export const ShortcutsPage: React.FC = () => {
     } catch (err: any) {
       console.error("Failed to load shortcuts:", err);
       const errorMessage = err?.message || "Failed to load shortcuts";
+      if (isUsageQuotaExceededError(errorMessage)) {
+        toast.error(errorMessage);
+        return;
+      }
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
@@ -89,6 +125,10 @@ export const ShortcutsPage: React.FC = () => {
       toast.success("Shortcut created");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to create shortcut";
+      if (isUsageQuotaExceededError(errorMessage)) {
+        toast.error(errorMessage);
+        return;
+      }
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
@@ -133,6 +173,10 @@ export const ShortcutsPage: React.FC = () => {
       toast.success("Shortcut updated");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to update shortcut";
+      if (isUsageQuotaExceededError(errorMessage)) {
+        toast.error(errorMessage);
+        return;
+      }
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
@@ -173,6 +217,10 @@ export const ShortcutsPage: React.FC = () => {
       toast.success("Shortcut deleted");
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to delete shortcut";
+      if (isUsageQuotaExceededError(errorMessage)) {
+        toast.error(errorMessage);
+        return;
+      }
       const isAuthError =
         errorMessage.includes("401") ||
         errorMessage.includes("403") ||
@@ -211,17 +259,14 @@ export const ShortcutsPage: React.FC = () => {
 
   return (
     <div className="transcripts-page">
-      <h2 className="transcripts-page-title transcripts-page-title--with-icon">
-        <ArrowLeftRight
-          className="transcripts-page-title__icon"
-          size={20}
-          strokeWidth={1.5}
-          aria-hidden
-        />
-        Shortcuts
-      </h2>
+      <ShortcutsPageHeading />
       {authStore.isInitialized && isLoading ? (
-        <p className="app-page-subtitle">Loading…</p>
+        <p className="app-page-subtitle">
+          <span
+            className="skeleton-block app-page-subtitle-skeleton"
+            style={{ width: 160, height: 12, borderRadius: 10 }}
+          />
+        </p>
       ) : authStore.isInitialized && shortcuts.length > 0 ? (
         <p className="app-page-subtitle">
           {shortcuts.length} {shortcuts.length === 1 ? "shortcut" : "shortcuts"}

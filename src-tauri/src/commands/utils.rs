@@ -2,6 +2,8 @@
 //!
 //! This module provides Tauri commands for utility functions that can be called from the frontend.
 
+use std::process::Command;
+
 use crate::utils;
 use arboard::Clipboard;
 
@@ -33,5 +35,44 @@ pub fn copy_to_clipboard(text: String) -> Result<(), String> {
     clipboard
         .set_text(text)
         .map_err(|e| format!("Failed to set clipboard text: {}", e))?;
+    Ok(())
+}
+
+/// Open an https URL in the system default browser (macOS `open`, Windows `start`, Linux `xdg-open`).
+#[tauri::command]
+pub fn open_external_url(url: String) -> Result<(), String> {
+    let trimmed = url.trim();
+    if !trimmed.starts_with("https://") {
+        return Err("Only https URLs are allowed".to_string());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(trimmed)
+            .spawn()
+            .map_err(|e| format!("Failed to open browser: {}", e))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "", trimmed])
+            .spawn()
+            .map_err(|e| format!("Failed to open browser: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(trimmed)
+            .spawn()
+            .map_err(|e| format!("Failed to open browser: {}", e))?;
+    }
+    #[cfg(not(any(
+        target_os = "macos",
+        target_os = "windows",
+        target_os = "linux"
+    )))]
+    {
+        return Err("Unsupported platform".to_string());
+    }
     Ok(())
 }

@@ -13,7 +13,7 @@ const initStore = async () => {
   if (typeof window !== "undefined" && (window as any).__TAURI__) {
     try {
       const { Store } = await import("@tauri-apps/plugin-store");
-      storeInstance = new Store(".auth.dat");
+      storeInstance = await Store.load(".auth.dat");
       isTauriAvailable = true;
       console.log("✅ Using Tauri Store for persistent storage");
       return true;

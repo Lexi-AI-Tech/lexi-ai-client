@@ -100,7 +100,7 @@ interface MeetingDetailPageProps {
 export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   meetingId,
   meeting,
-  onBackToList,
+  onBackToList: _onBackToList,
   onMeetingDeleted,
   onMeetingsUpdated,
   isThisMeetingRecording,
@@ -283,16 +283,52 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
               // doesn't "jump" from streaming → full re-render on completion.
               return prev;
             });
-            // Fetch suggested questions in parallel; no clear so no blink
+            // Refresh meeting details (including AI title updates) and suggested
+            // questions in parallel to reduce post-stream latency.
             setIsLoadingSuggestedQuestions(true);
-            invoke<string[]>("get_meeting_suggested_questions", { meetingId })
-              .then((questions) => {
-                setSuggestedQuestions(
-                  Array.isArray(questions) ? questions : [],
+            void (async () => {
+              const [detailsResult, suggestedQuestionsResult] =
+                await Promise.allSettled([
+                  invoke<{
+                    name?: string | null;
+                    summary?: string | null;
+                  }>("get_meeting_details", { meetingId }),
+                  invoke<string[]>("get_meeting_suggested_questions", {
+                    meetingId,
+                  }),
+                ]);
+
+              if (detailsResult.status === "fulfilled") {
+                const details = detailsResult.value;
+                const serverName =
+                  typeof details?.name === "string" ? details.name : null;
+                const serverSummary =
+                  typeof details?.summary === "string" ? details.summary : null;
+                onMeetingsUpdated((p) =>
+                  p.map((m) =>
+                    m.id === meetingId
+                      ? {
+                          ...m,
+                          ...(serverName ? { name: serverName } : {}),
+                          ...(serverSummary ? { summary: serverSummary } : {}),
+                        }
+                      : m,
+                  ),
                 );
-              })
-              .catch(() => setSuggestedQuestions([]))
-              .finally(() => setIsLoadingSuggestedQuestions(false));
+              }
+
+              if (suggestedQuestionsResult.status === "fulfilled") {
+                setSuggestedQuestions(
+                  Array.isArray(suggestedQuestionsResult.value)
+                    ? suggestedQuestionsResult.value
+                    : [],
+                );
+              } else {
+                setSuggestedQuestions([]);
+              }
+
+              setIsLoadingSuggestedQuestions(false);
+            })();
             return;
           }
           if (payload.line) {
@@ -954,7 +990,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         </div>
                         {isLoadingSuggestedQuestions ? (
                           <p className="meeting-detail-rail__suggestions-loading">
-                            Loading…
+                            <span
+                              className="skeleton-block app-page-subtitle-skeleton"
+                              style={{ width: 170, height: 12, borderRadius: 10 }}
+                            />
                           </p>
                         ) : (
                           (suggestedQuestions && suggestedQuestions.length > 0

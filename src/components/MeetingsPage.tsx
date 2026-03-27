@@ -6,6 +6,7 @@ import { MeetingsListPage, type Meeting } from "./meetings/MeetingsListPage";
 import { MeetingDetailPage } from "./meetings/MeetingDetailPage";
 import "./meetings.css";
 import { formatAppDateTime } from "../lib/dateUtils";
+import { useToast } from "./toast/useToast";
 
 interface TranscriptSegment {
   id: string;
@@ -49,6 +50,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   onRecordingStoppedGlobal,
 }) => {
   const { tokens } = useAuthStore();
+  const toast = useToast();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isMeetingsLoading, setIsMeetingsLoading] = useState(false);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(
@@ -63,9 +65,6 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   const [meetingTitleDraft, setMeetingTitleDraft] = useState("");
   const [isSavingMeetingTitle, setIsSavingMeetingTitle] = useState(false);
   const skipTitleBlurSaveRef = useRef(false);
-  const [focusedAppIconUrl, setFocusedAppIconUrl] = useState<string | null>(
-    null,
-  );
 
   const selectedMeeting = selectedMeetingId
     ? (meetings.find((m) => m.id === selectedMeetingId) ?? null)
@@ -88,26 +87,6 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
       fetchMeetings();
     }
   }, [tokens, fetchMeetings]);
-
-  const focusedAppName = (selectedMeeting?.platform ?? "").trim();
-
-  useEffect(() => {
-    if (!focusedAppName) {
-      setFocusedAppIconUrl(null);
-      return;
-    }
-    let cancelled = false;
-    invoke<string | null>("get_app_icon", { appName: focusedAppName })
-      .then((url) => {
-        if (!cancelled) setFocusedAppIconUrl(url ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setFocusedAppIconUrl(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [focusedAppName]);
 
   // Keep recording state stable across page unmount/remount by syncing from app-level state.
   useEffect(() => {
@@ -173,12 +152,26 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
 
       try {
         await invoke("start_meeting_recording", { meetingId: newMeeting.id });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Failed to start meeting recording:", error);
         setRecordingMeetingId(null);
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === "string"
+              ? error
+              : "Failed to start recording";
+        toast.error(message);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to create new meeting:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Failed to create meeting";
+      toast.error(message);
     }
   };
 
@@ -348,25 +341,6 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
                 Live
               </span>
             )}
-            {focusedAppName ? (
-              <span
-                className="meetings-page-header__focused-app"
-                title={focusedAppName}
-              >
-                {focusedAppIconUrl ? (
-                  <img
-                    src={focusedAppIconUrl}
-                    alt=""
-                    className="meetings-page-header__focused-app-icon"
-                  />
-                ) : null}
-                <span className="meetings-page-header__focused-app-text">
-                  <span className="meetings-page-header__focused-app-name">
-                    {focusedAppName}
-                  </span>
-                </span>
-              </span>
-            ) : null}
             {selectedMeetingDateLabel ? (
               <span className="meetings-page-header__date">
                 {selectedMeetingDateLabel}
