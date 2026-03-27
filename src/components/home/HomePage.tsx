@@ -52,6 +52,8 @@ interface BillingUsageResponse {
   features: FeatureUsageEntry[];
 }
 
+const UPGRADE_URL = "https://speaklexi.com";
+
 const FEATURE_LABELS: Record<string, string> = {
   "assistant.speech_to_text": "Assistant",
   "meetings.create": "Meeting",
@@ -450,6 +452,20 @@ export const HomePage: React.FC<HomePageProps> = ({
     [resolvedChartData.data],
   );
 
+  const handleUpgradeClick = useCallback(async () => {
+    try {
+      await invoke("open_external_url", { url: UPGRADE_URL });
+    } catch (e) {
+      console.error("Failed to open upgrade URL:", e);
+    }
+  }, []);
+
+  const showUpgradeCta =
+    isAuthenticated &&
+    billingUsage &&
+    !billingLoading &&
+    !isProPlan(billingUsage.plan_type);
+
   return (
     <motion.div
       className="home-container"
@@ -544,6 +560,15 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </p>
               )}
             </div>
+            {showUpgradeCta && (
+              <button
+                type="button"
+                className="home-upgrade-btn"
+                onClick={handleUpgradeClick}
+              >
+                Upgrade
+              </button>
+            )}
           </div>
 
           <div className="transcriptions-list">

@@ -125,7 +125,7 @@ use commands::rooms::{
 };
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
-use commands::utils::{copy_to_clipboard, get_system_type};
+use commands::utils::{copy_to_clipboard, get_system_type, open_external_url};
 use commands::window::{open_devtools, show_main_window};
 use meetings::commands::{
     add_meeting_note, create_doc_from_meeting, create_meeting, delete_meeting, get_meeting_details,
@@ -280,6 +280,7 @@ pub fn main() {
             update_app_config,
             get_system_type,
             copy_to_clipboard,
+            open_external_url,
             get_transcripts,
             get_transcript,
             delete_transcript,
