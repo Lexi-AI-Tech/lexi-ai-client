@@ -42,6 +42,17 @@
   line-height: 1.2;
 }
 
+.meetings-list-page__title--with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.meetings-list-page__title__icon {
+  flex-shrink: 0;
+  color: var(--lexi-primary);
+}
+
 .meetings-list-page__subtitle {
   font-size: 0.875rem;
   color: var(--lexi-text-muted);

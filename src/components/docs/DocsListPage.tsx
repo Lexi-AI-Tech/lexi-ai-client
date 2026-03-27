@@ -109,7 +109,15 @@ export const DocsListPage: React.FC<DocsListPageProps> = ({
     <div className="docs-list-page">
       <header className="docs-list-page__header">
         <div className="docs-list-page__header-inner">
-          <h1 className="docs-list-page__title">Docs</h1>
+          <h1 className="docs-list-page__title docs-list-page__title--with-icon">
+            <BookText
+              className="docs-list-page__title__icon"
+              size={22}
+              strokeWidth={2}
+              aria-hidden
+            />
+            Docs
+          </h1>
           {subtitle}
         </div>
         <button

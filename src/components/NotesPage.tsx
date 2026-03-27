@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
-import { LayoutGrid, RefreshCw, Edit, Trash2, Copy, Check } from "lucide-react";
+import {
+  LayoutGrid,
+  RefreshCw,
+  Edit,
+  Trash2,
+  Copy,
+  Check,
+  NotebookPen,
+} from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
@@ -171,16 +179,13 @@ export const NotesPage: React.FC = () => {
         fontFamily: "var(--lexi-font-body)",
       }}
     >
-      <h2
-        style={{
-          margin: 0,
-          marginBottom: "0.25rem",
-          fontSize: "24px",
-          fontWeight: 600,
-          color: "#111827",
-          letterSpacing: "-0.025em",
-        }}
-      >
+      <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+        <NotebookPen
+          className="transcripts-page-title__icon"
+          size={22}
+          strokeWidth={2}
+          aria-hidden
+        />
         Notes
       </h2>
       {loading && notes.length === 0 ? (

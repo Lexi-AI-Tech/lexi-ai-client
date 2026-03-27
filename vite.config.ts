@@ -14,6 +14,15 @@ export default defineConfig({
         main: path.resolve(__dirname, "index.html"),
         pill: path.resolve(__dirname, "pill.html"),
       },
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("framer-motion")) return "motion";
+          if (id.includes("@tiptap")) return "tiptap";
+          if (id.includes("lucide-react")) return "icons";
+          if (id.includes("react-dom") || id.includes("/react/")) return "react-vendor";
+        },
+      },
     },
   },
   // Tauri expects a fixed port, fail if that port is not available
