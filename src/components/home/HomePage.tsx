@@ -2,35 +2,33 @@
  * HomePage Component
  *
  * Compact dashboard: greeting, quick actions with descriptions,
- * unified stats card, mixed recent activity feed, and plan usage.
+ * tabbed recent activity (transcripts, meetings, actions), and plan usage.
  */
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Atom,
-  Clock,
   FileText,
-  Flame,
   Mic,
   Video,
   AudioLines,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import type { Transcript, PaginatedTranscriptsResponse } from "../../types";
+import type {
+  ActionHistory,
+  PaginatedActionHistoryResponse,
+  PaginatedTranscriptsResponse,
+  Transcript,
+} from "../../types";
 import type { Meeting } from "../meetings/MeetingsListPage";
+import { formatDateRelative } from "../../lib/dateUtils";
 import "./home.css";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface AnalyticsStats {
-  words_typed_this_week: number;
-  time_saved_minutes: number;
-  current_streak: number;
-}
 
 interface FeatureUsageEntry {
   feature_key: string;
@@ -49,21 +47,20 @@ interface BillingUsageResponse {
   features: FeatureUsageEntry[];
 }
 
-// Unified activity item for mixed feed
-interface ActivityItem {
-  id: string;
-  type: "transcription" | "meeting";
-  title: string;
-  subtitle: string;
-  timestamp: string;
-  icon: React.ElementType;
-}
+type RecentActivityTabId = "transcripts" | "meetings" | "actions";
 
 // ---------------------------------------------------------------------------
 // Constants & Helpers
 // ---------------------------------------------------------------------------
 
+function byCreatedAtDesc<T extends { created_at: string }>(a: T, b: T): number {
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
+
 const UPGRADE_URL = "https://speaklexi.com";
+
+/** Max items per category in Recent Activity (tabs + API page size). */
+const RECENT_ACTIVITY_LIMIT = 5;
 
 const FEATURE_LABELS: Record<string, string> = {
   "assistant.speech_to_text": "Assistant",
@@ -125,21 +122,6 @@ function formatResetsInCountdown(periodEndMs: number, nowMs: number): string {
   return `Resets in ${dPart}d ${p2(h)}h ${p2(m)}m ${p2(s)}s`;
 }
 
-function formatRelativeTime(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "Just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 function formatCurrentDate(): string {
   return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
@@ -150,64 +132,6 @@ const getGreeting = (): string => {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 };
-
-/** Build mixed activity feed from transcripts + meetings, sorted by date desc. */
-function buildActivityFeed(transcripts: Transcript[], meetings: Meeting[]): ActivityItem[] {
-  const items: ActivityItem[] = [];
-
-  for (const t of transcripts) {
-    items.push({
-      id: `t-${t.id}`,
-      type: "transcription",
-      title: t.original_text.length > 70 ? t.original_text.slice(0, 70) + "..." : t.original_text,
-      subtitle: `${t.original_text_word_count} words`,
-      timestamp: t.created_at,
-      icon: AudioLines,
-    });
-  }
-
-  for (const m of meetings) {
-    items.push({
-      id: `m-${m.id}`,
-      type: "meeting",
-      title: m.name || "Untitled Meeting",
-      subtitle: m.platform ?? "Meeting",
-      timestamp: m.created_at,
-      icon: Video,
-    });
-  }
-
-  items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  return items.slice(0, 8);
-}
-
-// ---------------------------------------------------------------------------
-// Hooks
-// ---------------------------------------------------------------------------
-
-function useCountUp(end: number, duration = 800): number {
-  const [value, setValue] = useState(0);
-  const prevEnd = useRef(0);
-
-  useEffect(() => {
-    if (end === prevEnd.current) return;
-    prevEnd.current = end;
-    if (end === 0) { setValue(0); return; }
-    const start = performance.now();
-    let raf: number;
-    const tick = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(eased * end));
-      if (progress < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [end, duration]);
-
-  return value;
-}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -233,37 +157,6 @@ const containerVariants = {
 const itemVariants = {
   hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
-};
-
-// Inline stat inside the unified card
-const InlineStat: React.FC<{
-  icon: React.ElementType;
-  label: string;
-  rawValue: number;
-  suffix?: string;
-  subValue?: string;
-  accentColor: string;
-  iconColor?: string;
-}> = ({ icon: Icon, label, rawValue, suffix = "", subValue, accentColor, iconColor }) => {
-  const animatedValue = useCountUp(rawValue);
-  return (
-    <div
-      className="inline-stat"
-      style={{
-        ["--stat-accent" as string]: accentColor,
-        ["--stat-icon-color" as string]: iconColor ?? "var(--lexi-primary)",
-      }}
-    >
-      <div className="inline-stat-icon">
-        <Icon size={18} />
-      </div>
-      <div className="inline-stat-content">
-        <span className="inline-stat-value">{animatedValue.toLocaleString()}{suffix}</span>
-        <span className="inline-stat-label">{label}</span>
-        {subValue && <span className="inline-stat-sub">{subValue}</span>}
-      </div>
-    </div>
-  );
 };
 
 // Quick action with description
@@ -295,22 +188,6 @@ const SkBlock: React.FC<{ className?: string; style?: React.CSSProperties }> = (
   <div className={`skeleton-block ${className ?? ""}`.trim()} style={style} />
 );
 
-const HomeStatsSkeleton: React.FC = () => (
-  <div className="stats-card" aria-hidden>
-    <div className="stats-card-grid">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="inline-stat">
-          <SkBlock style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-            <SkBlock style={{ height: 22, width: "50%", borderRadius: 6 }} />
-            <SkBlock style={{ height: 12, width: "65%", borderRadius: 4 }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
 const HomeRecentSkeleton: React.FC = () => (
   <div className="home-recent-skeleton" aria-hidden>
     {Array.from({ length: 5 }).map((_, i) => (
@@ -325,6 +202,32 @@ const HomeRecentSkeleton: React.FC = () => (
   </div>
 );
 
+const RecentActivityRow: React.FC<{
+  badgeClass: string;
+  icon: React.ElementType;
+  title: string;
+  subtitle: string;
+  typeLabel: string;
+  timestamp: string;
+  onRowClick: () => void;
+}> = ({ badgeClass, icon: Icon, title, subtitle, typeLabel, timestamp, onRowClick }) => (
+  <li className="recent-activity-row" onClick={onRowClick}>
+    <div className={`recent-activity-badge ${badgeClass}`}>
+      <Icon size={14} />
+    </div>
+    <div className="recent-activity-info">
+      <span className="recent-activity-text">{title}</span>
+      <div className="recent-activity-meta">
+        <span className="recent-activity-type">{typeLabel}</span>
+        <span className="recent-activity-dot" />
+        <span className="recent-activity-subtitle">{subtitle}</span>
+        <span className="recent-activity-dot" />
+        <span className="recent-activity-time">{formatDateRelative(timestamp)}</span>
+      </div>
+    </div>
+  </li>
+);
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -337,15 +240,17 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onViewAllTranscripts, onNavigate }) => {
   const { user, isAuthenticated, tokens } = useAuthStore();
 
+  const [recentActivityTab, setRecentActivityTab] = useState<RecentActivityTabId>("transcripts");
+
   const [billingLoading, setBillingLoading] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
   const [recentLoading, setRecentLoading] = useState(false);
   const [meetingsLoading, setMeetingsLoading] = useState(false);
+  const [actionsLoading, setActionsLoading] = useState(false);
 
-  const [stats, setStats] = useState<AnalyticsStats | null>(null);
   const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(null);
   const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [recentActions, setRecentActions] = useState<ActionHistory[]>([]);
 
   // Data fetching
   const fetchBillingUsage = useCallback(async () => {
@@ -354,18 +259,28 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
     catch (err) { console.error("Failed to fetch billing usage:", err); setBillingUsage(null); }
   }, [isAuthenticated, tokens?.access_token]);
 
-  const fetchStats = useCallback(async () => {
-    if (!isAuthenticated || !tokens?.access_token) return;
-    try { setStats(await invoke<AnalyticsStats>("get_analytics_stats")); }
-    catch (e) { console.error("Failed to fetch analytics stats:", e); }
-  }, [isAuthenticated, tokens?.access_token]);
-
   const fetchRecentTranscripts = useCallback(async () => {
     if (!isAuthenticated || !tokens?.access_token) return;
     try {
-      const data = await invoke<PaginatedTranscriptsResponse>("get_transcripts", { page: 1, pageSize: 5 });
+      const data = await invoke<PaginatedTranscriptsResponse>("get_transcripts", {
+        page: 1,
+        pageSize: RECENT_ACTIVITY_LIMIT,
+      });
       setRecentTranscripts(data.transcripts);
     } catch (err) { console.error("Failed to fetch recent transcripts:", err); }
+  }, [isAuthenticated, tokens?.access_token]);
+
+  const fetchRecentActions = useCallback(async () => {
+    if (!isAuthenticated || !tokens?.access_token) return;
+    try {
+      const data = await invoke<PaginatedActionHistoryResponse>("get_action_history", {
+        page: 1,
+        pageSize: RECENT_ACTIVITY_LIMIT,
+      });
+      setRecentActions(data.actions);
+    } catch (err) {
+      console.error("Failed to fetch recent actions:", err);
+    }
   }, [isAuthenticated, tokens?.access_token]);
 
   const fetchMeetings = useCallback(async () => {
@@ -383,13 +298,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
   }, [isAuthenticated, tokens?.access_token, fetchBillingUsage]);
 
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) { setStatsLoading(false); return; }
-    let c = false; setStatsLoading(true);
-    (async () => { try { await fetchStats(); } finally { if (!c) setStatsLoading(false); } })();
-    return () => { c = true; };
-  }, [isAuthenticated, tokens?.access_token, fetchStats]);
-
-  useEffect(() => {
     if (!isAuthenticated || !tokens?.access_token) { setRecentLoading(false); return; }
     let c = false; setRecentLoading(true);
     (async () => { try { await fetchRecentTranscripts(); } finally { if (!c) setRecentLoading(false); } })();
@@ -403,15 +311,40 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
     return () => { c = true; };
   }, [isAuthenticated, tokens?.access_token, fetchMeetings]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !tokens?.access_token) { setActionsLoading(false); return; }
+    let c = false; setActionsLoading(true);
+    (async () => { try { await fetchRecentActions(); } finally { if (!c) setActionsLoading(false); } })();
+    return () => { c = true; };
+  }, [isAuthenticated, tokens?.access_token, fetchRecentActions]);
+
   // Derived
   const userName = user?.name?.split(" ")[0] || "there";
-  const resolvedStats = stats ?? { words_typed_this_week: 0, time_saved_minutes: 0, current_streak: 0 };
   const planUsageRows = useMemo(
     () => billingUsage?.features ? sortPlanUsageFeatures(billingUsage.features) : [],
     [billingUsage],
   );
-  const streakLevel = resolvedStats.current_streak >= 7 ? "high" : resolvedStats.current_streak >= 3 ? "medium" : "low";
-  const activityFeed = useMemo(() => buildActivityFeed(recentTranscripts, meetings), [recentTranscripts, meetings]);
+
+  const recentTranscriptsSorted = useMemo(
+    () => [...recentTranscripts].sort(byCreatedAtDesc),
+    [recentTranscripts],
+  );
+  const recentTranscriptsDisplayed = useMemo(
+    () => recentTranscriptsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
+    [recentTranscriptsSorted],
+  );
+  const recentMeetingsSorted = useMemo(() => [...meetings].sort(byCreatedAtDesc), [meetings]);
+  const recentMeetingsDisplayed = useMemo(
+    () => recentMeetingsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
+    [recentMeetingsSorted],
+  );
+  const recentActionsSorted = useMemo(() => [...recentActions].sort(byCreatedAtDesc), [recentActions]);
+  const recentActionsDisplayed = useMemo(
+    () => recentActionsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
+    [recentActionsSorted],
+  );
+
+  const recentActivityLoading = recentLoading || meetingsLoading || actionsLoading;
 
   const handleUpgradeClick = useCallback(async () => {
     try {
@@ -470,92 +403,158 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
         </div>
       </motion.section>
 
-      {/* ── Unified Stats Card ── */}
-      <motion.section className="stats-section" variants={itemVariants}>
-        {isAuthenticated && (statsLoading || meetingsLoading) ? (
-          <HomeStatsSkeleton />
-        ) : (
-          <div className="stats-card">
-            <div className="stats-card-grid">
-              <InlineStat
-                icon={FileText}
-                label="Words Typed"
-                rawValue={resolvedStats.words_typed_this_week}
-                subValue="this week"
-                accentColor="var(--lexi-primary-muted)"
-                iconColor="var(--lexi-primary)"
-              />
-              <InlineStat
-                icon={Clock}
-                label="Time Saved"
-                rawValue={resolvedStats.time_saved_minutes}
-                suffix="m"
-                subValue="vs typing"
-                accentColor="var(--lexi-primary-muted)"
-                iconColor="var(--lexi-primary)"
-              />
-              <InlineStat
-                icon={Video}
-                label="Meetings"
-                rawValue={meetings.length}
-                subValue="total"
-                accentColor="rgba(59, 130, 246, 0.15)"
-                iconColor="#2563eb"
-              />
-              <InlineStat
-                icon={Flame}
-                label="Streak"
-                rawValue={resolvedStats.current_streak}
-                subValue="days"
-                accentColor={streakLevel === "high" ? "rgba(239,68,68,0.15)" : streakLevel === "medium" ? "rgba(245,158,11,0.2)" : "rgba(245,158,11,0.12)"}
-                iconColor={streakLevel === "high" ? "#dc2626" : streakLevel === "medium" ? "#d97706" : "#d4a053"}
-              />
-            </div>
-          </div>
-        )}
-      </motion.section>
-
       {/* ── Main Grid: Recent Activity | Plan Usage ── */}
       <div className="home-grid">
-        {/* Left: Mixed Recent Activity */}
+        {/* Left: Recent Activity (tabbed) */}
         <motion.section className="recent-activity-section" variants={itemVariants}>
-          <div className="section-header">
+          <div className="section-header section-header--recent-activity">
             <h2 className="section-title">Recent Activity</h2>
           </div>
 
           <div className="recent-activity-content">
-            {isAuthenticated && (recentLoading || meetingsLoading) ? (
+            {isAuthenticated && recentActivityLoading ? (
               <HomeRecentSkeleton />
-            ) : activityFeed.length === 0 ? (
+            ) : !isAuthenticated ? (
               <div className="empty-state">
                 <div className="empty-icon"><AudioLines size={24} /></div>
                 <p className="empty-title">No activity yet</p>
-                <p className="empty-sub">Transcriptions and meetings will appear here.</p>
+                <p className="empty-sub">Sign in to see transcriptions, meetings, and actions.</p>
               </div>
             ) : (
-              <ul className="recent-activity-list">
-                {activityFeed.map((item) => (
-                  <li
-                    key={item.id}
-                    className="recent-activity-row"
-                    onClick={() => onNavigate?.(item.type === "meeting" ? "meetings" : "transcripts")}
-                  >
-                    <div className={`recent-activity-badge ${item.type}`}>
-                      <item.icon size={14} />
+              <>
+                <div
+                  className="recent-activity-tabs"
+                  role="tablist"
+                  aria-label="Recent activity by category"
+                >
+                  {(
+                    [
+                      { id: "transcripts" as const, label: "Transcripts" },
+                      { id: "meetings" as const, label: "Meetings" },
+                      { id: "actions" as const, label: "Actions" },
+                    ] as const
+                  ).map(({ id, label }) => {
+                    const isActive = recentActivityTab === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        role="tab"
+                        id={`recent-activity-tab-${id}`}
+                        aria-selected={isActive}
+                        aria-controls={`recent-activity-panel-${id}`}
+                        tabIndex={isActive ? 0 : -1}
+                        className={`recent-activity-tab${isActive ? " is-active" : ""}`}
+                        onClick={() => setRecentActivityTab(id)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div
+                  id="recent-activity-panel-transcripts"
+                  role="tabpanel"
+                  aria-labelledby="recent-activity-tab-transcripts"
+                  hidden={recentActivityTab !== "transcripts"}
+                  className="recent-activity-panel"
+                >
+                  {recentTranscriptsSorted.length === 0 ? (
+                    <div className="empty-state empty-state--tab">
+                      <div className="empty-icon"><AudioLines size={24} /></div>
+                      <p className="empty-title">No transcriptions yet</p>
+                      <p className="empty-sub">Your speech-to-text history will show up here.</p>
                     </div>
-                    <div className="recent-activity-info">
-                      <span className="recent-activity-text">{item.title}</span>
-                      <div className="recent-activity-meta">
-                        <span className="recent-activity-type">{item.type === "meeting" ? "Meeting" : "Transcription"}</span>
-                        <span className="recent-activity-dot" />
-                        <span className="recent-activity-subtitle">{item.subtitle}</span>
-                        <span className="recent-activity-dot" />
-                        <span className="recent-activity-time">{formatRelativeTime(item.timestamp)}</span>
-                      </div>
+                  ) : (
+                    <ul className="recent-activity-list">
+                      {recentTranscriptsDisplayed.map((t) => {
+                        const title =
+                          t.original_text.length > 70 ? t.original_text.slice(0, 70) + "…" : t.original_text;
+                        return (
+                          <RecentActivityRow
+                            key={t.id}
+                            badgeClass="transcription"
+                            icon={AudioLines}
+                            title={title}
+                            subtitle={`${t.original_text_word_count} words`}
+                            typeLabel="Transcription"
+                            timestamp={t.created_at}
+                            onRowClick={() => onNavigate?.("transcripts")}
+                          />
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div
+                  id="recent-activity-panel-meetings"
+                  role="tabpanel"
+                  aria-labelledby="recent-activity-tab-meetings"
+                  hidden={recentActivityTab !== "meetings"}
+                  className="recent-activity-panel"
+                >
+                  {recentMeetingsSorted.length === 0 ? (
+                    <div className="empty-state empty-state--tab">
+                      <div className="empty-icon"><Video size={24} /></div>
+                      <p className="empty-title">No meetings yet</p>
+                      <p className="empty-sub">Recorded meetings will appear here.</p>
                     </div>
-                  </li>
-                ))}
-              </ul>
+                  ) : (
+                    <ul className="recent-activity-list">
+                      {recentMeetingsDisplayed.map((m) => (
+                        <RecentActivityRow
+                          key={m.id}
+                          badgeClass="meeting"
+                          icon={Video}
+                          title={m.name || "Untitled Meeting"}
+                          subtitle={m.platform ?? "Meeting"}
+                          typeLabel="Meeting"
+                          timestamp={m.created_at}
+                          onRowClick={() => onNavigate?.("meetings")}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div
+                  id="recent-activity-panel-actions"
+                  role="tabpanel"
+                  aria-labelledby="recent-activity-tab-actions"
+                  hidden={recentActivityTab !== "actions"}
+                  className="recent-activity-panel"
+                >
+                  {recentActionsSorted.length === 0 ? (
+                    <div className="empty-state empty-state--tab">
+                      <div className="empty-icon"><Atom size={24} /></div>
+                      <p className="empty-title">No actions yet</p>
+                      <p className="empty-sub">Action hotkey runs will show up here.</p>
+                    </div>
+                  ) : (
+                    <ul className="recent-activity-list">
+                      {recentActionsDisplayed.map((a) => {
+                        const cmd = a.action_command?.trim() || "Action";
+                        const title = cmd.length > 70 ? cmd.slice(0, 70) + "…" : cmd;
+                        const sub = a.app_name?.trim() || a.action_type || "Action";
+                        return (
+                          <RecentActivityRow
+                            key={a.id}
+                            badgeClass="action"
+                            icon={Atom}
+                            title={title}
+                            subtitle={sub}
+                            typeLabel="Action"
+                            timestamp={a.created_at}
+                            onRowClick={() => onNavigate?.("actions")}
+                          />
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </motion.section>
