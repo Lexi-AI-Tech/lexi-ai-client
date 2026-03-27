@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -9,12 +9,44 @@ import {
   Copy,
   Check,
   NotebookPen,
+  Info,
 } from "lucide-react";
 import { Note, PaginatedNotesResponse } from "../types";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import { formatAppDateTime } from "../lib/dateUtils";
 import "./home/home.css";
+
+const NOTES_HELP =
+  "Save quick thoughts, reminders, or snippets you’ll reuse later—ideas before they slip away, meeting follow-ups, or draft text. Examples: “Call Sam about budget,” or a paragraph you paste into Slack. Toggle list or grid, edit anytime, and copy a note into any app.";
+
+function NotesPageHeading() {
+  const tooltipId = useId();
+  return (
+    <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+      <NotebookPen
+        className="transcripts-page-title__icon"
+        size={22}
+        strokeWidth={2}
+        aria-hidden
+      />
+      Notes
+      <span className="transcripts-page-tooltip-wrap">
+        <button
+          type="button"
+          className="transcripts-page-tooltip-trigger"
+          aria-label="How notes work"
+          aria-describedby={tooltipId}
+        >
+          <Info size={16} strokeWidth={2} aria-hidden />
+        </button>
+        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+          {NOTES_HELP}
+        </span>
+      </span>
+    </h2>
+  );
+}
 
 type ViewMode = "list" | "grid";
 
@@ -179,15 +211,7 @@ export const NotesPage: React.FC = () => {
         fontFamily: "var(--lexi-font-body)",
       }}
     >
-      <h2 className="transcripts-page-title transcripts-page-title--with-icon">
-        <NotebookPen
-          className="transcripts-page-title__icon"
-          size={22}
-          strokeWidth={2}
-          aria-hidden
-        />
-        Notes
-      </h2>
+      <NotesPageHeading />
       {loading && notes.length === 0 ? (
         <p className="app-page-subtitle" style={{ marginBottom: "1.75rem" }}>
           <span

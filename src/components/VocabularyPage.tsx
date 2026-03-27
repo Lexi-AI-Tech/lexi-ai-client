@@ -1,11 +1,42 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, Plus, Trash2, Edit, Languages } from "lucide-react";
+import { RefreshCw, Plus, Trash2, Edit, Info, Languages } from "lucide-react";
 import type { TauriAppConfig } from "../types";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import { motion } from "framer-motion";
 import "./home/home.css";
+
+const VOCABULARY_HELP =
+  "Add words and phrases you say often—product names, people, acronyms—so dictation spells them correctly. Examples: “Lexi AI,” “Kubernetes,” “Q4 OKRs.” Vocabulary is saved in your app settings and applied when you transcribe.";
+
+function VocabularyPageHeading() {
+  const tooltipId = useId();
+  return (
+    <h2 className="page__title page__title--with-icon">
+      <Languages
+        className="page__title__icon"
+        size={22}
+        strokeWidth={2}
+        aria-hidden
+      />
+      Vocabulary
+      <span className="transcripts-page-tooltip-wrap">
+        <button
+          type="button"
+          className="transcripts-page-tooltip-trigger"
+          aria-label="How vocabulary works"
+          aria-describedby={tooltipId}
+        >
+          <Info size={16} strokeWidth={2} aria-hidden />
+        </button>
+        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+          {VOCABULARY_HELP}
+        </span>
+      </span>
+    </h2>
+  );
+}
 
 export const VocabularyPage: React.FC = () => {
   const toast = useToast();
@@ -147,7 +178,7 @@ export const VocabularyPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="page">
-        <h2 className="page__title">Vocabulary</h2>
+        <VocabularyPageHeading />
         <motion.div
           key="vocab-loading"
           initial={{ opacity: 0 }}
@@ -163,15 +194,7 @@ export const VocabularyPage: React.FC = () => {
 
   return (
     <div className="page">
-      <h2 className="page__title page__title--with-icon">
-        <Languages
-          className="page__title__icon"
-          size={22}
-          strokeWidth={2}
-          aria-hidden
-        />
-        Vocabulary
-      </h2>
+      <VocabularyPageHeading />
 
       {/* Add Vocabulary Form */}
       {showAddForm && (
