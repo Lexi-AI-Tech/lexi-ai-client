@@ -44,6 +44,17 @@
   line-height: 1.2;
 }
 
+.docs-list-page__title--with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.docs-list-page__title__icon {
+  flex-shrink: 0;
+  color: var(--lexi-primary);
+}
+
 .docs-list-page__subtitle {
   font-size: 0.875rem;
   color: var(--lexi-text-muted);

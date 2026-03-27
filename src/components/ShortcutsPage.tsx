@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, Plus, Edit, Trash2 } from "lucide-react";
+import { RefreshCw, Plus, Edit, Trash2, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
@@ -211,7 +211,15 @@ export const ShortcutsPage: React.FC = () => {
 
   return (
     <div className="transcripts-page">
-      <h2 className="transcripts-page-title">Shortcuts</h2>
+      <h2 className="transcripts-page-title transcripts-page-title--with-icon">
+        <Lock
+          className="transcripts-page-title__icon"
+          size={22}
+          strokeWidth={2}
+          aria-hidden
+        />
+        Shortcuts
+      </h2>
       {authStore.isInitialized && isLoading ? (
         <p className="app-page-subtitle">Loading…</p>
       ) : authStore.isInitialized && shortcuts.length > 0 ? (

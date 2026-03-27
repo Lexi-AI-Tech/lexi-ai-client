@@ -93,7 +93,15 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
     <div className="meetings-list-page">
       <header className="meetings-list-page__header">
         <div className="meetings-list-page__header-inner">
-          <h1 className="meetings-list-page__title">Meetings</h1>
+          <h1 className="meetings-list-page__title meetings-list-page__title--with-icon">
+            <Video
+              className="meetings-list-page__title__icon"
+              size={22}
+              strokeWidth={2}
+              aria-hidden
+            />
+            Meetings
+          </h1>
           {subtitle}
         </div>
         <button

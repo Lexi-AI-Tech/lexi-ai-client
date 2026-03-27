@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, Plus, Trash2, Edit } from "lucide-react";
+import { RefreshCw, Plus, Trash2, Edit, Languages } from "lucide-react";
 import type { TauriAppConfig } from "../types";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
@@ -146,7 +146,15 @@ export const VocabularyPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="page">
-        <h2 className="page__title">Vocabulary</h2>
+        <h2 className="page__title page__title--with-icon">
+          <Languages
+            className="page__title__icon"
+            size={22}
+            strokeWidth={2}
+            aria-hidden
+          />
+          Vocabulary
+        </h2>
         <ScreenSkeleton variant="vocabulary" className="page__empty" />
       </div>
     );
@@ -154,7 +162,15 @@ export const VocabularyPage: React.FC = () => {
 
   return (
     <div className="page">
-      <h2 className="page__title">Vocabulary</h2>
+      <h2 className="page__title page__title--with-icon">
+        <Languages
+          className="page__title__icon"
+          size={22}
+          strokeWidth={2}
+          aria-hidden
+        />
+        Vocabulary
+      </h2>
 
       {/* Add Vocabulary Form */}
       {showAddForm && (
