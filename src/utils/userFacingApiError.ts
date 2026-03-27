@@ -124,7 +124,9 @@ export function formatUserFacingApiError(raw: string): string {
 
   const stripped = s.replace(SERVER_ERROR_PREFIX, "").trim();
   if (stripped && stripped !== s) {
-    const inner = extractDetailFromAnywhere(stripped) ?? tryParseDetailFromJsonObject(stripped);
+    const inner =
+      extractDetailFromAnywhere(stripped) ??
+      tryParseDetailFromJsonObject(stripped);
     if (inner) return mapDetailToFriendly(inner);
     if (!stripped.includes("{")) return mapDetailToFriendly(stripped);
   }

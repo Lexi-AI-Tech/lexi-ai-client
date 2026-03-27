@@ -7,13 +7,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  Atom,
-  FileText,
-  Mic,
-  Video,
-  AudioLines,
-} from "lucide-react";
+import { Atom, FileText, Mic, Video, AudioLines } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 import type {
@@ -97,8 +91,12 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
-function sortPlanUsageFeatures<T extends { feature_key: string }>(features: T[]): T[] {
-  const orderMap = new Map<string, number>(PLAN_USAGE_FEATURE_ORDER.map((k, i) => [k, i]));
+function sortPlanUsageFeatures<T extends { feature_key: string }>(
+  features: T[],
+): T[] {
+  const orderMap = new Map<string, number>(
+    PLAN_USAGE_FEATURE_ORDER.map((k, i) => [k, i]),
+  );
   return [...features].sort((a, b) => {
     const ia = orderMap.get(a.feature_key);
     const ib = orderMap.get(b.feature_key);
@@ -123,7 +121,11 @@ function formatResetsInCountdown(periodEndMs: number, nowMs: number): string {
 }
 
 function formatCurrentDate(): string {
-  return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 const getGreeting = (): string => {
@@ -139,7 +141,9 @@ const getGreeting = (): string => {
 
 function BillingResetCountdown({ periodEndIso }: { periodEndIso: string }) {
   const endMs = useMemo(() => new Date(periodEndIso).getTime(), [periodEndIso]);
-  const [label, setLabel] = useState(() => formatResetsInCountdown(endMs, Date.now()));
+  const [label, setLabel] = useState(() =>
+    formatResetsInCountdown(endMs, Date.now()),
+  );
   useEffect(() => {
     const tick = () => setLabel(formatResetsInCountdown(endMs, Date.now()));
     tick();
@@ -151,12 +155,19 @@ function BillingResetCountdown({ periodEndIso }: { periodEndIso: string }) {
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+  },
 };
 
 const itemVariants = {
   hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const },
+  },
 };
 
 // Quick action with description
@@ -184,7 +195,10 @@ const QuickAction: React.FC<{
 );
 
 // Skeleton helpers
-const SkBlock: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+const SkBlock: React.FC<{
+  className?: string;
+  style?: React.CSSProperties;
+}> = ({ className, style }) => (
   <div className={`skeleton-block ${className ?? ""}`.trim()} style={style} />
 );
 
@@ -192,8 +206,12 @@ const HomeRecentSkeleton: React.FC = () => (
   <div className="home-recent-skeleton" aria-hidden>
     {Array.from({ length: 5 }).map((_, i) => (
       <div key={i} className="home-recent-skeleton__row">
-        <SkBlock style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }} />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+        <SkBlock
+          style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }}
+        />
+        <div
+          style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}
+        >
           <SkBlock style={{ height: 13, width: "70%", borderRadius: 5 }} />
           <SkBlock style={{ height: 10, width: "45%", borderRadius: 4 }} />
         </div>
@@ -210,7 +228,15 @@ const RecentActivityRow: React.FC<{
   typeLabel: string;
   timestamp: string;
   onRowClick: () => void;
-}> = ({ badgeClass, icon: Icon, title, subtitle, typeLabel, timestamp, onRowClick }) => (
+}> = ({
+  badgeClass,
+  icon: Icon,
+  title,
+  subtitle,
+  typeLabel,
+  timestamp,
+  onRowClick,
+}) => (
   <li className="recent-activity-row" onClick={onRowClick}>
     <div className={`recent-activity-badge ${badgeClass}`}>
       <Icon size={14} />
@@ -222,7 +248,9 @@ const RecentActivityRow: React.FC<{
         <span className="recent-activity-dot" />
         <span className="recent-activity-subtitle">{subtitle}</span>
         <span className="recent-activity-dot" />
-        <span className="recent-activity-time">{formatDateRelative(timestamp)}</span>
+        <span className="recent-activity-time">
+          {formatDateRelative(timestamp)}
+        </span>
       </div>
     </div>
   </li>
@@ -237,17 +265,23 @@ interface HomePageProps {
   onNavigate?: (page: string) => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onViewAllTranscripts, onNavigate }) => {
+export const HomePage: React.FC<HomePageProps> = ({
+  onViewAllTranscripts: _onViewAllTranscripts,
+  onNavigate,
+}) => {
   const { user, isAuthenticated, tokens } = useAuthStore();
 
-  const [recentActivityTab, setRecentActivityTab] = useState<RecentActivityTabId>("transcripts");
+  const [recentActivityTab, setRecentActivityTab] =
+    useState<RecentActivityTabId>("transcripts");
 
   const [billingLoading, setBillingLoading] = useState(false);
   const [recentLoading, setRecentLoading] = useState(false);
   const [meetingsLoading, setMeetingsLoading] = useState(false);
   const [actionsLoading, setActionsLoading] = useState(false);
 
-  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(null);
+  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(
+    null,
+  );
   const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [recentActions, setRecentActions] = useState<ActionHistory[]>([]);
@@ -255,28 +289,40 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
   // Data fetching
   const fetchBillingUsage = useCallback(async () => {
     if (!isAuthenticated || !tokens?.access_token) return;
-    try { setBillingUsage(await invoke<BillingUsageResponse>("get_billing_usage")); }
-    catch (err) { console.error("Failed to fetch billing usage:", err); setBillingUsage(null); }
+    try {
+      setBillingUsage(await invoke<BillingUsageResponse>("get_billing_usage"));
+    } catch (err) {
+      console.error("Failed to fetch billing usage:", err);
+      setBillingUsage(null);
+    }
   }, [isAuthenticated, tokens?.access_token]);
 
   const fetchRecentTranscripts = useCallback(async () => {
     if (!isAuthenticated || !tokens?.access_token) return;
     try {
-      const data = await invoke<PaginatedTranscriptsResponse>("get_transcripts", {
-        page: 1,
-        pageSize: RECENT_ACTIVITY_LIMIT,
-      });
+      const data = await invoke<PaginatedTranscriptsResponse>(
+        "get_transcripts",
+        {
+          page: 1,
+          pageSize: RECENT_ACTIVITY_LIMIT,
+        },
+      );
       setRecentTranscripts(data.transcripts);
-    } catch (err) { console.error("Failed to fetch recent transcripts:", err); }
+    } catch (err) {
+      console.error("Failed to fetch recent transcripts:", err);
+    }
   }, [isAuthenticated, tokens?.access_token]);
 
   const fetchRecentActions = useCallback(async () => {
     if (!isAuthenticated || !tokens?.access_token) return;
     try {
-      const data = await invoke<PaginatedActionHistoryResponse>("get_action_history", {
-        page: 1,
-        pageSize: RECENT_ACTIVITY_LIMIT,
-      });
+      const data = await invoke<PaginatedActionHistoryResponse>(
+        "get_action_history",
+        {
+          page: 1,
+          pageSize: RECENT_ACTIVITY_LIMIT,
+        },
+      );
       setRecentActions(data.actions);
     } catch (err) {
       console.error("Failed to fetch recent actions:", err);
@@ -285,43 +331,97 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
 
   const fetchMeetings = useCallback(async () => {
     if (!isAuthenticated || !tokens?.access_token) return;
-    try { setMeetings(await invoke<Meeting[]>("list_meetings")); }
-    catch (err) { console.error("Failed to fetch meetings:", err); }
+    try {
+      setMeetings(await invoke<Meeting[]>("list_meetings"));
+    } catch (err) {
+      console.error("Failed to fetch meetings:", err);
+    }
   }, [isAuthenticated, tokens?.access_token]);
 
   // Effects
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) { setBillingLoading(false); return; }
-    let c = false; setBillingLoading(true);
-    (async () => { try { await fetchBillingUsage(); } finally { if (!c) setBillingLoading(false); } })();
-    return () => { c = true; };
+    if (!isAuthenticated || !tokens?.access_token) {
+      setBillingLoading(false);
+      return;
+    }
+    let c = false;
+    setBillingLoading(true);
+    (async () => {
+      try {
+        await fetchBillingUsage();
+      } finally {
+        if (!c) setBillingLoading(false);
+      }
+    })();
+    return () => {
+      c = true;
+    };
   }, [isAuthenticated, tokens?.access_token, fetchBillingUsage]);
 
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) { setRecentLoading(false); return; }
-    let c = false; setRecentLoading(true);
-    (async () => { try { await fetchRecentTranscripts(); } finally { if (!c) setRecentLoading(false); } })();
-    return () => { c = true; };
+    if (!isAuthenticated || !tokens?.access_token) {
+      setRecentLoading(false);
+      return;
+    }
+    let c = false;
+    setRecentLoading(true);
+    (async () => {
+      try {
+        await fetchRecentTranscripts();
+      } finally {
+        if (!c) setRecentLoading(false);
+      }
+    })();
+    return () => {
+      c = true;
+    };
   }, [isAuthenticated, tokens?.access_token, fetchRecentTranscripts]);
 
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) { setMeetingsLoading(false); return; }
-    let c = false; setMeetingsLoading(true);
-    (async () => { try { await fetchMeetings(); } finally { if (!c) setMeetingsLoading(false); } })();
-    return () => { c = true; };
+    if (!isAuthenticated || !tokens?.access_token) {
+      setMeetingsLoading(false);
+      return;
+    }
+    let c = false;
+    setMeetingsLoading(true);
+    (async () => {
+      try {
+        await fetchMeetings();
+      } finally {
+        if (!c) setMeetingsLoading(false);
+      }
+    })();
+    return () => {
+      c = true;
+    };
   }, [isAuthenticated, tokens?.access_token, fetchMeetings]);
 
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) { setActionsLoading(false); return; }
-    let c = false; setActionsLoading(true);
-    (async () => { try { await fetchRecentActions(); } finally { if (!c) setActionsLoading(false); } })();
-    return () => { c = true; };
+    if (!isAuthenticated || !tokens?.access_token) {
+      setActionsLoading(false);
+      return;
+    }
+    let c = false;
+    setActionsLoading(true);
+    (async () => {
+      try {
+        await fetchRecentActions();
+      } finally {
+        if (!c) setActionsLoading(false);
+      }
+    })();
+    return () => {
+      c = true;
+    };
   }, [isAuthenticated, tokens?.access_token, fetchRecentActions]);
 
   // Derived
   const userName = user?.name?.split(" ")[0] || "there";
   const planUsageRows = useMemo(
-    () => billingUsage?.features ? sortPlanUsageFeatures(billingUsage.features) : [],
+    () =>
+      billingUsage?.features
+        ? sortPlanUsageFeatures(billingUsage.features)
+        : [],
     [billingUsage],
   );
 
@@ -333,18 +433,25 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
     () => recentTranscriptsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
     [recentTranscriptsSorted],
   );
-  const recentMeetingsSorted = useMemo(() => [...meetings].sort(byCreatedAtDesc), [meetings]);
+  const recentMeetingsSorted = useMemo(
+    () => [...meetings].sort(byCreatedAtDesc),
+    [meetings],
+  );
   const recentMeetingsDisplayed = useMemo(
     () => recentMeetingsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
     [recentMeetingsSorted],
   );
-  const recentActionsSorted = useMemo(() => [...recentActions].sort(byCreatedAtDesc), [recentActions]);
+  const recentActionsSorted = useMemo(
+    () => [...recentActions].sort(byCreatedAtDesc),
+    [recentActions],
+  );
   const recentActionsDisplayed = useMemo(
     () => recentActionsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
     [recentActionsSorted],
   );
 
-  const recentActivityLoading = recentLoading || meetingsLoading || actionsLoading;
+  const recentActivityLoading =
+    recentLoading || meetingsLoading || actionsLoading;
 
   const handleUpgradeClick = useCallback(async () => {
     try {
@@ -361,7 +468,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
     !isProPlan(billingUsage.plan_type);
 
   return (
-    <motion.div className="home-container" variants={containerVariants} initial="hidden" animate="visible">
+    <motion.div
+      className="home-container"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {/* ── Greeting ── */}
       <motion.header className="home-greeting" variants={itemVariants}>
         <div className="greeting-section">
@@ -369,7 +481,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
           <h1 className="greeting-text">
             {getGreeting()}, <span className="user-name">{userName}</span>
           </h1>
-          <p className="greeting-sub">Voice-first Work OS for thinking, meetings, and writing</p>
+          <p className="greeting-sub">
+            Voice-first Work OS for thinking, meetings, and writing
+          </p>
         </div>
       </motion.header>
 
@@ -406,7 +520,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
       {/* ── Main Grid: Recent Activity | Plan Usage ── */}
       <div className="home-grid">
         {/* Left: Recent Activity (tabbed) */}
-        <motion.section className="recent-activity-section" variants={itemVariants}>
+        <motion.section
+          className="recent-activity-section"
+          variants={itemVariants}
+        >
           <div className="section-header section-header--recent-activity">
             <h2 className="section-title">Recent Activity</h2>
           </div>
@@ -416,9 +533,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
               <HomeRecentSkeleton />
             ) : !isAuthenticated ? (
               <div className="empty-state">
-                <div className="empty-icon"><AudioLines size={24} /></div>
+                <div className="empty-icon">
+                  <AudioLines size={24} />
+                </div>
                 <p className="empty-title">No activity yet</p>
-                <p className="empty-sub">Sign in to see transcriptions, meetings, and actions.</p>
+                <p className="empty-sub">
+                  Sign in to see transcriptions, meetings, and actions.
+                </p>
               </div>
             ) : (
               <>
@@ -462,15 +583,21 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
                 >
                   {recentTranscriptsSorted.length === 0 ? (
                     <div className="empty-state empty-state--tab">
-                      <div className="empty-icon"><AudioLines size={24} /></div>
+                      <div className="empty-icon">
+                        <AudioLines size={24} />
+                      </div>
                       <p className="empty-title">No transcriptions yet</p>
-                      <p className="empty-sub">Your speech-to-text history will show up here.</p>
+                      <p className="empty-sub">
+                        Your speech-to-text history will show up here.
+                      </p>
                     </div>
                   ) : (
                     <ul className="recent-activity-list">
                       {recentTranscriptsDisplayed.map((t) => {
                         const title =
-                          t.original_text.length > 70 ? t.original_text.slice(0, 70) + "…" : t.original_text;
+                          t.original_text.length > 70
+                            ? t.original_text.slice(0, 70) + "…"
+                            : t.original_text;
                         return (
                           <RecentActivityRow
                             key={t.id}
@@ -497,9 +624,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
                 >
                   {recentMeetingsSorted.length === 0 ? (
                     <div className="empty-state empty-state--tab">
-                      <div className="empty-icon"><Video size={24} /></div>
+                      <div className="empty-icon">
+                        <Video size={24} />
+                      </div>
                       <p className="empty-title">No meetings yet</p>
-                      <p className="empty-sub">Recorded meetings will appear here.</p>
+                      <p className="empty-sub">
+                        Recorded meetings will appear here.
+                      </p>
                     </div>
                   ) : (
                     <ul className="recent-activity-list">
@@ -528,16 +659,22 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
                 >
                   {recentActionsSorted.length === 0 ? (
                     <div className="empty-state empty-state--tab">
-                      <div className="empty-icon"><Atom size={24} /></div>
+                      <div className="empty-icon">
+                        <Atom size={24} />
+                      </div>
                       <p className="empty-title">No actions yet</p>
-                      <p className="empty-sub">Action hotkey runs will show up here.</p>
+                      <p className="empty-sub">
+                        Action hotkey runs will show up here.
+                      </p>
                     </div>
                   ) : (
                     <ul className="recent-activity-list">
                       {recentActionsDisplayed.map((a) => {
                         const cmd = a.action_command?.trim() || "Action";
-                        const title = cmd.length > 70 ? cmd.slice(0, 70) + "…" : cmd;
-                        const sub = a.app_name?.trim() || a.action_type || "Action";
+                        const title =
+                          cmd.length > 70 ? cmd.slice(0, 70) + "…" : cmd;
+                        const sub =
+                          a.app_name?.trim() || a.action_type || "Action";
                         return (
                           <RecentActivityRow
                             key={a.id}
@@ -560,15 +697,22 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
         </motion.section>
 
         {/* Right: Plan Usage */}
-        <motion.section className="billing-usage-section" variants={itemVariants}>
+        <motion.section
+          className="billing-usage-section"
+          variants={itemVariants}
+        >
           <div className="section-header">
             <div>
               <h2 className="section-title">Plan Usage</h2>
               {billingUsage && (
                 <div className="billing-usage-meta">
-                  <span className="billing-plan-badge">{billingUsage.plan_type}</span>
+                  <span className="billing-plan-badge">
+                    {billingUsage.plan_type}
+                  </span>
                   {!isProPlan(billingUsage.plan_type) && (
-                    <BillingResetCountdown periodEndIso={billingUsage.period_end} />
+                    <BillingResetCountdown
+                      periodEndIso={billingUsage.period_end}
+                    />
                   )}
                 </div>
               )}
@@ -588,8 +732,17 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
             <div className="home-billing-skeleton">
               {[80, 55, 70].map((w, i) => (
                 <div key={i} className="home-billing-skeleton__row">
-                  <SkBlock style={{ height: 12, width: `${w}%`, borderRadius: 4, marginBottom: 6 }} />
-                  <SkBlock style={{ height: 6, width: "100%", borderRadius: 3 }} />
+                  <SkBlock
+                    style={{
+                      height: 12,
+                      width: `${w}%`,
+                      borderRadius: 4,
+                      marginBottom: 6,
+                    }}
+                  />
+                  <SkBlock
+                    style={{ height: 6, width: "100%", borderRadius: 3 }}
+                  />
                 </div>
               ))}
             </div>
@@ -599,18 +752,31 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
                 const limit = feature.limit_value;
                 const isUnlimited = limit === null;
                 const used = feature.used ?? 0;
-                const pct = isUnlimited ? 0 : clamp01(limit > 0 ? used / limit : used > 0 ? 1 : 0);
+                const pct = isUnlimited
+                  ? 0
+                  : clamp01(limit > 0 ? used / limit : used > 0 ? 1 : 0);
                 return (
-                  <li key={feature.feature_key} className={`billing-feature-row${!feature.enabled ? " is-disabled" : ""}`}>
+                  <li
+                    key={feature.feature_key}
+                    className={`billing-feature-row${!feature.enabled ? " is-disabled" : ""}`}
+                  >
                     <div className="billing-feature-info">
                       <div className="billing-feature-name-wrap">
-                        <span className="billing-feature-name">{featureLabel(feature.feature_key)}</span>
-                        {!feature.enabled && <span className="billing-feature-disabled">Not included</span>}
+                        <span className="billing-feature-name">
+                          {featureLabel(feature.feature_key)}
+                        </span>
+                        {!feature.enabled && (
+                          <span className="billing-feature-disabled">
+                            Not included
+                          </span>
+                        )}
                       </div>
                       <div className="billing-feature-metrics">
                         <span className="billing-feature-usage">
                           {isUnlimited ? (
-                            <span className="billing-usage-unlimited">Unlimited</span>
+                            <span className="billing-usage-unlimited">
+                              Unlimited
+                            </span>
                           ) : (
                             <>
                               <span className="billing-usage-numbers">
@@ -626,7 +792,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onViewAllTranscripts: _onVie
                     </div>
                     {!isUnlimited && feature.metered && (
                       <div className="billing-usage-bar">
-                        <div className="billing-usage-bar-fill" style={{ width: `${Math.round(pct * 100)}%` }} />
+                        <div
+                          className="billing-usage-bar-fill"
+                          style={{ width: `${Math.round(pct * 100)}%` }}
+                        />
                       </div>
                     )}
                   </li>

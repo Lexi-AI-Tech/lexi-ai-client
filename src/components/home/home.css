@@ -25,7 +25,11 @@
 .home-greeting-card {
   padding: 1.75rem 2rem;
   margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, var(--lexi-surface) 0%, var(--lexi-primary-muted) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--lexi-surface) 0%,
+    var(--lexi-primary-muted) 100%
+  );
   border: 1px solid var(--lexi-border-subtle);
   border-radius: 1rem;
 }
@@ -183,10 +187,15 @@
   gap: 0.1875rem;
   padding: 0.2rem;
   margin-bottom: 1.125rem;
-  background: color-mix(in srgb, var(--lexi-text) 5%, var(--lexi-surface-elevated));
+  background: color-mix(
+    in srgb,
+    var(--lexi-text) 5%,
+    var(--lexi-surface-elevated)
+  );
   border: none;
   border-radius: 0.625rem;
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--lexi-text) 4%, transparent);
+  box-shadow: inset 0 1px 2px
+    color-mix(in srgb, var(--lexi-text) 4%, transparent);
 }
 
 .recent-activity-tab {
@@ -400,7 +409,9 @@
   border: none;
   border-radius: 0.5rem;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.15s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
   font-family: inherit;
 }
 
@@ -598,9 +609,15 @@
 
 /* Skeleton shared */
 @keyframes skeleton-shimmer {
-  0% { opacity: 0.45; }
-  50% { opacity: 0.8; }
-  100% { opacity: 0.45; }
+  0% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.45;
+  }
 }
 
 .skeleton-block {

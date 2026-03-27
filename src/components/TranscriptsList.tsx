@@ -7,7 +7,15 @@
 
 import React, { useCallback, useEffect, useState, useRef, useId } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, Check, Trash2, Play, Pause, AudioLines, Info } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Trash2,
+  Play,
+  Pause,
+  AudioLines,
+  Info,
+} from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Transcript } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
@@ -40,7 +48,11 @@ function TranscriptsPageHeading() {
         >
           <Info size={16} strokeWidth={2} aria-hidden />
         </button>
-        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+        <span
+          id={tooltipId}
+          className="transcripts-page-tooltip"
+          role="tooltip"
+        >
           {TRANSCRIPTION_HELP}
         </span>
       </span>

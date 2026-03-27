@@ -30,7 +30,11 @@ function VocabularyPageHeading() {
         >
           <Info size={16} strokeWidth={2} aria-hidden />
         </button>
-        <span id={tooltipId} className="transcripts-page-tooltip" role="tooltip">
+        <span
+          id={tooltipId}
+          className="transcripts-page-tooltip"
+          role="tooltip"
+        >
           {VOCABULARY_HELP}
         </span>
       </span>
