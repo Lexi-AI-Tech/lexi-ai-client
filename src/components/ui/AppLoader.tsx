@@ -60,16 +60,6 @@ export function AppLoader() {
           </svg>
         </motion.div>
       </div>
-
-      {/* App name */}
-      <motion.p
-        className="app-loader-name"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7, duration: 0.4, ease: "easeOut" }}
-      >
-        Lexi
-      </motion.p>
     </div>
   );
 }
