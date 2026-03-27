@@ -1751,6 +1751,91 @@ textarea.form-input {
   color: var(--lexi-primary);
 }
 
+/* Info tooltip beside Transcripts heading — panel uses sidebar-style mint surface */
+.transcripts-page-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  margin-left: 0.125rem;
+}
+
+/* Hover matches .sidebar-item (light mint fill + dark sage text) */
+.transcripts-page-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border: none;
+  background: transparent;
+  color: var(--lexi-text-muted);
+  border-radius: 8px;
+  cursor: default;
+  line-height: 0;
+  transition: all 0.2s ease;
+}
+
+.transcripts-page-tooltip-trigger:hover,
+.transcripts-page-tooltip-trigger:focus-visible {
+  background: var(--lexi-nav-hover-bg);
+  color: var(--lexi-text);
+  outline: none;
+}
+
+.transcripts-page-tooltip {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 10px);
+  bottom: auto;
+  transform: translateX(-50%) translateY(-4px);
+  width: min(18rem, calc(100vw - 4rem));
+  padding: 0.875rem 1rem;
+  background: var(--lexi-surface-overlay);
+  color: var(--lexi-text);
+  font-family: var(--lexi-font-body);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+  border: 1px solid var(--lexi-sidebar-border);
+  border-radius: 8px;
+  box-shadow: var(--lexi-shadow-sm);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  cursor: default;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  z-index: 100;
+  text-align: left;
+}
+
+/* Arrow: same surface + border as panel */
+.transcripts-page-tooltip::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  margin-left: -5px;
+  width: 9px;
+  height: 9px;
+  background: var(--lexi-surface-overlay);
+  border-left: 1px solid var(--lexi-sidebar-border);
+  border-top: 1px solid var(--lexi-sidebar-border);
+  transform: rotate(45deg);
+  z-index: 1;
+}
+
+.transcripts-page-tooltip-wrap:hover .transcripts-page-tooltip,
+.transcripts-page-tooltip-wrap:focus-within .transcripts-page-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
 .transcripts-page-title-count {
   font-size: 14px;
   font-weight: normal;
