@@ -576,6 +576,13 @@
   font-style: italic;
 }
 
+.meeting-detail-rail__suggestions-empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lexi-text-muted);
+}
+
 .meeting-detail-rail__chip {
   display: inline-flex;
   align-items: center;

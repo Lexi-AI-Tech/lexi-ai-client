@@ -469,7 +469,11 @@ function App() {
   if (showLoading) {
     return (
       <div className="app">
-        {showLoadingScreen ? <AppLoader /> : <div className="app-loading-screen" />}
+        {showLoadingScreen ? (
+          <AppLoader />
+        ) : (
+          <div className="app-loading-screen" />
+        )}
       </div>
     );
   }

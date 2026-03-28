@@ -335,7 +335,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
             )}
           </div>
           <div className="meetings-page-header__meta">
-            {recordingMeetingId === selectedMeetingId && (
+            {(selectedMeeting?.status === "live" ||
+              recordingMeetingId === selectedMeetingId) && (
               <span className="meetings-page-header__badge meetings-page-header__badge--live">
                 <span className="meetings-page-header__badge-dot" />
                 Live

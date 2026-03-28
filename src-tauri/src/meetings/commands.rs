@@ -19,11 +19,17 @@ pub struct Meeting {
     pub updated_by: String,
     pub name: String,
     pub platform: Option<String>,
+    #[serde(default = "default_meeting_status")]
+    pub status: String,
     pub created_at: String,
     pub updated_at: String,
     #[serde(default)]
     pub summary: Option<String>,
     pub transcripts: Option<Vec<MeetingTranscriptSegment>>,
+}
+
+fn default_meeting_status() -> String {
+    "draft".to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -43,7 +49,10 @@ pub struct MeetingCreate {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MeetingUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -400,6 +409,7 @@ pub async fn update_meeting(
     app: AppHandle,
     meeting_id: String,
     name: Option<String>,
+    status: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let auth_token = get_auth_token_async(&app)
         .await
@@ -412,7 +422,7 @@ pub async fn update_meeting(
         meeting_id
     );
 
-    let payload = MeetingUpdate { name };
+    let payload = MeetingUpdate { name, status };
 
     utils::log_api_request("Update meeting details", "PATCH", &url);
 
