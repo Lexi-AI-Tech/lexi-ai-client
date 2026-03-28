@@ -549,9 +549,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       });
       setSessionStatus("ended");
       onMeetingsUpdated((prev) =>
-        prev.map((m) =>
-          m.id === meetingId ? { ...m, status: "ended" } : m,
-        ),
+        prev.map((m) => (m.id === meetingId ? { ...m, status: "ended" } : m)),
       );
       if (isThisMeetingRecording) await stopRecording();
       setShowEndConfirm(false);
