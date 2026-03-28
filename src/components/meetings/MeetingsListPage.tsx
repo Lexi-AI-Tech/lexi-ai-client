@@ -14,6 +14,8 @@ export interface Meeting {
   name: string;
   platform: string | null;
   created_at: string;
+  /** Server lifecycle: draft | live | paused | ended */
+  status?: string;
   summary?: string | null;
 }
 
@@ -195,7 +197,8 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
               animate="visible"
             >
               {meetings.map((m) => {
-                const isLiveMeeting = activeRecordingMeetingId === m.id;
+                const isLiveMeeting =
+                  m.status === "live" || activeRecordingMeetingId === m.id;
                 return (
                   <motion.div
                     key={m.id}
@@ -213,7 +216,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
                   >
                     <div className="meetings-list-page__card-body">
                       <div className="meetings-list-page__card-meta-row">
-                        {activeRecordingMeetingId === m.id && (
+                        {isLiveMeeting && (
                           <span className="meetings-page-header__badge meetings-page-header__badge--live">
                             <span className="meetings-page-header__badge-dot" />
                             Live

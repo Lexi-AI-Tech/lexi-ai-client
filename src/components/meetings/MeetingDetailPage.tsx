@@ -151,6 +151,11 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   /** When true, suggested questions are being fetched in the stream-done handler; useEffect should skip to avoid double fetch */
   const suggestedQuestionsFetchedByStreamRef = useRef(false);
 
+  /** Server-backed lifecycle (draft | live | paused | ended); drives Pause/End visibility */
+  const [sessionStatus, setSessionStatus] = useState<string>(
+    () => meeting?.status ?? "draft",
+  );
+
   const DEFAULT_SUGGESTED_QUESTIONS = [
     "What were the action items?",
     "Summarize key decisions",
@@ -177,9 +182,13 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       const details = await invoke<{
         transcripts?: TranscriptSegment[];
         summary?: string | null;
+        status?: string;
       }>("get_meeting_details", { meetingId });
       setFetchedSegments(details.transcripts ?? []);
       setActiveSummary(details.summary ?? null);
+      if (typeof details.status === "string" && details.status.length > 0) {
+        setSessionStatus(details.status);
+      }
     } catch (error) {
       console.error("Failed to fetch meeting details:", error);
       setFetchedSegments([]);
@@ -189,6 +198,12 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   useEffect(() => {
     fetchMeetingDetails();
   }, [fetchMeetingDetails]);
+
+  useEffect(() => {
+    setSessionStatus(meeting?.status ?? "draft");
+    // Only re-seed when opening a different meeting (avoid list stale status overwriting detail fetch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- meeting intentionally omitted
+  }, [meetingId]);
 
   // When recording stops, refetch so we show the latest saved transcripts (they were saved by the server during the stream)
   const wasRecordingRef = useRef(isThisMeetingRecording);
@@ -292,6 +307,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                   invoke<{
                     name?: string | null;
                     summary?: string | null;
+                    status?: string;
                   }>("get_meeting_details", { meetingId }),
                   invoke<string[]>("get_meeting_suggested_questions", {
                     meetingId,
@@ -304,6 +320,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                   typeof details?.name === "string" ? details.name : null;
                 const serverSummary =
                   typeof details?.summary === "string" ? details.summary : null;
+                const serverStatus =
+                  typeof details?.status === "string" ? details.status : null;
+                if (serverStatus) setSessionStatus(serverStatus);
                 onMeetingsUpdated((p) =>
                   p.map((m) =>
                     m.id === meetingId
@@ -311,6 +330,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                           ...m,
                           ...(serverName ? { name: serverName } : {}),
                           ...(serverSummary ? { summary: serverSummary } : {}),
+                          ...(serverStatus ? { status: serverStatus } : {}),
                         }
                       : m,
                   ),
@@ -347,10 +367,15 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
   const startRecording = async () => {
     if (!tokens?.access_token) return;
+    if (sessionStatus === "ended") {
+      console.warn("Cannot resume recording on an ended meeting");
+      return;
+    }
     setIsInitializingMeeting(true);
     try {
       await invoke("start_meeting_recording", { meetingId });
       onRecordingStarted?.(meetingId);
+      await fetchMeetingDetails();
     } catch (error) {
       console.error("Failed to start meeting recording:", error);
     } finally {
@@ -521,6 +546,16 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   const handleEndMeeting = async () => {
     setIsEnding(true);
     try {
+      await invoke("update_meeting", {
+        meetingId,
+        status: "ended",
+      });
+      setSessionStatus("ended");
+      onMeetingsUpdated((prev) =>
+        prev.map((m) =>
+          m.id === meetingId ? { ...m, status: "ended" } : m,
+        ),
+      );
       if (isThisMeetingRecording) await stopRecording();
       setShowEndConfirm(false);
       setActiveTab("summary");
@@ -638,7 +673,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
               Transcript
             </button>
           </div>
-          {!activeSummary && !isGeneratingSummary && !isInitializingMeeting && (
+          {sessionStatus !== "ended" && !isInitializingMeeting && (
             <div className="meeting-detail-controls">
               <button
                 type="button"
