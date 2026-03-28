@@ -494,7 +494,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             icon={Mic}
             label="Transcribe"
             description="Convert speech to text instantly"
-            onClick={() => {}}
+            onClick={() => onNavigate?.("transcripts")}
           />
           <QuickAction
             icon={Video}
