@@ -338,11 +338,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
               }
 
               if (suggestedQuestionsResult.status === "fulfilled") {
-                setSuggestedQuestions(
-                  Array.isArray(suggestedQuestionsResult.value)
-                    ? suggestedQuestionsResult.value
-                    : [],
-                );
+                const q = suggestedQuestionsResult.value;
+                setSuggestedQuestions(Array.isArray(q) ? q : []);
               } else {
                 setSuggestedQuestions([]);
               }
@@ -593,6 +590,11 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
   const hasSummaryContent = activeSummary || isGeneratingSummary;
   const showSummaryChatRail = hasSummaryContent && isChatRailOpen;
+  /** Server returned no suggested questions (e.g. no transcripts); show alternate copy instead of placeholder chips. */
+  const noSuggestedQuestionsFromServer =
+    suggestedQuestions !== null &&
+    suggestedQuestions.length === 0 &&
+    !isLoadingSuggestedQuestions;
   const isNarrowSplit = useMediaQuery("(max-width: 900px)");
   const summarySplitRef = useRef<HTMLDivElement>(null);
   const [railOuterWidthPx, setRailOuterWidthPx] = useState(
@@ -1033,6 +1035,12 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                                 borderRadius: 10,
                               }}
                             />
+                          </p>
+                        ) : noSuggestedQuestionsFromServer ? (
+                          <p className="meeting-detail-rail__suggestions-empty">
+                            Could not suggest questions due to missing
+                            transcripts. Add a transcript by recording or
+                            capturing this meeting.
                           </p>
                         ) : (
                           (suggestedQuestions && suggestedQuestions.length > 0
