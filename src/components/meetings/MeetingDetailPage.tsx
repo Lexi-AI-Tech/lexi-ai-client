@@ -367,7 +367,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
   const startRecording = async () => {
     if (sessionStatus === "ended") {
-      console.warn("Cannot resume recording on an ended meeting");
+      toast.error("This meeting has ended. You can’t resume recording.");
       return;
     }
     setIsInitializingMeeting(true);
@@ -389,6 +389,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       onRecordingStopped?.();
     } catch (error) {
       console.error("Failed to stop meeting recording:", error);
+      toast.error(error);
     }
   };
 
@@ -437,6 +438,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       );
     } catch (error) {
       console.error("Failed to create doc from meeting summary:", error);
+      toast.error(error);
     } finally {
       setIsCreatingDocFromSummary(false);
     }
@@ -524,6 +526,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     } catch (error) {
       console.error("Failed to add meeting note:", error);
+      toast.error(error);
     } finally {
       setIsAddingNote(false);
     }
@@ -538,6 +541,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       setDeleteConfirmId(null);
     } catch (error) {
       console.error("Failed to delete meeting:", error);
+      toast.error(error);
     } finally {
       setDeletingId(null);
     }
@@ -560,6 +564,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       await handleGenerateSummary(false);
     } catch (error) {
       console.error("Failed to end meeting:", error);
+      toast.error(error);
     } finally {
       setIsEnding(false);
     }

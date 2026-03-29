@@ -132,6 +132,9 @@ export const TranscriptsList: React.FC = () => {
       } catch (err: any) {
         if (cancelled) return;
         console.error("Failed to fetch transcripts:", err);
+        if (authStore.isInitialized && authStore.isAuthenticated) {
+          toast.error(err?.message || "Failed to load transcripts");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

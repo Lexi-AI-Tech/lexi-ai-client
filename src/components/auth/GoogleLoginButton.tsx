@@ -92,13 +92,21 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       }
     };
 
-    setupEventListeners().catch(console.error);
+    setupEventListeners().catch((error) => {
+      console.error("Failed to set up OAuth event listeners:", error);
+      setError("Sign-in setup failed. Please restart the app and try again.");
+      toast.error(
+        "Sign-in setup failed. Please restart the app and try again.",
+      );
+      setLoading(false);
+      setLocalLoading(false);
+    });
 
     return () => {
       isMounted = false;
       unlistenFunctions.forEach((unlisten) => unlisten());
     };
-  }, [onSuccess, onError, setError, setLoading]);
+  }, [onSuccess, onError, setError, setLoading, toast]);
 
   // Cleanup WebSocket connection on unmount
   useEffect(() => {
@@ -112,6 +120,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       await invoke("stop_oauth_websocket");
     } catch (error) {
       console.error("Failed to cancel OAuth WebSocket:", error);
+      toast.error(error);
     } finally {
       setLoading(false);
       setLocalLoading(false);
@@ -187,6 +196,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       console.log("✅ Logout successful");
     } catch (error) {
       console.error("Logout Failed:", error);
+      toast.error(error);
       clearAuth();
       await onboardingStore.refreshState();
     } finally {

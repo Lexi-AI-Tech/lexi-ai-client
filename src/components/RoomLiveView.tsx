@@ -106,6 +106,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
       }
     } catch (err) {
       console.error("Failed to load room:", err);
+      toast.error("Failed to load this room. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -118,6 +119,7 @@ export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
         await invoke("stop_room_recording_and_process", { roomId });
       } catch (e) {
         console.error("Error stopping recording:", e);
+        toast.error("Failed to stop recording. Please try again.");
       }
     }
 
