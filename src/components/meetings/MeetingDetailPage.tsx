@@ -18,6 +18,7 @@ import {
   MicOff,
   RefreshCw,
   Trash2,
+  Video,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import type { Doc } from "../../types";
@@ -907,7 +908,12 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     ) : (
                       <div className="meeting-detail-empty-state">
                         <div className="meeting-detail-empty-state__icon">
-                          ✨
+                          <Video
+                            size={28}
+                            strokeWidth={1.75}
+                            className="meeting-detail-empty-state__icon-svg"
+                            aria-hidden
+                          />
                         </div>
                         <h4 className="meeting-detail-empty-state__title">
                           Generate AI Summary

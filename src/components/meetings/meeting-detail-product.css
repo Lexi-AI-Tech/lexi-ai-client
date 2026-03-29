@@ -1143,6 +1143,11 @@
   font-size: 1.75rem;
 }
 
+.meeting-detail-empty-state__icon-svg {
+  color: var(--lexi-text);
+  opacity: 0.72;
+}
+
 .meeting-detail-empty-state__title {
   font-size: 1.125rem;
   font-weight: 600;
