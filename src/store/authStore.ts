@@ -2,24 +2,23 @@
  * Auth Store
  *
  * Manages authentication state for Lexi AI.
- * This is a pure in-memory state manager - all storage is handled by Rust backend.
+ * This is a pure in-memory UI state wrapper - all auth source of truth lives in Rust.
  *
  * Storage operations:
- * - Startup: Calls Rust get_auth_data to load persisted state
- * - Login: Rust WebSocket stores auth, React just updates in-memory state
- * - Logout: Calls Rust clear_auth_data
+ * - Startup: Calls Rust `auth_get_state` to load UI-safe state
+ * - Changes: Rust emits `auth_state_changed`; we re-fetch `auth_get_state`
+ * - Logout/Clear: Calls Rust `clear_auth_data`
  */
 
 import React from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AuthUser, AuthTokens, AuthState, AuthData } from "../types";
+import type { AuthUiState, AuthUser, AuthState } from "../types";
 import { onboardingStore } from "./onboardingStore";
 
 // Store state (in-memory only)
 let isAuthenticated: boolean = false;
 let user: AuthUser | null = null;
-let tokens: AuthTokens | null = null;
 let isLoading: boolean = false;
 let error: string | null = null;
 let storageInitialized: boolean = false;
@@ -34,18 +33,9 @@ const notifyListeners = () => {
 // Load auth state from Rust backend on startup
 const initializeFromRust = async () => {
   try {
-    const authData = await invoke<AuthData | null>("get_auth_data");
-    if (authData) {
-      console.log("✅ Loaded auth data from Rust backend");
-      isAuthenticated = true;
-      user = authData.user || null;
-      tokens = {
-        access_token: authData.access_token,
-        refresh_token: authData.refresh_token,
-        expires_at: authData.expires_at,
-        expires_in: authData.expires_in,
-      };
-    }
+    const state = await invoke<AuthUiState>("auth_get_state");
+    isAuthenticated = !!state?.is_authenticated;
+    user = (state?.user as AuthUser | null | undefined) ?? null;
   } catch (e) {
     console.error("Failed to load auth state from Rust:", e);
   }
@@ -63,12 +53,7 @@ listen("auth_expired", async () => {
   console.log("🔴 Auth expired event received, clearing auth state");
   isAuthenticated = false;
   user = null;
-  tokens = null;
   error = null;
-
-  invoke("clear_auth_data").catch((err: unknown) => {
-    console.error("Failed to clear auth data:", err);
-  });
 
   await onboardingStore.refreshState();
 
@@ -77,15 +62,20 @@ listen("auth_expired", async () => {
   console.error("Failed to setup auth_expired listener:", err);
 });
 
+// Listen for auth state changes (login/logout/refresh) from Rust backend.
+// Rust is the source of truth; we just re-fetch the latest UI-safe state.
+listen("auth_state_changed", async () => {
+  await initializeFromRust();
+}).catch((err: unknown) => {
+  console.error("Failed to setup auth_state_changed listener:", err);
+});
+
 export const authStore: AuthState = {
   get isAuthenticated() {
     return isAuthenticated;
   },
   get user() {
     return user;
-  },
-  get tokens() {
-    return tokens;
   },
   get isLoading() {
     return isLoading;
@@ -97,20 +87,10 @@ export const authStore: AuthState = {
     return storageInitialized;
   },
 
-  // Update in-memory state only - storage is handled by Rust
-  setAuthData: (newTokens: AuthTokens, newUser: AuthUser) => {
-    tokens = newTokens;
-    user = newUser;
-    isAuthenticated = true;
-    error = null;
-    notifyListeners();
-  },
-
   // Clear auth - calls Rust to clear storage
   clearAuth: () => {
     isAuthenticated = false;
     user = null;
-    tokens = null;
     error = null;
 
     // Clear from Rust backend
@@ -129,11 +109,6 @@ export const authStore: AuthState = {
   setError: (err: string | null) => {
     error = err;
     notifyListeners();
-  },
-
-  // No-op: Token refresh is handled automatically by Rust
-  refreshTokenIfNeeded: async () => {
-    return false;
   },
 
   // Reload auth state from Rust backend

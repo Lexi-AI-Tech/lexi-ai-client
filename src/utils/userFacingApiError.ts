@@ -14,6 +14,37 @@ export function isUsageQuotaExceededError(raw: string): boolean {
   return raw.toLowerCase().includes(USAGE_QUOTA_EXCEEDED_DETAIL);
 }
 
+/**
+ * True when the error indicates the user needs to re-authenticate.
+ *
+ * Note: Tauri commands may return plain strings like "Authentication required" or
+ * internal markers like "no_auth_data"/"expired", not only HTTP status text.
+ */
+export function isAuthErrorFromUnknown(err: unknown): boolean {
+  const raw =
+    typeof err === "string"
+      ? err
+      : err instanceof Error
+        ? err.message
+        : String(err ?? "");
+  const s = raw.trim();
+  if (!s) return false;
+  const lower = s.toLowerCase();
+  return (
+    lower.includes("not authenticated") ||
+    lower.includes("authentication required") ||
+    lower.includes("unauthorized") ||
+    lower.includes("forbidden") ||
+    lower.includes("no_auth_data") ||
+    lower.includes("expired") ||
+    // Some callers pass through upstream HTTP-ish strings.
+    lower.includes(" 401") ||
+    lower.includes(" 403") ||
+    lower.includes("401 ") ||
+    lower.includes("403 ")
+  );
+}
+
 const SERVER_ERROR_PREFIX = /^Server Error\s*\([^)]+\)\s*:\s*/i;
 
 function tryParseDetailFromJsonObject(jsonStr: string): string | null {

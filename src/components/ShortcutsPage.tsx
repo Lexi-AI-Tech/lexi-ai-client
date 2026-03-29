@@ -13,7 +13,10 @@ import type { Shortcut } from "../types";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
-import { isUsageQuotaExceededError } from "../utils/userFacingApiError";
+import {
+  isAuthErrorFromUnknown,
+  isUsageQuotaExceededError,
+} from "../utils/userFacingApiError";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 
@@ -64,13 +67,11 @@ export const ShortcutsPage: React.FC = () => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const showContent =
-    authStore.isInitialized &&
-    (!authStore.isAuthenticated || !!authStore.tokens?.access_token);
+  const showContent = authStore.isInitialized && true;
   const showLogin = authStore.isInitialized && !authStore.isAuthenticated;
 
   const loadShortcuts = async () => {
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+    if (!authStore.isAuthenticated) {
       setShortcuts([]);
       setIsLoading(false);
       return;
@@ -87,13 +88,7 @@ export const ShortcutsPage: React.FC = () => {
         toast.error(errorMessage);
         return;
       }
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("403") ||
-        errorMessage.includes("Unauthorized") ||
-        errorMessage.includes("Not authenticated");
-
-      if (isAuthError) {
+      if (isAuthErrorFromUnknown(err)) {
         console.log("Auth error loading shortcuts, clearing auth");
         authStore.clearAuth();
         setShortcuts([]);
@@ -112,11 +107,6 @@ export const ShortcutsPage: React.FC = () => {
   }, [authStore.isAuthenticated, authStore.isInitialized]);
 
   const handleCreateShortcut = async () => {
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      toast.error("Please sign in to create shortcuts");
-      return;
-    }
-
     if (!newShortcut.trim() || !newValue.trim()) {
       toast.warning("Both shortcut and value are required");
       return;
@@ -140,13 +130,7 @@ export const ShortcutsPage: React.FC = () => {
         toast.error(errorMessage);
         return;
       }
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("403") ||
-        errorMessage.includes("Unauthorized") ||
-        errorMessage.includes("Not authenticated");
-
-      if (isAuthError) {
+      if (isAuthErrorFromUnknown(err)) {
         console.log("Auth error creating shortcut, clearing auth");
         authStore.clearAuth();
       } else {
@@ -156,11 +140,6 @@ export const ShortcutsPage: React.FC = () => {
   };
 
   const handleUpdateShortcut = async (shortcut: Shortcut) => {
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      toast.error("Please sign in to update shortcuts");
-      return;
-    }
-
     if (!editingShortcut) {
       setEditingShortcut(shortcut);
       return;
@@ -188,13 +167,7 @@ export const ShortcutsPage: React.FC = () => {
         toast.error(errorMessage);
         return;
       }
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("403") ||
-        errorMessage.includes("Unauthorized") ||
-        errorMessage.includes("Not authenticated");
-
-      if (isAuthError) {
+      if (isAuthErrorFromUnknown(err)) {
         console.log("Auth error updating shortcut, clearing auth");
         authStore.clearAuth();
       } else {
@@ -213,10 +186,6 @@ export const ShortcutsPage: React.FC = () => {
 
   const handleConfirmDeleteShortcut = async () => {
     if (!deleteConfirmId) return;
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      toast.error("Please sign in to delete shortcuts");
-      return;
-    }
 
     setDeletingId(deleteConfirmId);
     try {
@@ -232,13 +201,7 @@ export const ShortcutsPage: React.FC = () => {
         toast.error(errorMessage);
         return;
       }
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("403") ||
-        errorMessage.includes("Unauthorized") ||
-        errorMessage.includes("Not authenticated");
-
-      if (isAuthError) {
+      if (isAuthErrorFromUnknown(err)) {
         console.log("Auth error deleting shortcut, clearing auth");
         authStore.clearAuth();
       } else {

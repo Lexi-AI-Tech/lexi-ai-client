@@ -181,7 +181,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 
       // Logout from backend (revokes sessions), clears auth and resets onboarding in Rust
       await invoke("logout");
-      clearAuth();
+      await authStore.checkAuth();
       await onboardingStore.refreshState();
 
       console.log("✅ Logout successful");

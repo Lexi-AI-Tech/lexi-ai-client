@@ -53,12 +53,53 @@ pub struct AuthDataRequest {
 }
 
 /// User data structure for authentication (frontend interface)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserDataRequest {
     pub id: String,
     pub email: String,
     pub name: String,
     pub picture: Option<String>,
+}
+
+// ============================================================================
+// UI-safe auth state (no tokens exposed to renderer)
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuthUiStateResponse {
+    pub is_authenticated: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<UserDataRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<u64>,
+}
+
+fn read_auth_ui_state(app: &AppHandle) -> Result<AuthUiStateResponse, String> {
+    let data = secure_storage::get_auth_data(app).map_err(|e| e.to_string())?;
+    match data {
+        Some(d) => Ok(AuthUiStateResponse {
+            is_authenticated: true,
+            user: d.user.map(Into::into),
+            expires_at: d.expires_at,
+        }),
+        None => Ok(AuthUiStateResponse {
+            is_authenticated: false,
+            user: None,
+            expires_at: None,
+        }),
+    }
+}
+
+fn emit_auth_state_changed(app: &AppHandle) {
+    match read_auth_ui_state(app) {
+        Ok(payload) => {
+            app.emit("auth_state_changed", payload)
+                .unwrap_or_else(|e| eprintln!("Failed to emit auth_state_changed: {}", e));
+        }
+        Err(e) => {
+            eprintln!("Failed to compute auth UI state: {}", e);
+        }
+    }
 }
 
 pub(crate) fn get_jwt_exp_claim(token: &str) -> Option<u64> {
@@ -174,6 +215,7 @@ pub async fn store_auth_data(app: AppHandle, data: AuthDataRequest) -> Result<()
         }
     }
 
+    emit_auth_state_changed(&app);
     Ok(())
 }
 
@@ -190,6 +232,12 @@ pub async fn get_auth_data(app: AppHandle) -> Result<Option<AuthDataRequest>, St
     Ok(secure_storage::get_auth_data(&app)?.map(Into::into))
 }
 
+/// Retrieve UI-safe authentication state (no tokens).
+#[tauri::command]
+pub async fn auth_get_state(app: AppHandle) -> Result<AuthUiStateResponse, String> {
+    read_auth_ui_state(&app)
+}
+
 /// Clear all authentication data
 ///
 /// Removes all stored authentication tokens and user data from secure storage.
@@ -198,6 +246,7 @@ pub async fn get_auth_data(app: AppHandle) -> Result<Option<AuthDataRequest>, St
 #[tauri::command]
 pub async fn clear_auth_data(app: AppHandle) -> Result<(), String> {
     secure_storage::clear_auth_data(&app)?;
+    emit_auth_state_changed(&app);
     Ok(())
 }
 
@@ -208,6 +257,7 @@ pub fn handle_auth_expired(app: &AppHandle) {
     if let Err(e) = crate::commands::onboarding::reset_onboarding(app.clone()) {
         eprintln!("Failed to reset onboarding on auth expiry: {}", e);
     }
+    emit_auth_state_changed(app);
     app.emit("auth_expired", ())
         .unwrap_or_else(|e| eprintln!("Failed to emit auth_expired: {}", e));
 }
@@ -317,6 +367,7 @@ async fn refresh_access_token(
                             };
 
                             secure_storage::store_auth_data(app, &new_auth_data)?;
+                            emit_auth_state_changed(app);
                             println!("✅ Access token refreshed successfully");
                             Ok(Some(access_token.to_string()))
                         } else {
@@ -682,5 +733,6 @@ pub async fn logout(app: AppHandle) -> Result<(), String> {
         eprintln!("Failed to reset onboarding on logout: {}", e);
     }
 
+    emit_auth_state_changed(&app);
     Ok(())
 }

@@ -57,18 +57,27 @@ export interface AuthData {
   user?: AuthUser;
 }
 
+/**
+ * Auth state exposed to the renderer.
+ *
+ * Source of truth is the Rust backend. Tokens are intentionally not exposed to
+ * the frontend to avoid stale/duplicated state and to keep business logic in Rust.
+ */
+export interface AuthUiState {
+  is_authenticated: boolean;
+  user?: AuthUser | null;
+  expires_at?: number | null;
+}
+
 export interface AuthState {
   isAuthenticated: boolean;
   user: AuthUser | null;
-  tokens: AuthTokens | null;
   isLoading: boolean;
   error: string | null;
   isInitialized: boolean;
-  setAuthData: (tokens: AuthTokens, user: AuthUser) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  refreshTokenIfNeeded: () => Promise<boolean>;
   checkAuth: () => Promise<void>;
 }
 

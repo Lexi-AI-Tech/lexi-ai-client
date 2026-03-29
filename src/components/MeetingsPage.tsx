@@ -49,7 +49,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   onRecordingStartedGlobal,
   onRecordingStoppedGlobal,
 }) => {
-  const { tokens } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const toast = useToast();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isMeetingsLoading, setIsMeetingsLoading] = useState(false);
@@ -83,10 +83,10 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   }, []);
 
   useEffect(() => {
-    if (tokens?.access_token) {
+    if (isAuthenticated) {
       fetchMeetings();
     }
-  }, [tokens, fetchMeetings]);
+  }, [isAuthenticated, fetchMeetings]);
 
   // Keep recording state stable across page unmount/remount by syncing from app-level state.
   useEffect(() => {
@@ -130,8 +130,6 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   }, []);
 
   const handleCreateAndStartMeeting = async () => {
-    if (!tokens?.access_token) return;
-
     try {
       const platform =
         typeof autoStartPlatform === "string" &&

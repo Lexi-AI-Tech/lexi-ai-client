@@ -102,7 +102,7 @@ export const TranscriptsList: React.FC = () => {
   // Fetch transcripts when authenticated and page changes (same pattern as HomePage: single effect, no callback in deps to avoid double fetch)
   useEffect(() => {
     if (!authStore.isInitialized) return;
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+    if (!authStore.isAuthenticated) {
       setTranscripts([]);
       setLoading(false);
       return;
@@ -140,12 +140,7 @@ export const TranscriptsList: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [
-    authStore.isInitialized,
-    authStore.isAuthenticated,
-    authStore.tokens?.access_token,
-    page,
-  ]);
+  }, [authStore.isInitialized, authStore.isAuthenticated, page]);
 
   // Fetch app icons for unique focused_app names (macOS only; Tauri returns data URL or null)
   useEffect(() => {
@@ -236,9 +231,7 @@ export const TranscriptsList: React.FC = () => {
   };
 
   // Same as HomePage: always show the page shell; show loading/login/content inside (no full-page gate)
-  const showContent =
-    authStore.isInitialized &&
-    (!authStore.isAuthenticated || !!authStore.tokens?.access_token);
+  const showContent = authStore.isInitialized;
   const showLogin = authStore.isInitialized && !authStore.isAuthenticated;
 
   const GRID_VARIANTS = {
