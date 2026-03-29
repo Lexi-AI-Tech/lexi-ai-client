@@ -7,7 +7,10 @@ import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
-import { isUsageQuotaExceededError } from "../utils/userFacingApiError";
+import {
+  isAuthErrorFromUnknown,
+  isUsageQuotaExceededError,
+} from "../utils/userFacingApiError";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 import "./actions/actions.css";
@@ -110,10 +113,6 @@ export const ActionsPage: React.FC = () => {
 
   const handleConfirmDeleteAction = async () => {
     if (!deleteConfirmId) return;
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
-      toast.error("Please sign in to delete actions");
-      return;
-    }
 
     setDeletingId(deleteConfirmId);
     try {
@@ -128,13 +127,7 @@ export const ActionsPage: React.FC = () => {
         toast.error(errorMessage);
         return;
       }
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("403") ||
-        errorMessage.includes("Unauthorized") ||
-        errorMessage.includes("Not authenticated");
-
-      if (isAuthError) {
+      if (isAuthErrorFromUnknown(err)) {
         console.log("Auth error deleting action, clearing auth");
         authStore.clearAuth();
       } else {
@@ -172,7 +165,7 @@ export const ActionsPage: React.FC = () => {
 
   useEffect(() => {
     if (!authStore.isInitialized) return;
-    if (!authStore.isAuthenticated || !authStore.tokens?.access_token) {
+    if (!authStore.isAuthenticated) {
       setActions([]);
       setIsLoading(false);
       setTotal(0);
@@ -203,13 +196,7 @@ export const ActionsPage: React.FC = () => {
           toast.error(errorMessage);
           return;
         }
-        const isAuthError =
-          errorMessage.includes("401") ||
-          errorMessage.includes("403") ||
-          errorMessage.includes("Unauthorized") ||
-          errorMessage.includes("Not authenticated");
-
-        if (isAuthError) {
+        if (isAuthErrorFromUnknown(err)) {
           console.log("Auth error loading action history, clearing auth");
           authStore.clearAuth();
           setActions([]);
@@ -227,12 +214,7 @@ export const ActionsPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [
-    authStore.isInitialized,
-    authStore.isAuthenticated,
-    authStore.tokens?.access_token,
-    page,
-  ]);
+  }, [authStore.isInitialized, authStore.isAuthenticated, page]);
 
   useEffect(() => {
     if (!actions.length) return;

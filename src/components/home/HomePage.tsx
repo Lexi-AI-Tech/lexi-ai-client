@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { Atom, FileText, Mic, Video, AudioLines } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
+import { useToast } from "../toast/useToast";
 import type {
   ActionHistory,
   PaginatedActionHistoryResponse,
@@ -269,7 +270,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   onViewAllTranscripts: _onViewAllTranscripts,
   onNavigate,
 }) => {
-  const { user, isAuthenticated, tokens } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const toast = useToast();
 
   const [recentActivityTab, setRecentActivityTab] =
     useState<RecentActivityTabId>("transcripts");
@@ -288,17 +290,17 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   // Data fetching
   const fetchBillingUsage = useCallback(async () => {
-    if (!isAuthenticated || !tokens?.access_token) return;
+    if (!isAuthenticated) return;
     try {
       setBillingUsage(await invoke<BillingUsageResponse>("get_billing_usage"));
     } catch (err) {
       console.error("Failed to fetch billing usage:", err);
       setBillingUsage(null);
     }
-  }, [isAuthenticated, tokens?.access_token]);
+  }, [isAuthenticated]);
 
   const fetchRecentTranscripts = useCallback(async () => {
-    if (!isAuthenticated || !tokens?.access_token) return;
+    if (!isAuthenticated) return;
     try {
       const data = await invoke<PaginatedTranscriptsResponse>(
         "get_transcripts",
@@ -311,10 +313,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     } catch (err) {
       console.error("Failed to fetch recent transcripts:", err);
     }
-  }, [isAuthenticated, tokens?.access_token]);
+  }, [isAuthenticated]);
 
   const fetchRecentActions = useCallback(async () => {
-    if (!isAuthenticated || !tokens?.access_token) return;
+    if (!isAuthenticated) return;
     try {
       const data = await invoke<PaginatedActionHistoryResponse>(
         "get_action_history",
@@ -327,20 +329,20 @@ export const HomePage: React.FC<HomePageProps> = ({
     } catch (err) {
       console.error("Failed to fetch recent actions:", err);
     }
-  }, [isAuthenticated, tokens?.access_token]);
+  }, [isAuthenticated]);
 
   const fetchMeetings = useCallback(async () => {
-    if (!isAuthenticated || !tokens?.access_token) return;
+    if (!isAuthenticated) return;
     try {
       setMeetings(await invoke<Meeting[]>("list_meetings"));
     } catch (err) {
       console.error("Failed to fetch meetings:", err);
     }
-  }, [isAuthenticated, tokens?.access_token]);
+  }, [isAuthenticated]);
 
   // Effects
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) {
+    if (!isAuthenticated) {
       setBillingLoading(false);
       return;
     }
@@ -356,10 +358,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     return () => {
       c = true;
     };
-  }, [isAuthenticated, tokens?.access_token, fetchBillingUsage]);
+  }, [isAuthenticated, fetchBillingUsage]);
 
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) {
+    if (!isAuthenticated) {
       setRecentLoading(false);
       return;
     }
@@ -375,10 +377,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     return () => {
       c = true;
     };
-  }, [isAuthenticated, tokens?.access_token, fetchRecentTranscripts]);
+  }, [isAuthenticated, fetchRecentTranscripts]);
 
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) {
+    if (!isAuthenticated) {
       setMeetingsLoading(false);
       return;
     }
@@ -394,10 +396,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     return () => {
       c = true;
     };
-  }, [isAuthenticated, tokens?.access_token, fetchMeetings]);
+  }, [isAuthenticated, fetchMeetings]);
 
   useEffect(() => {
-    if (!isAuthenticated || !tokens?.access_token) {
+    if (!isAuthenticated) {
       setActionsLoading(false);
       return;
     }
@@ -413,7 +415,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     return () => {
       c = true;
     };
-  }, [isAuthenticated, tokens?.access_token, fetchRecentActions]);
+  }, [isAuthenticated, fetchRecentActions]);
 
   // Derived
   const userName = user?.name?.split(" ")[0] || "there";
@@ -458,6 +460,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       await invoke("open_external_url", { url: UPGRADE_URL });
     } catch (e) {
       console.error("Failed to open upgrade URL:", e);
+      toast.error(e);
     }
   }, []);
 

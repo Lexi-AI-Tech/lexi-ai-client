@@ -32,6 +32,7 @@ import "../meetings.css";
 import "./meetings-list.css";
 import "./meeting-detail-product.css";
 import { formatLocaleTimeWithSeconds } from "../../lib/dateUtils";
+import { useToast } from "../toast/useToast";
 
 /** Gutter (24px) + max Q&A column (480px) — used for slide animation */
 const Q_A_RAIL_OUTER_WIDTH_PX = 504;
@@ -114,7 +115,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   onRecordingStarted,
   initialTab,
 }) => {
-  const { tokens } = useAuthStore();
+  useAuthStore();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<"transcript" | "summary">(
     initialTab ?? "transcript",
   );
@@ -364,9 +366,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   }, [meetingId, meeting, onMeetingsUpdated]);
 
   const startRecording = async () => {
-    if (!tokens?.access_token) return;
     if (sessionStatus === "ended") {
-      console.warn("Cannot resume recording on an ended meeting");
+      toast.error("This meeting has ended. You can’t resume recording.");
       return;
     }
     setIsInitializingMeeting(true);
@@ -376,6 +377,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       await fetchMeetingDetails();
     } catch (error) {
       console.error("Failed to start meeting recording:", error);
+      toast.error(error);
     } finally {
       setIsInitializingMeeting(false);
     }
@@ -387,12 +389,20 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       onRecordingStopped?.();
     } catch (error) {
       console.error("Failed to stop meeting recording:", error);
+      toast.error(error);
     }
   };
 
-  const handleGenerateSummary = async () => {
-    if (!meetingId || isGeneratingSummary || !tokens?.access_token) return;
-    const isRegenerate = !!activeSummary;
+  const handleGenerateSummary = async (regenerate = false) => {
+    if (!meetingId || isGeneratingSummary) return;
+    // Prevent confusing server/proxy errors when there is nothing to summarize yet.
+    // (e.g. meeting exists but no transcript segments were captured/saved)
+    if (segments.length === 0) {
+      toast.error(
+        "No transcript yet. Record the meeting (or add note) before generating a summary.",
+      );
+      return;
+    }
     setIsGeneratingSummary(true);
     setStreamingLines([]);
     setActiveSummary(null);
@@ -402,12 +412,13 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     try {
       await invoke("stream_meeting_summary", {
         meetingId,
-        regenerate: isRegenerate,
+        regenerate,
       });
     } catch (error) {
       console.error("Failed to generate meeting summary:", error);
       streamingForMeetingIdRef.current = null;
       setIsGeneratingSummary(false);
+      toast.error(error);
     } finally {
       // Don't flip `isGeneratingSummary` here.
       // We rely on the `meeting-summary-stream` { done: true } event so the UI
@@ -435,6 +446,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       );
     } catch (error) {
       console.error("Failed to create doc from meeting summary:", error);
+      toast.error(error);
     } finally {
       setIsCreatingDocFromSummary(false);
     }
@@ -522,6 +534,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     } catch (error) {
       console.error("Failed to add meeting note:", error);
+      toast.error(error);
     } finally {
       setIsAddingNote(false);
     }
@@ -536,6 +549,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       setDeleteConfirmId(null);
     } catch (error) {
       console.error("Failed to delete meeting:", error);
+      toast.error(error);
     } finally {
       setDeletingId(null);
     }
@@ -555,9 +569,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       if (isThisMeetingRecording) await stopRecording();
       setShowEndConfirm(false);
       setActiveTab("summary");
-      await handleGenerateSummary();
+      await handleGenerateSummary(false);
     } catch (error) {
       console.error("Failed to end meeting:", error);
+      toast.error(error);
     } finally {
       setIsEnding(false);
     }
@@ -884,7 +899,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         <button
                           type="button"
                           className="meeting-detail-btn meeting-detail-btn--secondary"
-                          onClick={handleGenerateSummary}
+                          onClick={() => handleGenerateSummary(true)}
                           disabled={!meetingId || isGeneratingSummary}
                           title="Generate a new summary"
                         >
@@ -925,7 +940,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         <button
                           type="button"
                           className="meeting-detail-empty-state__btn"
-                          onClick={handleGenerateSummary}
+                          onClick={() => handleGenerateSummary(false)}
                           disabled={!meetingId || isGeneratingSummary}
                         >
                           {isGeneratingSummary

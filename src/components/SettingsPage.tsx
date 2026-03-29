@@ -156,6 +156,8 @@ export const SettingsPage: React.FC = () => {
             hotkeys: configHotkeys.slice(0, 3),
           };
           setCurrentHotkeys(hotkey);
+        } else {
+          toast.error("Failed to load hotkeys");
         }
       }
 

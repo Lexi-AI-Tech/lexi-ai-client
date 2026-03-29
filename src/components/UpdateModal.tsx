@@ -48,7 +48,7 @@ export const UpdateModal: React.FC = () => {
       setTimeout(() => relaunch(), 1000);
     } catch (e: any) {
       console.error(e);
-      toast.error(`Update failed: ${e.message}`);
+      toast.error(e);
       setIsInstalling(false);
     }
   };

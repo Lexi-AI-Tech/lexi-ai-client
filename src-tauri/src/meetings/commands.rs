@@ -515,6 +515,7 @@ pub async fn stream_meeting_summary(
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
+        .header(reqwest::header::CONTENT_LENGTH, "0")
         .body("")
         .send()
         .await

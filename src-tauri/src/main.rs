@@ -101,9 +101,9 @@ use commands::app_config::{
     get_default_hotkeys, update_app_config,
 };
 use commands::auth::{
-    clear_auth_data, get_api_base_url, get_auth_data, get_auth_token, get_current_user,
-    get_pkce_verifier, has_auth_data, logout, refresh_auth_token, start_google_login,
-    store_auth_data,
+    auth_get_state, clear_auth_data, get_api_base_url, get_auth_data, get_auth_token,
+    get_current_user, get_pkce_verifier, has_auth_data, logout, refresh_auth_token,
+    start_google_login, store_auth_data,
 };
 use commands::billing::get_billing_usage;
 use commands::docs::{
@@ -265,6 +265,7 @@ pub fn main() {
             start_hotkey_recording,
             stop_hotkey_recording,
             store_auth_data,
+            auth_get_state,
             get_auth_data,
             clear_auth_data,
             has_auth_data,

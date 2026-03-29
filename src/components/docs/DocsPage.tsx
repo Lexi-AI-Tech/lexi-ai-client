@@ -122,6 +122,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
         );
       } catch (err) {
         console.error("Doc event listeners failed:", err);
+        toast.error("Docs failed to initialize. Please restart the app.");
       }
     })();
     return () => {
