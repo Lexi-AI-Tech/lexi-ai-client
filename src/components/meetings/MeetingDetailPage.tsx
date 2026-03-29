@@ -32,6 +32,7 @@ import "../meetings.css";
 import "./meetings-list.css";
 import "./meeting-detail-product.css";
 import { formatLocaleTimeWithSeconds } from "../../lib/dateUtils";
+import { useToast } from "../toast/useToast";
 
 /** Gutter (24px) + max Q&A column (480px) — used for slide animation */
 const Q_A_RAIL_OUTER_WIDTH_PX = 504;
@@ -114,7 +115,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   onRecordingStarted,
   initialTab,
 }) => {
-  const { tokens } = useAuthStore();
+  useAuthStore();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<"transcript" | "summary">(
     initialTab ?? "transcript",
   );
@@ -364,7 +366,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   }, [meetingId, meeting, onMeetingsUpdated]);
 
   const startRecording = async () => {
-    if (!tokens?.access_token) return;
     if (sessionStatus === "ended") {
       console.warn("Cannot resume recording on an ended meeting");
       return;
@@ -376,6 +377,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       await fetchMeetingDetails();
     } catch (error) {
       console.error("Failed to start meeting recording:", error);
+      toast.error(error);
     } finally {
       setIsInitializingMeeting(false);
     }
@@ -391,7 +393,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   };
 
   const handleGenerateSummary = async () => {
-    if (!meetingId || isGeneratingSummary || !tokens?.access_token) return;
+    if (!meetingId || isGeneratingSummary) return;
     const isRegenerate = !!activeSummary;
     setIsGeneratingSummary(true);
     setStreamingLines([]);
@@ -408,6 +410,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       console.error("Failed to generate meeting summary:", error);
       streamingForMeetingIdRef.current = null;
       setIsGeneratingSummary(false);
+      toast.error(error);
     } finally {
       // Don't flip `isGeneratingSummary` here.
       // We rely on the `meeting-summary-stream` { done: true } event so the UI
