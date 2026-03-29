@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight, Video, Trash2, Info } from "lucide-react";
 import "./meetings-list.css";
 import { formatAppDateTime } from "../../lib/dateUtils";
+import { useToast } from "../toast/useToast";
 
 const MEETINGS_HELP =
   "Lexi runs meeting auto-detect in the background—when it recognizes a supported call, you can start capturing from the prompt. You can also start anytime from the Lexi menu bar tray (Start Meeting) or with Start New Meeting here. Open a meeting for live transcript, AI summary, and chat; end recording from the meeting view or the tray when you’re done.";
@@ -42,6 +43,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
   isLoading = false,
 }) => {
   const meetingsTooltipId = useId();
+  const toast = useToast();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -54,6 +56,7 @@ export const MeetingsListPage: React.FC<MeetingsListPageProps> = ({
       setDeleteConfirmId(null);
     } catch (error) {
       console.error("Failed to delete meeting:", error);
+      toast.error(error);
     } finally {
       setDeletingId(null);
     }

@@ -395,6 +395,14 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
 
   const handleGenerateSummary = async (regenerate = false) => {
     if (!meetingId || isGeneratingSummary) return;
+    // Prevent confusing server/proxy errors when there is nothing to summarize yet.
+    // (e.g. meeting exists but no transcript segments were captured/saved)
+    if (segments.length === 0) {
+      toast.error(
+        "No transcript yet. Record the meeting (or add note) before generating a summary.",
+      );
+      return;
+    }
     setIsGeneratingSummary(true);
     setStreamingLines([]);
     setActiveSummary(null);

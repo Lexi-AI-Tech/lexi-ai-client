@@ -83,6 +83,7 @@ export const NotesPage: React.FC = () => {
       setNotes(response.notes);
     } catch (err) {
       console.error("Failed to fetch notes:", err);
+      toast.error(err);
     } finally {
       setLoading(false);
     }
@@ -95,6 +96,7 @@ export const NotesPage: React.FC = () => {
 
   const handleCreate = async () => {
     if (!content.trim()) {
+      toast.warning("Note content cannot be empty");
       return;
     }
 
@@ -108,7 +110,7 @@ export const NotesPage: React.FC = () => {
       toast.success("Note created");
     } catch (err) {
       console.error("Failed to create note:", err);
-      toast.error(`Failed to create note: ${err}`);
+      toast.error(err);
     } finally {
       setIsCreating(false);
     }
@@ -130,7 +132,7 @@ export const NotesPage: React.FC = () => {
       await fetchNotes();
       toast.success("Note updated");
     } catch (err) {
-      toast.error(`Failed to update note: ${err}`);
+      toast.error(err);
     } finally {
       setIsCreating(false);
     }

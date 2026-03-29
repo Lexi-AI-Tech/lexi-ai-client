@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { Atom, FileText, Mic, Video, AudioLines } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
+import { useToast } from "../toast/useToast";
 import type {
   ActionHistory,
   PaginatedActionHistoryResponse,
@@ -270,6 +271,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigate,
 }) => {
   const { user, isAuthenticated } = useAuthStore();
+  const toast = useToast();
 
   const [recentActivityTab, setRecentActivityTab] =
     useState<RecentActivityTabId>("transcripts");
@@ -458,6 +460,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       await invoke("open_external_url", { url: UPGRADE_URL });
     } catch (e) {
       console.error("Failed to open upgrade URL:", e);
+      toast.error(e);
     }
   }, []);
 

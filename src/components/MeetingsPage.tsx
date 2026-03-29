@@ -77,10 +77,11 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
       setMeetings(result);
     } catch (error) {
       console.error("Failed to fetch meetings:", error);
+      toast.error(error);
     } finally {
       setIsMeetingsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -269,6 +270,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
       setIsEditingMeetingTitle(false);
     } catch (error) {
       console.error("Failed to update meeting title:", error);
+      toast.error(error);
       setMeetingTitleDraft(selectedMeeting.name || "");
       setIsEditingMeetingTitle(false);
     } finally {

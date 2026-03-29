@@ -9,6 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
 import type { HotkeyConfig } from "../types";
+import { useToast } from "./toast/useToast";
 import "../styles/components/hotkey-selector.css";
 
 interface HotkeySelectorProps {
@@ -34,6 +35,7 @@ export function HotkeySelector({
   description,
   titleIcon,
 }: HotkeySelectorProps) {
+  const toast = useToast();
   const [hotkeys, setHotkeys] = useState<string[]>(value.hotkeys);
   const [isRecording, setIsRecording] = useState(false);
   const [currentKeys, setCurrentKeys] = useState<Set<string>>(new Set());
@@ -102,6 +104,7 @@ export function HotkeySelector({
       setCurrentKeys(new Set());
     } catch (err) {
       console.error("Failed to start hotkey recording:", err);
+      toast.error(err);
     }
   }, [disabled, hotkeys.length, maxHotkeys]);
 
@@ -117,6 +120,7 @@ export function HotkeySelector({
       await invoke("stop_hotkey_recording");
     } catch (err) {
       console.error("Failed to stop hotkey recording:", err);
+      toast.error(err);
     }
   }, []);
 
