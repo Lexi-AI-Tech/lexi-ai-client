@@ -65,7 +65,7 @@
         "decorations": true,
         "transparent": false,
         "url": "index.html",
-        "devtools": true,
+        "devtools": false,
         "visible": true,
         "titleBarStyle": "Transparent"
       }
