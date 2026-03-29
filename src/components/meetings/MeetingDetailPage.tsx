@@ -392,9 +392,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     }
   };
 
-  const handleGenerateSummary = async () => {
+  const handleGenerateSummary = async (regenerate = false) => {
     if (!meetingId || isGeneratingSummary) return;
-    const isRegenerate = !!activeSummary;
     setIsGeneratingSummary(true);
     setStreamingLines([]);
     setActiveSummary(null);
@@ -404,7 +403,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     try {
       await invoke("stream_meeting_summary", {
         meetingId,
-        regenerate: isRegenerate,
+        regenerate,
       });
     } catch (error) {
       console.error("Failed to generate meeting summary:", error);
@@ -558,7 +557,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       if (isThisMeetingRecording) await stopRecording();
       setShowEndConfirm(false);
       setActiveTab("summary");
-      await handleGenerateSummary();
+      await handleGenerateSummary(false);
     } catch (error) {
       console.error("Failed to end meeting:", error);
     } finally {
@@ -887,7 +886,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         <button
                           type="button"
                           className="meeting-detail-btn meeting-detail-btn--secondary"
-                          onClick={handleGenerateSummary}
+                          onClick={() => handleGenerateSummary(true)}
                           disabled={!meetingId || isGeneratingSummary}
                           title="Generate a new summary"
                         >
@@ -928,7 +927,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         <button
                           type="button"
                           className="meeting-detail-empty-state__btn"
-                          onClick={handleGenerateSummary}
+                          onClick={() => handleGenerateSummary(false)}
                           disabled={!meetingId || isGeneratingSummary}
                         >
                           {isGeneratingSummary
