@@ -83,6 +83,12 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
     }
   }, [toast]);
 
+  const goBackToMeetingsList = useCallback(() => {
+    setSelectedMeetingId(null);
+    setOpenToSummaryTab(false);
+    void fetchMeetings();
+  }, [fetchMeetings]);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchMeetings();
@@ -285,10 +291,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
           <button
             type="button"
             className="meetings-page-header__back"
-            onClick={() => {
-              setSelectedMeetingId(null);
-              setOpenToSummaryTab(false);
-            }}
+            onClick={goBackToMeetingsList}
             aria-label="Back to meetings list"
           >
             <ArrowLeft size={20} strokeWidth={2} />
@@ -356,10 +359,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
           meetingId={selectedMeetingId}
           meeting={selectedMeeting}
           initialTab={openToSummaryTab ? "summary" : undefined}
-          onBackToList={() => {
-            setSelectedMeetingId(null);
-            setOpenToSummaryTab(false);
-          }}
+          onBackToList={goBackToMeetingsList}
           onMeetingDeleted={() => {
             setMeetings((prev) =>
               prev.filter((m) => m.id !== selectedMeetingId),

@@ -1117,6 +1117,18 @@
 }
 
 /* Empty state – generate summary */
+.meeting-detail-summary-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.5rem 0;
+  min-height: 8rem;
+}
+
+.meeting-detail-summary-loading__line {
+  border-radius: 6px;
+}
+
 .meeting-detail-empty-state {
   flex: 1;
   display: flex;

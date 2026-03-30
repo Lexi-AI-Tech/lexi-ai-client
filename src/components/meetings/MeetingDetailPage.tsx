@@ -44,6 +44,12 @@ const RAIL_PANEL_TRANSITION = {
   ease: [0.16, 1, 0.3, 1] as const,
 };
 
+function summarySeedFromMeeting(m: Meeting | null): string | null {
+  if (!m?.summary || typeof m.summary !== "string") return null;
+  const t = m.summary.trim();
+  return t.length > 0 ? m.summary : null;
+}
+
 function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia(query).matches : false,
@@ -123,9 +129,15 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   const [fetchedSegments, setFetchedSegments] = useState<TranscriptSegment[]>(
     [],
   );
-  const [activeSummary, setActiveSummary] = useState<string | null>(null);
+  const [activeSummary, setActiveSummary] = useState<string | null>(() =>
+    summarySeedFromMeeting(meeting),
+  );
   const [streamingLines, setStreamingLines] = useState<SummaryLine[]>([]);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  /** False once get_meeting_details finishes for this meeting; avoids "Generate" flash before we know server state. */
+  const [isMeetingDetailsLoading, setIsMeetingDetailsLoading] = useState(
+    () => !summarySeedFromMeeting(meeting),
+  );
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isSendingChat, setIsSendingChat] = useState(false);
@@ -195,6 +207,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     } catch (error) {
       console.error("Failed to fetch meeting details:", error);
       setFetchedSegments([]);
+    } finally {
+      setIsMeetingDetailsLoading(false);
     }
   }, [meetingId]);
 
@@ -202,10 +216,16 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     fetchMeetingDetails();
   }, [fetchMeetingDetails]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const seed = summarySeedFromMeeting(meeting);
+    setActiveSummary(seed);
+    setFetchedSegments([]);
+    setStreamingLines([]);
+    setIsGeneratingSummary(false);
+    streamingForMeetingIdRef.current = null;
+    setIsMeetingDetailsLoading(!seed);
     setSessionStatus(meeting?.status ?? "draft");
-    // Only re-seed when opening a different meeting (avoid list stale status overwriting detail fetch)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- meeting intentionally omitted
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed per meetingId; meeting is list row for this id
   }, [meetingId]);
 
   // When recording stops, refetch so we show the latest saved transcripts (they were saved by the server during the stream)
@@ -920,6 +940,30 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         isStreaming={isGeneratingSummary}
                         className="meetings-summary-body"
                       />
+                    ) : isMeetingDetailsLoading && !isGeneratingSummary ? (
+                      <div
+                        className="meeting-detail-summary-loading"
+                        aria-busy="true"
+                        aria-label="Loading summary"
+                      >
+                        <div
+                          className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--lg meeting-detail-summary-loading__line"
+                          aria-hidden
+                        />
+                        <div
+                          className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--md meeting-detail-summary-loading__line"
+                          aria-hidden
+                        />
+                        <div
+                          className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--lg meeting-detail-summary-loading__line"
+                          aria-hidden
+                        />
+                        <div
+                          className="meetings-list-page__skeleton-line meetings-list-page__skeleton-line--md meeting-detail-summary-loading__line"
+                          style={{ width: "72%" }}
+                          aria-hidden
+                        />
+                      </div>
                     ) : (
                       <div className="meeting-detail-empty-state">
                         <div className="meeting-detail-empty-state__icon">
