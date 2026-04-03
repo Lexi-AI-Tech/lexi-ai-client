@@ -148,7 +148,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isInitializingMeeting, setIsInitializingMeeting] = useState(false);
   const [showCreateDocModal, setShowCreateDocModal] = useState(false);
-  const [docTitleInput, setDocTitleInput] = useState("");
   const [docInstructionsInput, setDocInstructionsInput] = useState("");
   const [isCreatingDocFromSummary, setIsCreatingDocFromSummary] =
     useState(false);
@@ -450,19 +449,15 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   };
 
   const handleCreateDocFromSummary = async () => {
-    const title = docTitleInput.trim();
     const instructions = docInstructionsInput.trim();
-    if (!meetingId || !title || !instructions || isCreatingDocFromSummary)
-      return;
+    if (!meetingId || !instructions || isCreatingDocFromSummary) return;
     setIsCreatingDocFromSummary(true);
     try {
       const doc = await invoke<Doc>("create_doc_from_meeting", {
         meetingId,
-        title,
         instructions,
       });
       setShowCreateDocModal(false);
-      setDocTitleInput("");
       setDocInstructionsInput("");
       window.dispatchEvent(
         new CustomEvent("lexi-navigate-to-doc", { detail: { docId: doc.id } }),
@@ -931,7 +926,15 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         <button
                           type="button"
                           className="meeting-detail-btn meeting-detail-btn--secondary"
-                          onClick={() => setShowCreateDocModal(true)}
+                          onClick={() => {
+                            if (segments.length === 0) {
+                              toast.error(
+                                "No transcript yet. Record the meeting (or add a note) before creating a doc.",
+                              );
+                              return;
+                            }
+                            setShowCreateDocModal(true);
+                          }}
                           title="Create a document from this meeting"
                         >
                           <FilePlus
@@ -1293,20 +1296,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
               >
                 <h3>Create document from this meeting</h3>
                 <p>
-                  Describe what you want to extract. The AI will generate a
-                  structured document from the meeting context.
+                  Describe what you want to extract. The AI will suggest a
+                  document title and generate structured content from the meeting.
                 </p>
-                <label className="meetings-create-doc-label">
-                  Document name
-                </label>
-                <input
-                  type="text"
-                  className="meetings-create-doc-input"
-                  placeholder="e.g. Project Brief, Action Items"
-                  value={docTitleInput}
-                  onChange={(e) => setDocTitleInput(e.target.value)}
-                  disabled={isCreatingDocFromSummary}
-                />
                 <label className="meetings-create-doc-label">
                   What would you like to get out of this meeting?
                 </label>
@@ -1332,9 +1324,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     className="delete-modal-btn-delete"
                     onClick={handleCreateDocFromSummary}
                     disabled={
-                      isCreatingDocFromSummary ||
-                      !docTitleInput.trim() ||
-                      !docInstructionsInput.trim()
+                      isCreatingDocFromSummary || !docInstructionsInput.trim()
                     }
                   >
                     {isCreatingDocFromSummary ? "Creating…" : "Create"}

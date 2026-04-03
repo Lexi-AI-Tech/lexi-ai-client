@@ -791,7 +791,6 @@ pub async fn get_meeting_suggested_questions(
 pub async fn create_doc_from_meeting(
     app: AppHandle,
     meeting_id: String,
-    title: String,
     instructions: String,
 ) -> Result<Doc, String> {
     let auth_token = get_auth_token_async(&app)
@@ -806,7 +805,6 @@ pub async fn create_doc_from_meeting(
     );
 
     let payload = serde_json::json!({
-        "title": title.trim(),
         "instructions": instructions.trim(),
     });
 

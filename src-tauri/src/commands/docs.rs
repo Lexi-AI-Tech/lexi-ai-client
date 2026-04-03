@@ -191,7 +191,7 @@ pub fn stop_doc_recording(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Server response for create-doc-from-audio (TipTap body + suggested title).
+/// Server response for create-doc-from-audio (editor JSON body + suggested title).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateDocFromAudioResult {
     pub title: String,
