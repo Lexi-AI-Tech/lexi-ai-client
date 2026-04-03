@@ -95,16 +95,50 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const selectedIdRef = useRef<string | null>(null);
   const scheduleSaveRef = useRef<(docId: string) => void>(() => {});
 
+  const saveDoc = useCallback(
+    async (docId: string, title: string, content: string) => {
+      const startedAt = Date.now();
+      saveIndicatorRef.current?.setSaving(true);
+      try {
+        await invoke("update_doc", {
+          payload: { docId, title, content },
+        });
+        lastSavedDocIdRef.current = docId;
+        lastSavedContentRef.current = content;
+        lastSavedTitleRef.current = title;
+        // Don't setDocs here — avoids re-rendering the whole page. We'll flush
+        // into docs when the user navigates away (see effect below).
+      } catch (err) {
+        console.error("Failed to save doc:", err);
+        toast.error("Failed to save");
+      } finally {
+        // Show "Saving…" for at least a moment so the user sees feedback even when save is instant
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < SAVE_INDICATOR_MIN_MS) {
+          await new Promise((r) =>
+            setTimeout(r, SAVE_INDICATOR_MIN_MS - elapsed),
+          );
+        }
+        saveIndicatorRef.current?.setSaving(false);
+      }
+    },
+    [toast],
+  );
+
   const selectedDoc = docs.find((d) => d.id === selectedId);
 
   // When switching docs: reset save refs, clear pending save, sync title field
   useEffect(() => {
     const id = selectedDoc?.id ?? null;
     if (id !== prevSaveDocIdRef.current) {
+      const oldId = prevSaveDocIdRef.current;
       prevSaveDocIdRef.current = id;
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
+        if (oldId) {
+          saveDoc(oldId, latestTitleRef.current, latestContentRef.current);
+        }
       }
       if (selectedDoc) {
         latestContentRef.current = selectedDoc.content ?? "";
@@ -116,64 +150,69 @@ export const DocsPage: React.FC<DocsPageProps> = ({
         setEditingTitle("");
       }
     }
-  }, [selectedDoc]);
+  }, [selectedDoc, saveDoc]);
 
   // Listen for doc recording and transcription events
   useEffect(() => {
     const unlistens: (() => void)[] = [];
+    let isMounted = true;
     (async () => {
       try {
-        unlistens.push(
-          await listen("doc_recording_started", () => setIsDocRecording(true)),
-        );
-        unlistens.push(
-          await listen("doc_recording_stopped", () => setIsDocRecording(false)),
-        );
-        unlistens.push(
-          await listen<string>("doc_transcription_ready", async (e) => {
-            const transcript = e.payload;
-            if (!transcript?.trim()) return;
-            setIsCreatingDocFromAudio(true);
-            try {
-              const result = await invoke<CreateDocFromAudioResult>(
-                "create_doc_from_audio",
-                { transcript },
-              );
-              editorRef.current?.insertStructuredContent(result.content);
-              const docId = selectedIdRef.current;
-              const suggested = (result.title ?? "").trim();
-              const currentTitle = latestTitleRef.current.trim();
-              const shouldApplyTitle =
-                Boolean(docId) &&
-                suggested.length > 0 &&
-                suggested.toLowerCase() !== "untitled" &&
-                (!currentTitle || currentTitle.toLowerCase() === "untitled");
-              if (shouldApplyTitle && docId) {
-                latestTitleRef.current = suggested;
-                setEditingTitle(suggested);
-                scheduleSaveRef.current(docId);
-              }
-              toast.success("Content added from voice");
-            } catch (err) {
-              console.error("Create doc from audio failed:", err);
-              toast.error("Failed to create doc from audio");
-            } finally {
-              setIsCreatingDocFromAudio(false);
+        const unlistenRecordingStarted = await listen("doc_recording_started", () => setIsDocRecording(true));
+        if (isMounted) unlistens.push(unlistenRecordingStarted);
+        else unlistenRecordingStarted();
+
+        const unlistenRecordingStopped = await listen("doc_recording_stopped", () => setIsDocRecording(false));
+        if (isMounted) unlistens.push(unlistenRecordingStopped);
+        else unlistenRecordingStopped();
+
+        const unlistenTranscriptionReady = await listen<string>("doc_transcription_ready", async (e) => {
+          const transcript = e.payload;
+          if (!transcript?.trim()) return;
+          setIsCreatingDocFromAudio(true);
+          try {
+            const result = await invoke<CreateDocFromAudioResult>(
+              "create_doc_from_audio",
+              { transcript },
+            );
+            editorRef.current?.insertStructuredContent(result.content);
+            const docId = selectedIdRef.current;
+            const suggested = (result.title ?? "").trim();
+            const currentTitle = latestTitleRef.current.trim();
+            const shouldApplyTitle =
+              Boolean(docId) &&
+              suggested.length > 0 &&
+              suggested.toLowerCase() !== "untitled" &&
+              (!currentTitle || currentTitle.toLowerCase() === "untitled");
+            if (shouldApplyTitle && docId) {
+              latestTitleRef.current = suggested;
+              setEditingTitle(suggested);
+              scheduleSaveRef.current(docId);
             }
-          }),
-        );
-        unlistens.push(
-          await listen<string>("doc_transcription_error", (e) => {
-            setIsDocRecording(false);
-            toast.error(e.payload || "Transcription failed");
-          }),
-        );
+            toast.success("Content added from voice");
+          } catch (err) {
+            console.error("Create doc from audio failed:", err);
+            toast.error("Failed to create doc from audio");
+          } finally {
+            setIsCreatingDocFromAudio(false);
+          }
+        });
+        if (isMounted) unlistens.push(unlistenTranscriptionReady);
+        else unlistenTranscriptionReady();
+
+        const unlistenTranscriptionError = await listen<string>("doc_transcription_error", (e) => {
+          setIsDocRecording(false);
+          toast.error(e.payload || "Transcription failed");
+        });
+        if (isMounted) unlistens.push(unlistenTranscriptionError);
+        else unlistenTranscriptionError();
       } catch (err) {
         console.error("Doc event listeners failed:", err);
         toast.error("Docs failed to initialize. Please restart the app.");
       }
     })();
     return () => {
+      isMounted = false;
       unlistens.forEach((fn) => fn());
     };
   }, [toast]);
@@ -282,36 +321,6 @@ export const DocsPage: React.FC<DocsPageProps> = ({
       toast.error("Failed to create doc");
     }
   };
-
-  const saveDoc = useCallback(
-    async (docId: string, title: string, content: string) => {
-      const startedAt = Date.now();
-      saveIndicatorRef.current?.setSaving(true);
-      try {
-        await invoke("update_doc", {
-          payload: { docId, title, content },
-        });
-        lastSavedDocIdRef.current = docId;
-        lastSavedContentRef.current = content;
-        lastSavedTitleRef.current = title;
-        // Don't setDocs here — avoids re-rendering the whole page. We'll flush
-        // into docs when the user navigates away (see effect below).
-      } catch (err) {
-        console.error("Failed to save doc:", err);
-        toast.error("Failed to save");
-      } finally {
-        // Show "Saving…" for at least a moment so the user sees feedback even when save is instant
-        const elapsed = Date.now() - startedAt;
-        if (elapsed < SAVE_INDICATOR_MIN_MS) {
-          await new Promise((r) =>
-            setTimeout(r, SAVE_INDICATOR_MIN_MS - elapsed),
-          );
-        }
-        saveIndicatorRef.current?.setSaving(false);
-      }
-    },
-    [toast],
-  );
 
   // When leaving the current doc, flush last-saved state into docs so the list stays in sync
   const prevSelectedIdRef = useRef<string | null>(null);
