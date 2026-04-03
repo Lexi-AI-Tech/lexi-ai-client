@@ -89,7 +89,7 @@ export interface RichTextEditorRef {
 }
 
 export interface RichTextEditorProps {
-  /** Initial content (TipTap JSON string or undefined for empty) */
+  /** Initial content: TipTap/ProseMirror JSON document as string */
   content?: string;
   placeholder?: string;
   editable?: boolean;
@@ -131,7 +131,11 @@ function buildAskLexiSelection(editor: Editor): DocSelection | null {
 const parseContent = (content: string | undefined): Content | undefined => {
   if (!content || !content.trim()) return undefined;
   try {
-    return JSON.parse(content) as Content;
+    const parsed = JSON.parse(content) as { type?: string };
+    if (!parsed || typeof parsed !== "object" || parsed.type !== "doc") {
+      return undefined;
+    }
+    return parsed as Content;
   } catch {
     return undefined;
   }
@@ -171,6 +175,8 @@ export const RichTextEditor = forwardRef<
   const askLexiRangeRef = useRef<{ from: number; to: number } | null>(null);
   /** Bump to force toolbar re-render so isActive() reflects current selection/marks. */
   const [, setToolbarVersion] = useState(0);
+  /** Last `content` prop string applied to the editor (avoids false skips vs getJSON()). */
+  const prevContentPropRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     askLexiOpenRef.current = askLexiOpen;
@@ -230,6 +236,8 @@ export const RichTextEditor = forwardRef<
       const closeAskLexiUi = () => {
         clearDebounce();
         prevAskRangeRef.current = null;
+        askLexiOpenRef.current = false;
+        askLexiRangeRef.current = null;
         setAskLexiOpen(false);
         setAskLexiSelection(null);
         setAskLexiInstructions("");
@@ -248,6 +256,16 @@ export const RichTextEditor = forwardRef<
       const text = doc.textBetween(from, to, "\n");
       if (!text.trim()) {
         closeAskLexiUi();
+        return;
+      }
+
+      // Selection unchanged while Ask Lexi is open (e.g. after highlight decoration txn)
+      if (
+        askLexiOpenRef.current &&
+        askLexiRangeRef.current &&
+        askLexiRangeRef.current.from === from &&
+        askLexiRangeRef.current.to === to
+      ) {
         return;
       }
 
@@ -276,6 +294,10 @@ export const RichTextEditor = forwardRef<
         prevAskRangeRef.current = { from: sel.from, to: sel.to };
         setAskLexiSelection(sel);
         setAskLexiOpen(true);
+        // Keep in sync before highlight dispatch so the follow-up `onSelectionUpdate`
+        // can hit the early-return path (avoids extra debounce ticks).
+        askLexiOpenRef.current = true;
+        askLexiRangeRef.current = { from: sel.from, to: sel.to };
         try {
           editor.view?.dispatch(
             editor.state.tr.setMeta(askLexiHighlightKey, {
@@ -317,6 +339,8 @@ export const RichTextEditor = forwardRef<
         askLexiDebounceRef.current = null;
       }
       prevAskRangeRef.current = null;
+      askLexiOpenRef.current = false;
+      askLexiRangeRef.current = null;
       setAskLexiOpen(false);
       setAskLexiSelection(null);
       setAskLexiInstructions("");
@@ -351,20 +375,17 @@ export const RichTextEditor = forwardRef<
     };
   }, []);
 
-  // Sync content when it changes externally (e.g. opening another doc)
+  // Sync when the `content` prop string changes (open doc, refetch). Do not compare to
+  // editor.getJSON() — TipTap normalization can match while the view was still empty, or vice versa.
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
+    if (prevContentPropRef.current === content) return;
+    prevContentPropRef.current = content;
     const next = parseContent(content);
-    const current = editor.getJSON();
-    const currentStr = JSON.stringify(current);
-    const nextStr = next
-      ? JSON.stringify(next)
-      : '{"type":"doc","content":[{"type":"paragraph"}]}';
-    if (currentStr !== nextStr) {
-      editor.commands.setContent(
-        next ?? { type: "doc", content: [{ type: "paragraph" }] },
-      );
-    }
+    editor.commands.setContent(
+      next ?? { type: "doc", content: [{ type: "paragraph" }] },
+      { emitUpdate: false },
+    );
   }, [editor, content]);
 
   useEffect(() => {
@@ -384,30 +405,27 @@ export const RichTextEditor = forwardRef<
       insertStructuredContent(json: string) {
         if (!editor) return;
         try {
-          const parsed = JSON.parse(json) as {
-            type?: string;
-            content?: Content[];
-          };
+          const parsed = JSON.parse(json) as { type?: string; content?: Content[] };
           const nodes =
             parsed?.type === "doc" && Array.isArray(parsed.content)
               ? parsed.content
               : [parsed as Content];
           editor.chain().focus().insertContent(nodes).run();
-          const newJson = JSON.stringify(editor.getJSON());
-          onUpdateRef.current?.(newJson);
+          onUpdateRef.current?.(JSON.stringify(editor.getJSON()));
+          return;
         } catch {
-          try {
-            editor
-              .chain()
-              .focus()
-              .insertContent([
-                { type: "paragraph", content: [{ type: "text", text: json }] },
-              ])
-              .run();
-            const newJson = JSON.stringify(editor.getJSON());
-            onUpdateRef.current?.(newJson);
-          } catch (_) {}
+          // fall through to plain text insert
         }
+        try {
+          editor
+            .chain()
+            .focus()
+            .insertContent([
+              { type: "paragraph", content: [{ type: "text", text: json }] },
+            ])
+            .run();
+          onUpdateRef.current?.(JSON.stringify(editor.getJSON()));
+        } catch (_) {}
       },
       getSelection(): DocSelection | null {
         if (!editor) return null;
@@ -432,8 +450,7 @@ export const RichTextEditor = forwardRef<
           .deleteRange({ from, to })
           .insertContentAt(from, content)
           .run();
-        const newJson = JSON.stringify(editor.getJSON());
-        onUpdateRef.current?.(newJson);
+        onUpdateRef.current?.(JSON.stringify(editor.getJSON()));
       },
     }),
     [editor],
@@ -547,6 +564,13 @@ export const RichTextEditor = forwardRef<
         {editable && askLexiOpen && askLexiSelection && (
           <BubbleMenu
             editor={editor}
+            appendTo={() => document.body}
+            options={{
+              strategy: "fixed",
+              placement: "top",
+              flip: true,
+              shift: { padding: 8 },
+            }}
             shouldShow={({ editor }) =>
               askLexiOpen && !editor.state.selection.empty
             }
@@ -605,6 +629,9 @@ export const RichTextEditor = forwardRef<
                     editor.view.dispatch(
                       editor.state.tr.setMeta(askLexiHighlightKey, "clear"),
                     );
+                    askLexiOpenRef.current = false;
+                    askLexiRangeRef.current = null;
+                    prevAskRangeRef.current = null;
                     setAskLexiOpen(false);
                     setAskLexiSelection(null);
                     setAskLexiInstructions("");

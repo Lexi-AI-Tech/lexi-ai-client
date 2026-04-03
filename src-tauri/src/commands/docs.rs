@@ -13,7 +13,7 @@ use tauri::{AppHandle, Manager};
 pub struct Doc {
     pub id: String,
     pub title: String,
-    /// TipTap/ProseMirror JSON document as string
+    /// LexiDoc JSON string (API canonical `content`)
     pub content: String,
     pub created_at: String,
     pub updated_at: String,
@@ -191,7 +191,7 @@ pub fn stop_doc_recording(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Call server LLM to structure transcript into TipTap/Notion-style rich content. Returns TipTap JSON string.
+/// Call server LLM to structure transcript into LexiDoc JSON. Returns LexiDoc JSON string.
 #[tauri::command]
 pub async fn structure_doc_content(app: AppHandle, transcript: String) -> Result<String, String> {
     let auth_token = get_auth_token_async(&app)

@@ -66,6 +66,10 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Latest title/body for debounced PATCH — avoids stale list state overwriting the server. */
+  const latestTitleRef = useRef("");
+  const latestContentRef = useRef("");
+  const prevSaveDocIdRef = useRef<string | null>(null);
   const lastSavedContentRef = useRef<string | null>(null);
   const lastSavedTitleRef = useRef<string | null>(null);
   const lastSavedDocIdRef = useRef<string | null>(null);
@@ -78,11 +82,26 @@ export const DocsPage: React.FC<DocsPageProps> = ({
 
   const selectedDoc = docs.find((d) => d.id === selectedId);
 
-  // Sync editing title when switching docs
+  // When switching docs: reset save refs, clear pending save, sync title field
   useEffect(() => {
-    if (selectedDoc) setEditingTitle(selectedDoc.title || "");
-    else setEditingTitle("");
-  }, [selectedId, selectedDoc?.id, selectedDoc?.title]);
+    const id = selectedDoc?.id ?? null;
+    if (id !== prevSaveDocIdRef.current) {
+      prevSaveDocIdRef.current = id;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      if (selectedDoc) {
+        latestContentRef.current = selectedDoc.content ?? "";
+        latestTitleRef.current = selectedDoc.title || "";
+        setEditingTitle(selectedDoc.title || "");
+      } else {
+        latestContentRef.current = "";
+        latestTitleRef.current = "";
+        setEditingTitle("");
+      }
+    }
+  }, [selectedDoc]);
 
   // Listen for doc recording and transcription events
   useEffect(() => {
@@ -149,6 +168,16 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   useEffect(() => {
     fetchDocs();
   }, []);
+
+  useEffect(
+    () => () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+    },
+    [],
+  );
 
   // When navigating with a specific doc to open (e.g. from "Create doc" in meetings)
   const hasConsumedInitialRef = useRef(false);
@@ -233,12 +262,12 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     }
   }, [selectedId]);
 
-  const debouncedSave = useCallback(
-    (docId: string, title: string, content: string) => {
+  const scheduleSave = useCallback(
+    (docId: string) => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         saveTimeoutRef.current = null;
-        saveDoc(docId, title, content);
+        saveDoc(docId, latestTitleRef.current, latestContentRef.current);
       }, SAVE_DEBOUNCE_MS);
     },
     [saveDoc],
@@ -247,17 +276,20 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const handleContentUpdate = useCallback(
     (json: string) => {
       if (!selectedDoc) return;
-      debouncedSave(selectedDoc.id, selectedDoc.title, json);
+      latestContentRef.current = json;
+      scheduleSave(selectedDoc.id);
     },
-    [selectedDoc, debouncedSave],
+    [selectedDoc, scheduleSave],
   );
 
   const handleTitleChange = useCallback(
     (title: string) => {
       if (!selectedDoc) return;
-      debouncedSave(selectedDoc.id, title, selectedDoc.content);
+      latestTitleRef.current = title;
+      setEditingTitle(title);
+      scheduleSave(selectedDoc.id);
     },
-    [selectedDoc, debouncedSave],
+    [selectedDoc, scheduleSave],
   );
 
   const handleMicClick = async () => {
@@ -351,7 +383,8 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                   onChange={(e) => {
                     const v = e.target.value;
                     setEditingTitle(v);
-                    debouncedSave(selectedDoc.id, v, selectedDoc.content);
+                    latestTitleRef.current = v;
+                    scheduleSave(selectedDoc.id);
                   }}
                   placeholder="Untitled"
                   aria-label="Document title"
@@ -399,7 +432,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                   ref={editorRef}
                   key={selectedDoc.id}
                   content={selectedDoc.content}
-                  title={selectedDoc.title}
+                  title={editingTitle}
                   onTitleChange={handleTitleChange}
                   onUpdate={handleContentUpdate}
                   placeholder="Start writing…"
