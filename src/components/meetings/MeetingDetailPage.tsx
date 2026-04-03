@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
@@ -1200,139 +1201,150 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         </AnimatePresence>
       </div>
 
-      {deleteConfirmId && (
-        <div
-          className="delete-modal-overlay"
-          onClick={() => !deletingId && setDeleteConfirmId(null)}
-        >
-          <div
-            className="delete-modal-content"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Delete meeting?</h3>
-            <p>
-              This action cannot be undone. The meeting and its entire
-              transcript will be permanently removed.
-            </p>
-            <div className="delete-modal-actions">
-              <button
-                type="button"
-                className="delete-modal-btn-cancel"
-                onClick={() => setDeleteConfirmId(null)}
-                disabled={!!deletingId}
+      {deleteConfirmId
+        ? createPortal(
+            <div
+              className="delete-modal-overlay"
+              onClick={() => !deletingId && setDeleteConfirmId(null)}
+            >
+              <div
+                className="delete-modal-content"
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="delete-modal-btn-delete"
-                onClick={handleConfirmDelete}
-                disabled={!!deletingId}
-              >
-                {deletingId ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <h3>Delete meeting?</h3>
+                <p>
+                  This action cannot be undone. The meeting and its entire
+                  transcript will be permanently removed.
+                </p>
+                <div className="delete-modal-actions">
+                  <button
+                    type="button"
+                    className="delete-modal-btn-cancel"
+                    onClick={() => setDeleteConfirmId(null)}
+                    disabled={!!deletingId}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-modal-btn-delete"
+                    onClick={handleConfirmDelete}
+                    disabled={!!deletingId}
+                  >
+                    {deletingId ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {showEndConfirm && (
-        <div
-          className="delete-modal-overlay"
-          onClick={() => !isEnding && setShowEndConfirm(false)}
-        >
-          <div
-            className="delete-modal-content"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>End meeting?</h3>
-            <p>
-              The transcript will be finalized and a summary will be generated.
-              You won't be able to resume recording after this.
-            </p>
-            <div className="delete-modal-actions">
-              <button
-                type="button"
-                className="delete-modal-btn-cancel"
-                onClick={() => setShowEndConfirm(false)}
-                disabled={isEnding}
+      {showEndConfirm
+        ? createPortal(
+            <div
+              className="delete-modal-overlay"
+              onClick={() => !isEnding && setShowEndConfirm(false)}
+            >
+              <div
+                className="delete-modal-content"
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="delete-modal-btn-delete"
-                onClick={handleEndMeeting}
-                disabled={isEnding}
-              >
-                {isEnding ? "Ending..." : "End Meeting"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <h3>End meeting?</h3>
+                <p>
+                  The transcript will be finalized and a summary will be
+                  generated. You won't be able to resume recording after this.
+                </p>
+                <div className="delete-modal-actions">
+                  <button
+                    type="button"
+                    className="delete-modal-btn-cancel"
+                    onClick={() => setShowEndConfirm(false)}
+                    disabled={isEnding}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-modal-btn-delete"
+                    onClick={handleEndMeeting}
+                    disabled={isEnding}
+                  >
+                    {isEnding ? "Ending..." : "End Meeting"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {showCreateDocModal && (
-        <div
-          className="delete-modal-overlay"
-          onClick={() =>
-            !isCreatingDocFromSummary && setShowCreateDocModal(false)
-          }
-        >
-          <div
-            className="delete-modal-content meetings-create-doc-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Create document from this meeting</h3>
-            <p>
-              Describe what you want to extract. The AI will generate a
-              structured document from the meeting context.
-            </p>
-            <label className="meetings-create-doc-label">Document name</label>
-            <input
-              type="text"
-              className="meetings-create-doc-input"
-              placeholder="e.g. Project Brief, Action Items"
-              value={docTitleInput}
-              onChange={(e) => setDocTitleInput(e.target.value)}
-              disabled={isCreatingDocFromSummary}
-            />
-            <label className="meetings-create-doc-label">
-              What would you like to get out of this meeting?
-            </label>
-            <textarea
-              className="meetings-create-doc-textarea"
-              placeholder="e.g. Extract key decisions and action items. Include who is responsible for each task and any deadlines mentioned."
-              value={docInstructionsInput}
-              onChange={(e) => setDocInstructionsInput(e.target.value)}
-              disabled={isCreatingDocFromSummary}
-              rows={4}
-            />
-            <div className="delete-modal-actions">
-              <button
-                type="button"
-                className="delete-modal-btn-cancel"
-                onClick={() => setShowCreateDocModal(false)}
-                disabled={isCreatingDocFromSummary}
+      {showCreateDocModal
+        ? createPortal(
+            <div
+              className="delete-modal-overlay"
+              onClick={() =>
+                !isCreatingDocFromSummary && setShowCreateDocModal(false)
+              }
+            >
+              <div
+                className="delete-modal-content meetings-create-doc-modal"
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="delete-modal-btn-delete"
-                onClick={handleCreateDocFromSummary}
-                disabled={
-                  isCreatingDocFromSummary ||
-                  !docTitleInput.trim() ||
-                  !docInstructionsInput.trim()
-                }
-              >
-                {isCreatingDocFromSummary ? "Creating…" : "Create"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <h3>Create document from this meeting</h3>
+                <p>
+                  Describe what you want to extract. The AI will generate a
+                  structured document from the meeting context.
+                </p>
+                <label className="meetings-create-doc-label">
+                  Document name
+                </label>
+                <input
+                  type="text"
+                  className="meetings-create-doc-input"
+                  placeholder="e.g. Project Brief, Action Items"
+                  value={docTitleInput}
+                  onChange={(e) => setDocTitleInput(e.target.value)}
+                  disabled={isCreatingDocFromSummary}
+                />
+                <label className="meetings-create-doc-label">
+                  What would you like to get out of this meeting?
+                </label>
+                <textarea
+                  className="meetings-create-doc-textarea"
+                  placeholder="e.g. Extract key decisions and action items. Include who is responsible for each task and any deadlines mentioned."
+                  value={docInstructionsInput}
+                  onChange={(e) => setDocInstructionsInput(e.target.value)}
+                  disabled={isCreatingDocFromSummary}
+                  rows={4}
+                />
+                <div className="delete-modal-actions">
+                  <button
+                    type="button"
+                    className="delete-modal-btn-cancel"
+                    onClick={() => setShowCreateDocModal(false)}
+                    disabled={isCreatingDocFromSummary}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-modal-btn-delete"
+                    onClick={handleCreateDocFromSummary}
+                    disabled={
+                      isCreatingDocFromSummary ||
+                      !docTitleInput.trim() ||
+                      !docInstructionsInput.trim()
+                    }
+                  >
+                    {isCreatingDocFromSummary ? "Creating…" : "Create"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </motion.div>
   );
 };

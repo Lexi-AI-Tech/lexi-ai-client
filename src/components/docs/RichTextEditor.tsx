@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import type { Editor } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react/menus";
 import type { Content } from "@tiptap/react";
 import { Extension } from "@tiptap/core";
@@ -28,6 +29,9 @@ import {
 } from "lucide-react";
 import "./docs.css";
 
+/** Must match the plugin key used for Ask Lexi selection highlight (setMeta / getMeta). */
+const askLexiHighlightKey = new PluginKey<DecorationSet>("askLexiHighlight");
+
 export interface DocSelection {
   from: number;
   to: number;
@@ -42,7 +46,7 @@ const AskLexiHighlight = Extension.create({
   name: "askLexiHighlight",
 
   addProseMirrorPlugins() {
-    const key = new PluginKey<DecorationSet>("askLexiHighlight");
+    const key = askLexiHighlightKey;
 
     return [
       new Plugin<DecorationSet>({
@@ -101,6 +105,29 @@ export interface RichTextEditorProps {
   className?: string;
 }
 
+const ASK_LEXI_OPEN_DEBOUNCE_MS = 200;
+
+function buildAskLexiSelection(editor: Editor): DocSelection | null {
+  const { from, to } = editor.state.selection;
+  if (from === to) return null;
+  const doc = editor.state.doc;
+  const text = doc.textBetween(from, to, "\n");
+  if (!text.trim()) return null;
+  const $from = doc.resolve(from);
+  const block = $from.parent;
+  const maxContext = 500;
+  const docSize = doc.content.size;
+  return {
+    from,
+    to,
+    text,
+    blockType: block.type.name,
+    blockAttrs: block.attrs,
+    contextBefore: doc.textBetween(Math.max(0, from - maxContext), from, "\n"),
+    contextAfter: doc.textBetween(to, Math.min(docSize, to + maxContext), "\n"),
+  };
+}
+
 const parseContent = (content: string | undefined): Content | undefined => {
   if (!content || !content.trim()) return undefined;
   try {
@@ -138,8 +165,22 @@ export const RichTextEditor = forwardRef<
   const [askLexiSelection, setAskLexiSelection] = useState<DocSelection | null>(
     null,
   );
+  const askLexiDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevAskRangeRef = useRef<{ from: number; to: number } | null>(null);
+  const askLexiOpenRef = useRef(false);
+  const askLexiRangeRef = useRef<{ from: number; to: number } | null>(null);
   /** Bump to force toolbar re-render so isActive() reflects current selection/marks. */
   const [, setToolbarVersion] = useState(0);
+
+  useEffect(() => {
+    askLexiOpenRef.current = askLexiOpen;
+  }, [askLexiOpen]);
+
+  useEffect(() => {
+    askLexiRangeRef.current = askLexiSelection
+      ? { from: askLexiSelection.from, to: askLexiSelection.to }
+      : null;
+  }, [askLexiSelection?.from, askLexiSelection?.to]);
 
   const editor = useEditor({
     extensions: [
@@ -155,64 +196,6 @@ export const RichTextEditor = forwardRef<
       attributes: {
         class: "docs-editor-content",
       },
-      handleKeyDown: (view, event) => {
-        if (
-          (event.metaKey || event.ctrlKey) &&
-          event.key.toLowerCase() === "k"
-        ) {
-          const state = view.state;
-          const { from, to } = state.selection;
-          const doc = state.doc;
-          if (from === to) {
-            return false;
-          }
-          const text = doc.textBetween(from, to, "\n");
-          if (!text.trim()) {
-            return false;
-          }
-          const $from = doc.resolve(from);
-          const block = $from.parent;
-          const blockType = block.type.name;
-          const blockAttrs = block.attrs;
-          const maxContext = 500;
-          const docSize = doc.content.size;
-          const contextBefore = doc.textBetween(
-            Math.max(0, from - maxContext),
-            from,
-            "\n",
-          );
-          const contextAfter = doc.textBetween(
-            to,
-            Math.min(docSize, to + maxContext),
-            "\n",
-          );
-          event.preventDefault();
-          setAskLexiSelection({
-            from,
-            to,
-            text,
-            blockType,
-            blockAttrs,
-            contextBefore,
-            contextAfter,
-          });
-          // Add inline highlight decoration while Ask Lexi is open
-          view.dispatch(
-            state.tr.setMeta(
-              (AskLexiHighlight as any).storage?.pluginKey ||
-                "askLexiHighlight",
-              { from, to },
-            ),
-          );
-          setAskLexiInstructions("");
-          setAskLexiOpen(true);
-          return true;
-        }
-        if (event.key === "Enter" && !event.shiftKey) {
-          // Allow default Enter behavior
-        }
-        return false;
-      },
     },
     onUpdate: ({ editor }) => {
       const json = JSON.stringify(editor.getJSON());
@@ -222,22 +205,131 @@ export const RichTextEditor = forwardRef<
     onSelectionUpdate: ({ editor }) => {
       setToolbarVersion((v) => v + 1);
       const cb = onSelectionChangeRef.current;
-      if (!cb) return;
       const { from, to } = editor.state.selection;
+      const doc = editor.state.doc;
+
+      if (cb) {
+        if (from === to) {
+          cb(null);
+        } else {
+          const t = doc.textBetween(from, to, "\n");
+          if (!t.trim()) cb(null);
+          else cb({ from, to, text: t });
+        }
+      }
+
+      if (!editable) return;
+
+      const clearDebounce = () => {
+        if (askLexiDebounceRef.current) {
+          clearTimeout(askLexiDebounceRef.current);
+          askLexiDebounceRef.current = null;
+        }
+      };
+
+      const closeAskLexiUi = () => {
+        clearDebounce();
+        prevAskRangeRef.current = null;
+        setAskLexiOpen(false);
+        setAskLexiSelection(null);
+        setAskLexiInstructions("");
+        try {
+          editor.view?.dispatch(
+            editor.state.tr.setMeta(askLexiHighlightKey, "clear"),
+          );
+        } catch {}
+      };
+
       if (from === to) {
-        cb(null);
+        closeAskLexiUi();
         return;
       }
-      const text = editor.state.doc.textBetween(from, to, "\n");
+
+      const text = doc.textBetween(from, to, "\n");
       if (!text.trim()) {
-        cb(null);
+        closeAskLexiUi();
         return;
       }
-      cb({ from, to, text });
+
+      clearDebounce();
+      askLexiDebounceRef.current = setTimeout(() => {
+        askLexiDebounceRef.current = null;
+        const sel = buildAskLexiSelection(editor);
+        if (!sel) return;
+
+        // Avoid an infinite transaction loop: dispatching the highlight transaction triggers
+        // `onSelectionUpdate` again. If we are already open on the same range, do nothing.
+        const current = askLexiRangeRef.current;
+        if (
+          askLexiOpenRef.current &&
+          current &&
+          current.from === sel.from &&
+          current.to === sel.to
+        ) {
+          return;
+        }
+
+        const prev = prevAskRangeRef.current;
+        if (!prev || prev.from !== sel.from || prev.to !== sel.to) {
+          setAskLexiInstructions("");
+        }
+        prevAskRangeRef.current = { from: sel.from, to: sel.to };
+        setAskLexiSelection(sel);
+        setAskLexiOpen(true);
+        try {
+          editor.view?.dispatch(
+            editor.state.tr.setMeta(askLexiHighlightKey, {
+              from: sel.from,
+              to: sel.to,
+            }),
+          );
+        } catch {}
+      }, ASK_LEXI_OPEN_DEBOUNCE_MS);
     },
   });
 
   const askLexiInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (askLexiDebounceRef.current) {
+        clearTimeout(askLexiDebounceRef.current);
+        askLexiDebounceRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!askLexiOpen || !askLexiSelection || !editor) return;
+    const id = requestAnimationFrame(() => {
+      askLexiInputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [askLexiOpen, askLexiSelection?.from, askLexiSelection?.to, editor]);
+
+  useEffect(() => {
+    if (!askLexiOpen || !editor) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      if (askLexiDebounceRef.current) {
+        clearTimeout(askLexiDebounceRef.current);
+        askLexiDebounceRef.current = null;
+      }
+      prevAskRangeRef.current = null;
+      setAskLexiOpen(false);
+      setAskLexiSelection(null);
+      setAskLexiInstructions("");
+      try {
+        editor.view?.dispatch(
+          editor.state.tr.setMeta(askLexiHighlightKey, "clear"),
+        );
+      } catch {}
+      editor.chain().focus().run();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [askLexiOpen, editor]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -463,10 +555,6 @@ export const RichTextEditor = forwardRef<
               <input
                 ref={(el) => {
                   askLexiInputRef.current = el;
-                  if (el) {
-                    el.focus();
-                    el.select();
-                  }
                 }}
                 className="docs-ask-lexi-input"
                 placeholder="Ask Lexi…"
@@ -515,7 +603,7 @@ export const RichTextEditor = forwardRef<
                     }
                     // Clear inline highlight decoration
                     editor.view.dispatch(
-                      editor.state.tr.setMeta("askLexiHighlight", "clear"),
+                      editor.state.tr.setMeta(askLexiHighlightKey, "clear"),
                     );
                     setAskLexiOpen(false);
                     setAskLexiSelection(null);

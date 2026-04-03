@@ -1348,11 +1348,20 @@
 .meetings-create-doc-modal .delete-modal-btn-delete {
   background: var(--lexi-primary);
   border-color: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
 }
 
 .meetings-create-doc-modal .delete-modal-btn-delete:hover:not(:disabled) {
   background: var(--lexi-primary-hover);
   border-color: var(--lexi-primary-hover);
+}
+
+.meetings-create-doc-modal .delete-modal-btn-delete:disabled {
+  color: #ffffff;
+  opacity: 1;
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--lexi-primary) 58%, var(--lexi-surface-overlay));
+  border-color: transparent;
 }
 
 /* ==========================

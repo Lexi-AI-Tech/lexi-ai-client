@@ -270,7 +270,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     } else {
       try {
         await invoke("start_doc_recording");
-        toast.success("Recording… Click mic again when done.");
+        toast.success("Recording… Click stop button when done.");
       } catch (err) {
         toast.error("Failed to start recording");
       }
