@@ -441,51 +441,6 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                 />
               </div>
             </div>
-            <aside className="docs-ask-lexi-rail">
-              <div className="docs-ask-lexi-rail__header">
-                <span className="docs-ask-lexi-rail__label">Ask Lexi</span>
-                <p className="docs-ask-lexi-rail__hint">
-                  Turn this doc into briefs, checklists, and summaries with one
-                  click.
-                </p>
-              </div>
-              <div className="docs-ask-lexi-rail__section">
-                <div className="docs-ask-lexi-rail__section-title">
-                  Quick transforms
-                </div>
-                <button
-                  type="button"
-                  className="docs-ask-lexi-rail__chip"
-                  disabled={!selectedDoc}
-                >
-                  Summarize this doc
-                </button>
-                <button
-                  type="button"
-                  className="docs-ask-lexi-rail__chip"
-                  disabled={!selectedDoc}
-                >
-                  Turn into action list
-                </button>
-                <button
-                  type="button"
-                  className="docs-ask-lexi-rail__chip"
-                  disabled={!selectedDoc}
-                >
-                  Create exec brief
-                </button>
-              </div>
-              <div className="docs-ask-lexi-rail__section docs-ask-lexi-rail__section--subtle">
-                <div className="docs-ask-lexi-rail__section-title">
-                  From meetings
-                </div>
-                <p className="docs-ask-lexi-rail__small">
-                  Docs created from meetings stay linked to their original
-                  session, so you can always jump back to the transcript and AI
-                  summary.
-                </p>
-              </div>
-            </aside>
           </div>
         </div>
       ) : null}

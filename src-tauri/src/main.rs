@@ -107,8 +107,8 @@ use commands::auth::{
 };
 use commands::billing::get_billing_usage;
 use commands::docs::{
-    create_doc, delete_doc, get_doc, get_docs, rewrite_doc_section, start_doc_recording,
-    stop_doc_recording, structure_doc_content, update_doc,
+    create_doc, delete_doc, get_doc, get_docs, start_doc_recording, stop_doc_recording,
+    structure_doc_content, update_doc,
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
@@ -318,7 +318,6 @@ pub fn main() {
             start_doc_recording,
             stop_doc_recording,
             structure_doc_content,
-            rewrite_doc_section,
             create_room,
             list_rooms,
             get_room_details,

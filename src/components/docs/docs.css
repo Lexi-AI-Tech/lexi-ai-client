@@ -362,18 +362,11 @@
     0 18px 40px rgba(15, 23, 42, 0.12);
 }
 
-/* Main editor + Ask Lexi rail */
 .docs-editor-shell {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-}
-
-@media (max-width: 1100px) {
-  .docs-editor-shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  display: flex;
+  flex-direction: column;
 }
 
 .docs-editor-main {
@@ -382,104 +375,6 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-right: 1px solid rgba(15, 23, 42, 0.06);
-}
-
-.docs-ask-lexi-rail {
-  display: flex;
-  flex-direction: column;
-  padding: 14px 16px 16px;
-  background: radial-gradient(
-    circle at top,
-    rgba(15, 23, 42, 0.06),
-    transparent 65%
-  );
-}
-
-@media (max-width: 1100px) {
-  .docs-ask-lexi-rail {
-    display: none;
-  }
-}
-
-.docs-ask-lexi-rail__header {
-  margin-bottom: 12px;
-}
-
-.docs-ask-lexi-rail__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--lexi-text);
-}
-
-.docs-ask-lexi-rail__hint {
-  margin: 6px 0 0 0;
-  font-size: 12px;
-  color: var(--lexi-text-muted);
-  line-height: 1.5;
-}
-
-.docs-ask-lexi-rail__section {
-  margin-top: 14px;
-}
-
-.docs-ask-lexi-rail__section--subtle {
-  margin-top: 18px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(15, 23, 42, 0.06);
-}
-
-.docs-ask-lexi-rail__section-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lexi-text-muted);
-  margin-bottom: 8px;
-}
-
-.docs-ask-lexi-rail__chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-  padding: 8px 10px;
-  margin-bottom: 6px;
-  border-radius: 999px;
-  border: none;
-  background: rgba(15, 23, 42, 0.03);
-  color: var(--lexi-text);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: left;
-  transition:
-    background 0.15s ease,
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.docs-ask-lexi-rail__chip:hover:not(:disabled) {
-  background: rgba(15, 23, 42, 0.06);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
-}
-
-.docs-ask-lexi-rail__chip:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.docs-ask-lexi-rail__small {
-  margin: 0;
-  font-size: 11px;
-  color: #9ca3af;
-  line-height: 1.5;
 }
 
 .docs-editor-pane__empty {
@@ -498,49 +393,6 @@
 
 .docs-editor-pane__empty-inner p {
   margin: 0 0 12px 0;
-}
-
-/* Inline Ask Lexi popover (BubbleMenu; may be portaled to body) */
-.docs-ask-lexi-popover {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--lexi-primary);
-  color: var(--lexi-primary-foreground);
-  border-radius: 999px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
-  font-size: 13px;
-  z-index: 10050;
-}
-
-.docs-ask-lexi-input {
-  border: none;
-  background: transparent;
-  color: inherit;
-  font-size: 13px;
-  min-width: 160px;
-  outline: none;
-}
-
-.docs-ask-lexi-input::placeholder {
-  color: #d1d5db;
-}
-
-.docs-ask-lexi-btn {
-  border: none;
-  background: #f9fafb;
-  color: var(--lexi-text);
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.docs-ask-lexi-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .docs-editor-wrap {
@@ -805,13 +657,6 @@
   color: var(--lexi-text);
 }
 
-/* Persistent Ask Lexi highlight while editing */
-.docs-ask-lexi-highlight {
-  background: color-mix(in srgb, var(--lexi-primary) 14%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lexi-primary) 42%, transparent);
-  border-radius: 2px;
-}
-
 /* Doc actions (delete, etc.) in editor header */
 .docs-editor-actions {
   display: flex;
@@ -930,65 +775,3 @@
   cursor: not-allowed;
 }
 
-/* Ask Lexi modal */
-.docs-modal--ask-lexi {
-  max-width: 520px;
-}
-
-.docs-ask-lexi-hint {
-  margin: 0 0 12px 0;
-  font-size: 13px;
-  color: var(--lexi-text-muted);
-}
-
-.docs-ask-lexi-selected {
-  margin-bottom: 16px;
-}
-
-.docs-ask-lexi-field {
-  margin-bottom: 20px;
-}
-
-.docs-ask-lexi-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 6px;
-}
-
-.docs-ask-lexi-text {
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--lexi-text);
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 12px;
-  max-height: 120px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.docs-ask-lexi-textarea {
-  width: 100%;
-  font-size: 14px;
-  line-height: 1.5;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  resize: vertical;
-  min-height: 80px;
-  font-family: inherit;
-}
-
-.docs-ask-lexi-textarea:focus {
-  outline: none;
-  border-color: var(--lexi-text);
-  box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.18);
-}
-
-.docs-ask-lexi-textarea::placeholder {
-  color: #9ca3af;
-}
