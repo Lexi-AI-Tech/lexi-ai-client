@@ -32,7 +32,6 @@
 //! ## Permissions Required (macOS)
 //!
 //! - **Microphone**: For audio recording
-//! - **Input Monitoring**: For global keyboard event listening
 //! - **Accessibility**: For text injection and cursor context retrieval
 
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
@@ -58,7 +57,7 @@ mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key f
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 
 mod meetings;
-mod permissions; // macOS permission requests and checks (microphone, input monitoring, accessibility)
+mod permissions; // macOS permission requests and checks (microphone, accessibility, system audio)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
@@ -86,9 +85,8 @@ use state::{
 use window::show_and_focus_main_window;
 
 use permissions::{
-    check_accessibility_permission, check_input_monitoring_permission, check_microphone_permission,
-    check_system_audio_permission, open_permission_pane, request_accessibility_permission,
-    request_input_monitoring_permission, request_microphone_permission,
+    check_accessibility_permission, check_microphone_permission, check_system_audio_permission,
+    open_permission_pane, request_accessibility_permission, request_microphone_permission,
     request_system_audio_permission,
 };
 
@@ -165,9 +163,8 @@ struct KeyListenerParams {
     meeting_recording_rx: watch::Receiver<bool>,
 }
 
-/// Start the global key listener if not already started. Called by the frontend when the user
-/// has completed the permissions step (or when app loads with onboarding already complete)
-/// so that the Fn key works without requiring an app restart after granting Input Monitoring.
+/// Start the global key listener if not already started. Called by the frontend when onboarding
+/// is complete so hotkeys work without requiring an app restart after deferred startup.
 #[tauri::command]
 fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
     let state = app.state::<KeyListenerStartupState>();
@@ -184,7 +181,7 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
             params.recording_state,
             params.meeting_recording_rx,
         );
-        println!("✅ Global key listener started (Input Monitoring will now be used)");
+        println!("✅ Global key listener started");
 
         // Set up macOS sleep/wake watcher to restart the app after wake.
         // macOS destroys CGEventTap, stales HTTP sockets, and invalidates audio handles
@@ -248,11 +245,9 @@ pub fn main() {
         .manage(OAuthState::default())
         .invoke_handler(tauri::generate_handler![
             request_microphone_permission,
-            request_input_monitoring_permission,
             request_accessibility_permission,
             open_permission_pane,
             check_microphone_permission,
-            check_input_monitoring_permission,
             check_accessibility_permission,
             check_system_audio_permission,
             request_system_audio_permission,
@@ -445,9 +440,7 @@ pub fn main() {
             });
 
             // Defer starting the key listener until the frontend calls start_global_key_listener
-            // (after permissions step or when onboarding already complete). This ensures the
-            // Fn key works on first install without requiring an app restart after granting
-            // Input Monitoring.
+            // after onboarding is complete so the listener is not started during first-run setup.
             app.manage(KeyListenerStartupState {
                 inner: std::sync::Mutex::new(Some(KeyListenerParams {
                     recording_tx: recording_tx.clone(),

@@ -215,10 +215,6 @@ export function PermissionsStep({
     granted: false,
     checking: false,
   });
-  const [inputMonitoring, setInputMonitoring] = useState<PermissionState>({
-    granted: false,
-    checking: false,
-  });
   const [systemAudio, setSystemAudio] = useState<PermissionState>({
     granted: false,
     checking: false,
@@ -238,16 +234,12 @@ export function PermissionsStep({
       const accGranted = await invoke<boolean>(
         "check_accessibility_permission",
       );
-      const inputGranted = await invoke<boolean>(
-        "check_input_monitoring_permission",
-      );
       const systemAudioGranted = await invoke<boolean>(
         "check_system_audio_permission",
       );
 
       setMicrophone((prev) => ({ ...prev, granted: micGranted }));
       setAccessibility((prev) => ({ ...prev, granted: accGranted }));
-      setInputMonitoring((prev) => ({ ...prev, granted: inputGranted }));
       setSystemAudio((prev) => ({ ...prev, granted: systemAudioGranted }));
     } catch (error) {
       console.error("Failed to check permissions:", error);
@@ -278,18 +270,6 @@ export function PermissionsStep({
     }
   };
 
-  const requestInputMonitoring = async () => {
-    setInputMonitoring((prev) => ({ ...prev, checking: true }));
-    try {
-      await invoke<boolean>("request_input_monitoring_permission");
-      setTimeout(checkPermissions, 1000);
-    } catch (error) {
-      console.error("Failed to request input monitoring permission:", error);
-    } finally {
-      setInputMonitoring((prev) => ({ ...prev, checking: false }));
-    }
-  };
-
   const requestSystemAudio = async () => {
     setSystemAudio((prev) => ({ ...prev, checking: true }));
     try {
@@ -302,13 +282,9 @@ export function PermissionsStep({
     }
   };
 
-  // Core permissions needed to continue (mic + input monitoring)
-  // All permissions are now required to continue
-
   const allGranted =
     microphone.granted &&
     accessibility.granted &&
-    inputMonitoring.granted &&
     systemAudio.granted;
 
   // Auto-advance when all permissions are granted
@@ -327,13 +303,6 @@ export function PermissionsStep({
       desc: "Record your voice for transcription",
       state: microphone,
       request: requestMicrophone,
-    },
-    {
-      icon: Keyboard,
-      title: "Input Monitoring",
-      desc: "For detecting hotkeys",
-      state: inputMonitoring,
-      request: requestInputMonitoring,
     },
     {
       icon: Monitor,

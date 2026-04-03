@@ -10,17 +10,12 @@
 //!    - Triggered by: Attempting to access the default input device
 //!    - System Location: Privacy & Security → Microphone
 //!
-//! 2. **Input Monitoring Permission**
-//!    - Required for: Global keyboard event listening
-//!    - Triggered by: Attempting to create a CGEventTap
-//!    - System Location: Privacy & Security → Input Monitoring
-//!
-//! 3. **Accessibility Permission**
+//! 2. **Accessibility Permission**
 //!    - Required for: Text injection (AppleScript) and cursor context retrieval (AXUIElement)
 //!    - Triggered by: Using System Events or Accessibility API
 //!    - System Location: Privacy & Security → Accessibility
 //!
-//! 4. **System audio permission** (for capturing system audio in meetings)
+//! 3. **System audio permission** (for capturing system audio in meetings)
 //!    - **macOS 14.4+**: Prefer "Audio Capture" (kTCCServiceAudioCapture) so the user can grant
 //!      system audio only without full Screen Recording. Checked via private TCC API; fallback below.
 //!    - **Older macOS or if TCC unavailable**: Screen Recording permission is used (same capability).
@@ -35,8 +30,7 @@
 //! ## Implementation Notes
 //!
 //! Microphone on macOS uses AVFoundation's AVCaptureDevice.authorizationStatus(for: .audio)
-//! so the UI reflects the actual System Settings toggle. Accessibility uses AXIsProcessTrusted;
-//! Input Monitoring uses IOHIDCheckAccess.
+//! so the UI reflects the actual System Settings toggle. Accessibility uses AXIsProcessTrusted.
 
 #![allow(unexpected_cfgs)]
 
@@ -74,30 +68,6 @@ pub fn check_microphone_permission() -> Result<bool, String> {
 #[tauri::command]
 #[cfg(not(target_os = "macos"))]
 pub fn check_microphone_permission() -> Result<bool, String> {
-    Ok(true)
-}
-
-// IOHIDCheckAccess: macOS 10.15+ API to check Input Monitoring permission.
-// kIOHIDRequestTypeListenEvent = 1, kIOHIDAccessTypeGranted = 0.
-#[cfg(target_os = "macos")]
-extern "C" {
-    fn IOHIDCheckAccess(request_type: u32) -> u32;
-}
-
-/// Check Input Monitoring permission on macOS via IOHIDCheckAccess.
-#[tauri::command]
-#[cfg(target_os = "macos")]
-pub fn check_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> {
-    const K_IOHID_REQUEST_TYPE_LISTEN_EVENT: u32 = 1;
-    const K_IOHID_ACCESS_TYPE_GRANTED: u32 = 0;
-    let access = unsafe { IOHIDCheckAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT) };
-    Ok(access == K_IOHID_ACCESS_TYPE_GRANTED)
-}
-
-/// Check Input Monitoring permission (non-macOS platforms)
-#[tauri::command]
-#[cfg(not(target_os = "macos"))]
-pub fn check_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
@@ -209,9 +179,6 @@ fn open_permission_pane_impl(pane: &str) -> Result<(), String> {
         "accessibility" => {
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
         }
-        "input_monitoring" => {
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
-        }
         "screen_capture" => {
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
         }
@@ -290,51 +257,6 @@ pub fn request_microphone_permission() -> Result<bool, String> {
 #[tauri::command]
 #[cfg(not(target_os = "macos"))]
 pub fn request_microphone_permission() -> Result<bool, String> {
-    Ok(true)
-}
-
-// IOHIDRequestAccess: macOS 10.15+ API to request (trigger dialog for) Input Monitoring permission.
-#[cfg(target_os = "macos")]
-extern "C" {
-    fn IOHIDRequestAccess(request_type: u32) -> bool;
-}
-
-/// Request Input Monitoring permission on macOS.
-///
-/// Strategy: Use `IOHIDRequestAccess` which triggers the proper system dialog
-/// (the user sees "App wants to monitor input" and can click "Open System Preferences"
-/// where the app is already highlighted). Falls back to opening Settings if already denied.
-#[tauri::command]
-#[cfg(target_os = "macos")]
-pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> {
-    const K_IOHID_REQUEST_TYPE_LISTEN_EVENT: u32 = 1;
-    const K_IOHID_ACCESS_TYPE_GRANTED: u32 = 0;
-
-    // Check current status first
-    let access = unsafe { IOHIDCheckAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT) };
-    if access == K_IOHID_ACCESS_TYPE_GRANTED {
-        println!("⌨️  Input Monitoring already granted");
-        return Ok(true);
-    }
-
-    // Trigger the native system dialog
-    println!("⌨️  Requesting Input Monitoring via IOHIDRequestAccess");
-    let granted = unsafe { IOHIDRequestAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT) };
-
-    if !granted {
-        // The dialog was shown before and denied, or the user dismissed it.
-        // Open System Settings as fallback so the user can toggle manually.
-        println!("⌨️  Input Monitoring not granted after request — opening System Settings");
-        let _ = open_permission_pane_impl("input_monitoring");
-    }
-
-    Ok(granted)
-}
-
-/// Request Input Monitoring permission (non-macOS platforms)
-#[tauri::command]
-#[cfg(not(target_os = "macos"))]
-pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 

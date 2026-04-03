@@ -8,7 +8,7 @@
 //!
 //! ## Permissions Required
 //!
-//! - **Input Monitoring** (macOS) or **Accessibility**
+//! - **Accessibility** (macOS)
 
 use crate::RecordingCommand;
 use std::collections::HashSet;
