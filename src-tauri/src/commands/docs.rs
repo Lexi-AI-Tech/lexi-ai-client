@@ -191,13 +191,23 @@ pub fn stop_doc_recording(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Call server LLM to structure transcript into LexiDoc JSON. Returns LexiDoc JSON string.
+/// Server response for create-doc-from-audio (TipTap body + suggested title).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateDocFromAudioResult {
+    pub title: String,
+    pub content: String,
+}
+
+/// Call server LLM to create doc content from a voice transcript.
 #[tauri::command]
-pub async fn structure_doc_content(app: AppHandle, transcript: String) -> Result<String, String> {
+pub async fn create_doc_from_audio(
+    app: AppHandle,
+    transcript: String,
+) -> Result<CreateDocFromAudioResult, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .map_err(|_| "Authentication required")?;
-    let url = crate::api_endpoints::docs::structure_content_url();
+    let url = crate::api_endpoints::docs::create_doc_from_audio_url();
     let client = crate::utils::create_http_client();
     let response = client
         .post(&url)
@@ -224,6 +234,13 @@ pub async fn structure_doc_content(app: AppHandle, transcript: String) -> Result
         .get("content")
         .or_else(|| data.get("data").and_then(|d| d.get("content")))
         .and_then(|c| c.as_str())
-        .ok_or_else(|| "Missing content in response")?;
-    Ok(content.to_string())
+        .ok_or_else(|| "Missing content in response")?
+        .to_string();
+    let title = data
+        .get("title")
+        .or_else(|| data.get("data").and_then(|d| d.get("title")))
+        .and_then(|t| t.as_str())
+        .unwrap_or("Untitled")
+        .to_string();
+    Ok(CreateDocFromAudioResult { title, content })
 }

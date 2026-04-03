@@ -17,6 +17,9 @@ import "./docs.css";
 const SAVE_DEBOUNCE_MS = 600;
 const SAVE_INDICATOR_MIN_MS = 400;
 
+/** Matches Tauri `CreateDocFromAudioResult` / server `CreateDocFromAudioResponse`. */
+type CreateDocFromAudioResult = { title: string; content: string };
+
 /** Isolated save indicator so parent doesn't re-render on saving state change */
 export interface SaveIndicatorRef {
   setSaving: (saving: boolean) => void;
@@ -24,8 +27,8 @@ export interface SaveIndicatorRef {
 
 const SaveIndicator = React.forwardRef<
   SaveIndicatorRef,
-  { isStructuring?: boolean }
->(function SaveIndicator({ isStructuring }, ref) {
+  { isCreatingDocFromAudio?: boolean }
+>(function SaveIndicator({ isCreatingDocFromAudio }, ref) {
   const [saving, setSaving] = useState(false);
   useImperativeHandle(ref, () => ({ setSaving }), []);
   return (
@@ -40,9 +43,9 @@ const SaveIndicator = React.forwardRef<
           Saved
         </span>
       )}
-      {isStructuring && (
+      {isCreatingDocFromAudio && (
         <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--ai">
-          Structuring from voice…
+          Creating doc from audio…
         </span>
       )}
     </div>
@@ -76,9 +79,11 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const editorRef = useRef<RichTextEditorRef>(null);
   const saveIndicatorRef = useRef<SaveIndicatorRef>(null);
   const [isDocRecording, setIsDocRecording] = useState(false);
-  const [isStructuring, setIsStructuring] = useState(false);
+  const [isCreatingDocFromAudio, setIsCreatingDocFromAudio] = useState(false);
   /** Local title for the current doc to avoid setDocs on every keystroke */
   const [editingTitle, setEditingTitle] = useState("");
+  const selectedIdRef = useRef<string | null>(null);
+  const scheduleSaveRef = useRef<(docId: string) => void>(() => {});
 
   const selectedDoc = docs.find((d) => d.id === selectedId);
 
@@ -118,18 +123,33 @@ export const DocsPage: React.FC<DocsPageProps> = ({
           await listen<string>("doc_transcription_ready", async (e) => {
             const transcript = e.payload;
             if (!transcript?.trim()) return;
-            setIsStructuring(true);
+            setIsCreatingDocFromAudio(true);
             try {
-              const content = await invoke<string>("structure_doc_content", {
-                transcript,
-              });
-              editorRef.current?.insertStructuredContent(content);
+              const result = await invoke<CreateDocFromAudioResult>(
+                "create_doc_from_audio",
+                { transcript },
+              );
+              editorRef.current?.insertStructuredContent(result.content);
+              const docId = selectedIdRef.current;
+              const suggested = (result.title ?? "").trim();
+              const currentTitle = latestTitleRef.current.trim();
+              const shouldApplyTitle =
+                Boolean(docId) &&
+                suggested.length > 0 &&
+                suggested.toLowerCase() !== "untitled" &&
+                (!currentTitle ||
+                  currentTitle.toLowerCase() === "untitled");
+              if (shouldApplyTitle && docId) {
+                latestTitleRef.current = suggested;
+                setEditingTitle(suggested);
+                scheduleSaveRef.current(docId);
+              }
               toast.success("Content added from voice");
             } catch (err) {
-              console.error("Structure doc content failed:", err);
-              toast.error("Failed to structure content");
+              console.error("Create doc from audio failed:", err);
+              toast.error("Failed to create doc from audio");
             } finally {
-              setIsStructuring(false);
+              setIsCreatingDocFromAudio(false);
             }
           }),
         );
@@ -273,6 +293,14 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     [saveDoc],
   );
 
+  useEffect(() => {
+    scheduleSaveRef.current = scheduleSave;
+  }, [scheduleSave]);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
   const handleContentUpdate = useCallback(
     (json: string) => {
       if (!selectedDoc) return;
@@ -391,17 +419,17 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                 />
                 <SaveIndicator
                   ref={saveIndicatorRef}
-                  isStructuring={isStructuring}
+                  isCreatingDocFromAudio={isCreatingDocFromAudio}
                 />
                 <button
                   type="button"
                   onClick={handleMicClick}
-                  disabled={isStructuring}
+                  disabled={isCreatingDocFromAudio}
                   className={`docs-mic-btn ${isDocRecording ? "docs-mic-btn--recording" : ""}`}
                   title={
                     isDocRecording
                       ? "Stop recording"
-                      : "Record voice to add structured content"
+                      : "Record voice to create doc from audio"
                   }
                 >
                   {isDocRecording ? (

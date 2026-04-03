@@ -7,7 +7,7 @@ import { ScreenSkeleton } from "../ui/ScreenSkeleton";
 import "./docs-list.css";
 
 const DOCS_HELP =
-  "On a meeting’s detail page, use Create doc to generate a document from that meeting. Here, click New doc to start fresh, then use the mic in the editor toolbar to dictate—Lexi turns your speech into the document.";
+  "On a meeting’s detail page, use Create doc to generate a document from that meeting. Here, click New doc to start fresh, then use the mic in the editor toolbar to dictate—Lexi creates the doc from your audio.";
 
 const PREVIEW_MAX_LENGTH = 140;
 
