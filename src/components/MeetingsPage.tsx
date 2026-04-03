@@ -98,6 +98,9 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({
   // Keep recording state stable across page unmount/remount by syncing from app-level state.
   useEffect(() => {
     setRecordingMeetingId(activeRecordingMeetingId ?? null);
+    // Critical: clear in-memory live segments whenever the active recording session changes
+    // (including ending via tray/reminder/mic-ended flows that don't go through detail-page callbacks).
+    setLiveSegments([]);
   }, [activeRecordingMeetingId]);
 
   // Real-time transcript listener
