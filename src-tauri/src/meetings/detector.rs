@@ -43,8 +43,7 @@ fn is_lexi_app(app: &AppInfo) -> bool {
 
 /// Non-system mic users other than Lexi (e.g. Zoom, Chrome). When this count hits zero after being positive during recording, the external call likely ended.
 fn count_non_lexi_mic_users(apps: &[AppInfo]) -> usize {
-    apps
-        .iter()
+    apps.iter()
         .filter(|a| !is_system_app_for_display(a) && !is_lexi_app(a))
         .count()
 }

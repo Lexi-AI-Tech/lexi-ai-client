@@ -107,8 +107,8 @@ use commands::auth::{
 };
 use commands::billing::get_billing_usage;
 use commands::docs::{
-    create_doc, delete_doc, get_doc, get_docs, start_doc_recording, stop_doc_recording,
-    create_doc_from_audio, update_doc,
+    create_doc, create_doc_from_audio, delete_doc, get_doc, get_docs, start_doc_recording,
+    stop_doc_recording, update_doc,
 };
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,

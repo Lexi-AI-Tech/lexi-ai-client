@@ -402,4 +402,3 @@ pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> 
 pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
-

@@ -178,7 +178,10 @@ export const RichTextEditor = forwardRef<
       insertStructuredContent(json: string) {
         if (!editor) return;
         try {
-          const parsed = JSON.parse(json) as { type?: string; content?: Content[] };
+          const parsed = JSON.parse(json) as {
+            type?: string;
+            content?: Content[];
+          };
           const nodes =
             parsed?.type === "doc" && Array.isArray(parsed.content)
               ? parsed.content

@@ -413,9 +413,7 @@ export function PermissionsStep({
                 <item.icon className="permission-icon" />
               </div>
               <div>
-                <h3 className="permission-title">
-                  {item.title}
-                </h3>
+                <h3 className="permission-title">{item.title}</h3>
                 <p className="permission-desc">{item.desc}</p>
               </div>
             </div>
@@ -429,9 +427,7 @@ export function PermissionsStep({
                 Opening…
               </span>
             ) : (
-              <span className="permission-allow-hint">
-                Click to allow
-              </span>
+              <span className="permission-allow-hint">Click to allow</span>
             )}
           </div>
         ))}
@@ -453,9 +449,7 @@ export function PermissionsStep({
           className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
           onClick={onNext}
           title={
-            !allGranted
-              ? "All permissions are required to continue"
-              : undefined
+            !allGranted ? "All permissions are required to continue" : undefined
           }
         >
           Continue

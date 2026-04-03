@@ -1360,7 +1360,11 @@
   color: #ffffff;
   opacity: 1;
   cursor: not-allowed;
-  background: color-mix(in srgb, var(--lexi-primary) 58%, var(--lexi-surface-overlay));
+  background: color-mix(
+    in srgb,
+    var(--lexi-primary) 58%,
+    var(--lexi-surface-overlay)
+  );
   border-color: transparent;
 }
 

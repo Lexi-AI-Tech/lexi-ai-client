@@ -162,8 +162,10 @@ function App() {
     meetingId: string;
     readableDuration: string;
   } | null>(null);
-  const [openSummaryAfterCompleteForMeetingId, setOpenSummaryAfterCompleteForMeetingId] =
-    useState<string | null>(null);
+  const [
+    openSummaryAfterCompleteForMeetingId,
+    setOpenSummaryAfterCompleteForMeetingId,
+  ] = useState<string | null>(null);
   const [_activeRecordingMeetingId, setActiveRecordingMeetingId] = useState<
     string | null
   >(null);
@@ -710,8 +712,8 @@ function App() {
           >
             <h3>Has your meeting ended?</h3>
             <p>
-              We no longer detect a meeting session. Do you want to end this meeting in Lexi and generate
-              a summary?
+              We no longer detect a meeting session. Do you want to end this
+              meeting in Lexi and generate a summary?
             </p>
             <div className="delete-modal-actions">
               <button

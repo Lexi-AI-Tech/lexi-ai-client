@@ -147,8 +147,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                 Boolean(docId) &&
                 suggested.length > 0 &&
                 suggested.toLowerCase() !== "untitled" &&
-                (!currentTitle ||
-                  currentTitle.toLowerCase() === "untitled");
+                (!currentTitle || currentTitle.toLowerCase() === "untitled");
               if (shouldApplyTitle && docId) {
                 latestTitleRef.current = suggested;
                 setEditingTitle(suggested);
@@ -428,7 +427,9 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const showDetailView = !showListView && selectedDoc;
 
   return (
-    <div className={`docs-page ${showDetailView || showGeneratingMeeting ? "docs-page--detail" : ""}`}>
+    <div
+      className={`docs-page ${showDetailView || showGeneratingMeeting ? "docs-page--detail" : ""}`}
+    >
       {showGeneratingMeeting && (
         <>
           <div className="docs-page-header">

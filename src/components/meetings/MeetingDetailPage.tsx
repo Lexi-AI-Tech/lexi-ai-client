@@ -1287,7 +1287,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                 <h3>Create document from this meeting</h3>
                 <p>
                   Describe what you want to extract. The AI will suggest a
-                  document title and generate structured content from the meeting.
+                  document title and generate structured content from the
+                  meeting.
                 </p>
                 <label className="meetings-create-doc-label">
                   What would you like to get out of this meeting?

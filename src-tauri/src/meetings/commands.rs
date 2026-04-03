@@ -396,8 +396,8 @@ pub async fn end_meeting_session(
 
     let updated =
         update_meeting_on_server(&app, &meeting_id, None, Some("ended".to_string())).await?;
-    let meeting: Meeting = serde_json::from_value(updated)
-        .map_err(|e| format!("Invalid meeting response: {}", e))?;
+    let meeting: Meeting =
+        serde_json::from_value(updated).map_err(|e| format!("Invalid meeting response: {}", e))?;
 
     if recording {
         stop_active_meeting_recording(&app, &state).await?;
