@@ -94,9 +94,10 @@ interface MeetingDetailPageProps {
   onLiveSegmentAdded?: (segment: TranscriptSegment) => void;
   /** When tray triggers end meeting */
   triggerEndMeetingFromTray?: boolean;
-  /** When reminder triggers end meeting, run full end flow immediately (no extra confirm modal). */
-  triggerAutoEndMeetingFromReminder?: boolean;
   onEndMeetingFromTrayConsumed?: () => void;
+  /** Opened from a global flow after Rust ended the session; generate summary once transcript is loaded */
+  runSummaryAfterExternalEnd?: boolean;
+  onRunSummaryAfterExternalEndConsumed?: () => void;
   /** Called when recording is stopped (so parent can clear recording state) */
   onRecordingStopped?: () => void;
   /** Called when recording is started (e.g. Resume) so parent can set recordingMeetingId and show live segments */
@@ -115,8 +116,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   liveSegments,
   onLiveSegmentAdded,
   triggerEndMeetingFromTray,
-  triggerAutoEndMeetingFromReminder,
   onEndMeetingFromTrayConsumed,
+  runSummaryAfterExternalEnd,
+  onRunSummaryAfterExternalEndConsumed,
   onRecordingStopped,
   onRecordingStarted,
   initialTab,
@@ -578,15 +580,23 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   const handleEndMeeting = async () => {
     setIsEnding(true);
     try {
-      await invoke("update_meeting", {
+      const updated = await invoke<Meeting>("end_meeting_session", {
         meetingId,
-        status: "ended",
       });
-      setSessionStatus("ended");
+      setSessionStatus(updated.status ?? "ended");
       onMeetingsUpdated((prev) =>
-        prev.map((m) => (m.id === meetingId ? { ...m, status: "ended" } : m)),
+        prev.map((m) =>
+          m.id === meetingId
+            ? {
+                ...m,
+                status: updated.status,
+                name: updated.name,
+                summary: updated.summary ?? m.summary,
+              }
+            : m,
+        ),
       );
-      if (isThisMeetingRecording) await stopRecording();
+      if (isThisMeetingRecording) onRecordingStopped?.();
       setShowEndConfirm(false);
       setActiveTab("summary");
       await handleGenerateSummary(false);
@@ -598,12 +608,28 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     }
   };
 
+  const externalSummaryRanRef = useRef(false);
   useEffect(() => {
-    if (!triggerAutoEndMeetingFromReminder) return;
+    if (!runSummaryAfterExternalEnd) {
+      externalSummaryRanRef.current = false;
+      return;
+    }
+    if (segments.length === 0 || externalSummaryRanRef.current) return;
+    externalSummaryRanRef.current = true;
     setActiveTab("summary");
-    // Auto-run the same "End" flow used by the End button.
-    handleEndMeeting();
-  }, [triggerAutoEndMeetingFromReminder]);
+    void (async () => {
+      try {
+        await handleGenerateSummary(false);
+      } finally {
+        onRunSummaryAfterExternalEndConsumed?.();
+      }
+    })();
+  }, [
+    runSummaryAfterExternalEnd,
+    segments.length,
+    meetingId,
+    onRunSummaryAfterExternalEndConsumed,
+  ]);
 
   const PAGE_VARIANTS = {
     hidden: { opacity: 0 },

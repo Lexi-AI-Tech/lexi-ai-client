@@ -22,6 +22,7 @@ import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { NotesPage } from "./components/NotesPage";
 import { MeetingsPage } from "./components/MeetingsPage";
+import type { Meeting } from "./components/meetings/MeetingsListPage";
 import { DocsPage } from "./components/docs/DocsPage";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
@@ -160,11 +161,14 @@ function App() {
     meetingId: string;
     readableDuration: string;
   } | null>(null);
-  const [_pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
+  const [openSummaryAfterCompleteForMeetingId, setOpenSummaryAfterCompleteForMeetingId] =
     useState<string | null>(null);
   const [_activeRecordingMeetingId, setActiveRecordingMeetingId] = useState<
     string | null
   >(null);
+  const [meetingMicEndedPrompt, setMeetingMicEndedPrompt] = useState<{
+    meetingId: string;
+  } | null>(null);
 
   // When not authenticated, reset sync flag so we sync again after next login
   useEffect(() => {
@@ -365,6 +369,38 @@ function App() {
     };
   }, []);
 
+  // External call likely ended (e.g. Zoom no longer on mic) while Lexi is still recording
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenFn: (() => void) | undefined;
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen<{ meetingId: string }>(
+        "meeting-mic-ended",
+        (event) => {
+          if (cancelled) return;
+          const payload = (event.payload || {}) as { meetingId?: string };
+          const id =
+            typeof payload.meetingId === "string" ? payload.meetingId : null;
+          if (!id) return;
+          setCurrentPage("meetings");
+          setMeetingMicEndedPrompt({ meetingId: id });
+        },
+      );
+      unlistenFn = unlisten;
+    };
+
+    setup().catch((e) => {
+      console.error("Failed to set up meeting-mic-ended listener:", e);
+    });
+
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
+
   // Periodic safety reminder for long-running meetings (every 45 minutes)
   useEffect(() => {
     let cancelled = false;
@@ -409,12 +445,40 @@ function App() {
   };
 
   const handleEndMeetingFromReminder = () => {
-    if (!meetingReminderModal?.meetingId) return;
-    // Run the same full end flow as the Meetings "End" button:
-    // stop recording, switch to summary tab, and generate summary.
-    setPendingReminderAutoEndMeetingId(meetingReminderModal.meetingId);
-    setCurrentPage("meetings");
+    const id = meetingReminderModal?.meetingId;
+    if (!id) return;
     setMeetingReminderModal(null);
+    void (async () => {
+      try {
+        await invoke<Meeting>("end_meeting_session", { meetingId: id });
+        setCurrentPage("meetings");
+        setOpenSummaryAfterCompleteForMeetingId(id);
+      } catch (e) {
+        console.error("Failed to end meeting from reminder:", e);
+        toast.error(e);
+      }
+    })();
+  };
+
+  const dismissMeetingMicEndedPrompt = () => {
+    void invoke("dismiss_meeting_end_check_prompt").catch(() => {});
+    setMeetingMicEndedPrompt(null);
+  };
+
+  const confirmMeetingMicEndedEnd = () => {
+    const id = meetingMicEndedPrompt?.meetingId;
+    if (!id) return;
+    setMeetingMicEndedPrompt(null);
+    void (async () => {
+      try {
+        await invoke<Meeting>("end_meeting_session", { meetingId: id });
+        setCurrentPage("meetings");
+        setOpenSummaryAfterCompleteForMeetingId(id);
+      } catch (e) {
+        console.error("Failed to complete meeting after mic-ended prompt:", e);
+        toast.error(e);
+      }
+    })();
   };
 
   // Navigate to docs page, optionally opening a specific doc (e.g. after creating from meeting)
@@ -545,6 +609,12 @@ function App() {
                   onEndMeetingFromTrayConsumed={() =>
                     setTriggerEndMeetingFromTray(false)
                   }
+                  openSummaryAfterCompleteForMeetingId={
+                    openSummaryAfterCompleteForMeetingId
+                  }
+                  onOpenSummaryAfterCompleteConsumed={() =>
+                    setOpenSummaryAfterCompleteForMeetingId(null)
+                  }
                 />
               </div>
             )}
@@ -588,6 +658,40 @@ function App() {
                 onClick={handleEndMeetingFromReminder}
               >
                 End Meeting
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {meetingMicEndedPrompt && (
+        <div
+          className="delete-modal-overlay"
+          onClick={dismissMeetingMicEndedPrompt}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Has your meeting ended?</h3>
+            <p>
+              We no longer detect a meeting session. Do you want to end this meeting in Lexi and generate
+              a summary?
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={dismissMeetingMicEndedPrompt}
+              >
+                Keep recording
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={confirmMeetingMicEndedEnd}
+              >
+                Yes, end meeting
               </button>
             </div>
           </div>

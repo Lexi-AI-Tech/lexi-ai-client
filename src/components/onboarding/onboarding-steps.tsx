@@ -224,9 +224,11 @@ export function PermissionsStep({
     checking: false,
   });
 
+  const [autoAdvanced, setAutoAdvanced] = useState(false);
+
   useEffect(() => {
     checkPermissions();
-    const interval = setInterval(checkPermissions, 2000);
+    const interval = setInterval(checkPermissions, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -300,11 +302,23 @@ export function PermissionsStep({
     }
   };
 
+  // Core permissions needed to continue (mic + input monitoring)
+  // All permissions are now required to continue
+
   const allGranted =
     microphone.granted &&
     accessibility.granted &&
     inputMonitoring.granted &&
     systemAudio.granted;
+
+  // Auto-advance when all permissions are granted
+  useEffect(() => {
+    if (allGranted && !autoAdvanced) {
+      setAutoAdvanced(true);
+      const timeout = setTimeout(() => onNext(), 800);
+      return () => clearTimeout(timeout);
+    }
+  }, [allGranted, autoAdvanced, onNext]);
 
   const permissions = [
     {
@@ -350,8 +364,8 @@ export function PermissionsStep({
       <div className="step-header">
         <h1 className="step-title">Permissions</h1>
         <p className="step-description">
-          Lexi AI needs access to these controls so it can listen, capture
-          meetings, and type for you system-wide.
+          Click each permission below — most just need a single "Allow" in the
+          system popup that appears.
         </p>
         <div className="permissions-progress" aria-label="Permission progress">
           <div className="permissions-progress__track">
@@ -399,7 +413,9 @@ export function PermissionsStep({
                 <item.icon className="permission-icon" />
               </div>
               <div>
-                <h3 className="permission-title">{item.title}</h3>
+                <h3 className="permission-title">
+                  {item.title}
+                </h3>
                 <p className="permission-desc">{item.desc}</p>
               </div>
             </div>
@@ -410,11 +426,11 @@ export function PermissionsStep({
             ) : item.state.checking ? (
               <span className="permission-allow-hint permission-allow-hint--loading">
                 <Loader2 className="permission-spinner" aria-hidden />
-                Opening settings…
+                Opening…
               </span>
             ) : (
               <span className="permission-allow-hint">
-                Click to allow in System Settings
+                Click to allow
               </span>
             )}
           </div>
@@ -436,10 +452,20 @@ export function PermissionsStep({
           disabled={!allGranted}
           className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
           onClick={onNext}
+          title={
+            !allGranted
+              ? "All permissions are required to continue"
+              : undefined
+          }
         >
           Continue
         </button>
       </div>
+      {!allGranted && (
+        <p className="permissions-hint-text">
+          All permissions are required to provide the full Lexi AI experience.
+        </p>
+      )}
       {onSkip && (
         <button
           type="button"
@@ -804,7 +830,7 @@ export function TryItStep({
             {triedCount === 0
               ? "0 / 2 — try transcription or actions"
               : triedCount === 1
-                ? "1 / 2 — optional: try the other"
+                ? "1 / 2 — try the other path"
                 : "2 / 2 done"}
           </span>
         </div>

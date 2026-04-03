@@ -128,7 +128,8 @@ use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type, open_external_url};
 use commands::window::{open_devtools, show_main_window};
 use meetings::commands::{
-    add_meeting_note, create_doc_from_meeting, create_meeting, delete_meeting, get_meeting_details,
+    add_meeting_note, create_doc_from_meeting, create_meeting, delete_meeting,
+    dismiss_meeting_end_check_prompt, end_meeting_session, get_meeting_details,
     get_meeting_suggested_questions, list_meetings, send_meeting_chat, start_meeting_recording,
     stop_meeting_recording, stream_meeting_summary, update_meeting,
 };
@@ -332,6 +333,8 @@ pub fn main() {
             get_meeting_suggested_questions,
             start_meeting_recording,
             stop_meeting_recording,
+            end_meeting_session,
+            dismiss_meeting_end_check_prompt,
             update_meeting,
             delete_meeting,
             stream_meeting_summary,
@@ -430,6 +433,7 @@ pub fn main() {
                 meeting_recording_tx: Mutex::new(meeting_recording_tx),
                 current_meeting_id: Mutex::new(None),
                 reminder_task: Mutex::new(None),
+                pending_mic_ended_meeting_id: Mutex::new(None),
             });
 
             // Fetch config in background after state is managed to ensure channels get updated

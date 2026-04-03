@@ -1189,6 +1189,16 @@
   height: 1rem;
 }
 
+
+/* Hint text below continue button */
+.permissions-hint-text {
+  font-size: 0.75rem;
+  color: var(--lexi-text-faint);
+  text-align: center;
+  margin: 0;
+  line-height: 1.45;
+}
+
 /* ============================================
    HOTKEY TEST STEP (Lexi theme)
    ============================================ */

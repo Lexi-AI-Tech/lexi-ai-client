@@ -237,26 +237,53 @@ pub fn open_permission_pane(_pane: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Request microphone permission on macOS
-/// This will trigger the system permission dialog by attempting to access the microphone
+/// Request microphone permission on macOS.
+///
+/// Strategy: "popup first, Settings only as fallback"
+/// - If status is `notDetermined` (first time): trigger the native system popup
+///   via AVFoundation — user just clicks "Allow" in one dialog. No Settings needed.
+/// - If status is `denied/restricted` (user denied before): open System Settings
+///   because macOS won't show the popup again.
+/// - Tells the caller whether the popup was shown (`true`) or Settings was opened (`false`).
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_microphone_permission() -> Result<bool, String> {
     use std::thread;
 
-    // Open System Settings pane so user can enable if the modal doesn't show
-    let _ = open_permission_pane_impl("microphone");
+    // AVAuthorizationStatus values
+    const AV_AUTH_NOT_DETERMINED: i64 = 0;
+    const AV_AUTH_AUTHORIZED: i64 = 3;
 
-    // Spawn a thread to attempt microphone access, which triggers the permission dialog
-    thread::spawn(move || {
-        // Try to create an audio recorder, which will trigger the permission dialog
-        let _ = std::panic::catch_unwind(|| {
-            let _recorder = AudioRecorder::new();
-            println!("Microphone permission dialog should have appeared");
+    let av_class =
+        Class::get("AVCaptureDevice").ok_or_else(|| "AVCaptureDevice unavailable".to_string())?;
+    let ns_string_class =
+        Class::get("NSString").ok_or_else(|| "NSString unavailable".to_string())?;
+    let c_str = CString::new("soun").map_err(|e| e.to_string())?;
+    let media_type: *mut objc::runtime::Object =
+        unsafe { msg_send![ns_string_class, stringWithUTF8String: c_str.as_ptr()] };
+    let status: i64 = unsafe { msg_send![av_class, authorizationStatusForMediaType: media_type] };
+
+    if status == AV_AUTH_AUTHORIZED {
+        println!("🎤 Microphone already authorized");
+        return Ok(true);
+    }
+
+    if status == AV_AUTH_NOT_DETERMINED {
+        // First time — trigger the native system popup (1-click Allow/Deny)
+        println!("🎤 Microphone not determined — triggering native popup");
+        thread::spawn(move || {
+            let _ = std::panic::catch_unwind(|| {
+                let _recorder = AudioRecorder::new();
+                println!("🎤 Microphone permission dialog triggered");
+            });
         });
-    });
+        return Ok(true);
+    }
 
-    Ok(true)
+    // Already denied/restricted — must open System Settings manually
+    println!("🎤 Microphone denied — opening System Settings");
+    open_permission_pane_impl("microphone")?;
+    Ok(false)
 }
 
 /// Request microphone permission (non-macOS platforms)
@@ -266,50 +293,42 @@ pub fn request_microphone_permission() -> Result<bool, String> {
     Ok(true)
 }
 
-/// Request Input Monitoring permission on macOS
-/// This will trigger the system permission dialog by attempting to create a test CGEventTap
+// IOHIDRequestAccess: macOS 10.15+ API to request (trigger dialog for) Input Monitoring permission.
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn IOHIDRequestAccess(request_type: u32) -> bool;
+}
+
+/// Request Input Monitoring permission on macOS.
+///
+/// Strategy: Use `IOHIDRequestAccess` which triggers the proper system dialog
+/// (the user sees "App wants to monitor input" and can click "Open System Preferences"
+/// where the app is already highlighted). Falls back to opening Settings if already denied.
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, String> {
-    use objc2_core_graphics::{
-        CGEvent, CGEventMask, CGEventTapCallBack, CGEventTapLocation, CGEventTapOptions,
-        CGEventTapPlacement, CGEventTapProxy, CGEventType,
-    };
-    use std::os::raw::c_void;
-    use std::ptr::{null_mut, NonNull};
-    use std::thread;
+    const K_IOHID_REQUEST_TYPE_LISTEN_EVENT: u32 = 1;
+    const K_IOHID_ACCESS_TYPE_GRANTED: u32 = 0;
 
-    // Open System Settings pane so user can enable if the modal doesn't show
-    let _ = open_permission_pane_impl("input_monitoring");
+    // Check current status first
+    let access = unsafe { IOHIDCheckAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT) };
+    if access == K_IOHID_ACCESS_TYPE_GRANTED {
+        println!("⌨️  Input Monitoring already granted");
+        return Ok(true);
+    }
 
-    // Spawn a thread to attempt starting a test tap, which triggers the permission dialog
-    thread::spawn(move || {
-        unsafe extern "C-unwind" fn dummy_callback(
-            _proxy: CGEventTapProxy,
-            _type: CGEventType,
-            cg_event: NonNull<CGEvent>,
-            _user_info: *mut c_void,
-        ) -> *mut CGEvent {
-            cg_event.as_ptr()
-        }
+    // Trigger the native system dialog
+    println!("⌨️  Requesting Input Monitoring via IOHIDRequestAccess");
+    let granted = unsafe { IOHIDRequestAccess(K_IOHID_REQUEST_TYPE_LISTEN_EVENT) };
 
-        let _ = std::panic::catch_unwind(|| {
-            unsafe {
-                let callback: CGEventTapCallBack = Some(dummy_callback);
-                let _tap = CGEvent::tap_create(
-                    CGEventTapLocation::HIDEventTap,
-                    CGEventTapPlacement::HeadInsertEventTap,
-                    CGEventTapOptions::Default,
-                    (1 << 12) as CGEventMask, // 12 is kCGEventFlagsChanged
-                    callback,
-                    null_mut(),
-                );
-            }
-            println!("Input Monitoring permission dialog should have appeared");
-        });
-    });
+    if !granted {
+        // The dialog was shown before and denied, or the user dismissed it.
+        // Open System Settings as fallback so the user can toggle manually.
+        println!("⌨️  Input Monitoring not granted after request — opening System Settings");
+        let _ = open_permission_pane_impl("input_monitoring");
+    }
 
-    Ok(true)
+    Ok(granted)
 }
 
 /// Request Input Monitoring permission (non-macOS platforms)
@@ -319,31 +338,29 @@ pub fn request_input_monitoring_permission(_app: AppHandle) -> Result<bool, Stri
     Ok(true)
 }
 
-/// Request Accessibility permission on macOS
-/// This is required for pasting text via AppleScript/System Events
+/// Request Accessibility permission on macOS.
+///
+/// Strategy: Use `AXIsProcessTrustedWithOptions(kAXTrustedCheckOptionPrompt: true)` via the
+/// `macos_accessibility_client` crate. This shows a native system dialog that:
+/// - Tells the user "Lexi AI would like to control this computer"
+/// - Has an "Open System Preferences" button that opens Settings with the app highlighted
+///
+/// This replaces the old osascript approach which was broken (it requested accessibility
+/// for the `osascript` process, not for Lexi AI).
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
-    use std::process::Command;
-    use std::thread;
+    use macos_accessibility_client::accessibility::application_is_trusted_with_prompt;
 
-    // Open System Settings pane so user can enable if the modal doesn't show
-    let _ = open_permission_pane_impl("accessibility");
-
-    // Spawn a thread to attempt using System Events, which triggers the permission dialog
-    thread::spawn(move || {
-        let script = r#"
-            tell application "System Events"
-                get name of every process
-            end tell
-        "#;
-        let _ = std::panic::catch_unwind(|| {
-            let _ = Command::new("osascript").arg("-e").arg(script).output();
-            println!("Accessibility permission dialog should have appeared");
-        });
-    });
-
-    Ok(true)
+    // This shows the native prompt if not already trusted.
+    // If already trusted: returns true immediately, no popup.
+    // If not trusted: shows system dialog with "Open System Preferences" that highlights the app.
+    let trusted = application_is_trusted_with_prompt();
+    println!(
+        "♿ Accessibility permission: {}",
+        if trusted { "granted" } else { "prompt shown" }
+    );
+    Ok(trusted)
 }
 
 /// Request Accessibility permission (non-macOS platforms)
@@ -353,14 +370,31 @@ pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String>
     Ok(true)
 }
 
-/// Request screen recording permission (needed for system audio in meetings).
-/// Call CGRequestScreenCaptureAccess() (macOS shows the popup at most once), then deep-link to Settings.
+/// Request screen recording / system audio permission (needed for system audio in meetings).
+///
+/// Strategy: Call `CGRequestScreenCaptureAccess()` — macOS shows a native dialog (once).
+/// If the permission was already denied, open System Settings as fallback.
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
-    let _ = open_permission_pane_impl("screen_capture");
-    let _ = unsafe { CGRequestScreenCaptureAccess() };
-    Ok(true)
+    // Check if already granted
+    let already_granted = unsafe { CGPreflightScreenCaptureAccess() };
+    if already_granted {
+        println!("🖥️  Screen Recording already granted");
+        return Ok(true);
+    }
+
+    // Trigger the native popup (macOS shows this once per app)
+    println!("🖥️  Requesting Screen Recording via CGRequestScreenCaptureAccess");
+    let granted = unsafe { CGRequestScreenCaptureAccess() };
+
+    if !granted {
+        // Popup was already shown and denied — open Settings as fallback
+        println!("🖥️  Screen Recording not granted — opening System Settings");
+        let _ = open_permission_pane_impl("screen_capture");
+    }
+
+    Ok(granted)
 }
 
 #[tauri::command]
@@ -368,3 +402,4 @@ pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> 
 pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
+
