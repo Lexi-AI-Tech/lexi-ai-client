@@ -22,7 +22,6 @@ import {
   Video,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
-import type { Doc } from "../../types";
 import type { Meeting } from "./MeetingsListPage";
 import type { SummaryLine } from "./StreamingSummaryDisplay";
 import {
@@ -149,8 +148,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   const [isInitializingMeeting, setIsInitializingMeeting] = useState(false);
   const [showCreateDocModal, setShowCreateDocModal] = useState(false);
   const [docInstructionsInput, setDocInstructionsInput] = useState("");
-  const [isCreatingDocFromSummary, setIsCreatingDocFromSummary] =
-    useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -448,26 +445,21 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     }
   };
 
-  const handleCreateDocFromSummary = async () => {
+  const handleCreateDocFromSummary = () => {
     const instructions = docInstructionsInput.trim();
-    if (!meetingId || !instructions || isCreatingDocFromSummary) return;
-    setIsCreatingDocFromSummary(true);
-    try {
-      const doc = await invoke<Doc>("create_doc_from_meeting", {
-        meetingId,
-        instructions,
-      });
-      setShowCreateDocModal(false);
-      setDocInstructionsInput("");
-      window.dispatchEvent(
-        new CustomEvent("lexi-navigate-to-doc", { detail: { docId: doc.id } }),
-      );
-    } catch (error) {
-      console.error("Failed to create doc from meeting summary:", error);
-      toast.error(error);
-    } finally {
-      setIsCreatingDocFromSummary(false);
-    }
+    if (!meetingId || !instructions) return;
+    setShowCreateDocModal(false);
+    const instr = instructions;
+    setDocInstructionsInput("");
+    window.dispatchEvent(
+      new CustomEvent("lexi-start-meeting-doc-generation", {
+        detail: {
+          requestId: crypto.randomUUID(),
+          meetingId,
+          instructions: instr,
+        },
+      }),
+    );
   };
 
   const handleSendChatMessage = async (
@@ -1286,9 +1278,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         ? createPortal(
             <div
               className="delete-modal-overlay"
-              onClick={() =>
-                !isCreatingDocFromSummary && setShowCreateDocModal(false)
-              }
+              onClick={() => setShowCreateDocModal(false)}
             >
               <div
                 className="delete-modal-content meetings-create-doc-modal"
@@ -1307,7 +1297,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                   placeholder="e.g. Extract key decisions and action items. Include who is responsible for each task and any deadlines mentioned."
                   value={docInstructionsInput}
                   onChange={(e) => setDocInstructionsInput(e.target.value)}
-                  disabled={isCreatingDocFromSummary}
                   rows={4}
                 />
                 <div className="delete-modal-actions">
@@ -1315,7 +1304,6 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     type="button"
                     className="delete-modal-btn-cancel"
                     onClick={() => setShowCreateDocModal(false)}
-                    disabled={isCreatingDocFromSummary}
                   >
                     Cancel
                   </button>
@@ -1323,11 +1311,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                     type="button"
                     className="delete-modal-btn-delete"
                     onClick={handleCreateDocFromSummary}
-                    disabled={
-                      isCreatingDocFromSummary || !docInstructionsInput.trim()
-                    }
+                    disabled={!docInstructionsInput.trim()}
                   >
-                    {isCreatingDocFromSummary ? "Creating…" : "Create"}
+                    Create
                   </button>
                 </div>
               </div>

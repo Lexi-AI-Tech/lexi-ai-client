@@ -775,3 +775,43 @@
   cursor: not-allowed;
 }
 
+/* Meeting → doc: in-flight generation on Docs */
+.docs-generating-meeting {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+
+.docs-generating-meeting__spinner {
+  animation: docs-generating-spin 0.9s linear infinite;
+  color: var(--lexi-text-muted);
+}
+
+@keyframes docs-generating-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.docs-generating-meeting__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--lexi-text);
+  max-width: 22rem;
+}
+
+.docs-generating-meeting__hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--lexi-text-muted);
+  max-width: 24rem;
+  line-height: 1.45;
+}
+

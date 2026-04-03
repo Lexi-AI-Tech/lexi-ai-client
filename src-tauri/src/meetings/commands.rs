@@ -797,7 +797,7 @@ pub async fn create_doc_from_meeting(
         .await
         .map_err(|_| "Authentication required")?;
 
-    let client = crate::utils::create_http_client();
+    let client = crate::utils::create_http_client_long_timeout();
     let url = format!(
         "{}/api/v1/meetings/{}/create-doc",
         crate::config::api_base_url(),

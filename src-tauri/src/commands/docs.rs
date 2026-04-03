@@ -33,33 +33,50 @@ pub struct DeleteDocRequest {
     pub doc_id: String,
 }
 
+/// Use inner object when the server wraps payloads as `{ "data": { ... } }`.
+fn api_doc_root<'a>(v: &'a serde_json::Value) -> &'a serde_json::Value {
+    match v.get("data") {
+        Some(serde_json::Value::Object(_)) => v.get("data").unwrap(),
+        _ => v,
+    }
+}
+
+fn required_api_string(root: &serde_json::Value, key: &str) -> Result<String, String> {
+    match root.get(key) {
+        Some(serde_json::Value::String(s)) => Ok(s.clone()),
+        Some(serde_json::Value::Number(n)) => Ok(n.to_string()),
+        None | Some(serde_json::Value::Null) => Err(format!("Missing {}", key)),
+        _ => Err(format!("Invalid {} (expected string)", key)),
+    }
+}
+
+fn doc_content_field(root: &serde_json::Value) -> String {
+    match root.get("content") {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(v) => v.to_string(),
+        None => String::new(),
+    }
+}
+
 /// Parse API doc response into Doc (pub for use from meeting commands).
 pub fn parse_doc_from_value(v: &serde_json::Value) -> Result<Doc, String> {
-    let id = v
-        .get("id")
-        .and_then(|x| x.as_str())
-        .ok_or("Missing id")?
-        .to_string();
-    let title = v
-        .get("title")
-        .and_then(|x| x.as_str())
-        .unwrap_or("Untitled")
-        .to_string();
-    let content = v
-        .get("content")
-        .and_then(|x| x.as_str())
-        .unwrap_or("")
-        .to_string();
-    let created_at = v
-        .get("created_at")
-        .and_then(|x| x.as_str())
-        .ok_or("Missing created_at")?
-        .to_string();
-    let updated_at = v
-        .get("updated_at")
-        .and_then(|x| x.as_str())
-        .ok_or("Missing updated_at")?
-        .to_string();
+    let root = api_doc_root(v);
+    let id = required_api_string(root, "id")?;
+    let title = match root.get("title") {
+        Some(serde_json::Value::String(s)) => {
+            let t = s.trim();
+            if t.is_empty() {
+                "Untitled".to_string()
+            } else {
+                t.to_string()
+            }
+        }
+        None | Some(serde_json::Value::Null) => "Untitled".to_string(),
+        Some(v) => v.to_string(),
+    };
+    let content = doc_content_field(root);
+    let created_at = required_api_string(root, "created_at")?;
+    let updated_at = required_api_string(root, "updated_at")?;
     Ok(Doc {
         id,
         title,

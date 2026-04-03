@@ -23,7 +23,8 @@ import { TranscriptsList } from "./components/TranscriptsList";
 import { NotesPage } from "./components/NotesPage";
 import { MeetingsPage } from "./components/MeetingsPage";
 import type { Meeting } from "./components/meetings/MeetingsListPage";
-import { DocsPage } from "./components/docs/DocsPage";
+import { DocsPage, type DocsEntryIntent } from "./components/docs/DocsPage";
+import type { Doc } from "./types";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
 import { check } from "@tauri-apps/plugin-updater";
@@ -482,36 +483,70 @@ function App() {
   };
 
   // Navigate to docs page, optionally opening a specific doc (e.g. after creating from meeting)
-  const [selectedDocIdToOpen, setSelectedDocIdToOpen] = useState<string | null>(
-    null,
-  );
+  const [docsEntryIntent, setDocsEntryIntent] =
+    useState<DocsEntryIntent | null>(null);
 
   useEffect(() => {
     const handleNavigateToDocs = () => {
-      setSelectedDocIdToOpen(null);
+      setDocsEntryIntent(null);
       setCurrentPage("docs");
     };
     const handleNavigateToDoc = (e: Event) => {
-      const ev = e as CustomEvent<{ docId: string }>;
+      const ev = e as CustomEvent<{ docId: string; doc?: Doc }>;
       const docId = ev.detail?.docId;
+      const doc = ev.detail?.doc;
       if (docId) {
-        setSelectedDocIdToOpen(docId);
+        setDocsEntryIntent({ kind: "open", docId, doc });
       } else {
-        setSelectedDocIdToOpen(null);
+        setDocsEntryIntent(null);
       }
       setCurrentPage("docs");
+    };
+    const handleStartMeetingDocGeneration = (e: Event) => {
+      const ev = e as CustomEvent<{
+        requestId: string;
+        meetingId: string;
+        instructions: string;
+      }>;
+      const { requestId, meetingId, instructions } = ev.detail ?? {};
+      const trimmed = instructions?.trim();
+      if (!(requestId && meetingId && trimmed)) return;
+
+      // Navigate first so Docs mounts as the active page, then deliver the intent on
+      // a later frame so generation + invoke run inside DocsPage (avoids batched
+      // navigation+intent updates and Strict Mode effect edge cases).
+      setDocsEntryIntent(null);
+      setCurrentPage("docs");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setDocsEntryIntent({
+            kind: "generating-meeting-doc",
+            requestId,
+            meetingId,
+            instructions: trimmed,
+          });
+        });
+      });
     };
     window.addEventListener(
       "lexi-navigate-to-docs",
       handleNavigateToDocs as EventListener,
     );
     window.addEventListener("lexi-navigate-to-doc", handleNavigateToDoc);
+    window.addEventListener(
+      "lexi-start-meeting-doc-generation",
+      handleStartMeetingDocGeneration,
+    );
     return () => {
       window.removeEventListener(
         "lexi-navigate-to-docs",
         handleNavigateToDocs as EventListener,
       );
       window.removeEventListener("lexi-navigate-to-doc", handleNavigateToDoc);
+      window.removeEventListener(
+        "lexi-start-meeting-doc-generation",
+        handleStartMeetingDocGeneration,
+      );
     };
   }, []);
 
@@ -621,8 +656,8 @@ function App() {
             {currentPage === "docs" && (
               <div className="container container--docs">
                 <DocsPage
-                  initialSelectedDocId={selectedDocIdToOpen}
-                  onInitialDocConsumed={() => setSelectedDocIdToOpen(null)}
+                  entryIntent={docsEntryIntent}
+                  onEntryIntentConsumed={() => setDocsEntryIntent(null)}
                 />
               </div>
             )}

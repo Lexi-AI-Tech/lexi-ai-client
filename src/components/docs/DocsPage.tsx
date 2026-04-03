@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowLeft, Mic, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Mic, Square, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
 import { useToast } from "../toast/useToast";
 import { DocsListPage } from "./DocsListPage";
@@ -52,15 +52,23 @@ const SaveIndicator = React.forwardRef<
   );
 });
 
+export type DocsEntryIntent =
+  | { kind: "open"; docId: string; doc?: Doc }
+  | {
+      kind: "generating-meeting-doc";
+      requestId: string;
+      meetingId: string;
+      instructions: string;
+    };
+
 interface DocsPageProps {
-  /** When set, open this doc (e.g. after creating from meeting). Cleared via onInitialDocConsumed. */
-  initialSelectedDocId?: string | null;
-  onInitialDocConsumed?: () => void;
+  entryIntent?: DocsEntryIntent | null;
+  onEntryIntentConsumed?: () => void;
 }
 
 export const DocsPage: React.FC<DocsPageProps> = ({
-  initialSelectedDocId,
-  onInitialDocConsumed,
+  entryIntent,
+  onEntryIntentConsumed,
 }) => {
   const toast = useToast();
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -80,6 +88,8 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const saveIndicatorRef = useRef<SaveIndicatorRef>(null);
   const [isDocRecording, setIsDocRecording] = useState(false);
   const [isCreatingDocFromAudio, setIsCreatingDocFromAudio] = useState(false);
+  const [isGeneratingMeetingDoc, setIsGeneratingMeetingDoc] = useState(false);
+  const ignoreMeetingGenResultRef = useRef(false);
   /** Local title for the current doc to avoid setDocs on every keystroke */
   const [editingTitle, setEditingTitle] = useState("");
   const selectedIdRef = useRef<string | null>(null);
@@ -199,15 +209,65 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     [],
   );
 
-  // When navigating with a specific doc to open (e.g. from "Create doc" in meetings)
-  const hasConsumedInitialRef = useRef(false);
+  const lastHandledOpenDocIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (initialSelectedDocId && !loading && !hasConsumedInitialRef.current) {
-      hasConsumedInitialRef.current = true;
-      setSelectedId(initialSelectedDocId);
-      onInitialDocConsumed?.();
+    if (!entryIntent || entryIntent.kind !== "open" || loading) return;
+    if (lastHandledOpenDocIdRef.current === entryIntent.docId) return;
+    lastHandledOpenDocIdRef.current = entryIntent.docId;
+    const { docId, doc } = entryIntent;
+    if (doc) {
+      setDocs((prev) =>
+        prev.some((d) => d.id === doc.id) ? prev : [doc, ...prev],
+      );
     }
-  }, [initialSelectedDocId, loading, onInitialDocConsumed]);
+    setSelectedId(docId);
+    onEntryIntentConsumed?.();
+  }, [entryIntent, loading, onEntryIntentConsumed]);
+
+  const lastHandledGenRequestIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !entryIntent ||
+      entryIntent.kind !== "generating-meeting-doc" ||
+      loading
+    ) {
+      return;
+    }
+    if (lastHandledGenRequestIdRef.current === entryIntent.requestId) return;
+    lastHandledGenRequestIdRef.current = entryIntent.requestId;
+
+    const { meetingId, instructions } = entryIntent;
+    onEntryIntentConsumed?.();
+
+    ignoreMeetingGenResultRef.current = false;
+    setSelectedId(null);
+    setIsGeneratingMeetingDoc(true);
+
+    // Do not use an effect cleanup "cancelled" flag for this async work. React
+    // Strict Mode runs effects twice in dev: cleanup flips cancelled before the
+    // invoke resolves, so we'd never clear generating or apply the new doc.
+    void (async () => {
+      try {
+        const doc = await invoke<Doc>("create_doc_from_meeting", {
+          meetingId,
+          instructions,
+        });
+        if (ignoreMeetingGenResultRef.current) return;
+        setDocs((prev) =>
+          prev.some((d) => d.id === doc.id) ? prev : [doc, ...prev],
+        );
+        setSelectedId(doc.id);
+        toast.success("Document created");
+      } catch (err) {
+        if (!ignoreMeetingGenResultRef.current) {
+          console.error("Create doc from meeting failed:", err);
+          toast.error(err);
+        }
+      } finally {
+        setIsGeneratingMeetingDoc(false);
+      }
+    })();
+  }, [entryIntent, loading, onEntryIntentConsumed, toast]);
 
   const handleCreateDoc = async () => {
     try {
@@ -363,11 +423,44 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     [selectedId, toast],
   );
 
-  const showListView = selectedId === null;
+  const showGeneratingMeeting = isGeneratingMeetingDoc;
+  const showListView = selectedId === null && !showGeneratingMeeting;
   const showDetailView = !showListView && selectedDoc;
 
   return (
-    <div className={`docs-page ${showDetailView ? "docs-page--detail" : ""}`}>
+    <div className={`docs-page ${showDetailView || showGeneratingMeeting ? "docs-page--detail" : ""}`}>
+      {showGeneratingMeeting && (
+        <>
+          <div className="docs-page-header">
+            <button
+              type="button"
+              className="docs-page-header__back"
+              onClick={() => {
+                ignoreMeetingGenResultRef.current = true;
+                setIsGeneratingMeetingDoc(false);
+              }}
+              aria-label="Back to docs list"
+            >
+              <ArrowLeft size={20} strokeWidth={2} />
+              <span>Docs</span>
+            </button>
+          </div>
+          <div className="docs-generating-meeting">
+            <Loader2
+              className="docs-generating-meeting__spinner"
+              size={40}
+              strokeWidth={1.5}
+              aria-hidden
+            />
+            <p className="docs-generating-meeting__title">
+              Generating document from your meeting…
+            </p>
+            <p className="docs-generating-meeting__hint">
+              We’ll open the doc here when it’s ready.
+            </p>
+          </div>
+        </>
+      )}
       {showDetailView && selectedDoc && (
         <div className="docs-page-header">
           <button
