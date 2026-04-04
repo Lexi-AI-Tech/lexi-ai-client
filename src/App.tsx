@@ -31,7 +31,6 @@ import { check } from "@tauri-apps/plugin-updater";
 import { useAutoUpdater, checkUpdateDetails } from "./hooks/useAutoUpdater";
 import { useUpdaterStore } from "./store/updaterStore";
 import { useToast } from "./components/toast/useToast";
-import { AppLoader } from "./components/ui/AppLoader";
 
 const ONBOARDING_VERSION = 1;
 
@@ -562,7 +561,9 @@ function App() {
     return (
       <div className="app">
         {showLoadingScreen ? (
-          <AppLoader />
+          <div className="app-loading-screen" role="status" aria-label="Loading">
+            <div className="app-loading-spinner" aria-hidden />
+          </div>
         ) : (
           <div className="app-loading-screen" />
         )}

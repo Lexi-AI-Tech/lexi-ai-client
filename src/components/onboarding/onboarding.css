@@ -1194,6 +1194,24 @@
   line-height: 1.45;
 }
 
+.permissions-setup-help {
+  font-size: 0.75rem;
+  color: var(--lexi-text-faint);
+  text-align: center;
+  margin: 0.75rem 0 0;
+  line-height: 1.45;
+}
+
+.permissions-setup-help a {
+  color: var(--lexi-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.permissions-setup-help a:hover {
+  color: var(--lexi-text-primary);
+}
+
 /* ============================================
    HOTKEY TEST STEP (Lexi theme)
    ============================================ */

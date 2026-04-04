@@ -427,6 +427,17 @@ export function PermissionsStep({
           All permissions are required to provide the full Lexi AI experience.
         </p>
       )}
+      <p className="permissions-setup-help">
+        Having trouble setting up?{" "}
+        <a
+          href="https://speaklexi.com/how-to-setup"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Click here
+        </a>
+        .
+      </p>
     </motion.div>
   );
 }

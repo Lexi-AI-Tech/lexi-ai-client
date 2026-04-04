@@ -2537,6 +2537,17 @@ textarea.form-input {
 }
 
 /* Sonner toast variants (used by ToastProvider) */
+.toast-loading-spinner {
+  display: block;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 2px solid var(--lexi-border-subtle);
+  border-top-color: var(--lexi-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 .sonner-toast {
   font-family: var(--lexi-font-body);
 }
