@@ -173,9 +173,7 @@ impl MacosSystemAudioStream {
 pub fn spawn_process_tap_permission_attempt() {
     thread::spawn(|| {
         let (drain_tx, drain_rx) = mpsc::channel::<Vec<u8>>();
-        let _drainer = thread::spawn(move || {
-            while drain_rx.recv().is_ok() {}
-        });
+        let _drainer = thread::spawn(move || while drain_rx.recv().is_ok() {});
 
         match MacosSystemAudioStream::start(drain_tx) {
             Ok(session) => {

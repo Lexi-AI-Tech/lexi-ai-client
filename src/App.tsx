@@ -561,7 +561,11 @@ function App() {
     return (
       <div className="app">
         {showLoadingScreen ? (
-          <div className="app-loading-screen" role="status" aria-label="Loading">
+          <div
+            className="app-loading-screen"
+            role="status"
+            aria-label="Loading"
+          >
             <div className="app-loading-spinner" aria-hidden />
           </div>
         ) : (
@@ -588,7 +592,12 @@ function App() {
             initial="initial"
             animate="animate"
             exit="exit"
-            style={{ flex: 1, display: "flex", flexDirection: "column" }}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+            }}
           >
             {currentPage === "home" && (
               <HomePage

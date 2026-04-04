@@ -57,8 +57,7 @@ fn tcc_access_preflight_many(services: &[&str]) -> Vec<Option<bool>> {
         return vec![None; services.len()];
     };
 
-    type PreflightFn =
-        unsafe extern "C" fn(*mut std::ffi::c_void, *mut std::ffi::c_void) -> i32;
+    type PreflightFn = unsafe extern "C" fn(*mut std::ffi::c_void, *mut std::ffi::c_void) -> i32;
     let preflight_ptr = unsafe {
         libc::dlsym(
             handle.as_ptr(),
