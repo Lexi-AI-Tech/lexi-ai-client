@@ -245,30 +245,11 @@ pub fn request_microphone_permission() -> Result<bool, String> {
     Ok(true)
 }
 
-/// Request Accessibility permission on macOS
-/// This is required for pasting text via AppleScript/System Events
+/// Open System Settings → Privacy & Security → Accessibility so the user can enable Lexi.
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
-    use std::process::Command;
-    use std::thread;
-
-    // Open System Settings pane so user can enable if the modal doesn't show
-    let _ = open_permission_pane_impl("accessibility");
-
-    // Spawn a thread to attempt using System Events, which triggers the permission dialog
-    thread::spawn(move || {
-        let script = r#"
-            tell application "System Events"
-                get name of every process
-            end tell
-        "#;
-        let _ = std::panic::catch_unwind(|| {
-            let _ = Command::new("osascript").arg("-e").arg(script).output();
-            println!("Accessibility permission dialog should have appeared");
-        });
-    });
-
+    open_permission_pane_impl("accessibility")?;
     Ok(true)
 }
 
