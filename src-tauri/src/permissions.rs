@@ -29,39 +29,30 @@
 //!
 //! ## Implementation Notes
 //!
-//! Microphone on macOS uses AVFoundation's AVCaptureDevice.authorizationStatus(for: .audio)
-//! so the UI reflects the actual System Settings toggle. Accessibility uses AXIsProcessTrusted.
+//! Microphone on macOS uses AVFoundation (`cidre`): `authorizationStatusForMediaType` and
+//! `requestAccessForMediaType:completionHandler:` (same approach as tauri-plugin-macos-permissions).
+//! Accessibility uses `macos_accessibility_client::application_is_trusted` / `_with_prompt`.
 
 #![allow(unexpected_cfgs)]
 
 use tauri::AppHandle;
 
-use crate::audio::recorder::AudioRecorder;
 #[cfg(target_os = "macos")]
-use objc::runtime::Class;
+use cidre::av;
 #[cfg(target_os = "macos")]
-use objc::{msg_send, sel, sel_impl};
+use cidre::av::capture::device::{AuthorizationStatus, Device};
 #[cfg(target_os = "macos")]
-use std::ffi::CString;
+use cidre::blocks::SendBlock;
 
 /// Check microphone permission on macOS using AVFoundation (matches System Settings).
 /// cpal can succeed even when the mic toggle is off; this uses the real authorization status.
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn check_microphone_permission() -> Result<bool, String> {
-    // AVAuthorizationStatusAuthorized = 3
-    const AV_AUTHORIZATION_STATUS_AUTHORIZED: i64 = 3;
-
-    let av_class =
-        Class::get("AVCaptureDevice").ok_or_else(|| "AVCaptureDevice unavailable".to_string())?;
-    let ns_string_class =
-        Class::get("NSString").ok_or_else(|| "NSString unavailable".to_string())?;
-    let c_str = CString::new("soun").map_err(|e| e.to_string())?;
-    let media_type: *mut objc::runtime::Object =
-        unsafe { msg_send![ns_string_class, stringWithUTF8String: c_str.as_ptr()] };
-    let status: i64 = unsafe { msg_send![av_class, authorizationStatusForMediaType: media_type] };
-
-    Ok(status == AV_AUTHORIZATION_STATUS_AUTHORIZED)
+    let media_type = av::MediaType::audio();
+    let status = Device::authorization_status_for_media_type(media_type)
+        .map_err(|e| format!("authorizationStatusForMediaType failed: {e}"))?;
+    Ok(status == AuthorizationStatus::Authorized)
 }
 
 /// Check microphone permission (non-macOS platforms)
@@ -76,10 +67,8 @@ pub fn check_microphone_permission() -> Result<bool, String> {
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
-    use macos_accessibility_client::raw::AXIsProcessTrusted;
-    // AXIsProcessTrusted returns non-zero (true) only if this process has accessibility permission.
-    let granted = unsafe { AXIsProcessTrusted() != 0 };
-    Ok(granted)
+    use macos_accessibility_client::accessibility::application_is_trusted;
+    Ok(application_is_trusted())
 }
 
 /// Check Accessibility permission (non-macOS platforms)
@@ -118,7 +107,6 @@ const K_CF_STRING_ENCODING_UTF8: u32 = 0x0800_0100;
 /// Check "Audio Capture" permission via private TCC API (macOS 14.4+).
 /// Returns Some(true) if granted, Some(false) if denied/not determined, None if TCC API unavailable.
 #[cfg(target_os = "macos")]
-#[allow(dead_code)]
 fn check_audio_capture_permission_tcc() -> Option<bool> {
     use std::ffi::CString;
     const TCC_PATH: &str = "/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC";
@@ -206,51 +194,48 @@ pub fn open_permission_pane(_pane: String) -> Result<(), String> {
 
 /// Request microphone permission on macOS.
 ///
-/// Strategy: "popup first, Settings only as fallback"
-/// - If status is `notDetermined` (first time): trigger the native system popup
-///   via AVFoundation — user just clicks "Allow" in one dialog. No Settings needed.
-/// - If status is `denied/restricted` (user denied before): open System Settings
-///   because macOS won't show the popup again.
-/// - Tells the caller whether the popup was shown (`true`) or Settings was opened (`false`).
+/// Matches [tauri-plugin-macos-permissions](https://github.com/ayangweb/tauri-plugin-macos-permissions):
+/// uses `+[AVCaptureDevice requestAccessForMediaType:completionHandler:]` so the system shows
+/// the native prompt when appropriate, without spinning up `cpal` / `AudioRecorder` (which could
+/// feel like duplicate work or extra side effects).
+///
+/// Returns whether access is already granted (`true`) after this call completes, or `false` if
+/// the user still needs to allow (dialog shown) or must use System Settings (denied/restricted).
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_microphone_permission() -> Result<bool, String> {
-    use std::thread;
+    let media_type = av::MediaType::audio();
+    let status = Device::authorization_status_for_media_type(media_type)
+        .map_err(|e| format!("authorizationStatusForMediaType failed: {e}"))?;
 
-    // AVAuthorizationStatus values
-    const AV_AUTH_NOT_DETERMINED: i64 = 0;
-    const AV_AUTH_AUTHORIZED: i64 = 3;
-
-    let av_class =
-        Class::get("AVCaptureDevice").ok_or_else(|| "AVCaptureDevice unavailable".to_string())?;
-    let ns_string_class =
-        Class::get("NSString").ok_or_else(|| "NSString unavailable".to_string())?;
-    let c_str = CString::new("soun").map_err(|e| e.to_string())?;
-    let media_type: *mut objc::runtime::Object =
-        unsafe { msg_send![ns_string_class, stringWithUTF8String: c_str.as_ptr()] };
-    let status: i64 = unsafe { msg_send![av_class, authorizationStatusForMediaType: media_type] };
-
-    if status == AV_AUTH_AUTHORIZED {
+    if status == AuthorizationStatus::Authorized {
         println!("🎤 Microphone already authorized");
         return Ok(true);
     }
 
-    if status == AV_AUTH_NOT_DETERMINED {
-        // First time — trigger the native system popup (1-click Allow/Deny)
-        println!("🎤 Microphone not determined — triggering native popup");
-        thread::spawn(move || {
-            let _ = std::panic::catch_unwind(|| {
-                let _recorder = AudioRecorder::new();
-                println!("🎤 Microphone permission dialog triggered");
-            });
-        });
-        return Ok(true);
+    if matches!(
+        status,
+        AuthorizationStatus::Denied | AuthorizationStatus::Restricted
+    ) {
+        // macOS will not show the prompt again; same as plugin — send user to Settings.
+        println!("🎤 Microphone denied or restricted — opening System Settings");
+        open_permission_pane_impl("microphone")?;
+        return Ok(false);
     }
 
-    // Already denied/restricted — must open System Settings manually
-    println!("🎤 Microphone denied — opening System Settings");
-    open_permission_pane_impl("microphone")?;
-    Ok(false)
+    println!("🎤 Requesting microphone via AVFoundation requestAccessForMediaType");
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut block = SendBlock::new1(move |granted: bool| {
+        let _ = tx.send(granted);
+    });
+    Device::request_access_for_media_type_ch(media_type, block.as_mut())
+        .map_err(|e| format!("requestAccessForMediaType failed: {e}"))?;
+
+    let granted = rx
+        .recv()
+        .map_err(|_| "microphone permission completion handler did not run".to_string())?;
+
+    Ok(granted)
 }
 
 /// Request microphone permission (non-macOS platforms)
@@ -294,28 +279,22 @@ pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String>
 
 /// Request screen recording / system audio permission (needed for system audio in meetings).
 ///
-/// Strategy: Call `CGRequestScreenCaptureAccess()` — macOS shows a native dialog (once).
-/// If the permission was already denied, open System Settings as fallback.
+/// Aligns with [tauri-plugin-macos-permissions](https://github.com/ayangweb/tauri-plugin-macos-permissions)
+/// screen recording API: only `CGRequestScreenCaptureAccess()`. We do **not** immediately open
+/// System Settings when it returns `false`, so the user is not hit with a Settings window right
+/// after dismissing or denying the system dialog (use `open_permission_pane` from the UI if needed).
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
-    // Check if already granted
-    let already_granted = unsafe { CGPreflightScreenCaptureAccess() };
-    if already_granted {
-        println!("🖥️  Screen Recording already granted");
+    let audio_capture_granted = check_audio_capture_permission_tcc() == Some(true);
+    let screen_granted = unsafe { CGPreflightScreenCaptureAccess() };
+    if audio_capture_granted || screen_granted {
+        println!("🖥️  System audio / screen capture already granted");
         return Ok(true);
     }
 
-    // Trigger the native popup (macOS shows this once per app)
     println!("🖥️  Requesting Screen Recording via CGRequestScreenCaptureAccess");
     let granted = unsafe { CGRequestScreenCaptureAccess() };
-
-    if !granted {
-        // Popup was already shown and denied — open Settings as fallback
-        println!("🖥️  Screen Recording not granted — opening System Settings");
-        let _ = open_permission_pane_impl("screen_capture");
-    }
-
     Ok(granted)
 }
 

@@ -402,6 +402,24 @@ export function PermissionsStep({
         ))}
       </div>
 
+      {!systemAudio.granted && (
+        <p className="permissions-sub-hint">
+          <button
+            type="button"
+            className="permissions-settings-link"
+            onClick={() => {
+              void invoke("open_permission_pane", { pane: "screen_capture" });
+            }}
+          >
+            Open Screen Recording in System Settings
+          </button>
+          <span className="permissions-sub-hint__rest">
+            {" "}
+            if the system dialog does not appear or access is still off.
+          </span>
+        </p>
+      )}
+
       <div className="step-actions-row">
         {showBack && onBack && (
           <button
