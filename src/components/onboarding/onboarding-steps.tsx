@@ -222,12 +222,6 @@ export function PermissionsStep({
 
   const [autoAdvanced, setAutoAdvanced] = useState(false);
 
-  useEffect(() => {
-    checkPermissions();
-    const interval = setInterval(checkPermissions, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   const checkPermissions = async () => {
     try {
       const micGranted = await invoke<boolean>("check_microphone_permission");
@@ -246,11 +240,17 @@ export function PermissionsStep({
     }
   };
 
+  useEffect(() => {
+    void checkPermissions();
+    const interval = setInterval(checkPermissions, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const requestMicrophone = async () => {
     setMicrophone((prev) => ({ ...prev, checking: true }));
     try {
       await invoke<boolean>("request_microphone_permission");
-      setTimeout(checkPermissions, 1000);
+      setTimeout(checkPermissions, 800);
     } catch (error) {
       console.error("Failed to request microphone permission:", error);
     } finally {
@@ -262,7 +262,7 @@ export function PermissionsStep({
     setAccessibility((prev) => ({ ...prev, checking: true }));
     try {
       await invoke<boolean>("request_accessibility_permission");
-      setTimeout(checkPermissions, 1000);
+      setTimeout(checkPermissions, 800);
     } catch (error) {
       console.error("Failed to request accessibility permission:", error);
     } finally {
@@ -274,7 +274,7 @@ export function PermissionsStep({
     setSystemAudio((prev) => ({ ...prev, checking: true }));
     try {
       await invoke<boolean>("request_system_audio_permission");
-      setTimeout(checkPermissions, 1000);
+      setTimeout(checkPermissions, 800);
     } catch (error) {
       console.error("Failed to request system audio permission:", error);
     } finally {

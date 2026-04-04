@@ -46,134 +46,161 @@ fn send_tagged_chunks(
 #[cfg(target_os = "macos")]
 const SYSTEM_AUDIO_TAP_NAME: &str = "lexi-audio-tap";
 
+/// Holds tap + aggregate + cpal stream so Core Audio objects outlive the stream (see README_MACOS §8.3).
 #[cfg(target_os = "macos")]
-fn run_system_audio_capture(sender: mpsc::Sender<Vec<u8>>, stop_rx: mpsc::Receiver<()>) {
-    use cidre::{cf, core_audio as ca, ns};
-    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-    use std::sync::atomic::{AtomicBool, Ordering};
+struct MacosSystemAudioStream {
+    _tap: cidre::core_audio::TapGuard,
+    _agg_device: cidre::core_audio::AggregateDevice,
+    stream: cpal::Stream,
+    shutting_down: Arc<std::sync::atomic::AtomicBool>,
+}
 
-    let shutting_down = Arc::new(AtomicBool::new(false));
-    let shutting_down_cb = Arc::clone(&shutting_down);
+#[cfg(target_os = "macos")]
+impl MacosSystemAudioStream {
+    fn start(sender: mpsc::Sender<Vec<u8>>) -> Result<Self, String> {
+        use cidre::{cf, core_audio as ca, ns};
+        use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+        use std::sync::atomic::{AtomicBool, Ordering};
 
-    let output_device = match ca::System::default_output_device() {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("System audio: default_output_device failed: {:?}", e);
-            return;
-        }
-    };
-    let output_uid = match output_device.uid() {
-        Ok(u) => u,
-        Err(e) => {
-            eprintln!("System audio: device uid failed: {:?}", e);
-            return;
-        }
-    };
+        let shutting_down = Arc::new(AtomicBool::new(false));
+        let shutting_down_cb = Arc::clone(&shutting_down);
 
-    let tap_desc = ca::TapDesc::with_mono_global_tap_excluding_processes(&ns::Array::new());
-    let tap = match tap_desc.create_process_tap() {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("System audio: create_process_tap failed: {:?}", e);
-            return;
-        }
-    };
+        let output_device = ca::System::default_output_device()
+            .map_err(|e| format!("default_output_device: {:?}", e))?;
+        let output_uid = output_device
+            .uid()
+            .map_err(|e| format!("device uid: {:?}", e))?;
 
-    let sub_tap = cf::DictionaryOf::with_keys_values(
-        &[ca::sub_device_keys::uid()],
-        &[tap.uid().unwrap().as_type_ref()],
-    );
+        let tap_desc = ca::TapDesc::with_mono_global_tap_excluding_processes(&ns::Array::new());
+        let tap = tap_desc
+            .create_process_tap()
+            .map_err(|e| format!("create_process_tap: {:?}", e))?;
 
-    let agg_desc = cf::DictionaryOf::with_keys_values(
-        &[
-            ca::aggregate_device_keys::is_private(),
-            ca::aggregate_device_keys::is_stacked(),
-            ca::aggregate_device_keys::tap_auto_start(),
-            ca::aggregate_device_keys::name(),
-            ca::aggregate_device_keys::main_sub_device(),
-            ca::aggregate_device_keys::uid(),
-            ca::aggregate_device_keys::tap_list(),
-        ],
-        &[
-            cf::Boolean::value_true().as_type_ref(),
-            cf::Boolean::value_false(),
-            cf::Boolean::value_true().as_type_ref(),
-            cf::str!(c"lexi-audio-tap").as_type_ref(),
-            &output_uid,
-            &cf::Uuid::new().to_cf_string(),
-            &cf::ArrayOf::from_slice(&[sub_tap.as_ref()]),
-        ],
-    );
+        let sub_tap = cf::DictionaryOf::with_keys_values(
+            &[ca::sub_device_keys::uid()],
+            &[tap.uid().unwrap().as_type_ref()],
+        );
 
-    let _agg_device = match ca::AggregateDevice::with_desc(&agg_desc) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("System audio: AggregateDevice::with_desc failed: {:?}", e);
-            return;
-        }
-    };
+        let agg_desc = cf::DictionaryOf::with_keys_values(
+            &[
+                ca::aggregate_device_keys::is_private(),
+                ca::aggregate_device_keys::is_stacked(),
+                ca::aggregate_device_keys::tap_auto_start(),
+                ca::aggregate_device_keys::name(),
+                ca::aggregate_device_keys::main_sub_device(),
+                ca::aggregate_device_keys::uid(),
+                ca::aggregate_device_keys::tap_list(),
+            ],
+            &[
+                cf::Boolean::value_true().as_type_ref(),
+                cf::Boolean::value_false(),
+                cf::Boolean::value_true().as_type_ref(),
+                cf::str!(c"lexi-audio-tap").as_type_ref(),
+                &output_uid,
+                &cf::Uuid::new().to_cf_string(),
+                &cf::ArrayOf::from_slice(&[sub_tap.as_ref()]),
+            ],
+        );
 
-    // Give Core Audio time to register the aggregate; use a longer delay when
-    // starting a new meeting after a previous one (avoids stale "lexi-audio-tap" in device list).
-    thread::sleep(Duration::from_millis(300));
+        let agg_device = ca::AggregateDevice::with_desc(&agg_desc)
+            .map_err(|e| format!("AggregateDevice::with_desc: {:?}", e))?;
 
-    let host = cpal::default_host();
-    let device = match host.input_devices().ok().and_then(|mut devs| {
-        devs.find(|d| {
-            d.name()
-                .map(|n| n == SYSTEM_AUDIO_TAP_NAME)
-                .unwrap_or(false)
+        thread::sleep(Duration::from_millis(300));
+
+        let host = cpal::default_host();
+        let device = host
+            .input_devices()
+            .map_err(|e| e.to_string())?
+            .find(|d| {
+                d.name()
+                    .map(|n| n == SYSTEM_AUDIO_TAP_NAME)
+                    .unwrap_or(false)
+            })
+            .ok_or_else(|| format!("input device '{}' not found", SYSTEM_AUDIO_TAP_NAME))?;
+
+        let config = device
+            .default_input_config()
+            .map_err(|e| e.to_string())?
+            .into();
+
+        let amplitude = i16::MAX as f32;
+        let stream = device
+            .build_input_stream(
+                &config,
+                move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                    let mut bytes = Vec::with_capacity(data.len() * 2);
+                    for &sample in data {
+                        let val =
+                            (sample * amplitude).clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+                        bytes.extend_from_slice(&val.to_le_bytes());
+                    }
+                    let _ = sender.send(bytes);
+                },
+                move |err| {
+                    if !shutting_down_cb.load(Ordering::Relaxed) {
+                        eprintln!("System audio stream error: {}", err);
+                    }
+                },
+                None,
+            )
+            .map_err(|e| e.to_string())?;
+
+        stream.play().map_err(|e| e.to_string())?;
+
+        Ok(Self {
+            _tap: tap,
+            _agg_device: agg_device,
+            stream,
+            shutting_down,
         })
-    }) {
-        Some(d) => d,
-        None => {
-            eprintln!("System audio: device '{}' not found", SYSTEM_AUDIO_TAP_NAME);
-            return;
-        }
-    };
-
-    let config = match device.default_input_config() {
-        Ok(c) => c.into(),
-        Err(e) => {
-            eprintln!("System audio: default_input_config failed: {}", e);
-            return;
-        }
-    };
-
-    let amplitude = i16::MAX as f32;
-    let stream = match device.build_input_stream(
-        &config,
-        move |data: &[f32], _: &cpal::InputCallbackInfo| {
-            let mut bytes = Vec::with_capacity(data.len() * 2);
-            for &sample in data {
-                let val = (sample * amplitude).clamp(i16::MIN as f32, i16::MAX as f32) as i16;
-                bytes.extend_from_slice(&val.to_le_bytes());
-            }
-            let _ = sender.send(bytes);
-        },
-        move |err| {
-            if !shutting_down_cb.load(Ordering::Relaxed) {
-                eprintln!("System audio stream error: {}", err);
-            }
-        },
-        None,
-    ) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("System audio: build_input_stream failed: {}", e);
-            return;
-        }
-    };
-
-    if stream.play().is_err() {
-        eprintln!("System audio: stream.play() failed");
-        return;
     }
 
+    fn stop(self) {
+        use cpal::traits::StreamTrait;
+        use std::sync::atomic::Ordering;
+        self.shutting_down.store(true, Ordering::Relaxed);
+        let _ = self.stream.pause();
+        thread::sleep(Duration::from_millis(30));
+        drop(self.stream);
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// Run the **full** meeting system-audio pipeline (tap → aggregate → cpal input) briefly.
+/// macOS often attaches the **system audio** consent UI to **starting the input stream**, not to
+/// `create_process_tap()` alone, so a tap-only probe may never show a sheet.
+#[cfg(target_os = "macos")]
+pub fn spawn_process_tap_permission_attempt() {
+    thread::spawn(|| {
+        let (drain_tx, drain_rx) = mpsc::channel::<Vec<u8>>();
+        let _drainer = thread::spawn(move || {
+            while drain_rx.recv().is_ok() {}
+        });
+
+        match MacosSystemAudioStream::start(drain_tx) {
+            Ok(session) => {
+                thread::sleep(Duration::from_millis(800));
+                session.stop();
+            }
+            Err(e) => eprintln!("System audio permission attempt failed: {}", e),
+        }
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn spawn_process_tap_permission_attempt() {}
+
+#[cfg(target_os = "macos")]
+fn run_system_audio_capture(sender: mpsc::Sender<Vec<u8>>, stop_rx: mpsc::Receiver<()>) {
+    let session = match MacosSystemAudioStream::start(sender) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("System audio: {}", e);
+            return;
+        }
+    };
     let _ = stop_rx.recv();
-    shutting_down.store(true, Ordering::Relaxed);
-    let _ = stream.pause();
-    drop(stream);
+    session.stop();
 }
 
 /// Starts meeting audio: mic ("user") + system ("system") on macOS; sends (source, chunk) to `output_tx`.
