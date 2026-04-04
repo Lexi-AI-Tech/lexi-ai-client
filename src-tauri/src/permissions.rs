@@ -204,53 +204,26 @@ pub fn open_permission_pane(_pane: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Request microphone permission on macOS.
-///
-/// Strategy: "popup first, Settings only as fallback"
-/// - If status is `notDetermined` (first time): trigger the native system popup
-///   via AVFoundation — user just clicks "Allow" in one dialog. No Settings needed.
-/// - If status is `denied/restricted` (user denied before): open System Settings
-///   because macOS won't show the popup again.
-/// - Tells the caller whether the popup was shown (`true`) or Settings was opened (`false`).
+/// Request microphone permission on macOS
+/// This will trigger the system permission dialog by attempting to access the microphone
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_microphone_permission() -> Result<bool, String> {
     use std::thread;
 
-    // AVAuthorizationStatus values
-    const AV_AUTH_NOT_DETERMINED: i64 = 0;
-    const AV_AUTH_AUTHORIZED: i64 = 3;
+    // Open System Settings pane so user can enable if the modal doesn't show
+    let _ = open_permission_pane_impl("microphone");
 
-    let av_class =
-        Class::get("AVCaptureDevice").ok_or_else(|| "AVCaptureDevice unavailable".to_string())?;
-    let ns_string_class =
-        Class::get("NSString").ok_or_else(|| "NSString unavailable".to_string())?;
-    let c_str = CString::new("soun").map_err(|e| e.to_string())?;
-    let media_type: *mut objc::runtime::Object =
-        unsafe { msg_send![ns_string_class, stringWithUTF8String: c_str.as_ptr()] };
-    let status: i64 = unsafe { msg_send![av_class, authorizationStatusForMediaType: media_type] };
-
-    if status == AV_AUTH_AUTHORIZED {
-        println!("🎤 Microphone already authorized");
-        return Ok(true);
-    }
-
-    if status == AV_AUTH_NOT_DETERMINED {
-        // First time — trigger the native system popup (1-click Allow/Deny)
-        println!("🎤 Microphone not determined — triggering native popup");
-        thread::spawn(move || {
-            let _ = std::panic::catch_unwind(|| {
-                let _recorder = AudioRecorder::new();
-                println!("🎤 Microphone permission dialog triggered");
-            });
+    // Spawn a thread to attempt microphone access, which triggers the permission dialog
+    thread::spawn(move || {
+        // Try to create an audio recorder, which will trigger the permission dialog
+        let _ = std::panic::catch_unwind(|| {
+            let _recorder = AudioRecorder::new();
+            println!("Microphone permission dialog should have appeared");
         });
-        return Ok(true);
-    }
+    });
 
-    // Already denied/restricted — must open System Settings manually
-    println!("🎤 Microphone denied — opening System Settings");
-    open_permission_pane_impl("microphone")?;
-    Ok(false)
+    Ok(true)
 }
 
 /// Request microphone permission (non-macOS platforms)
@@ -260,29 +233,31 @@ pub fn request_microphone_permission() -> Result<bool, String> {
     Ok(true)
 }
 
-/// Request Accessibility permission on macOS.
-///
-/// Strategy: Use `AXIsProcessTrustedWithOptions(kAXTrustedCheckOptionPrompt: true)` via the
-/// `macos_accessibility_client` crate. This shows a native system dialog that:
-/// - Tells the user "Lexi AI would like to control this computer"
-/// - Has an "Open System Preferences" button that opens Settings with the app highlighted
-///
-/// This replaces the old osascript approach which was broken (it requested accessibility
-/// for the `osascript` process, not for Lexi AI).
+/// Request Accessibility permission on macOS
+/// This is required for pasting text via AppleScript/System Events
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
-    use macos_accessibility_client::accessibility::application_is_trusted_with_prompt;
+    use std::process::Command;
+    use std::thread;
 
-    // This shows the native prompt if not already trusted.
-    // If already trusted: returns true immediately, no popup.
-    // If not trusted: shows system dialog with "Open System Preferences" that highlights the app.
-    let trusted = application_is_trusted_with_prompt();
-    println!(
-        "♿ Accessibility permission: {}",
-        if trusted { "granted" } else { "prompt shown" }
-    );
-    Ok(trusted)
+    // Open System Settings pane so user can enable if the modal doesn't show
+    let _ = open_permission_pane_impl("accessibility");
+
+    // Spawn a thread to attempt using System Events, which triggers the permission dialog
+    thread::spawn(move || {
+        let script = r#"
+            tell application "System Events"
+                get name of every process
+            end tell
+        "#;
+        let _ = std::panic::catch_unwind(|| {
+            let _ = Command::new("osascript").arg("-e").arg(script).output();
+            println!("Accessibility permission dialog should have appeared");
+        });
+    });
+
+    Ok(true)
 }
 
 /// Request Accessibility permission (non-macOS platforms)
@@ -292,31 +267,14 @@ pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String>
     Ok(true)
 }
 
-/// Request screen recording / system audio permission (needed for system audio in meetings).
-///
-/// Strategy: Call `CGRequestScreenCaptureAccess()` — macOS shows a native dialog (once).
-/// If the permission was already denied, open System Settings as fallback.
+/// Request screen recording permission (needed for system audio in meetings).
+/// Call CGRequestScreenCaptureAccess() (macOS shows the popup at most once), then deep-link to Settings.
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
-    // Check if already granted
-    let already_granted = unsafe { CGPreflightScreenCaptureAccess() };
-    if already_granted {
-        println!("🖥️  Screen Recording already granted");
-        return Ok(true);
-    }
-
-    // Trigger the native popup (macOS shows this once per app)
-    println!("🖥️  Requesting Screen Recording via CGRequestScreenCaptureAccess");
-    let granted = unsafe { CGRequestScreenCaptureAccess() };
-
-    if !granted {
-        // Popup was already shown and denied — open Settings as fallback
-        println!("🖥️  Screen Recording not granted — opening System Settings");
-        let _ = open_permission_pane_impl("screen_capture");
-    }
-
-    Ok(granted)
+    let _ = open_permission_pane_impl("screen_capture");
+    let _ = unsafe { CGRequestScreenCaptureAccess() };
+    Ok(true)
 }
 
 #[tauri::command]
