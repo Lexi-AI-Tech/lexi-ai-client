@@ -95,6 +95,7 @@ jobs:
             EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
             echo "RELEASE_NOTES<<$EOF" >> $GITHUB_ENV
             cat "$CHANGELOG_PATH" >> $GITHUB_ENV
+            echo "" >> $GITHUB_ENV
             echo "$EOF" >> $GITHUB_ENV
           else
             echo "❌ Error: No changelog found for version ${{ env.VERSION }} at $CHANGELOG_PATH"
