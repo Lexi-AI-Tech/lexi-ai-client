@@ -11,9 +11,7 @@ export function ToastProvider() {
       expand
       closeButton
       icons={{
-        loading: (
-          <span className="toast-loading-spinner" aria-hidden />
-        ),
+        loading: <span className="toast-loading-spinner" aria-hidden />,
       }}
       toastOptions={{
         style: {

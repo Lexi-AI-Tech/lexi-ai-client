@@ -158,52 +158,64 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     let isMounted = true;
     (async () => {
       try {
-        const unlistenRecordingStarted = await listen("doc_recording_started", () => setIsDocRecording(true));
+        const unlistenRecordingStarted = await listen(
+          "doc_recording_started",
+          () => setIsDocRecording(true),
+        );
         if (isMounted) unlistens.push(unlistenRecordingStarted);
         else unlistenRecordingStarted();
 
-        const unlistenRecordingStopped = await listen("doc_recording_stopped", () => setIsDocRecording(false));
+        const unlistenRecordingStopped = await listen(
+          "doc_recording_stopped",
+          () => setIsDocRecording(false),
+        );
         if (isMounted) unlistens.push(unlistenRecordingStopped);
         else unlistenRecordingStopped();
 
-        const unlistenTranscriptionReady = await listen<string>("doc_transcription_ready", async (e) => {
-          const transcript = e.payload;
-          if (!transcript?.trim()) return;
-          setIsCreatingDocFromAudio(true);
-          try {
-            const result = await invoke<CreateDocFromAudioResult>(
-              "create_doc_from_audio",
-              { transcript },
-            );
-            editorRef.current?.insertStructuredContent(result.content);
-            const docId = selectedIdRef.current;
-            const suggested = (result.title ?? "").trim();
-            const currentTitle = latestTitleRef.current.trim();
-            const shouldApplyTitle =
-              Boolean(docId) &&
-              suggested.length > 0 &&
-              suggested.toLowerCase() !== "untitled" &&
-              (!currentTitle || currentTitle.toLowerCase() === "untitled");
-            if (shouldApplyTitle && docId) {
-              latestTitleRef.current = suggested;
-              setEditingTitle(suggested);
-              scheduleSaveRef.current(docId);
+        const unlistenTranscriptionReady = await listen<string>(
+          "doc_transcription_ready",
+          async (e) => {
+            const transcript = e.payload;
+            if (!transcript?.trim()) return;
+            setIsCreatingDocFromAudio(true);
+            try {
+              const result = await invoke<CreateDocFromAudioResult>(
+                "create_doc_from_audio",
+                { transcript },
+              );
+              editorRef.current?.insertStructuredContent(result.content);
+              const docId = selectedIdRef.current;
+              const suggested = (result.title ?? "").trim();
+              const currentTitle = latestTitleRef.current.trim();
+              const shouldApplyTitle =
+                Boolean(docId) &&
+                suggested.length > 0 &&
+                suggested.toLowerCase() !== "untitled" &&
+                (!currentTitle || currentTitle.toLowerCase() === "untitled");
+              if (shouldApplyTitle && docId) {
+                latestTitleRef.current = suggested;
+                setEditingTitle(suggested);
+                scheduleSaveRef.current(docId);
+              }
+              toast.success("Content added from voice");
+            } catch (err) {
+              console.error("Create doc from audio failed:", err);
+              toast.error("Failed to create doc from audio");
+            } finally {
+              setIsCreatingDocFromAudio(false);
             }
-            toast.success("Content added from voice");
-          } catch (err) {
-            console.error("Create doc from audio failed:", err);
-            toast.error("Failed to create doc from audio");
-          } finally {
-            setIsCreatingDocFromAudio(false);
-          }
-        });
+          },
+        );
         if (isMounted) unlistens.push(unlistenTranscriptionReady);
         else unlistenTranscriptionReady();
 
-        const unlistenTranscriptionError = await listen<string>("doc_transcription_error", (e) => {
-          setIsDocRecording(false);
-          toast.error(e.payload || "Transcription failed");
-        });
+        const unlistenTranscriptionError = await listen<string>(
+          "doc_transcription_error",
+          (e) => {
+            setIsDocRecording(false);
+            toast.error(e.payload || "Transcription failed");
+          },
+        );
         if (isMounted) unlistens.push(unlistenTranscriptionError);
         else unlistenTranscriptionError();
       } catch (err) {

@@ -283,9 +283,7 @@ export function PermissionsStep({
   };
 
   const allGranted =
-    microphone.granted &&
-    accessibility.granted &&
-    systemAudio.granted;
+    microphone.granted && accessibility.granted && systemAudio.granted;
 
   // Auto-advance when all permissions are granted
   useEffect(() => {
