@@ -72,4 +72,6 @@ pub struct MeetingState {
     pub current_meeting_id: Mutex<Option<String>>,
     /// Background task handle for the 45-minute reminder loop (aborted on stop)
     pub reminder_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    /// Set when the mic watcher asks the user whether the external call has ended (cleared on dismiss or complete).
+    pub pending_mic_ended_meeting_id: Mutex<Option<String>>,
 }

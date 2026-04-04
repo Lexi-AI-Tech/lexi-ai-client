@@ -22,14 +22,15 @@ import { Sidebar } from "./components/Sidebar";
 import { TranscriptsList } from "./components/TranscriptsList";
 import { NotesPage } from "./components/NotesPage";
 import { MeetingsPage } from "./components/MeetingsPage";
-import { DocsPage } from "./components/docs/DocsPage";
+import type { Meeting } from "./components/meetings/MeetingsListPage";
+import { DocsPage, type DocsEntryIntent } from "./components/docs/DocsPage";
+import type { Doc } from "./types";
 import { useOnboardingStore } from "./store/onboardingStore";
 import { useAuthStore } from "./store/authStore";
 import { check } from "@tauri-apps/plugin-updater";
 import { useAutoUpdater, checkUpdateDetails } from "./hooks/useAutoUpdater";
 import { useUpdaterStore } from "./store/updaterStore";
 import { useToast } from "./components/toast/useToast";
-import { AppLoader } from "./components/ui/AppLoader";
 
 const ONBOARDING_VERSION = 1;
 
@@ -160,11 +161,16 @@ function App() {
     meetingId: string;
     readableDuration: string;
   } | null>(null);
-  const [_pendingReminderAutoEndMeetingId, setPendingReminderAutoEndMeetingId] =
-    useState<string | null>(null);
+  const [
+    openSummaryAfterCompleteForMeetingId,
+    setOpenSummaryAfterCompleteForMeetingId,
+  ] = useState<string | null>(null);
   const [_activeRecordingMeetingId, setActiveRecordingMeetingId] = useState<
     string | null
   >(null);
+  const [meetingMicEndedPrompt, setMeetingMicEndedPrompt] = useState<{
+    meetingId: string;
+  } | null>(null);
 
   // When not authenticated, reset sync flag so we sync again after next login
   useEffect(() => {
@@ -215,28 +221,12 @@ function App() {
     refreshState,
   ]);
 
-  // Whenever we land in the main app (complete/skip onboarding or load with onboarding done), show home
+  // Whenever we land in the main app (onboarding complete or load with onboarding done), show home
   useEffect(() => {
     if (isCompleted && !prevCompletedRef.current) {
       setCurrentPage("home");
     }
     prevCompletedRef.current = isCompleted;
-  }, [isCompleted]);
-
-  // Start the global key listener only when onboarding is complete AND input monitoring
-  // is already granted. This avoids triggering the macOS Input Monitoring popup before
-  // the user has reached the permissions page (e.g. when server says onboarding complete
-  // from another device). After the user grants the permission and restarts, this will
-  // start the listener on next launch.
-  useEffect(() => {
-    if (!isCompleted) return;
-    invoke<boolean>("check_input_monitoring_permission")
-      .then((granted) => {
-        if (granted) {
-          invoke("start_global_key_listener").catch(() => {});
-        }
-      })
-      .catch(() => {});
   }, [isCompleted]);
 
   // Listen for "Start Meeting" from system tray
@@ -365,6 +355,38 @@ function App() {
     };
   }, []);
 
+  // External call likely ended (e.g. Zoom no longer on mic) while Lexi is still recording
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenFn: (() => void) | undefined;
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen<{ meetingId: string }>(
+        "meeting-mic-ended",
+        (event) => {
+          if (cancelled) return;
+          const payload = (event.payload || {}) as { meetingId?: string };
+          const id =
+            typeof payload.meetingId === "string" ? payload.meetingId : null;
+          if (!id) return;
+          setCurrentPage("meetings");
+          setMeetingMicEndedPrompt({ meetingId: id });
+        },
+      );
+      unlistenFn = unlisten;
+    };
+
+    setup().catch((e) => {
+      console.error("Failed to set up meeting-mic-ended listener:", e);
+    });
+
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
+
   // Periodic safety reminder for long-running meetings (every 45 minutes)
   useEffect(() => {
     let cancelled = false;
@@ -409,45 +431,107 @@ function App() {
   };
 
   const handleEndMeetingFromReminder = () => {
-    if (!meetingReminderModal?.meetingId) return;
-    // Run the same full end flow as the Meetings "End" button:
-    // stop recording, switch to summary tab, and generate summary.
-    setPendingReminderAutoEndMeetingId(meetingReminderModal.meetingId);
-    setCurrentPage("meetings");
+    const id = meetingReminderModal?.meetingId;
+    if (!id) return;
     setMeetingReminderModal(null);
+    void (async () => {
+      try {
+        await invoke<Meeting>("end_meeting_session", { meetingId: id });
+        setCurrentPage("meetings");
+        setOpenSummaryAfterCompleteForMeetingId(id);
+      } catch (e) {
+        console.error("Failed to end meeting from reminder:", e);
+        toast.error(e);
+      }
+    })();
+  };
+
+  const dismissMeetingMicEndedPrompt = () => {
+    void invoke("dismiss_meeting_end_check_prompt").catch(() => {});
+    setMeetingMicEndedPrompt(null);
+  };
+
+  const confirmMeetingMicEndedEnd = () => {
+    const id = meetingMicEndedPrompt?.meetingId;
+    if (!id) return;
+    setMeetingMicEndedPrompt(null);
+    void (async () => {
+      try {
+        await invoke<Meeting>("end_meeting_session", { meetingId: id });
+        setCurrentPage("meetings");
+        setOpenSummaryAfterCompleteForMeetingId(id);
+      } catch (e) {
+        console.error("Failed to complete meeting after mic-ended prompt:", e);
+        toast.error(e);
+      }
+    })();
   };
 
   // Navigate to docs page, optionally opening a specific doc (e.g. after creating from meeting)
-  const [selectedDocIdToOpen, setSelectedDocIdToOpen] = useState<string | null>(
-    null,
-  );
+  const [docsEntryIntent, setDocsEntryIntent] =
+    useState<DocsEntryIntent | null>(null);
 
   useEffect(() => {
     const handleNavigateToDocs = () => {
-      setSelectedDocIdToOpen(null);
+      setDocsEntryIntent(null);
       setCurrentPage("docs");
     };
     const handleNavigateToDoc = (e: Event) => {
-      const ev = e as CustomEvent<{ docId: string }>;
+      const ev = e as CustomEvent<{ docId: string; doc?: Doc }>;
       const docId = ev.detail?.docId;
+      const doc = ev.detail?.doc;
       if (docId) {
-        setSelectedDocIdToOpen(docId);
+        setDocsEntryIntent({ kind: "open", docId, doc });
       } else {
-        setSelectedDocIdToOpen(null);
+        setDocsEntryIntent(null);
       }
       setCurrentPage("docs");
+    };
+    const handleStartMeetingDocGeneration = (e: Event) => {
+      const ev = e as CustomEvent<{
+        requestId: string;
+        meetingId: string;
+        instructions: string;
+      }>;
+      const { requestId, meetingId, instructions } = ev.detail ?? {};
+      const trimmed = instructions?.trim();
+      if (!(requestId && meetingId && trimmed)) return;
+
+      // Navigate first so Docs mounts as the active page, then deliver the intent on
+      // a later frame so generation + invoke run inside DocsPage (avoids batched
+      // navigation+intent updates and Strict Mode effect edge cases).
+      setDocsEntryIntent(null);
+      setCurrentPage("docs");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setDocsEntryIntent({
+            kind: "generating-meeting-doc",
+            requestId,
+            meetingId,
+            instructions: trimmed,
+          });
+        });
+      });
     };
     window.addEventListener(
       "lexi-navigate-to-docs",
       handleNavigateToDocs as EventListener,
     );
     window.addEventListener("lexi-navigate-to-doc", handleNavigateToDoc);
+    window.addEventListener(
+      "lexi-start-meeting-doc-generation",
+      handleStartMeetingDocGeneration,
+    );
     return () => {
       window.removeEventListener(
         "lexi-navigate-to-docs",
         handleNavigateToDocs as EventListener,
       );
       window.removeEventListener("lexi-navigate-to-doc", handleNavigateToDoc);
+      window.removeEventListener(
+        "lexi-start-meeting-doc-generation",
+        handleStartMeetingDocGeneration,
+      );
     };
   }, []);
 
@@ -455,6 +539,13 @@ function App() {
     !authStore.isInitialized ||
     (authStore.isAuthenticated && !onboardingSyncDone) ||
     !isInitialized;
+
+  // Returning users: start tap only after loading (never during splash — avoids stale isCompleted race).
+  // First-run users: OnboardingFlow starts the listener only after the Permissions step (hotkey-test+).
+  useEffect(() => {
+    if (!isCompleted || showLoading) return;
+    invoke("start_global_key_listener").catch(() => {});
+  }, [isCompleted, showLoading]);
 
   // Defer showing the loading screen so we don't flash "Loading..." when init finishes in a few ms
   useEffect(() => {
@@ -470,7 +561,13 @@ function App() {
     return (
       <div className="app">
         {showLoadingScreen ? (
-          <AppLoader />
+          <div
+            className="app-loading-screen"
+            role="status"
+            aria-label="Loading"
+          >
+            <div className="app-loading-spinner" aria-hidden />
+          </div>
         ) : (
           <div className="app-loading-screen" />
         )}
@@ -495,7 +592,12 @@ function App() {
             initial="initial"
             animate="animate"
             exit="exit"
-            style={{ flex: 1, display: "flex", flexDirection: "column" }}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+            }}
           >
             {currentPage === "home" && (
               <HomePage
@@ -545,14 +647,20 @@ function App() {
                   onEndMeetingFromTrayConsumed={() =>
                     setTriggerEndMeetingFromTray(false)
                   }
+                  openSummaryAfterCompleteForMeetingId={
+                    openSummaryAfterCompleteForMeetingId
+                  }
+                  onOpenSummaryAfterCompleteConsumed={() =>
+                    setOpenSummaryAfterCompleteForMeetingId(null)
+                  }
                 />
               </div>
             )}
             {currentPage === "docs" && (
               <div className="container container--docs">
                 <DocsPage
-                  initialSelectedDocId={selectedDocIdToOpen}
-                  onInitialDocConsumed={() => setSelectedDocIdToOpen(null)}
+                  entryIntent={docsEntryIntent}
+                  onEntryIntentConsumed={() => setDocsEntryIntent(null)}
                 />
               </div>
             )}
@@ -588,6 +696,40 @@ function App() {
                 onClick={handleEndMeetingFromReminder}
               >
                 End Meeting
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {meetingMicEndedPrompt && (
+        <div
+          className="delete-modal-overlay"
+          onClick={dismissMeetingMicEndedPrompt}
+        >
+          <div
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Has your meeting ended?</h3>
+            <p>
+              We no longer detect a meeting session. Do you want to end this
+              meeting in Lexi and generate a summary?
+            </p>
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="delete-modal-btn-cancel"
+                onClick={dismissMeetingMicEndedPrompt}
+              >
+                Keep recording
+              </button>
+              <button
+                type="button"
+                className="delete-modal-btn-delete"
+                onClick={confirmMeetingMicEndedEnd}
+              >
+                Yes, end meeting
               </button>
             </div>
           </div>

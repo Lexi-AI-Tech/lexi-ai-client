@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowLeft, Mic, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Mic, Square, Trash2 } from "lucide-react";
 import type { Doc } from "../../types";
 import { useToast } from "../toast/useToast";
 import { DocsListPage } from "./DocsListPage";
@@ -17,6 +17,9 @@ import "./docs.css";
 const SAVE_DEBOUNCE_MS = 600;
 const SAVE_INDICATOR_MIN_MS = 400;
 
+/** Matches Tauri `CreateDocFromAudioResult` / server `CreateDocFromAudioResponse`. */
+type CreateDocFromAudioResult = { title: string; content: string };
+
 /** Isolated save indicator so parent doesn't re-render on saving state change */
 export interface SaveIndicatorRef {
   setSaving: (saving: boolean) => void;
@@ -24,8 +27,8 @@ export interface SaveIndicatorRef {
 
 const SaveIndicator = React.forwardRef<
   SaveIndicatorRef,
-  { isStructuring?: boolean }
->(function SaveIndicator({ isStructuring }, ref) {
+  { isCreatingDocFromAudio?: boolean }
+>(function SaveIndicator({ isCreatingDocFromAudio }, ref) {
   const [saving, setSaving] = useState(false);
   useImperativeHandle(ref, () => ({ setSaving }), []);
   return (
@@ -40,24 +43,32 @@ const SaveIndicator = React.forwardRef<
           Saved
         </span>
       )}
-      {isStructuring && (
+      {isCreatingDocFromAudio && (
         <span className="docs-editor-toolbar-pill docs-editor-toolbar-pill--ai">
-          Structuring from voice…
+          Creating doc from audio…
         </span>
       )}
     </div>
   );
 });
 
+export type DocsEntryIntent =
+  | { kind: "open"; docId: string; doc?: Doc }
+  | {
+      kind: "generating-meeting-doc";
+      requestId: string;
+      meetingId: string;
+      instructions: string;
+    };
+
 interface DocsPageProps {
-  /** When set, open this doc (e.g. after creating from meeting). Cleared via onInitialDocConsumed. */
-  initialSelectedDocId?: string | null;
-  onInitialDocConsumed?: () => void;
+  entryIntent?: DocsEntryIntent | null;
+  onEntryIntentConsumed?: () => void;
 }
 
 export const DocsPage: React.FC<DocsPageProps> = ({
-  initialSelectedDocId,
-  onInitialDocConsumed,
+  entryIntent,
+  onEntryIntentConsumed,
 }) => {
   const toast = useToast();
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -66,114 +77,23 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Latest title/body for debounced PATCH — avoids stale list state overwriting the server. */
+  const latestTitleRef = useRef("");
+  const latestContentRef = useRef("");
+  const prevSaveDocIdRef = useRef<string | null>(null);
   const lastSavedContentRef = useRef<string | null>(null);
   const lastSavedTitleRef = useRef<string | null>(null);
   const lastSavedDocIdRef = useRef<string | null>(null);
   const editorRef = useRef<RichTextEditorRef>(null);
   const saveIndicatorRef = useRef<SaveIndicatorRef>(null);
   const [isDocRecording, setIsDocRecording] = useState(false);
-  const [isStructuring, setIsStructuring] = useState(false);
+  const [isCreatingDocFromAudio, setIsCreatingDocFromAudio] = useState(false);
+  const [isGeneratingMeetingDoc, setIsGeneratingMeetingDoc] = useState(false);
+  const ignoreMeetingGenResultRef = useRef(false);
   /** Local title for the current doc to avoid setDocs on every keystroke */
   const [editingTitle, setEditingTitle] = useState("");
-
-  const selectedDoc = docs.find((d) => d.id === selectedId);
-
-  // Sync editing title when switching docs
-  useEffect(() => {
-    if (selectedDoc) setEditingTitle(selectedDoc.title || "");
-    else setEditingTitle("");
-  }, [selectedId, selectedDoc?.id, selectedDoc?.title]);
-
-  // Listen for doc recording and transcription events
-  useEffect(() => {
-    const unlistens: (() => void)[] = [];
-    (async () => {
-      try {
-        unlistens.push(
-          await listen("doc_recording_started", () => setIsDocRecording(true)),
-        );
-        unlistens.push(
-          await listen("doc_recording_stopped", () => setIsDocRecording(false)),
-        );
-        unlistens.push(
-          await listen<string>("doc_transcription_ready", async (e) => {
-            const transcript = e.payload;
-            if (!transcript?.trim()) return;
-            setIsStructuring(true);
-            try {
-              const content = await invoke<string>("structure_doc_content", {
-                transcript,
-              });
-              editorRef.current?.insertStructuredContent(content);
-              toast.success("Content added from voice");
-            } catch (err) {
-              console.error("Structure doc content failed:", err);
-              toast.error("Failed to structure content");
-            } finally {
-              setIsStructuring(false);
-            }
-          }),
-        );
-        unlistens.push(
-          await listen<string>("doc_transcription_error", (e) => {
-            setIsDocRecording(false);
-            toast.error(e.payload || "Transcription failed");
-          }),
-        );
-      } catch (err) {
-        console.error("Doc event listeners failed:", err);
-        toast.error("Docs failed to initialize. Please restart the app.");
-      }
-    })();
-    return () => {
-      unlistens.forEach((fn) => fn());
-    };
-  }, [toast]);
-
-  const fetchDocs = useCallback(async () => {
-    try {
-      setLoading(true);
-      const list = await invoke<Doc[]>("get_docs");
-      setDocs(list ?? []);
-      if (selectedId && !list?.some((d) => d.id === selectedId)) {
-        setSelectedId(null);
-      }
-    } catch (err) {
-      console.error("Failed to fetch docs:", err);
-      toast.error("Failed to load docs");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedId, toast]);
-
-  useEffect(() => {
-    fetchDocs();
-  }, []);
-
-  // When navigating with a specific doc to open (e.g. from "Create doc" in meetings)
-  const hasConsumedInitialRef = useRef(false);
-  useEffect(() => {
-    if (initialSelectedDocId && !loading && !hasConsumedInitialRef.current) {
-      hasConsumedInitialRef.current = true;
-      setSelectedId(initialSelectedDocId);
-      onInitialDocConsumed?.();
-    }
-  }, [initialSelectedDocId, loading, onInitialDocConsumed]);
-
-  const handleCreateDoc = async () => {
-    try {
-      const doc = await invoke<Doc>("create_doc", {
-        title: "Untitled",
-        content: undefined,
-      });
-      setDocs((prev) => [doc, ...prev]);
-      setSelectedId(doc.id);
-      toast.success("Doc created");
-    } catch (err) {
-      console.error("Failed to create doc:", err);
-      toast.error("Failed to create doc");
-    }
-  };
+  const selectedIdRef = useRef<string | null>(null);
+  const scheduleSaveRef = useRef<(docId: string) => void>(() => {});
 
   const saveDoc = useCallback(
     async (docId: string, title: string, content: string) => {
@@ -205,6 +125,215 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     [toast],
   );
 
+  const selectedDoc = docs.find((d) => d.id === selectedId);
+
+  // When switching docs: reset save refs, clear pending save, sync title field
+  useEffect(() => {
+    const id = selectedDoc?.id ?? null;
+    if (id !== prevSaveDocIdRef.current) {
+      const oldId = prevSaveDocIdRef.current;
+      prevSaveDocIdRef.current = id;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        if (oldId) {
+          saveDoc(oldId, latestTitleRef.current, latestContentRef.current);
+        }
+      }
+      if (selectedDoc) {
+        latestContentRef.current = selectedDoc.content ?? "";
+        latestTitleRef.current = selectedDoc.title || "";
+        setEditingTitle(selectedDoc.title || "");
+      } else {
+        latestContentRef.current = "";
+        latestTitleRef.current = "";
+        setEditingTitle("");
+      }
+    }
+  }, [selectedDoc, saveDoc]);
+
+  // Listen for doc recording and transcription events
+  useEffect(() => {
+    const unlistens: (() => void)[] = [];
+    let isMounted = true;
+    (async () => {
+      try {
+        const unlistenRecordingStarted = await listen(
+          "doc_recording_started",
+          () => setIsDocRecording(true),
+        );
+        if (isMounted) unlistens.push(unlistenRecordingStarted);
+        else unlistenRecordingStarted();
+
+        const unlistenRecordingStopped = await listen(
+          "doc_recording_stopped",
+          () => setIsDocRecording(false),
+        );
+        if (isMounted) unlistens.push(unlistenRecordingStopped);
+        else unlistenRecordingStopped();
+
+        const unlistenTranscriptionReady = await listen<string>(
+          "doc_transcription_ready",
+          async (e) => {
+            const transcript = e.payload;
+            if (!transcript?.trim()) return;
+            setIsCreatingDocFromAudio(true);
+            try {
+              const result = await invoke<CreateDocFromAudioResult>(
+                "create_doc_from_audio",
+                { transcript },
+              );
+              editorRef.current?.insertStructuredContent(result.content);
+              const docId = selectedIdRef.current;
+              const suggested = (result.title ?? "").trim();
+              const currentTitle = latestTitleRef.current.trim();
+              const shouldApplyTitle =
+                Boolean(docId) &&
+                suggested.length > 0 &&
+                suggested.toLowerCase() !== "untitled" &&
+                (!currentTitle || currentTitle.toLowerCase() === "untitled");
+              if (shouldApplyTitle && docId) {
+                latestTitleRef.current = suggested;
+                setEditingTitle(suggested);
+                scheduleSaveRef.current(docId);
+              }
+              toast.success("Content added from voice");
+            } catch (err) {
+              console.error("Create doc from audio failed:", err);
+              toast.error("Failed to create doc from audio");
+            } finally {
+              setIsCreatingDocFromAudio(false);
+            }
+          },
+        );
+        if (isMounted) unlistens.push(unlistenTranscriptionReady);
+        else unlistenTranscriptionReady();
+
+        const unlistenTranscriptionError = await listen<string>(
+          "doc_transcription_error",
+          (e) => {
+            setIsDocRecording(false);
+            toast.error(e.payload || "Transcription failed");
+          },
+        );
+        if (isMounted) unlistens.push(unlistenTranscriptionError);
+        else unlistenTranscriptionError();
+      } catch (err) {
+        console.error("Doc event listeners failed:", err);
+        toast.error("Docs failed to initialize. Please restart the app.");
+      }
+    })();
+    return () => {
+      isMounted = false;
+      unlistens.forEach((fn) => fn());
+    };
+  }, [toast]);
+
+  const fetchDocs = useCallback(async () => {
+    try {
+      setLoading(true);
+      const list = await invoke<Doc[]>("get_docs");
+      setDocs(list ?? []);
+      if (selectedId && !list?.some((d) => d.id === selectedId)) {
+        setSelectedId(null);
+      }
+    } catch (err) {
+      console.error("Failed to fetch docs:", err);
+      toast.error("Failed to load docs");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedId, toast]);
+
+  useEffect(() => {
+    fetchDocs();
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+    },
+    [],
+  );
+
+  const lastHandledOpenDocIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!entryIntent || entryIntent.kind !== "open" || loading) return;
+    if (lastHandledOpenDocIdRef.current === entryIntent.docId) return;
+    lastHandledOpenDocIdRef.current = entryIntent.docId;
+    const { docId, doc } = entryIntent;
+    if (doc) {
+      setDocs((prev) =>
+        prev.some((d) => d.id === doc.id) ? prev : [doc, ...prev],
+      );
+    }
+    setSelectedId(docId);
+    onEntryIntentConsumed?.();
+  }, [entryIntent, loading, onEntryIntentConsumed]);
+
+  const lastHandledGenRequestIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !entryIntent ||
+      entryIntent.kind !== "generating-meeting-doc" ||
+      loading
+    ) {
+      return;
+    }
+    if (lastHandledGenRequestIdRef.current === entryIntent.requestId) return;
+    lastHandledGenRequestIdRef.current = entryIntent.requestId;
+
+    const { meetingId, instructions } = entryIntent;
+    onEntryIntentConsumed?.();
+
+    ignoreMeetingGenResultRef.current = false;
+    setSelectedId(null);
+    setIsGeneratingMeetingDoc(true);
+
+    // Do not use an effect cleanup "cancelled" flag for this async work. React
+    // Strict Mode runs effects twice in dev: cleanup flips cancelled before the
+    // invoke resolves, so we'd never clear generating or apply the new doc.
+    void (async () => {
+      try {
+        const doc = await invoke<Doc>("create_doc_from_meeting", {
+          meetingId,
+          instructions,
+        });
+        if (ignoreMeetingGenResultRef.current) return;
+        setDocs((prev) =>
+          prev.some((d) => d.id === doc.id) ? prev : [doc, ...prev],
+        );
+        setSelectedId(doc.id);
+        toast.success("Document created");
+      } catch (err) {
+        if (!ignoreMeetingGenResultRef.current) {
+          console.error("Create doc from meeting failed:", err);
+          toast.error(err);
+        }
+      } finally {
+        setIsGeneratingMeetingDoc(false);
+      }
+    })();
+  }, [entryIntent, loading, onEntryIntentConsumed, toast]);
+
+  const handleCreateDoc = async () => {
+    try {
+      const doc = await invoke<Doc>("create_doc", {
+        title: "Untitled",
+        content: undefined,
+      });
+      setDocs((prev) => [doc, ...prev]);
+      setSelectedId(doc.id);
+      toast.success("Doc created");
+    } catch (err) {
+      console.error("Failed to create doc:", err);
+      toast.error("Failed to create doc");
+    }
+  };
+
   // When leaving the current doc, flush last-saved state into docs so the list stays in sync
   const prevSelectedIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -233,31 +362,42 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     }
   }, [selectedId]);
 
-  const debouncedSave = useCallback(
-    (docId: string, title: string, content: string) => {
+  const scheduleSave = useCallback(
+    (docId: string) => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         saveTimeoutRef.current = null;
-        saveDoc(docId, title, content);
+        saveDoc(docId, latestTitleRef.current, latestContentRef.current);
       }, SAVE_DEBOUNCE_MS);
     },
     [saveDoc],
   );
 
+  useEffect(() => {
+    scheduleSaveRef.current = scheduleSave;
+  }, [scheduleSave]);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
   const handleContentUpdate = useCallback(
     (json: string) => {
       if (!selectedDoc) return;
-      debouncedSave(selectedDoc.id, selectedDoc.title, json);
+      latestContentRef.current = json;
+      scheduleSave(selectedDoc.id);
     },
-    [selectedDoc, debouncedSave],
+    [selectedDoc, scheduleSave],
   );
 
   const handleTitleChange = useCallback(
     (title: string) => {
       if (!selectedDoc) return;
-      debouncedSave(selectedDoc.id, title, selectedDoc.content);
+      latestTitleRef.current = title;
+      setEditingTitle(title);
+      scheduleSave(selectedDoc.id);
     },
-    [selectedDoc, debouncedSave],
+    [selectedDoc, scheduleSave],
   );
 
   const handleMicClick = async () => {
@@ -270,7 +410,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     } else {
       try {
         await invoke("start_doc_recording");
-        toast.success("Recording… Click mic again when done.");
+        toast.success("Recording… Click stop button when done.");
       } catch (err) {
         toast.error("Failed to start recording");
       }
@@ -303,11 +443,46 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     [selectedId, toast],
   );
 
-  const showListView = selectedId === null;
+  const showGeneratingMeeting = isGeneratingMeetingDoc;
+  const showListView = selectedId === null && !showGeneratingMeeting;
   const showDetailView = !showListView && selectedDoc;
 
   return (
-    <div className={`docs-page ${showDetailView ? "docs-page--detail" : ""}`}>
+    <div
+      className={`docs-page ${showDetailView || showGeneratingMeeting ? "docs-page--detail" : ""}`}
+    >
+      {showGeneratingMeeting && (
+        <>
+          <div className="docs-page-header">
+            <button
+              type="button"
+              className="docs-page-header__back"
+              onClick={() => {
+                ignoreMeetingGenResultRef.current = true;
+                setIsGeneratingMeetingDoc(false);
+              }}
+              aria-label="Back to docs list"
+            >
+              <ArrowLeft size={20} strokeWidth={2} />
+              <span>Docs</span>
+            </button>
+          </div>
+          <div className="docs-generating-meeting">
+            <Loader2
+              className="docs-generating-meeting__spinner"
+              size={40}
+              strokeWidth={1.5}
+              aria-hidden
+            />
+            <p className="docs-generating-meeting__title">
+              Generating document from your meeting…
+            </p>
+            <p className="docs-generating-meeting__hint">
+              We’ll open the doc here when it’s ready.
+            </p>
+          </div>
+        </>
+      )}
       {showDetailView && selectedDoc && (
         <div className="docs-page-header">
           <button
@@ -351,24 +526,25 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                   onChange={(e) => {
                     const v = e.target.value;
                     setEditingTitle(v);
-                    debouncedSave(selectedDoc.id, v, selectedDoc.content);
+                    latestTitleRef.current = v;
+                    scheduleSave(selectedDoc.id);
                   }}
                   placeholder="Untitled"
                   aria-label="Document title"
                 />
                 <SaveIndicator
                   ref={saveIndicatorRef}
-                  isStructuring={isStructuring}
+                  isCreatingDocFromAudio={isCreatingDocFromAudio}
                 />
                 <button
                   type="button"
                   onClick={handleMicClick}
-                  disabled={isStructuring}
+                  disabled={isCreatingDocFromAudio}
                   className={`docs-mic-btn ${isDocRecording ? "docs-mic-btn--recording" : ""}`}
                   title={
                     isDocRecording
                       ? "Stop recording"
-                      : "Record voice to add structured content"
+                      : "Record voice to create doc from audio"
                   }
                 >
                   {isDocRecording ? (
@@ -399,7 +575,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                   ref={editorRef}
                   key={selectedDoc.id}
                   content={selectedDoc.content}
-                  title={selectedDoc.title}
+                  title={editingTitle}
                   onTitleChange={handleTitleChange}
                   onUpdate={handleContentUpdate}
                   placeholder="Start writing…"
@@ -408,51 +584,6 @@ export const DocsPage: React.FC<DocsPageProps> = ({
                 />
               </div>
             </div>
-            <aside className="docs-ask-lexi-rail">
-              <div className="docs-ask-lexi-rail__header">
-                <span className="docs-ask-lexi-rail__label">Ask Lexi</span>
-                <p className="docs-ask-lexi-rail__hint">
-                  Turn this doc into briefs, checklists, and summaries with one
-                  click.
-                </p>
-              </div>
-              <div className="docs-ask-lexi-rail__section">
-                <div className="docs-ask-lexi-rail__section-title">
-                  Quick transforms
-                </div>
-                <button
-                  type="button"
-                  className="docs-ask-lexi-rail__chip"
-                  disabled={!selectedDoc}
-                >
-                  Summarize this doc
-                </button>
-                <button
-                  type="button"
-                  className="docs-ask-lexi-rail__chip"
-                  disabled={!selectedDoc}
-                >
-                  Turn into action list
-                </button>
-                <button
-                  type="button"
-                  className="docs-ask-lexi-rail__chip"
-                  disabled={!selectedDoc}
-                >
-                  Create exec brief
-                </button>
-              </div>
-              <div className="docs-ask-lexi-rail__section docs-ask-lexi-rail__section--subtle">
-                <div className="docs-ask-lexi-rail__section-title">
-                  From meetings
-                </div>
-                <p className="docs-ask-lexi-rail__small">
-                  Docs created from meetings stay linked to their original
-                  session, so you can always jump back to the transcript and AI
-                  summary.
-                </p>
-              </div>
-            </aside>
           </div>
         </div>
       ) : null}

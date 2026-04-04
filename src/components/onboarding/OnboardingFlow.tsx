@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { useOnboardingStore } from "../../store/onboardingStore";
@@ -16,6 +16,15 @@ const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];
 export const OnboardingFlow: React.FC = () => {
   const { currentStep, nextStep, previousStep, completeOnboarding } =
     useOnboardingStore();
+
+  // CGEventTap requires Accessibility; only start after the Permissions step is done.
+  useEffect(() => {
+    if (currentStep !== "hotkey-test" && currentStep !== "microphone-test") {
+      return;
+    }
+    invoke("start_global_key_listener").catch(() => {});
+  }, [currentStep]);
+
   const currentStepIndex = (() => {
     switch (currentStep) {
       case "welcome":
@@ -63,12 +72,8 @@ export const OnboardingFlow: React.FC = () => {
               {currentStepIndex === 1 && (
                 <PermissionsStep
                   key="permissions"
-                  onNext={async () => {
-                    await invoke("start_global_key_listener").catch(() => {});
-                    await nextStep();
-                  }}
+                  onNext={nextStep}
                   onBack={previousStep}
-                  onSkip={completeOnboarding}
                   showBack={showBack}
                 />
               )}

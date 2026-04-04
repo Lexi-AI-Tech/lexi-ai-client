@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { invoke } from "@tauri-apps/api/core";
@@ -21,7 +22,6 @@ import {
   Video,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
-import type { Doc } from "../../types";
 import type { Meeting } from "./MeetingsListPage";
 import type { SummaryLine } from "./StreamingSummaryDisplay";
 import {
@@ -94,9 +94,10 @@ interface MeetingDetailPageProps {
   onLiveSegmentAdded?: (segment: TranscriptSegment) => void;
   /** When tray triggers end meeting */
   triggerEndMeetingFromTray?: boolean;
-  /** When reminder triggers end meeting, run full end flow immediately (no extra confirm modal). */
-  triggerAutoEndMeetingFromReminder?: boolean;
   onEndMeetingFromTrayConsumed?: () => void;
+  /** Opened from a global flow after Rust ended the session; generate summary once transcript is loaded */
+  runSummaryAfterExternalEnd?: boolean;
+  onRunSummaryAfterExternalEndConsumed?: () => void;
   /** Called when recording is stopped (so parent can clear recording state) */
   onRecordingStopped?: () => void;
   /** Called when recording is started (e.g. Resume) so parent can set recordingMeetingId and show live segments */
@@ -115,8 +116,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   liveSegments,
   onLiveSegmentAdded,
   triggerEndMeetingFromTray,
-  triggerAutoEndMeetingFromReminder,
   onEndMeetingFromTrayConsumed,
+  runSummaryAfterExternalEnd,
+  onRunSummaryAfterExternalEndConsumed,
   onRecordingStopped,
   onRecordingStarted,
   initialTab,
@@ -145,10 +147,7 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isInitializingMeeting, setIsInitializingMeeting] = useState(false);
   const [showCreateDocModal, setShowCreateDocModal] = useState(false);
-  const [docTitleInput, setDocTitleInput] = useState("");
   const [docInstructionsInput, setDocInstructionsInput] = useState("");
-  const [isCreatingDocFromSummary, setIsCreatingDocFromSummary] =
-    useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -446,30 +445,21 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     }
   };
 
-  const handleCreateDocFromSummary = async () => {
-    const title = docTitleInput.trim();
+  const handleCreateDocFromSummary = () => {
     const instructions = docInstructionsInput.trim();
-    if (!meetingId || !title || !instructions || isCreatingDocFromSummary)
-      return;
-    setIsCreatingDocFromSummary(true);
-    try {
-      const doc = await invoke<Doc>("create_doc_from_meeting", {
-        meetingId,
-        title,
-        instructions,
-      });
-      setShowCreateDocModal(false);
-      setDocTitleInput("");
-      setDocInstructionsInput("");
-      window.dispatchEvent(
-        new CustomEvent("lexi-navigate-to-doc", { detail: { docId: doc.id } }),
-      );
-    } catch (error) {
-      console.error("Failed to create doc from meeting summary:", error);
-      toast.error(error);
-    } finally {
-      setIsCreatingDocFromSummary(false);
-    }
+    if (!meetingId || !instructions) return;
+    setShowCreateDocModal(false);
+    const instr = instructions;
+    setDocInstructionsInput("");
+    window.dispatchEvent(
+      new CustomEvent("lexi-start-meeting-doc-generation", {
+        detail: {
+          requestId: crypto.randomUUID(),
+          meetingId,
+          instructions: instr,
+        },
+      }),
+    );
   };
 
   const handleSendChatMessage = async (
@@ -578,15 +568,23 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   const handleEndMeeting = async () => {
     setIsEnding(true);
     try {
-      await invoke("update_meeting", {
+      const updated = await invoke<Meeting>("end_meeting_session", {
         meetingId,
-        status: "ended",
       });
-      setSessionStatus("ended");
+      setSessionStatus(updated.status ?? "ended");
       onMeetingsUpdated((prev) =>
-        prev.map((m) => (m.id === meetingId ? { ...m, status: "ended" } : m)),
+        prev.map((m) =>
+          m.id === meetingId
+            ? {
+                ...m,
+                status: updated.status,
+                name: updated.name,
+                summary: updated.summary ?? m.summary,
+              }
+            : m,
+        ),
       );
-      if (isThisMeetingRecording) await stopRecording();
+      if (isThisMeetingRecording) onRecordingStopped?.();
       setShowEndConfirm(false);
       setActiveTab("summary");
       await handleGenerateSummary(false);
@@ -598,12 +596,28 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     }
   };
 
+  const externalSummaryRanRef = useRef(false);
   useEffect(() => {
-    if (!triggerAutoEndMeetingFromReminder) return;
+    if (!runSummaryAfterExternalEnd) {
+      externalSummaryRanRef.current = false;
+      return;
+    }
+    if (segments.length === 0 || externalSummaryRanRef.current) return;
+    externalSummaryRanRef.current = true;
     setActiveTab("summary");
-    // Auto-run the same "End" flow used by the End button.
-    handleEndMeeting();
-  }, [triggerAutoEndMeetingFromReminder]);
+    void (async () => {
+      try {
+        await handleGenerateSummary(false);
+      } finally {
+        onRunSummaryAfterExternalEndConsumed?.();
+      }
+    })();
+  }, [
+    runSummaryAfterExternalEnd,
+    segments.length,
+    meetingId,
+    onRunSummaryAfterExternalEndConsumed,
+  ]);
 
   const PAGE_VARIANTS = {
     hidden: { opacity: 0 },
@@ -904,7 +918,15 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                         <button
                           type="button"
                           className="meeting-detail-btn meeting-detail-btn--secondary"
-                          onClick={() => setShowCreateDocModal(true)}
+                          onClick={() => {
+                            if (segments.length === 0) {
+                              toast.error(
+                                "No transcript yet. Record the meeting (or add a note) before creating a doc.",
+                              );
+                              return;
+                            }
+                            setShowCreateDocModal(true);
+                          }}
                           title="Create a document from this meeting"
                         >
                           <FilePlus
@@ -1174,139 +1196,132 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
         </AnimatePresence>
       </div>
 
-      {deleteConfirmId && (
-        <div
-          className="delete-modal-overlay"
-          onClick={() => !deletingId && setDeleteConfirmId(null)}
-        >
-          <div
-            className="delete-modal-content"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Delete meeting?</h3>
-            <p>
-              This action cannot be undone. The meeting and its entire
-              transcript will be permanently removed.
-            </p>
-            <div className="delete-modal-actions">
-              <button
-                type="button"
-                className="delete-modal-btn-cancel"
-                onClick={() => setDeleteConfirmId(null)}
-                disabled={!!deletingId}
+      {deleteConfirmId
+        ? createPortal(
+            <div
+              className="delete-modal-overlay"
+              onClick={() => !deletingId && setDeleteConfirmId(null)}
+            >
+              <div
+                className="delete-modal-content"
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="delete-modal-btn-delete"
-                onClick={handleConfirmDelete}
-                disabled={!!deletingId}
-              >
-                {deletingId ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <h3>Delete meeting?</h3>
+                <p>
+                  This action cannot be undone. The meeting and its entire
+                  transcript will be permanently removed.
+                </p>
+                <div className="delete-modal-actions">
+                  <button
+                    type="button"
+                    className="delete-modal-btn-cancel"
+                    onClick={() => setDeleteConfirmId(null)}
+                    disabled={!!deletingId}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-modal-btn-delete"
+                    onClick={handleConfirmDelete}
+                    disabled={!!deletingId}
+                  >
+                    {deletingId ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {showEndConfirm && (
-        <div
-          className="delete-modal-overlay"
-          onClick={() => !isEnding && setShowEndConfirm(false)}
-        >
-          <div
-            className="delete-modal-content"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>End meeting?</h3>
-            <p>
-              The transcript will be finalized and a summary will be generated.
-              You won't be able to resume recording after this.
-            </p>
-            <div className="delete-modal-actions">
-              <button
-                type="button"
-                className="delete-modal-btn-cancel"
-                onClick={() => setShowEndConfirm(false)}
-                disabled={isEnding}
+      {showEndConfirm
+        ? createPortal(
+            <div
+              className="delete-modal-overlay"
+              onClick={() => !isEnding && setShowEndConfirm(false)}
+            >
+              <div
+                className="delete-modal-content"
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="delete-modal-btn-delete"
-                onClick={handleEndMeeting}
-                disabled={isEnding}
-              >
-                {isEnding ? "Ending..." : "End Meeting"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <h3>End meeting?</h3>
+                <p>
+                  The transcript will be finalized and a summary will be
+                  generated. You won't be able to resume recording after this.
+                </p>
+                <div className="delete-modal-actions">
+                  <button
+                    type="button"
+                    className="delete-modal-btn-cancel"
+                    onClick={() => setShowEndConfirm(false)}
+                    disabled={isEnding}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-modal-btn-delete"
+                    onClick={handleEndMeeting}
+                    disabled={isEnding}
+                  >
+                    {isEnding ? "Ending..." : "End Meeting"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {showCreateDocModal && (
-        <div
-          className="delete-modal-overlay"
-          onClick={() =>
-            !isCreatingDocFromSummary && setShowCreateDocModal(false)
-          }
-        >
-          <div
-            className="delete-modal-content meetings-create-doc-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Create document from this meeting</h3>
-            <p>
-              Describe what you want to extract. The AI will generate a
-              structured document from the meeting context.
-            </p>
-            <label className="meetings-create-doc-label">Document name</label>
-            <input
-              type="text"
-              className="meetings-create-doc-input"
-              placeholder="e.g. Project Brief, Action Items"
-              value={docTitleInput}
-              onChange={(e) => setDocTitleInput(e.target.value)}
-              disabled={isCreatingDocFromSummary}
-            />
-            <label className="meetings-create-doc-label">
-              What would you like to get out of this meeting?
-            </label>
-            <textarea
-              className="meetings-create-doc-textarea"
-              placeholder="e.g. Extract key decisions and action items. Include who is responsible for each task and any deadlines mentioned."
-              value={docInstructionsInput}
-              onChange={(e) => setDocInstructionsInput(e.target.value)}
-              disabled={isCreatingDocFromSummary}
-              rows={4}
-            />
-            <div className="delete-modal-actions">
-              <button
-                type="button"
-                className="delete-modal-btn-cancel"
-                onClick={() => setShowCreateDocModal(false)}
-                disabled={isCreatingDocFromSummary}
+      {showCreateDocModal
+        ? createPortal(
+            <div
+              className="delete-modal-overlay"
+              onClick={() => setShowCreateDocModal(false)}
+            >
+              <div
+                className="delete-modal-content meetings-create-doc-modal"
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="delete-modal-btn-delete"
-                onClick={handleCreateDocFromSummary}
-                disabled={
-                  isCreatingDocFromSummary ||
-                  !docTitleInput.trim() ||
-                  !docInstructionsInput.trim()
-                }
-              >
-                {isCreatingDocFromSummary ? "Creating…" : "Create"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <h3>Create document from this meeting</h3>
+                <p>
+                  Describe what you want to extract. The AI will suggest a
+                  document title and generate structured content from the
+                  meeting.
+                </p>
+                <label className="meetings-create-doc-label">
+                  What would you like to get out of this meeting?
+                </label>
+                <textarea
+                  className="meetings-create-doc-textarea"
+                  placeholder="e.g. Extract key decisions and action items. Include who is responsible for each task and any deadlines mentioned."
+                  value={docInstructionsInput}
+                  onChange={(e) => setDocInstructionsInput(e.target.value)}
+                  rows={4}
+                />
+                <div className="delete-modal-actions">
+                  <button
+                    type="button"
+                    className="delete-modal-btn-cancel"
+                    onClick={() => setShowCreateDocModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-modal-btn-delete"
+                    onClick={handleCreateDocFromSummary}
+                    disabled={!docInstructionsInput.trim()}
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </motion.div>
   );
 };

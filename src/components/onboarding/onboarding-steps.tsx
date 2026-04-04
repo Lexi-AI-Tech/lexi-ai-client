@@ -30,6 +30,8 @@ const LOCAL_HOTKEY_FALLBACK: DefaultHotkeysResponse = {
   action_hotkeys: ["Fn+Control"],
 };
 
+const HOW_TO_SETUP_URL = "https://speaklexi.com/how-to-setup";
+
 /**
  * Labels for the try-it step: prefer `get_app_config`, fill empty sides with
  * `get_default_hotkeys` (same server defaults as the hotkey dry-run), then local fallback.
@@ -199,12 +201,10 @@ interface PermissionState {
 export function PermissionsStep({
   onNext,
   onBack,
-  onSkip,
   showBack,
 }: {
   onNext: () => void | Promise<void>;
   onBack?: () => void | Promise<void>;
-  onSkip?: () => void | Promise<void>;
   showBack?: boolean;
 }) {
   const [microphone, setMicrophone] = useState<PermissionState>({
@@ -215,20 +215,12 @@ export function PermissionsStep({
     granted: false,
     checking: false,
   });
-  const [inputMonitoring, setInputMonitoring] = useState<PermissionState>({
-    granted: false,
-    checking: false,
-  });
   const [systemAudio, setSystemAudio] = useState<PermissionState>({
     granted: false,
     checking: false,
   });
 
-  useEffect(() => {
-    checkPermissions();
-    const interval = setInterval(checkPermissions, 2000);
-    return () => clearInterval(interval);
-  }, []);
+  const [autoAdvanced, setAutoAdvanced] = useState(false);
 
   const checkPermissions = async () => {
     try {
@@ -236,27 +228,29 @@ export function PermissionsStep({
       const accGranted = await invoke<boolean>(
         "check_accessibility_permission",
       );
-      const inputGranted = await invoke<boolean>(
-        "check_input_monitoring_permission",
-      );
       const systemAudioGranted = await invoke<boolean>(
         "check_system_audio_permission",
       );
 
       setMicrophone((prev) => ({ ...prev, granted: micGranted }));
       setAccessibility((prev) => ({ ...prev, granted: accGranted }));
-      setInputMonitoring((prev) => ({ ...prev, granted: inputGranted }));
       setSystemAudio((prev) => ({ ...prev, granted: systemAudioGranted }));
     } catch (error) {
       console.error("Failed to check permissions:", error);
     }
   };
 
+  useEffect(() => {
+    void checkPermissions();
+    const interval = setInterval(checkPermissions, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const requestMicrophone = async () => {
     setMicrophone((prev) => ({ ...prev, checking: true }));
     try {
       await invoke<boolean>("request_microphone_permission");
-      setTimeout(checkPermissions, 1000);
+      setTimeout(checkPermissions, 800);
     } catch (error) {
       console.error("Failed to request microphone permission:", error);
     } finally {
@@ -268,7 +262,7 @@ export function PermissionsStep({
     setAccessibility((prev) => ({ ...prev, checking: true }));
     try {
       await invoke<boolean>("request_accessibility_permission");
-      setTimeout(checkPermissions, 1000);
+      setTimeout(checkPermissions, 800);
     } catch (error) {
       console.error("Failed to request accessibility permission:", error);
     } finally {
@@ -276,23 +270,11 @@ export function PermissionsStep({
     }
   };
 
-  const requestInputMonitoring = async () => {
-    setInputMonitoring((prev) => ({ ...prev, checking: true }));
-    try {
-      await invoke<boolean>("request_input_monitoring_permission");
-      setTimeout(checkPermissions, 1000);
-    } catch (error) {
-      console.error("Failed to request input monitoring permission:", error);
-    } finally {
-      setInputMonitoring((prev) => ({ ...prev, checking: false }));
-    }
-  };
-
   const requestSystemAudio = async () => {
     setSystemAudio((prev) => ({ ...prev, checking: true }));
     try {
       await invoke<boolean>("request_system_audio_permission");
-      setTimeout(checkPermissions, 1000);
+      setTimeout(checkPermissions, 800);
     } catch (error) {
       console.error("Failed to request system audio permission:", error);
     } finally {
@@ -301,10 +283,16 @@ export function PermissionsStep({
   };
 
   const allGranted =
-    microphone.granted &&
-    accessibility.granted &&
-    inputMonitoring.granted &&
-    systemAudio.granted;
+    microphone.granted && accessibility.granted && systemAudio.granted;
+
+  // Auto-advance when all permissions are granted
+  useEffect(() => {
+    if (allGranted && !autoAdvanced) {
+      setAutoAdvanced(true);
+      const timeout = setTimeout(() => onNext(), 800);
+      return () => clearTimeout(timeout);
+    }
+  }, [allGranted, autoAdvanced, onNext]);
 
   const permissions = [
     {
@@ -313,13 +301,6 @@ export function PermissionsStep({
       desc: "Record your voice for transcription",
       state: microphone,
       request: requestMicrophone,
-    },
-    {
-      icon: Keyboard,
-      title: "Input Monitoring",
-      desc: "For detecting hotkeys",
-      state: inputMonitoring,
-      request: requestInputMonitoring,
     },
     {
       icon: Monitor,
@@ -350,8 +331,8 @@ export function PermissionsStep({
       <div className="step-header">
         <h1 className="step-title">Permissions</h1>
         <p className="step-description">
-          Lexi AI needs access to these controls so it can listen, capture
-          meetings, and type for you system-wide.
+          Click each permission below — most just need a single "Allow" in the
+          system popup that appears.
         </p>
         <div className="permissions-progress" aria-label="Permission progress">
           <div className="permissions-progress__track">
@@ -410,12 +391,10 @@ export function PermissionsStep({
             ) : item.state.checking ? (
               <span className="permission-allow-hint permission-allow-hint--loading">
                 <Loader2 className="permission-spinner" aria-hidden />
-                Opening settings…
+                Opening…
               </span>
             ) : (
-              <span className="permission-allow-hint">
-                Click to allow in System Settings
-              </span>
+              <span className="permission-allow-hint">Click to allow</span>
             )}
           </div>
         ))}
@@ -436,19 +415,38 @@ export function PermissionsStep({
           disabled={!allGranted}
           className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
           onClick={onNext}
+          title={
+            !allGranted ? "All permissions are required to continue" : undefined
+          }
         >
           Continue
         </button>
       </div>
-      {onSkip && (
-        <button
-          type="button"
-          className="btn btn-outline btn-full btn-skip-onboarding"
-          onClick={onSkip}
-        >
-          Skip onboarding
-        </button>
+      {!allGranted && (
+        <p className="permissions-hint-text">
+          All permissions are required to provide the full Lexi AI experience.
+        </p>
       )}
+      <p className="permissions-setup-help">
+        Having trouble setting up?{" "}
+        <a
+          href={HOW_TO_SETUP_URL}
+          onClick={(e) => {
+            e.preventDefault();
+            void (async () => {
+              try {
+                await invoke("open_external_url", { url: HOW_TO_SETUP_URL });
+              } catch (err) {
+                console.error("Failed to open setup guide:", err);
+                window.open(HOW_TO_SETUP_URL, "_blank", "noopener,noreferrer");
+              }
+            })();
+          }}
+        >
+          Click here
+        </a>
+        .
+      </p>
     </motion.div>
   );
 }
@@ -804,7 +802,7 @@ export function TryItStep({
             {triedCount === 0
               ? "0 / 2 — try transcription or actions"
               : triedCount === 1
-                ? "1 / 2 — optional: try the other"
+                ? "1 / 2 — try the other path"
                 : "2 / 2 done"}
           </span>
         </div>

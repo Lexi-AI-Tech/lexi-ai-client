@@ -11,7 +11,9 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Lexi AI needs access to your microphone to record audio for speech-to-text transcription.</string>
     <key>NSAudioCaptureUsageDescription</key>
-    <string>Lexi AI needs permission to capture system audio so it can transcribe meeting and call audio when you start a meeting.</string>
+    <string>Lexi AI needs system audio recording permission only to transcribe meeting and call audio when you start a meeting.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Lexi AI needs system audio recording permission only. On some macOS versions the system shows this under Screen Recording; use system audio only—Lexi does not record your screen.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Lexi AI needs Apple Events permission to paste transcribed text at your cursor position.</string>
     <key>NSAccessibilityUsageDescription</key>
@@ -20,14 +22,12 @@
     <array>
         <dict>
             <key>CFBundleURLName</key>
-            <string>com.lexi.ai</string>
+            <string>com.lexiai.client</string>
             <key>CFBundleURLSchemes</key>
             <array>
                 <string>lexi-ai</string>
-                <string>lexi</string>
             </array>
         </dict>
     </array>
 </dict>
 </plist>
-

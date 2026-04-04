@@ -105,13 +105,12 @@ pub mod app_config {
     }
 }
 
-/// Docs endpoints (CRUD + structure/rewrite)
+/// Docs endpoints (CRUD + create-doc-from-audio)
 pub mod docs {
     use super::*;
 
     pub const LIST: &str = "/docs";
-    pub const STRUCTURE_CONTENT: &str = "/docs/structure-content";
-    pub const REWRITE_SECTION: &str = "/docs/rewrite-section";
+    pub const CREATE_DOC_FROM_AUDIO: &str = "/docs/create-doc-from-audio";
 
     pub fn list_url() -> String {
         format!("{}{}{}", config::api_base_url(), super::API_V1_PREFIX, LIST)
@@ -127,21 +126,12 @@ pub mod docs {
         )
     }
 
-    pub fn structure_content_url() -> String {
+    pub fn create_doc_from_audio_url() -> String {
         format!(
             "{}{}{}",
             config::api_base_url(),
             super::API_V1_PREFIX,
-            STRUCTURE_CONTENT
-        )
-    }
-
-    pub fn rewrite_section_url() -> String {
-        format!(
-            "{}{}{}",
-            config::api_base_url(),
-            super::API_V1_PREFIX,
-            REWRITE_SECTION
+            CREATE_DOC_FROM_AUDIO
         )
     }
 }

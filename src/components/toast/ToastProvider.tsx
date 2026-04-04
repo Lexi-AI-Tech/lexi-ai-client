@@ -10,6 +10,9 @@ export function ToastProvider() {
       richColors={false}
       expand
       closeButton
+      icons={{
+        loading: <span className="toast-loading-spinner" aria-hidden />,
+      }}
       toastOptions={{
         style: {
           fontSize: "14px",

@@ -82,7 +82,7 @@ export function useAutoUpdater() {
 
             if (isAppBusy) {
               console.log(
-                `⏳ Patch v${update.version} installed — app is busy, deferring restart...`,
+                `Patch v${update.version} installed — app is busy, deferring restart…`,
               );
               setPatchRebootPending(true);
               toast.info(

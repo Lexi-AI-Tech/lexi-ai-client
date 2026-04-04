@@ -256,12 +256,50 @@ pub async fn start_meeting_recording(
     Ok(())
 }
 
-/// Stop recording and finalize the meeting
-#[tauri::command]
-pub async fn stop_meeting_recording(
-    app: AppHandle,
-    state: State<'_, MeetingState>,
-    _meeting_id: String,
+/// Update meeting fields on the server (shared by `update_meeting` and `end_meeting_session`).
+pub(crate) async fn update_meeting_on_server(
+    app: &AppHandle,
+    meeting_id: &str,
+    name: Option<String>,
+    status: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let auth_token = get_auth_token_async(app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let client = crate::utils::create_http_client();
+    let url = format!(
+        "{}/api/v1/meetings/{}",
+        crate::config::api_base_url(),
+        meeting_id
+    );
+
+    let payload = MeetingUpdate { name, status };
+
+    utils::log_api_request("Update meeting details", "PATCH", &url);
+
+    let response = client
+        .patch(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+
+    response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+/// Stop the currently-active meeting recording and release audio/WebSocket (shared implementation).
+pub(crate) async fn stop_active_meeting_recording(
+    app: &AppHandle,
+    state: &MeetingState,
 ) -> Result<String, String> {
     let ended_meeting_id = state.current_meeting_id.lock().unwrap().clone();
     {
@@ -270,7 +308,6 @@ pub async fn stop_meeting_recording(
             return Err("Not recording".to_string());
         }
 
-        // Send stop signal to recorder thread
         {
             let mut command_tx_guard = state.command_tx.lock().unwrap();
             if let Some(tx) = command_tx_guard.take() {
@@ -278,7 +315,6 @@ pub async fn stop_meeting_recording(
             }
         }
 
-        // Stop system audio capture (macOS)
         {
             let mut guard = state.system_stop_tx.lock().unwrap();
             if let Some(tx) = guard.take() {
@@ -289,7 +325,6 @@ pub async fn stop_meeting_recording(
         *is_recording = false;
     }
 
-    // Stop reminder loop
     {
         let mut guard = state.reminder_task.lock().unwrap();
         if let Some(handle) = guard.take() {
@@ -298,28 +333,23 @@ pub async fn stop_meeting_recording(
     }
     *state.current_meeting_id.lock().unwrap() = None;
 
-    // Send end event so Lexi AI server can finalize and close the stream (no reliance on timeout)
     let ws_tx = state.meeting_ws_text_tx.lock().unwrap().take();
     if let Some(tx) = ws_tx {
         let _ = tx.send(r#"{"type":"end_recording"}"#.to_string()).await;
     }
-    // Explicitly close the WebSocket so send/recv tasks exit and connection and mic are released
     let close_tx = state.meeting_ws_close_tx.lock().unwrap().take();
     if let Some(tx) = close_tx {
         let _ = tx.send(()).await;
     }
 
-    // Broadcast so key listener re-enables assistant/action hotkeys
     if let Ok(tx) = state.meeting_recording_tx.lock() {
         let _ = tx.send(false);
     }
 
-    // Show pill overlay again
     if let Some(pill_window) = app.get_webview_window("pill") {
         let _ = pill_window.show();
     }
 
-    // Restore tray to "Start Meeting"
     if let Some(ref item) = *state.tray_start_meeting.lock().unwrap() {
         let _ = item.set_text("Start Meeting");
     }
@@ -332,6 +362,55 @@ pub async fn stop_meeting_recording(
     }
 
     Ok("Recording stopped".to_string())
+}
+
+/// Stop recording for the currently active meeting.
+#[tauri::command]
+pub async fn stop_meeting_recording(
+    app: AppHandle,
+    state: State<'_, MeetingState>,
+    _meeting_id: String,
+) -> Result<String, String> {
+    stop_active_meeting_recording(&app, &state).await
+}
+
+/// End a meeting session: mark ended on the server, then stop recording if this meeting is active.
+#[tauri::command]
+pub async fn end_meeting_session(
+    app: AppHandle,
+    meeting_id: String,
+    state: State<'_, MeetingState>,
+) -> Result<Meeting, String> {
+    {
+        let mut pending = state.pending_mic_ended_meeting_id.lock().unwrap();
+        if pending.as_deref() == Some(meeting_id.as_str()) {
+            pending.take();
+        }
+    }
+
+    let recording = *state.is_recording.lock().unwrap();
+    let current = state.current_meeting_id.lock().unwrap().clone();
+    if recording && current.as_deref() != Some(meeting_id.as_str()) {
+        return Err("Active recording is for a different meeting.".to_string());
+    }
+
+    let updated =
+        update_meeting_on_server(&app, &meeting_id, None, Some("ended".to_string())).await?;
+    let meeting: Meeting =
+        serde_json::from_value(updated).map_err(|e| format!("Invalid meeting response: {}", e))?;
+
+    if recording {
+        stop_active_meeting_recording(&app, &state).await?;
+    }
+
+    Ok(meeting)
+}
+
+/// User dismissed the “call may have ended” prompt (keep recording).
+#[tauri::command]
+pub fn dismiss_meeting_end_check_prompt(state: State<'_, MeetingState>) -> Result<(), String> {
+    state.pending_mic_ended_meeting_id.lock().unwrap().take();
+    Ok(())
 }
 
 /// List user's meetings
@@ -411,39 +490,7 @@ pub async fn update_meeting(
     name: Option<String>,
     status: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .map_err(|_| "Authentication required")?;
-
-    let client = crate::utils::create_http_client();
-    let url = format!(
-        "{}/api/v1/meetings/{}",
-        crate::config::api_base_url(),
-        meeting_id
-    );
-
-    let payload = MeetingUpdate { name, status };
-
-    utils::log_api_request("Update meeting details", "PATCH", &url);
-
-    let response = client
-        .patch(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
-    }
-
-    let meeting: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    Ok(meeting)
+    update_meeting_on_server(&app, &meeting_id, name, status).await
 }
 
 /// Delete a meeting
@@ -744,14 +791,13 @@ pub async fn get_meeting_suggested_questions(
 pub async fn create_doc_from_meeting(
     app: AppHandle,
     meeting_id: String,
-    title: String,
     instructions: String,
 ) -> Result<Doc, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .map_err(|_| "Authentication required")?;
 
-    let client = crate::utils::create_http_client();
+    let client = crate::utils::create_http_client_long_timeout();
     let url = format!(
         "{}/api/v1/meetings/{}/create-doc",
         crate::config::api_base_url(),
@@ -759,7 +805,6 @@ pub async fn create_doc_from_meeting(
     );
 
     let payload = serde_json::json!({
-        "title": title.trim(),
         "instructions": instructions.trim(),
     });
 

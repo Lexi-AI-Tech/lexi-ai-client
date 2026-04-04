@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAuthStore, authStore } from "../../store/authStore";
@@ -230,7 +231,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           >
             {loading ? (
               <>
-                <span className="auth-spinner">⏳</span>
+                <Loader2 className="auth-spinner" size={16} aria-hidden />
                 Signing out...
               </>
             ) : (

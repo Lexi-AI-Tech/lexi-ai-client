@@ -13,7 +13,7 @@ use tauri::{AppHandle, Manager};
 pub struct Doc {
     pub id: String,
     pub title: String,
-    /// TipTap/ProseMirror JSON document as string
+    /// LexiDoc JSON string (API canonical `content`)
     pub content: String,
     pub created_at: String,
     pub updated_at: String,
@@ -33,33 +33,50 @@ pub struct DeleteDocRequest {
     pub doc_id: String,
 }
 
+/// Use inner object when the server wraps payloads as `{ "data": { ... } }`.
+fn api_doc_root<'a>(v: &'a serde_json::Value) -> &'a serde_json::Value {
+    match v.get("data") {
+        Some(serde_json::Value::Object(_)) => v.get("data").unwrap(),
+        _ => v,
+    }
+}
+
+fn required_api_string(root: &serde_json::Value, key: &str) -> Result<String, String> {
+    match root.get(key) {
+        Some(serde_json::Value::String(s)) => Ok(s.clone()),
+        Some(serde_json::Value::Number(n)) => Ok(n.to_string()),
+        None | Some(serde_json::Value::Null) => Err(format!("Missing {}", key)),
+        _ => Err(format!("Invalid {} (expected string)", key)),
+    }
+}
+
+fn doc_content_field(root: &serde_json::Value) -> String {
+    match root.get("content") {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(v) => v.to_string(),
+        None => String::new(),
+    }
+}
+
 /// Parse API doc response into Doc (pub for use from meeting commands).
 pub fn parse_doc_from_value(v: &serde_json::Value) -> Result<Doc, String> {
-    let id = v
-        .get("id")
-        .and_then(|x| x.as_str())
-        .ok_or("Missing id")?
-        .to_string();
-    let title = v
-        .get("title")
-        .and_then(|x| x.as_str())
-        .unwrap_or("Untitled")
-        .to_string();
-    let content = v
-        .get("content")
-        .and_then(|x| x.as_str())
-        .unwrap_or("")
-        .to_string();
-    let created_at = v
-        .get("created_at")
-        .and_then(|x| x.as_str())
-        .ok_or("Missing created_at")?
-        .to_string();
-    let updated_at = v
-        .get("updated_at")
-        .and_then(|x| x.as_str())
-        .ok_or("Missing updated_at")?
-        .to_string();
+    let root = api_doc_root(v);
+    let id = required_api_string(root, "id")?;
+    let title = match root.get("title") {
+        Some(serde_json::Value::String(s)) => {
+            let t = s.trim();
+            if t.is_empty() {
+                "Untitled".to_string()
+            } else {
+                t.to_string()
+            }
+        }
+        None | Some(serde_json::Value::Null) => "Untitled".to_string(),
+        Some(v) => v.to_string(),
+    };
+    let content = doc_content_field(root);
+    let created_at = required_api_string(root, "created_at")?;
+    let updated_at = required_api_string(root, "updated_at")?;
     Ok(Doc {
         id,
         title,
@@ -191,13 +208,23 @@ pub fn stop_doc_recording(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Call server LLM to structure transcript into TipTap/Notion-style rich content. Returns TipTap JSON string.
+/// Server response for create-doc-from-audio (editor JSON body + suggested title).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateDocFromAudioResult {
+    pub title: String,
+    pub content: String,
+}
+
+/// Call server LLM to create doc content from a voice transcript.
 #[tauri::command]
-pub async fn structure_doc_content(app: AppHandle, transcript: String) -> Result<String, String> {
+pub async fn create_doc_from_audio(
+    app: AppHandle,
+    transcript: String,
+) -> Result<CreateDocFromAudioResult, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .map_err(|_| "Authentication required")?;
-    let url = crate::api_endpoints::docs::structure_content_url();
+    let url = crate::api_endpoints::docs::create_doc_from_audio_url();
     let client = crate::utils::create_http_client();
     let response = client
         .post(&url)
@@ -224,54 +251,13 @@ pub async fn structure_doc_content(app: AppHandle, transcript: String) -> Result
         .get("content")
         .or_else(|| data.get("data").and_then(|d| d.get("content")))
         .and_then(|c| c.as_str())
-        .ok_or_else(|| "Missing content in response")?;
-    Ok(content.to_string())
-}
-
-/// Rewrite only a selected section of a doc per user instructions. Returns the rewritten text for that section only.
-#[tauri::command]
-pub async fn rewrite_doc_section(
-    app: AppHandle,
-    text: String,
-    instructions: String,
-    context_before: Option<String>,
-    context_after: Option<String>,
-) -> Result<String, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .map_err(|_| "Authentication required")?;
-    let url = crate::api_endpoints::docs::rewrite_section_url();
-    let client = crate::utils::create_http_client();
-    let response = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "text": text,
-            "instructions": instructions,
-            "context_before": context_before.unwrap_or_default(),
-            "context_after": context_after.unwrap_or_default(),
-        }))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        let err_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Unknown error".to_string());
-        return Err(format!("Server error: {}", err_text));
-    }
-
-    let data: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Invalid response: {}", e))?;
-    let content = data
-        .get("content")
-        .or_else(|| data.get("data").and_then(|d| d.get("content")))
-        .and_then(|c| c.as_str())
-        .ok_or_else(|| "Missing content in response")?;
-    Ok(content.to_string())
+        .ok_or_else(|| "Missing content in response")?
+        .to_string();
+    let title = data
+        .get("title")
+        .or_else(|| data.get("data").and_then(|d| d.get("title")))
+        .and_then(|t| t.as_str())
+        .unwrap_or("Untitled")
+        .to_string();
+    Ok(CreateDocFromAudioResult { title, content })
 }

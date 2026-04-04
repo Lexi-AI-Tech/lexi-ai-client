@@ -86,8 +86,8 @@
 }
 
 .auth-spinner {
-  display: inline-block;
-  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
@@ -325,11 +325,4 @@
   font-size: 14px !important;
   color: #80868b !important;
   font-style: italic;
-}
-
-.oauth-spinner {
-  display: inline-block;
-  font-size: 48px;
-  margin-bottom: 24px;
-  animation: spin 1s linear infinite;
 }
