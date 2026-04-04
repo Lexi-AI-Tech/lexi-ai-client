@@ -1,8 +1,74 @@
 import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
 import { useUpdaterStore } from "../store/updaterStore";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Download, X } from "lucide-react";
 import { useToast } from "./toast/useToast";
+
+const RELEASE_NOTES_MD_COMPONENTS: Components = {
+  h1: ({ children }) => (
+    <h1
+      style={{
+        fontSize: "15px",
+        fontWeight: 600,
+        margin: "0 0 10px 0",
+        color: "#111827",
+      }}
+    >
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2
+      style={{
+        fontSize: "14px",
+        fontWeight: 600,
+        margin: "12px 0 8px 0",
+        color: "#111827",
+      }}
+    >
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => (
+    <h3
+      style={{
+        fontSize: "13px",
+        fontWeight: 600,
+        margin: "10px 0 6px 0",
+        color: "#111827",
+      }}
+    >
+      {children}
+    </h3>
+  ),
+  p: ({ children }) => (
+    <p style={{ margin: "0 0 8px 0" }}>{children}</p>
+  ),
+  ul: ({ children }) => (
+    <ul style={{ margin: "0 0 8px 0", paddingLeft: "20px" }}>{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol style={{ margin: "0 0 8px 0", paddingLeft: "20px" }}>{children}</ol>
+  ),
+  li: ({ children }) => (
+    <li style={{ marginBottom: "4px" }}>{children}</li>
+  ),
+  strong: ({ children }) => (
+    <strong style={{ fontWeight: 600, color: "#111827" }}>{children}</strong>
+  ),
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      style={{ color: "#059669", textDecoration: "underline" }}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {children}
+    </a>
+  ),
+};
 
 export const UpdateModal: React.FC = () => {
   const update = useUpdaterStore((state) => state.update);
@@ -181,13 +247,14 @@ export const UpdateModal: React.FC = () => {
             margin: "0 0 20px 0",
             fontSize: "13px",
             lineHeight: "1.6",
-            whiteSpace: "pre-wrap",
             maxHeight: "180px",
             overflowY: "auto",
             color: "#374151",
           }}
         >
-          {updateDetails?.notes || update.body || "No release notes provided."}
+          <ReactMarkdown components={RELEASE_NOTES_MD_COMPONENTS}>
+            {updateDetails?.notes || update.body || "No release notes provided."}
+          </ReactMarkdown>
         </div>
 
         {isInstalling && (

@@ -312,52 +312,6 @@ body {
   }
 }
 
-/* Tooltip for release notes on hover */
-.sidebar-update-notes {
-  position: absolute;
-  bottom: calc(100% + 12px);
-  left: 0;
-  width: 240px;
-  background: var(--lexi-tooltip-bg);
-  color: var(--lexi-tooltip-fg);
-  padding: 12px 14px;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.5;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(4px);
-  transition: all 0.2s ease;
-  z-index: 50;
-  pointer-events: none;
-  font-weight: 400;
-  white-space: pre-wrap;
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  line-clamp: 6;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Tooltip arrow */
-.sidebar-update-notes::after {
-  content: "";
-  position: absolute;
-  bottom: -4px;
-  left: 20px;
-  width: 8px;
-  height: 8px;
-  background: var(--lexi-tooltip-bg);
-  transform: rotate(45deg);
-}
-
-.sidebar-update-banner:hover .sidebar-update-notes {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
 .sidebar-update-banner__text {
   display: flex;
   flex-direction: column;
@@ -854,30 +808,6 @@ textarea.form-input {
 
 .dropdown-chevron.open {
   transform: rotate(180deg);
-}
-
-/* Markdown Content Styling for the Tooltip */
-.sidebar-update-notes-content {
-  font-size: 12px;
-  line-height: 1.5;
-  color: #f9fafb;
-}
-
-.sidebar-update-notes-content p {
-  margin-bottom: 8px;
-}
-
-.sidebar-update-notes-content p:last-child {
-  margin-bottom: 0;
-}
-
-.sidebar-update-notes-content ul {
-  padding-left: 16px;
-  margin-bottom: 8px;
-}
-
-.sidebar-update-notes-content li {
-  margin-bottom: 4px;
 }
 
 .spinner-small {
