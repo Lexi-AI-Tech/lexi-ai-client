@@ -57,7 +57,7 @@ mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key f
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 
 mod meetings;
-mod permissions; // macOS permission requests and checks (microphone, accessibility, system audio)
+mod os_permissions; // macOS permission requests and checks (microphone, accessibility, system audio)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
@@ -84,7 +84,7 @@ use state::{
 };
 use window::show_and_focus_main_window;
 
-use permissions::{
+use os_permissions::{
     check_accessibility_permission, check_microphone_permission, check_system_audio_permission,
     open_permission_pane, request_accessibility_permission, request_microphone_permission,
     request_system_audio_permission,
