@@ -230,12 +230,6 @@ function App() {
     prevCompletedRef.current = isCompleted;
   }, [isCompleted]);
 
-  // Start the global key listener once onboarding is complete (deferred from Rust startup).
-  useEffect(() => {
-    if (!isCompleted) return;
-    invoke("start_global_key_listener").catch(() => {});
-  }, [isCompleted]);
-
   // Listen for "Start Meeting" from system tray
   const [pendingTrayMeeting, setPendingTrayMeeting] = useState(false);
   const [pendingTrayMeetingPlatform, setPendingTrayMeetingPlatform] = useState<
@@ -546,6 +540,13 @@ function App() {
     !authStore.isInitialized ||
     (authStore.isAuthenticated && !onboardingSyncDone) ||
     !isInitialized;
+
+  // Returning users: start tap only after loading (never during splash — avoids stale isCompleted race).
+  // First-run users: OnboardingFlow starts the listener only after the Permissions step (hotkey-test+).
+  useEffect(() => {
+    if (!isCompleted || showLoading) return;
+    invoke("start_global_key_listener").catch(() => {});
+  }, [isCompleted, showLoading]);
 
   // Defer showing the loading screen so we don't flash "Loading..." when init finishes in a few ms
   useEffect(() => {

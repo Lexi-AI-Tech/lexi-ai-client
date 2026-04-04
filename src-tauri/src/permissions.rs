@@ -16,9 +16,10 @@
 //!    - System Location: Privacy & Security → Accessibility
 //!
 //! 3. **System audio permission** (for capturing system audio in meetings)
-//!    - **Check** uses TCC preflight for `kTCCServiceAudioCapture` (matches **System audio recording**
-//!      in System Settings on supported macOS) **or** `kTCCServiceScreenCapture` / `CGPreflightScreenCaptureAccess`
-//!      when the user only enabled Lexi under **Screen Recording** (e.g. system-audio-only there).
+//!    - **Check** uses **`TCCAccessPreflight`** for **`kTCCServiceAudioCapture` only** — the same TCC
+//!      decision **System Settings** uses for **System audio recording** (no Core Audio tap probe:
+//!      taps can succeed before the toggle appears and caused false “Allowed”).
+//!      Screen Recording / combined “screen and system audio” is **not** part of this check.
 //!    - **Request** triggers only the Core Audio **process tap** (same as meetings) so macOS can show
 //!      the **system audio** consent sheet — not `CGRequestScreenCaptureAccess`, which pushes the
 //!      broader Screen Recording flow. Do **not** open System Settings before the tap attempt.
@@ -32,6 +33,8 @@
 //!
 //! Microphone on macOS uses AVFoundation's AVCaptureDevice.authorizationStatus(for: .audio)
 //! so the UI reflects the actual System Settings toggle. Accessibility uses AXIsProcessTrusted.
+//! System audio uses `TCCAccessPreflight(kTCCServiceAudioCapture)` — the same policy **System Settings**
+//! applies for **System audio recording** (Apple does not expose a separate “read Settings UI” API).
 
 #![allow(unexpected_cfgs)]
 
@@ -88,12 +91,6 @@ pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
 #[cfg(not(target_os = "macos"))]
 pub fn check_accessibility_permission(_app: AppHandle) -> Result<bool, String> {
     Ok(true)
-}
-
-// Screen Recording (macOS 10.15+): preflight for **check** only (user may have enabled Lexi there).
-#[cfg(target_os = "macos")]
-extern "C" {
-    fn CGPreflightScreenCaptureAccess() -> bool;
 }
 
 #[cfg(target_os = "macos")]
@@ -168,19 +165,13 @@ fn tcc_access_preflight_many(services: &[&str]) -> Vec<Option<bool>> {
     results
 }
 
-/// System audio: **System audio recording** (`kTCCServiceAudioCapture`) and/or Screen Recording
-/// (`kTCCServiceScreenCapture` + `CGPreflightScreenCaptureAccess`). All are OR’d — not `unwrap_or` on TCC alone.
+/// System audio: **`kTCCServiceAudioCapture` via `TCCAccessPreflight` only** — aligns with the
+/// **System audio recording** toggle list in System Settings for this process (no tap-based guess).
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn check_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
-    let tcc = tcc_access_preflight_many(&[
-        "kTCCServiceAudioCapture",
-        "kTCCServiceScreenCapture",
-    ]);
-    let system_audio_recording = tcc.first().copied().flatten() == Some(true);
-    let screen_capture_tcc = tcc.get(1).copied().flatten() == Some(true);
-    let screen_capture_api = unsafe { CGPreflightScreenCaptureAccess() };
-    Ok(system_audio_recording || screen_capture_tcc || screen_capture_api)
+    let tcc = tcc_access_preflight_many(&["kTCCServiceAudioCapture"]);
+    Ok(tcc.first().copied().flatten() == Some(true))
 }
 
 #[tauri::command]
@@ -294,8 +285,6 @@ pub fn request_accessibility_permission(_app: AppHandle) -> Result<bool, String>
 #[tauri::command]
 #[cfg(target_os = "macos")]
 pub fn request_system_audio_permission(_app: AppHandle) -> Result<bool, String> {
-    // Same idea as mic / accessibility: always attempt the native trigger; UI state comes from
-    // `check_system_audio_permission` (TCC / Settings), not from probing `create_process_tap` here.
     crate::audio::meeting::spawn_process_tap_permission_attempt();
     Ok(true)
 }
