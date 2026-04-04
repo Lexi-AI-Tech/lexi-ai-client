@@ -1190,34 +1190,6 @@
 }
 
 /* Hint text below continue button */
-.permissions-sub-hint {
-  margin: 0.75rem 0 0;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: var(--onboarding-muted, rgba(255, 255, 255, 0.55));
-  text-align: center;
-}
-
-.permissions-settings-link {
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.permissions-settings-link:hover {
-  color: var(--onboarding-text, #fff);
-}
-
-.permissions-sub-hint__rest {
-  opacity: 0.92;
-}
-
 .permissions-hint-text {
   font-size: 0.75rem;
   color: var(--lexi-text-faint);
