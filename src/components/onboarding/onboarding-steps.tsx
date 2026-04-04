@@ -199,12 +199,10 @@ interface PermissionState {
 export function PermissionsStep({
   onNext,
   onBack,
-  onSkip,
   showBack,
 }: {
   onNext: () => void | Promise<void>;
   onBack?: () => void | Promise<void>;
-  onSkip?: () => void | Promise<void>;
   showBack?: boolean;
 }) {
   const [microphone, setMicrophone] = useState<PermissionState>({
@@ -428,15 +426,6 @@ export function PermissionsStep({
         <p className="permissions-hint-text">
           All permissions are required to provide the full Lexi AI experience.
         </p>
-      )}
-      {onSkip && (
-        <button
-          type="button"
-          className="btn btn-outline btn-full btn-skip-onboarding"
-          onClick={onSkip}
-        >
-          Skip onboarding
-        </button>
       )}
     </motion.div>
   );

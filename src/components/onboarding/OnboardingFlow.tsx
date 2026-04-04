@@ -68,7 +68,6 @@ export const OnboardingFlow: React.FC = () => {
                     await nextStep();
                   }}
                   onBack={previousStep}
-                  onSkip={completeOnboarding}
                   showBack={showBack}
                 />
               )}

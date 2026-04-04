@@ -222,7 +222,7 @@ function App() {
     refreshState,
   ]);
 
-  // Whenever we land in the main app (complete/skip onboarding or load with onboarding done), show home
+  // Whenever we land in the main app (onboarding complete or load with onboarding done), show home
   useEffect(() => {
     if (isCompleted && !prevCompletedRef.current) {
       setCurrentPage("home");

@@ -251,7 +251,7 @@ pub async fn get_server_onboarding_status(
 }
 
 /// Mark onboarding as complete on the server for current user and system type.
-/// Call when user finishes or skips the onboarding flow.
+/// Call when the user finishes the onboarding flow.
 #[tauri::command]
 pub async fn complete_server_onboarding(
     app: AppHandle,
