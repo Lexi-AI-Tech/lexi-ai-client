@@ -30,6 +30,8 @@ const LOCAL_HOTKEY_FALLBACK: DefaultHotkeysResponse = {
   action_hotkeys: ["Fn+Control"],
 };
 
+const HOW_TO_SETUP_URL = "https://speaklexi.com/how-to-setup";
+
 /**
  * Labels for the try-it step: prefer `get_app_config`, fill empty sides with
  * `get_default_hotkeys` (same server defaults as the hotkey dry-run), then local fallback.
@@ -430,9 +432,18 @@ export function PermissionsStep({
       <p className="permissions-setup-help">
         Having trouble setting up?{" "}
         <a
-          href="https://speaklexi.com/how-to-setup"
-          target="_blank"
-          rel="noopener noreferrer"
+          href={HOW_TO_SETUP_URL}
+          onClick={(e) => {
+            e.preventDefault();
+            void (async () => {
+              try {
+                await invoke("open_external_url", { url: HOW_TO_SETUP_URL });
+              } catch (err) {
+                console.error("Failed to open setup guide:", err);
+                window.open(HOW_TO_SETUP_URL, "_blank", "noopener,noreferrer");
+              }
+            })();
+          }}
         >
           Click here
         </a>
