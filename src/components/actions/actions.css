@@ -29,6 +29,37 @@
   margin-left: auto;
 }
 
+button.actions-page-header__hotkeys-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  margin-left: auto;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  border-radius: 10px;
+  transition:
+    opacity 0.15s ease,
+    transform 0.12s ease;
+}
+
+button.actions-page-header__hotkeys-btn:hover {
+  opacity: 0.9;
+}
+
+button.actions-page-header__hotkeys-btn:active {
+  transform: scale(0.99);
+}
+
+button.actions-page-header__hotkeys-btn:focus-visible {
+  outline: 2px solid var(--lexi-primary);
+  outline-offset: 2px;
+}
+
 .actions-page__content {
   margin-top: 1.75rem;
 }

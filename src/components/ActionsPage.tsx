@@ -76,14 +76,22 @@ function ActionsPageHeading() {
   );
 }
 
-function ActionsPageHeader({ actionHotkeys }: { actionHotkeys: string[] }) {
+function ActionsPageHeader({
+  actionHotkeys,
+  onOpenHotkeysSettings,
+}: {
+  actionHotkeys: string[];
+  onOpenHotkeysSettings?: () => void;
+}) {
   return (
     <div className="actions-page__header">
       <ActionsPageHeading />
       {actionHotkeys.length > 0 ? (
-        <div
-          className="actions-page-header__hotkeys hotkey-selector__chips"
-          aria-label={`Action hotkeys: ${actionHotkeys.join(", ")}`}
+        <button
+          type="button"
+          className="actions-page-header__hotkeys-btn actions-page-header__hotkeys hotkey-selector__chips"
+          onClick={onOpenHotkeysSettings}
+          aria-label="Open Settings — Hotkeys to change Action shortcuts"
         >
           {actionHotkeys.map((hotkey, index) => {
             const keys = hotkey.split("+");
@@ -100,13 +108,19 @@ function ActionsPageHeader({ actionHotkeys }: { actionHotkeys: string[] }) {
               </div>
             );
           })}
-        </div>
+        </button>
       ) : null}
     </div>
   );
 }
 
-export const ActionsPage: React.FC = () => {
+type ActionsPageProps = {
+  onOpenHotkeysSettings?: () => void;
+};
+
+export const ActionsPage: React.FC<ActionsPageProps> = ({
+  onOpenHotkeysSettings,
+}) => {
   const authStore = useAuthStore();
   const toast = useToast();
   const [actions, setActions] = useState<ActionHistory[]>([]);
@@ -322,7 +336,10 @@ export const ActionsPage: React.FC = () => {
   if (!authStore.isInitialized) {
     return (
       <div className="actions-page">
-        <ActionsPageHeader actionHotkeys={actionHotkeys} />
+        <ActionsPageHeader
+          actionHotkeys={actionHotkeys}
+          onOpenHotkeysSettings={onOpenHotkeysSettings}
+        />
         <p className="app-page-subtitle">
           <span
             className="skeleton-block app-page-subtitle-skeleton"
@@ -343,7 +360,10 @@ export const ActionsPage: React.FC = () => {
   if (!authStore.isAuthenticated) {
     return (
       <div className="actions-page">
-        <ActionsPageHeader actionHotkeys={actionHotkeys} />
+        <ActionsPageHeader
+          actionHotkeys={actionHotkeys}
+          onOpenHotkeysSettings={onOpenHotkeysSettings}
+        />
         <div className="actions-login">
           <p className="actions-login__hint">Sign in to access your actions</p>
           <GoogleLoginButton
@@ -361,7 +381,10 @@ export const ActionsPage: React.FC = () => {
 
   return (
     <div className="actions-page">
-      <ActionsPageHeader actionHotkeys={actionHotkeys} />
+      <ActionsPageHeader
+        actionHotkeys={actionHotkeys}
+        onOpenHotkeysSettings={onOpenHotkeysSettings}
+      />
       {isLoading && actions.length === 0 ? (
         <p className="app-page-subtitle">
           <span

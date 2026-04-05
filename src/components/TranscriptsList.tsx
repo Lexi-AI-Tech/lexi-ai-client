@@ -88,16 +88,20 @@ function TranscriptsPageHeading() {
 
 function TranscriptsPageHeader({
   transcriptionHotkeys,
+  onOpenHotkeysSettings,
 }: {
   transcriptionHotkeys: string[];
+  onOpenHotkeysSettings?: () => void;
 }) {
   return (
     <div className="transcripts-page__header">
       <TranscriptsPageHeading />
       {transcriptionHotkeys.length > 0 ? (
-        <div
-          className="transcripts-page-header__hotkeys hotkey-selector__chips"
-          aria-label={`Transcription hotkeys: ${transcriptionHotkeys.join(", ")}`}
+        <button
+          type="button"
+          className="transcripts-page-header__hotkeys-btn transcripts-page-header__hotkeys hotkey-selector__chips"
+          onClick={onOpenHotkeysSettings}
+          aria-label="Open Settings — Hotkeys to change transcription shortcuts"
         >
           {transcriptionHotkeys.map((hotkey, index) => {
             const keys = hotkey.split("+");
@@ -114,13 +118,19 @@ function TranscriptsPageHeader({
               </div>
             );
           })}
-        </div>
+        </button>
       ) : null}
     </div>
   );
 }
 
-export const TranscriptsList: React.FC = () => {
+type TranscriptsListProps = {
+  onOpenHotkeysSettings?: () => void;
+};
+
+export const TranscriptsList: React.FC<TranscriptsListProps> = ({
+  onOpenHotkeysSettings,
+}) => {
   const authStore = useAuthStore();
   const toast = useToast();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
@@ -336,7 +346,10 @@ export const TranscriptsList: React.FC = () => {
 
   return (
     <div className="transcripts-page">
-      <TranscriptsPageHeader transcriptionHotkeys={transcriptionHotkeys} />
+      <TranscriptsPageHeader
+        transcriptionHotkeys={transcriptionHotkeys}
+        onOpenHotkeysSettings={onOpenHotkeysSettings}
+      />
       {loading ? (
         <p className="app-page-subtitle">
           <span

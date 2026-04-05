@@ -8,14 +8,17 @@
  * if not complete, onboarding flow is shown from start; otherwise go to homepage.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { AppLoader } from "./components/AppLoader";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { HomePage } from "./components/home/HomePage";
-import { SettingsPage } from "./components/SettingsPage";
+import {
+  SettingsPage,
+  type SettingsPageInitialSection,
+} from "./components/SettingsPage";
 import { VocabularyPage } from "./components/VocabularyPage";
 import { ActionsPage } from "./components/ActionsPage";
 import { ShortcutsPage } from "./components/ShortcutsPage";
@@ -77,10 +80,21 @@ function App() {
   const authStore = useAuthStore();
   const { isCompleted, isInitialized, refreshState } = useOnboardingStore();
   const [currentPage, setCurrentPage] = useState<Page>("home");
+  const [settingsInitialSection, setSettingsInitialSection] =
+    useState<SettingsPageInitialSection | null>(null);
   const [onboardingSyncDone, setOnboardingSyncDone] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const prevCompletedRef = useRef(isCompleted);
   const toast = useToast();
+
+  const handleSettingsInitialSectionConsumed = useCallback(() => {
+    setSettingsInitialSection(null);
+  }, []);
+
+  const openHotkeysSettings = useCallback(() => {
+    setSettingsInitialSection("hotkeys");
+    setCurrentPage("settings");
+  }, []);
   const lastForegroundedErrorRef = useRef<{ msg: string; at: number } | null>(
     null,
   );
@@ -602,12 +616,17 @@ function App() {
             )}
             {currentPage === "transcripts" && (
               <div className="container container--transcripts">
-                <TranscriptsList />
+                <TranscriptsList onOpenHotkeysSettings={openHotkeysSettings} />
               </div>
             )}
             {currentPage === "settings" && (
               <div className="container">
-                <SettingsPage />
+                <SettingsPage
+                  initialSection={settingsInitialSection}
+                  onInitialSectionConsumed={
+                    handleSettingsInitialSectionConsumed
+                  }
+                />
               </div>
             )}
             {currentPage === "vocabulary" && (
@@ -617,7 +636,7 @@ function App() {
             )}
             {currentPage === "actions" && (
               <div className="container">
-                <ActionsPage />
+                <ActionsPage onOpenHotkeysSettings={openHotkeysSettings} />
               </div>
             )}
             {currentPage === "shortcuts" && (
