@@ -296,13 +296,6 @@ export function PermissionsStep({
 
   const permissions = [
     {
-      icon: Mic,
-      title: "Microphone",
-      desc: "Record your voice for transcription",
-      state: microphone,
-      request: requestMicrophone,
-    },
-    {
       icon: Monitor,
       title: "Accessibility",
       desc: "For typing into apps",
@@ -315,6 +308,13 @@ export function PermissionsStep({
       desc: "For capturing participant audio in meetings",
       state: systemAudio,
       request: requestSystemAudio,
+    },
+    {
+      icon: Mic,
+      title: "Microphone",
+      desc: "For recording your voice",
+      state: microphone,
+      request: requestMicrophone,
     },
   ];
 
