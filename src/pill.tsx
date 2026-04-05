@@ -731,15 +731,19 @@ export const Pill: React.FC = () => {
 
   // Waveform icon SVG - individual bars that respond to audio levels
   // Uses separate width/height so bars fill the pill properly
+  const LEXI_PRIMARY = "var(--lexi-primary, #6b8f6e)";
+
   const WaveformIcon = ({
     width: svgWidth = 48,
     height: svgHeight = 24,
     audioLevels = [],
+    barFill = "rgba(255, 255, 255, 0.9)",
   }: {
     width?: number;
     height?: number;
-    color?: string;
     audioLevels?: number[];
+    /** Recording: white bars. Assistant/processing: primary. */
+    barFill?: string;
   }) => {
     const numBars = 7;
     const barWidth = 3;
@@ -793,7 +797,7 @@ export const Pill: React.FC = () => {
               y={y}
               width={barWidth}
               height={height}
-              fill="rgba(255, 255, 255, 0.9)"
+              fill={barFill}
               rx={barWidth / 2}
               style={{
                 transition: hasAudio
@@ -926,11 +930,12 @@ export const Pill: React.FC = () => {
             accent = "var(--lexi-primary, #6b8f6e)";
             speed = "2s";
           } else if (status === "speaking") {
-            // Speaking/TTS: purple
-            accent = "#a855f7";
+            // Assistant TTS — match app primary
+            accent = "var(--lexi-primary, #6b8f6e)";
             speed = "1.8s";
           } else if (status === "processing") {
-            accent = "#3b82f6";
+            // Assistant processing — match app primary
+            accent = "var(--lexi-primary, #6b8f6e)";
             speed = "1.5s";
           } else if (isActionMode) {
             accent = "#f97316";
@@ -1205,11 +1210,11 @@ export const Pill: React.FC = () => {
                 {/* Sound arc 1 — close */}
                 <path
                   d="M18 9.5c1.5 1.2 2.5 3 2.5 5s-1 3.8-2.5 5"
-                  stroke="white"
+                  stroke={LEXI_PRIMARY}
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   fill="none"
-                  opacity={0.8}
+                  opacity={0.85}
                   style={{
                     animation: "speakPulse1 1.2s ease-in-out infinite",
                     transformOrigin: "16px 13px",
@@ -1218,11 +1223,11 @@ export const Pill: React.FC = () => {
                 {/* Sound arc 2 — far */}
                 <path
                   d="M22 6.5c2.5 2 4 5 4 7.5s-1.5 5.5-4 7.5"
-                  stroke="white"
+                  stroke={LEXI_PRIMARY}
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   fill="none"
-                  opacity={0.5}
+                  opacity={0.55}
                   style={{
                     animation: "speakPulse2 1.2s ease-in-out 0.3s infinite",
                     transformOrigin: "20px 13px",
@@ -1233,16 +1238,16 @@ export const Pill: React.FC = () => {
                   cx="33"
                   cy="10"
                   r="1.5"
-                  fill="white"
-                  opacity={0.6}
+                  fill={LEXI_PRIMARY}
+                  opacity={0.65}
                   style={{ animation: "speakPulse1 0.8s ease-in-out infinite" }}
                 />
                 <circle
                   cx="37"
                   cy="13"
                   r="1.5"
-                  fill="white"
-                  opacity={0.8}
+                  fill={LEXI_PRIMARY}
+                  opacity={0.85}
                   style={{
                     animation: "speakPulse1 0.8s ease-in-out 0.15s infinite",
                   }}
@@ -1251,8 +1256,8 @@ export const Pill: React.FC = () => {
                   cx="41"
                   cy="10"
                   r="1.5"
-                  fill="white"
-                  opacity={0.6}
+                  fill={LEXI_PRIMARY}
+                  opacity={0.65}
                   style={{
                     animation: "speakPulse1 0.8s ease-in-out 0.3s infinite",
                   }}
@@ -1261,9 +1266,14 @@ export const Pill: React.FC = () => {
             </>
           ) : status === "processing" ? (
             <>
-              {/* Processing: bars + loader */}
-              <WaveformIcon width={52} height={22} audioLevels={[]} />
-              <LoaderIcon size={14} color="white" />
+              {/* Processing: bars + loader (assistant — primary) */}
+              <WaveformIcon
+                width={52}
+                height={22}
+                audioLevels={[]}
+                barFill={LEXI_PRIMARY}
+              />
+              <LoaderIcon size={14} color={LEXI_PRIMARY} />
             </>
           ) : (
             /* Recording: bars fill the pill */
