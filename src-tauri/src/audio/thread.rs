@@ -9,6 +9,7 @@ use super::recorder::AudioRecorder;
 use crate::actions::processor::process_action_audio;
 use crate::assistant::processor::{process_audio, process_audio_for_doc};
 use crate::RecordingCommand;
+use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -157,14 +158,17 @@ pub fn spawn_recording_thread(
                     }
                     thread::sleep(CORE_AUDIO_RELEASE_DELAY);
 
-                    let app_handle_clone = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Some(pill_window) = app_handle_clone.get_webview_window("pill") {
-                            if let Err(e) = pill_window.show() {
-                                eprintln!("⚠️  Failed to show pill window: {}", e);
+                    let onboarding_dry_run = onboarding_skip_backend.load(Ordering::Acquire);
+                    if !onboarding_dry_run {
+                        let app_handle_clone = app_handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Some(pill_window) = app_handle_clone.get_webview_window("pill") {
+                                if let Err(e) = pill_window.show() {
+                                    eprintln!("⚠️  Failed to show pill window: {}", e);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
 
                     // Create channel for real-time volume updates
                     let (volume_tx, volume_rx) = mpsc::channel::<f32>();
@@ -190,7 +194,20 @@ pub fn spawn_recording_thread(
 
                             let app_handle_clone = app_handle.clone();
                             let mode = ctx.mode;
+                            let dry = onboarding_skip_backend.load(Ordering::Acquire);
                             tauri::async_runtime::spawn(async move {
+                                if dry {
+                                    let mode_str = match mode {
+                                        RecordingMode::Assistant => "assistant",
+                                        RecordingMode::Action => "action",
+                                        RecordingMode::Doc => "doc",
+                                    };
+                                    let _ = app_handle_clone.emit(
+                                        "onboarding_hotkey_verify",
+                                        json!({ "mode": mode_str }),
+                                    );
+                                    return;
+                                }
                                 match mode {
                                     RecordingMode::Assistant => {
                                         app_handle_clone
@@ -261,7 +278,12 @@ pub fn spawn_recording_thread(
 
                                 let app_handle_clone = app_handle.clone();
                                 let mode = ctx.mode;
+                                let dry_stop =
+                                    onboarding_skip_backend.load(Ordering::Acquire);
                                 tauri::async_runtime::spawn(async move {
+                                    if dry_stop {
+                                        return;
+                                    }
                                     match mode {
                                         RecordingMode::Assistant => {
                                             app_handle_clone
@@ -382,7 +404,15 @@ pub fn spawn_recording_thread(
                         println!("🔄 Seamlessly switching recording mode: Assistant → Action");
                         ctx.mode = RecordingMode::Action;
                         let app_handle_clone = app_handle.clone();
+                        let dry_sw = onboarding_skip_backend.load(Ordering::Acquire);
                         tauri::async_runtime::spawn(async move {
+                            if dry_sw {
+                                let _ = app_handle_clone.emit(
+                                    "onboarding_hotkey_verify",
+                                    json!({ "mode": "action" }),
+                                );
+                                return;
+                            }
                             app_handle_clone
                                 .emit("recording_stopped", ())
                                 .unwrap_or_default();
@@ -401,7 +431,15 @@ pub fn spawn_recording_thread(
                         println!("🔄 Seamlessly switching recording mode: Action → Assistant");
                         ctx.mode = RecordingMode::Assistant;
                         let app_handle_clone = app_handle.clone();
+                        let dry_sw = onboarding_skip_backend.load(Ordering::Acquire);
                         tauri::async_runtime::spawn(async move {
+                            if dry_sw {
+                                let _ = app_handle_clone.emit(
+                                    "onboarding_hotkey_verify",
+                                    json!({ "mode": "assistant" }),
+                                );
+                                return;
+                            }
                             app_handle_clone
                                 .emit("action_recording_stopped", ())
                                 .unwrap_or_default();

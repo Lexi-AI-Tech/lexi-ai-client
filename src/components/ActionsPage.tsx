@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Play, Pause, Trash2, Copy, Check, Atom, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { ActionHistory, PaginatedActionHistoryResponse } from "../types";
+import { KEY_SYMBOLS } from "../lib/keySymbols";
+import type {
+  ActionHistory,
+  PaginatedActionHistoryResponse,
+  TauriAppConfig,
+} from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
@@ -14,9 +19,30 @@ import {
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
 import "./actions/actions.css";
+import "../styles/components/hotkey-selector.css";
 
 const ACTIONS_HELP =
   "Hold your Action hotkey (configure it in Settings) and speak your command. With text selected in the active app, Lexi uses that selection as context—rewrite, summarize, or build on it. With nothing selected, you get a fresh generation from scratch. Output is pasted at the cursor and saved in this list.";
+
+function renderHeadingKeyCap(key: string, keyIndex: number, totalKeys: number) {
+  const keyName = key.trim().toLowerCase();
+  const keyInfo = KEY_SYMBOLS[keyName];
+  return (
+    <span key={`${keyIndex}-${key}`} className="hotkey-selector__key-row">
+      <span className="hotkey-selector__key-cap">
+        {keyInfo ? (
+          <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>
+        ) : null}
+        <span className="hotkey-selector__key-label">
+          {keyInfo ? keyInfo.label : key.trim()}
+        </span>
+      </span>
+      {keyIndex < totalKeys - 1 ? (
+        <span className="hotkey-selector__plus">+</span>
+      ) : null}
+    </span>
+  );
+}
 
 function ActionsPageHeading() {
   const tooltipId = useId();
@@ -29,18 +55,18 @@ function ActionsPageHeading() {
         aria-hidden
       />
       Actions
-      <span className="transcripts-page-tooltip-wrap">
+      <span className="transcripts-page-tooltip-wrap actions-page-heading__tooltip-wrap">
         <button
           type="button"
-          className="transcripts-page-tooltip-trigger"
+          className="transcripts-page-tooltip-trigger actions-page-heading__tooltip-trigger"
           aria-label="How actions work"
           aria-describedby={tooltipId}
         >
-          <Info size={16} strokeWidth={2} aria-hidden />
+          <Info size={14} strokeWidth={2} aria-hidden />
         </button>
         <span
           id={tooltipId}
-          className="transcripts-page-tooltip"
+          className="transcripts-page-tooltip actions-page-heading__tooltip"
           role="tooltip"
         >
           {ACTIONS_HELP}
@@ -50,7 +76,51 @@ function ActionsPageHeading() {
   );
 }
 
-export const ActionsPage: React.FC = () => {
+function ActionsPageHeader({
+  actionHotkeys,
+  onOpenHotkeysSettings,
+}: {
+  actionHotkeys: string[];
+  onOpenHotkeysSettings?: () => void;
+}) {
+  return (
+    <div className="actions-page__header">
+      <ActionsPageHeading />
+      {actionHotkeys.length > 0 ? (
+        <button
+          type="button"
+          className="actions-page-header__hotkeys-btn actions-page-header__hotkeys hotkey-selector__chips"
+          onClick={onOpenHotkeysSettings}
+          aria-label="Open Settings — Hotkeys to change Action shortcuts"
+        >
+          {actionHotkeys.map((hotkey, index) => {
+            const keys = hotkey.split("+");
+            return (
+              <div
+                key={`header-hotkey-${index}-${hotkey}`}
+                className="hotkey-selector__chip-wrapper"
+              >
+                <div className="hotkey-selector__chip">
+                  {keys.map((k, keyIndex) =>
+                    renderHeadingKeyCap(k, keyIndex, keys.length),
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+type ActionsPageProps = {
+  onOpenHotkeysSettings?: () => void;
+};
+
+export const ActionsPage: React.FC<ActionsPageProps> = ({
+  onOpenHotkeysSettings,
+}) => {
   const authStore = useAuthStore();
   const toast = useToast();
   const [actions, setActions] = useState<ActionHistory[]>([]);
@@ -67,8 +137,26 @@ export const ActionsPage: React.FC = () => {
   const [appIcons, setAppIcons] = useState<Record<string, string | null>>({});
   const appIconsRequestedRef = useRef<Set<string>>(new Set());
   const observer = useRef<IntersectionObserver | null>(null);
+  const [actionHotkeys, setActionHotkeys] = useState<string[]>([]);
 
   const pageSize = 20;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cfg = await invoke<TauriAppConfig>("get_app_config");
+        if (cancelled) return;
+        const list = (cfg.action_hotkeys ?? []).filter(Boolean).slice(0, 3);
+        setActionHotkeys(list);
+      } catch (e) {
+        console.warn("Failed to load action hotkeys:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const lastElementRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -248,7 +336,10 @@ export const ActionsPage: React.FC = () => {
   if (!authStore.isInitialized) {
     return (
       <div className="actions-page">
-        <ActionsPageHeading />
+        <ActionsPageHeader
+          actionHotkeys={actionHotkeys}
+          onOpenHotkeysSettings={onOpenHotkeysSettings}
+        />
         <p className="app-page-subtitle">
           <span
             className="skeleton-block app-page-subtitle-skeleton"
@@ -269,7 +360,10 @@ export const ActionsPage: React.FC = () => {
   if (!authStore.isAuthenticated) {
     return (
       <div className="actions-page">
-        <ActionsPageHeading />
+        <ActionsPageHeader
+          actionHotkeys={actionHotkeys}
+          onOpenHotkeysSettings={onOpenHotkeysSettings}
+        />
         <div className="actions-login">
           <p className="actions-login__hint">Sign in to access your actions</p>
           <GoogleLoginButton
@@ -287,7 +381,10 @@ export const ActionsPage: React.FC = () => {
 
   return (
     <div className="actions-page">
-      <ActionsPageHeading />
+      <ActionsPageHeader
+        actionHotkeys={actionHotkeys}
+        onOpenHotkeysSettings={onOpenHotkeysSettings}
+      />
       {isLoading && actions.length === 0 ? (
         <p className="app-page-subtitle">
           <span

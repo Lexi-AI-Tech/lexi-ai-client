@@ -14,6 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
 import { useAuthStore } from "../../store/authStore";
 import type { TauriAppConfig } from "../../types";
@@ -296,13 +297,6 @@ export function PermissionsStep({
 
   const permissions = [
     {
-      icon: Mic,
-      title: "Microphone",
-      desc: "Record your voice for transcription",
-      state: microphone,
-      request: requestMicrophone,
-    },
-    {
       icon: Monitor,
       title: "Accessibility",
       desc: "For typing into apps",
@@ -315,6 +309,13 @@ export function PermissionsStep({
       desc: "For capturing participant audio in meetings",
       state: systemAudio,
       request: requestSystemAudio,
+    },
+    {
+      icon: Mic,
+      title: "Microphone",
+      desc: "For recording your voice",
+      state: microphone,
+      request: requestMicrophone,
     },
   ];
 
@@ -394,13 +395,40 @@ export function PermissionsStep({
                 Opening…
               </span>
             ) : (
-              <span className="permission-allow-hint">Click to allow</span>
+              <span className="permission-allow-hint permission-allow-hint--cta">
+                Click to allow
+              </span>
             )}
           </div>
         ))}
       </div>
 
-      <div className="step-actions-row">
+      <div className="permissions-restart-note">
+        <p className="permissions-restart-note__text">
+          Sometimes the permission status above may not update right away after
+          you allow access in System Settings. You may need to restart the app to refresh.
+        </p>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm permissions-restart-note__btn"
+          onClick={() => {
+            void relaunch().catch((err) =>
+              console.error("Failed to restart app:", err),
+            );
+          }}
+        >
+          Restart app
+        </button>
+      </div>
+
+      <div
+        className={[
+          "step-actions-row",
+          showBack && onBack ? "step-actions-row--with-back" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         {showBack && onBack && (
           <button
             type="button"
@@ -413,7 +441,7 @@ export function PermissionsStep({
         )}
         <button
           disabled={!allGranted}
-          className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
+          className={`btn btn-primary ${showBack && onBack ? "" : "btn-full"} permissions-continue-btn`}
           onClick={onNext}
           title={
             !allGranted ? "All permissions are required to continue" : undefined
@@ -451,7 +479,7 @@ export function PermissionsStep({
   );
 }
 
-// Step 3: Hotkeys — show transcription + action combos; user must trigger each once
+// Step 3: Hotkeys — press each once; dry-run skips pill (see `onboarding_hotkey_verify` in Rust).
 export function SetupStep({
   onNext,
   onBack,
@@ -473,10 +501,9 @@ export function SetupStep({
     let cancelled = false;
     (async () => {
       try {
-        const defaults = await invoke<{
-          hotkeys: string[];
-          action_hotkeys: string[];
-        }>("begin_onboarding_hotkey_dry_run");
+        const defaults = await invoke<DefaultHotkeysResponse>(
+          "begin_onboarding_hotkey_dry_run",
+        );
         if (cancelled) return;
         setTranscriptionHotkeys(defaults.hotkeys?.filter(Boolean) ?? []);
         setActionHotkeys(defaults.action_hotkeys?.filter(Boolean) ?? []);
@@ -501,14 +528,11 @@ export function SetupStep({
   useEffect(() => {
     let disposed = false;
     const unsub: Array<() => void> = [];
-    listen("recording_started", () => {
-      if (!disposed) setTranscriptionTested(true);
-    }).then((u) => {
-      if (disposed) u();
-      else unsub.push(u);
-    });
-    listen("action_recording_started", () => {
-      if (!disposed) setActionTested(true);
+    listen<{ mode: string }>("onboarding_hotkey_verify", (event) => {
+      if (disposed) return;
+      const m = event.payload?.mode;
+      if (m === "assistant") setTranscriptionTested(true);
+      if (m === "action") setActionTested(true);
     }).then((u) => {
       if (disposed) u();
       else unsub.push(u);
@@ -519,7 +543,8 @@ export function SetupStep({
     };
   }, []);
 
-  const verifiedCount = (transcriptionTested ? 1 : 0) + (actionTested ? 1 : 0);
+  const verifiedCount =
+    (transcriptionTested ? 1 : 0) + (actionTested ? 1 : 0);
   const canContinue =
     !configLoading &&
     transcriptionHotkeys.length > 0 &&
@@ -538,10 +563,10 @@ export function SetupStep({
       <div className="step-header">
         <h1 className="step-title">Try your shortcuts</h1>
         <p className="step-description">
-          These are Lexi’s default shortcuts (what most people use after setup).
-          Press and hold each once — your mic turns on, then release to stop.
-          Nothing is sent for transcription or voice actions during this step;
-          we only verify the keys work.
+          These are Lexi’s default shortcuts. Press and hold each once — your mic
+          turns on, then release to stop. Nothing is sent to transcription or
+          voice actions here; we only check the keys. The floating pill appears
+          on the next step when you try Lexi for real.
         </p>
         <div
           className="permissions-progress hotkey-test-progress"

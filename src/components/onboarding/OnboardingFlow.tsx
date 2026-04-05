@@ -17,7 +17,7 @@ export const OnboardingFlow: React.FC = () => {
   const { currentStep, nextStep, previousStep, completeOnboarding } =
     useOnboardingStore();
 
-  // CGEventTap requires Accessibility; only start after the Permissions step is done.
+  // After Permissions: shortcuts step uses dry-run (no pill); “Try it” uses full recording + pill.
   useEffect(() => {
     if (currentStep !== "hotkey-test" && currentStep !== "microphone-test") {
       return;

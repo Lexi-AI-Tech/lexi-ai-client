@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useUpdaterStore } from "../store/updaterStore";
-import ReactMarkdown from "react-markdown";
 import {
   Atom,
   AudioLines,
@@ -198,29 +197,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="sidebar-update-banner__size">{sizeMb} MB</span>
             )}
           </div>
-          {(updateDetails?.notes || update.body) && (
-            <div className="sidebar-update-notes">
-              <strong
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontSize: "11px",
-                  color: "#9ca3af",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Release Notes
-              </strong>
-              <div className="sidebar-update-notes-content">
-                <ReactMarkdown>
-                  {updateDetails?.notes ||
-                    update.body ||
-                    "A new update is available to install."}
-                </ReactMarkdown>
-              </div>
-            </div>
-          )}
         </button>
       )}
 

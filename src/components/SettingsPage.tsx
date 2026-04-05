@@ -33,13 +33,27 @@ type DefaultHotkeysResponse = {
   action_hotkeys: string[];
 };
 
+export type SettingsPageInitialSection =
+  | "general"
+  | "account"
+  | "transcription"
+  | "hotkeys";
+
+export type SettingsPageProps = {
+  initialSection?: SettingsPageInitialSection | null;
+  onInitialSectionConsumed?: () => void;
+};
+
 // Supported languages for transcription
 const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
   value: code,
   label: getLanguageName(code),
 }));
 
-export const SettingsPage: React.FC = () => {
+export const SettingsPage: React.FC<SettingsPageProps> = ({
+  initialSection = null,
+  onInitialSectionConsumed,
+}) => {
   const authStore = useAuthStore();
   const toast = useToast();
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
@@ -73,6 +87,14 @@ export const SettingsPage: React.FC = () => {
   >("general");
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!initialSection) return;
+    setActiveSection(initialSection);
+    onInitialSectionConsumed?.();
+    // Intentionally only follow `initialSection` so a changing callback ref does not re-open tabs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSection]);
 
   // Derived values from config - no defaults, rely entirely on backend
   const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;

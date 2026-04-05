@@ -17,16 +17,42 @@ import {
   Info,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { Transcript } from "../types";
+import { KEY_SYMBOLS } from "../lib/keySymbols";
+import type { Transcript, TauriAppConfig } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import "./home/home.css";
+import "../styles/components/hotkey-selector.css";
 
 const TRANSCRIPTION_HELP =
   "Press and hold your configured hotkey in any app while you speak. Release to stop—text is inserted at the cursor and saved here. Copy, play audio, or delete entries from the list below.";
+
+function renderTranscriptsHeaderKeyCap(
+  key: string,
+  keyIndex: number,
+  totalKeys: number,
+) {
+  const keyName = key.trim().toLowerCase();
+  const keyInfo = KEY_SYMBOLS[keyName];
+  return (
+    <span key={`${keyIndex}-${key}`} className="hotkey-selector__key-row">
+      <span className="hotkey-selector__key-cap">
+        {keyInfo ? (
+          <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>
+        ) : null}
+        <span className="hotkey-selector__key-label">
+          {keyInfo ? keyInfo.label : key.trim()}
+        </span>
+      </span>
+      {keyIndex < totalKeys - 1 ? (
+        <span className="hotkey-selector__plus">+</span>
+      ) : null}
+    </span>
+  );
+}
 
 function TranscriptsPageHeading() {
   const tooltipId = useId();
@@ -39,18 +65,18 @@ function TranscriptsPageHeading() {
         aria-hidden
       />
       Transcripts
-      <span className="transcripts-page-tooltip-wrap">
+      <span className="transcripts-page-tooltip-wrap transcripts-page-heading__tooltip-wrap">
         <button
           type="button"
-          className="transcripts-page-tooltip-trigger"
+          className="transcripts-page-tooltip-trigger transcripts-page-heading__tooltip-trigger"
           aria-label="How transcription works"
           aria-describedby={tooltipId}
         >
-          <Info size={16} strokeWidth={2} aria-hidden />
+          <Info size={14} strokeWidth={2} aria-hidden />
         </button>
         <span
           id={tooltipId}
-          className="transcripts-page-tooltip"
+          className="transcripts-page-tooltip transcripts-page-heading__tooltip"
           role="tooltip"
         >
           {TRANSCRIPTION_HELP}
@@ -60,7 +86,51 @@ function TranscriptsPageHeading() {
   );
 }
 
-export const TranscriptsList: React.FC = () => {
+function TranscriptsPageHeader({
+  transcriptionHotkeys,
+  onOpenHotkeysSettings,
+}: {
+  transcriptionHotkeys: string[];
+  onOpenHotkeysSettings?: () => void;
+}) {
+  return (
+    <div className="transcripts-page__header">
+      <TranscriptsPageHeading />
+      {transcriptionHotkeys.length > 0 ? (
+        <button
+          type="button"
+          className="transcripts-page-header__hotkeys-btn transcripts-page-header__hotkeys hotkey-selector__chips"
+          onClick={onOpenHotkeysSettings}
+          aria-label="Open Settings — Hotkeys to change transcription shortcuts"
+        >
+          {transcriptionHotkeys.map((hotkey, index) => {
+            const keys = hotkey.split("+");
+            return (
+              <div
+                key={`transcripts-header-hotkey-${index}-${hotkey}`}
+                className="hotkey-selector__chip-wrapper"
+              >
+                <div className="hotkey-selector__chip">
+                  {keys.map((k, keyIndex) =>
+                    renderTranscriptsHeaderKeyCap(k, keyIndex, keys.length),
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+type TranscriptsListProps = {
+  onOpenHotkeysSettings?: () => void;
+};
+
+export const TranscriptsList: React.FC<TranscriptsListProps> = ({
+  onOpenHotkeysSettings,
+}) => {
   const authStore = useAuthStore();
   const toast = useToast();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
@@ -80,6 +150,26 @@ export const TranscriptsList: React.FC = () => {
   // App icons for the App column (macOS: data URLs from get_app_icon)
   const [appIcons, setAppIcons] = useState<Record<string, string | null>>({});
   const appIconsRequestedRef = useRef<Set<string>>(new Set());
+  const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(
+    [],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cfg = await invoke<TauriAppConfig>("get_app_config");
+        if (cancelled) return;
+        const list = (cfg.hotkeys ?? []).filter(Boolean).slice(0, 3);
+        setTranscriptionHotkeys(list);
+      } catch (e) {
+        console.warn("Failed to load transcription hotkeys:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Infinite scrolling observer
   const observer = useRef<IntersectionObserver | null>(null);
@@ -256,7 +346,10 @@ export const TranscriptsList: React.FC = () => {
 
   return (
     <div className="transcripts-page">
-      <TranscriptsPageHeading />
+      <TranscriptsPageHeader
+        transcriptionHotkeys={transcriptionHotkeys}
+        onOpenHotkeysSettings={onOpenHotkeysSettings}
+      />
       {loading ? (
         <p className="app-page-subtitle">
           <span
@@ -271,8 +364,7 @@ export const TranscriptsList: React.FC = () => {
       ) : null}
 
       {!showContent && (
-        <div className="transcripts-page">
-          <TranscriptsPageHeading />
+        <div className="transcripts-page__init-skeleton">
           <ScreenSkeleton variant="transcripts" className="page__empty" />
         </div>
       )}
