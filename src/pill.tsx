@@ -729,10 +729,21 @@ export const Pill: React.FC = () => {
     }
   };
 
+  // Pill accents — dictation primary; processing blue; action gold; speaking teal
+  // (pill.html does not load index.css; optional --lexi-* overrides, hex fallbacks)
+  /** Dictation (voice → text) — brand sage */
+  const PILL_DICTATION = "var(--lexi-primary, #6b8f6e)";
+  /** Processing — dusty blue, similar mid-value to --lexi-primary (not electric blue) */
+  const PILL_PROCESSING = "var(--lexi-pill-processing-accent, #7aa3c4)";
+  /** Action hotkey — warm gold, clearly not green/teal */
+  const PILL_ACTION = "var(--lexi-pill-action-accent, #c9a45c)";
+  /** Assistant TTS (speaking) — cool teal, distinct from dictation + action */
+  const PILL_ASSISTANT = "var(--lexi-pill-assistant-accent, #4a9e96)";
+  const BAR_FILL_DICTATION = `color-mix(in srgb, ${PILL_DICTATION} 36%, rgba(255,255,255,0.94) 64%)`;
+  const BAR_FILL_ACTION = `color-mix(in srgb, ${PILL_ACTION} 44%, rgba(255,255,255,0.91) 56%)`;
+
   // Waveform icon SVG - individual bars that respond to audio levels
   // Uses separate width/height so bars fill the pill properly
-  const LEXI_PRIMARY = "var(--lexi-primary, #6b8f6e)";
-
   const WaveformIcon = ({
     width: svgWidth = 48,
     height: svgHeight = 24,
@@ -742,7 +753,7 @@ export const Pill: React.FC = () => {
     width?: number;
     height?: number;
     audioLevels?: number[];
-    /** Recording: white bars. Assistant/processing: primary. */
+    /** Dictation / action / assistant each pass a theme barFill */
     barFill?: string;
   }) => {
     const numBars = 7;
@@ -926,22 +937,19 @@ export const Pill: React.FC = () => {
           let accent: string;
           let speed: string;
           if (status === "meeting_detected") {
-            // Meeting prompt: app primary
-            accent = "var(--lexi-primary, #6b8f6e)";
+            accent = PILL_DICTATION;
             speed = "2s";
           } else if (status === "speaking") {
-            // Assistant TTS — match app primary
-            accent = "var(--lexi-primary, #6b8f6e)";
+            accent = PILL_ASSISTANT;
             speed = "1.8s";
           } else if (status === "processing") {
-            // Assistant processing — match app primary
-            accent = "var(--lexi-primary, #6b8f6e)";
+            accent = PILL_PROCESSING;
             speed = "1.5s";
           } else if (isActionMode) {
-            accent = "#f97316";
+            accent = PILL_ACTION;
             speed = "2s";
           } else {
-            accent = "#22c55e";
+            accent = PILL_DICTATION;
             speed = "2s";
           }
 
@@ -1210,7 +1218,7 @@ export const Pill: React.FC = () => {
                 {/* Sound arc 1 — close */}
                 <path
                   d="M18 9.5c1.5 1.2 2.5 3 2.5 5s-1 3.8-2.5 5"
-                  stroke={LEXI_PRIMARY}
+                  stroke={PILL_ASSISTANT}
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   fill="none"
@@ -1223,7 +1231,7 @@ export const Pill: React.FC = () => {
                 {/* Sound arc 2 — far */}
                 <path
                   d="M22 6.5c2.5 2 4 5 4 7.5s-1.5 5.5-4 7.5"
-                  stroke={LEXI_PRIMARY}
+                  stroke={PILL_ASSISTANT}
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   fill="none"
@@ -1238,7 +1246,7 @@ export const Pill: React.FC = () => {
                   cx="33"
                   cy="10"
                   r="1.5"
-                  fill={LEXI_PRIMARY}
+                  fill={PILL_ASSISTANT}
                   opacity={0.65}
                   style={{ animation: "speakPulse1 0.8s ease-in-out infinite" }}
                 />
@@ -1246,7 +1254,7 @@ export const Pill: React.FC = () => {
                   cx="37"
                   cy="13"
                   r="1.5"
-                  fill={LEXI_PRIMARY}
+                  fill={PILL_ASSISTANT}
                   opacity={0.85}
                   style={{
                     animation: "speakPulse1 0.8s ease-in-out 0.15s infinite",
@@ -1256,7 +1264,7 @@ export const Pill: React.FC = () => {
                   cx="41"
                   cy="10"
                   r="1.5"
-                  fill={LEXI_PRIMARY}
+                  fill={PILL_ASSISTANT}
                   opacity={0.65}
                   style={{
                     animation: "speakPulse1 0.8s ease-in-out 0.3s infinite",
@@ -1266,18 +1274,23 @@ export const Pill: React.FC = () => {
             </>
           ) : status === "processing" ? (
             <>
-              {/* Processing: bars + loader (assistant — primary) */}
+              {/* Processing: bars + loader — blue */}
               <WaveformIcon
                 width={52}
                 height={22}
                 audioLevels={[]}
-                barFill={LEXI_PRIMARY}
+                barFill={PILL_PROCESSING}
               />
-              <LoaderIcon size={14} color={LEXI_PRIMARY} />
+              <LoaderIcon size={14} color={PILL_PROCESSING} />
             </>
           ) : (
-            /* Recording: bars fill the pill */
-            <WaveformIcon width={56} height={26} audioLevels={smoothedLevels} />
+            /* Dictation vs action: same layout, different bar tint */
+            <WaveformIcon
+              width={56}
+              height={26}
+              audioLevels={smoothedLevels}
+              barFill={isActionMode ? BAR_FILL_ACTION : BAR_FILL_DICTATION}
+            />
           )}
         </div>
       )}
