@@ -14,6 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
 import { useAuthStore } from "../../store/authStore";
 import type { TauriAppConfig } from "../../types";
@@ -394,13 +395,40 @@ export function PermissionsStep({
                 Opening…
               </span>
             ) : (
-              <span className="permission-allow-hint">Click to allow</span>
+              <span className="permission-allow-hint permission-allow-hint--cta">
+                Click to allow
+              </span>
             )}
           </div>
         ))}
       </div>
 
-      <div className="step-actions-row">
+      <div className="permissions-restart-note">
+        <p className="permissions-restart-note__text">
+          Sometimes the permission status above may not update right away after
+          you allow access in System Settings. You may need to restart the app to refresh.
+        </p>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm permissions-restart-note__btn"
+          onClick={() => {
+            void relaunch().catch((err) =>
+              console.error("Failed to restart app:", err),
+            );
+          }}
+        >
+          Restart app
+        </button>
+      </div>
+
+      <div
+        className={[
+          "step-actions-row",
+          showBack && onBack ? "step-actions-row--with-back" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         {showBack && onBack && (
           <button
             type="button"
@@ -413,7 +441,7 @@ export function PermissionsStep({
         )}
         <button
           disabled={!allGranted}
-          className={`btn btn-primary ${showBack ? "btn-flex-2" : "btn-full"}`}
+          className={`btn btn-primary ${showBack && onBack ? "" : "btn-full"} permissions-continue-btn`}
           onClick={onNext}
           title={
             !allGranted ? "All permissions are required to continue" : undefined
