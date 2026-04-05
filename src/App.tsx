@@ -12,6 +12,7 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "framer-motion";
 
+import { AppLoader } from "./components/AppLoader";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { HomePage } from "./components/home/HomePage";
 import { SettingsPage } from "./components/SettingsPage";
@@ -559,15 +560,9 @@ function App() {
 
   if (showLoading) {
     return (
-      <div className="app">
+      <div className="app app--initial-load">
         {showLoadingScreen ? (
-          <div
-            className="app-loading-screen"
-            role="status"
-            aria-label="Loading"
-          >
-            <div className="app-loading-spinner" aria-hidden />
-          </div>
+          <AppLoader />
         ) : (
           <div className="app-loading-screen" />
         )}

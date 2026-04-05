@@ -154,21 +154,20 @@ body {
   gap: 18px;
 }
 
-/* Full-screen loading state (centered spinner) */
+/* Initial auth / onboarding sync — stretch so AppLoader fills the shell */
+.app.app--initial-load {
+  align-items: stretch;
+}
+
+/* Full-screen loading placeholder (before deferred splash appears) */
 .app-loading-screen {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-}
-
-.app-loading-spinner {
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--lexi-border);
-  border-top-color: var(--lexi-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
 }
 
 /* Shared page loader (used on all pages - same spinner + "Loading...") */
