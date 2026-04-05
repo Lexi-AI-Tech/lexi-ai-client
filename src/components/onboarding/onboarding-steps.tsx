@@ -451,7 +451,7 @@ export function PermissionsStep({
   );
 }
 
-// Step 3: Hotkeys — show transcription + action combos; user must trigger each once
+// Step 3: Hotkeys — press each once; dry-run skips pill (see `onboarding_hotkey_verify` in Rust).
 export function SetupStep({
   onNext,
   onBack,
@@ -473,10 +473,9 @@ export function SetupStep({
     let cancelled = false;
     (async () => {
       try {
-        const defaults = await invoke<{
-          hotkeys: string[];
-          action_hotkeys: string[];
-        }>("begin_onboarding_hotkey_dry_run");
+        const defaults = await invoke<DefaultHotkeysResponse>(
+          "begin_onboarding_hotkey_dry_run",
+        );
         if (cancelled) return;
         setTranscriptionHotkeys(defaults.hotkeys?.filter(Boolean) ?? []);
         setActionHotkeys(defaults.action_hotkeys?.filter(Boolean) ?? []);
@@ -501,14 +500,11 @@ export function SetupStep({
   useEffect(() => {
     let disposed = false;
     const unsub: Array<() => void> = [];
-    listen("recording_started", () => {
-      if (!disposed) setTranscriptionTested(true);
-    }).then((u) => {
-      if (disposed) u();
-      else unsub.push(u);
-    });
-    listen("action_recording_started", () => {
-      if (!disposed) setActionTested(true);
+    listen<{ mode: string }>("onboarding_hotkey_verify", (event) => {
+      if (disposed) return;
+      const m = event.payload?.mode;
+      if (m === "assistant") setTranscriptionTested(true);
+      if (m === "action") setActionTested(true);
     }).then((u) => {
       if (disposed) u();
       else unsub.push(u);
@@ -519,7 +515,8 @@ export function SetupStep({
     };
   }, []);
 
-  const verifiedCount = (transcriptionTested ? 1 : 0) + (actionTested ? 1 : 0);
+  const verifiedCount =
+    (transcriptionTested ? 1 : 0) + (actionTested ? 1 : 0);
   const canContinue =
     !configLoading &&
     transcriptionHotkeys.length > 0 &&
@@ -538,10 +535,10 @@ export function SetupStep({
       <div className="step-header">
         <h1 className="step-title">Try your shortcuts</h1>
         <p className="step-description">
-          These are Lexi’s default shortcuts (what most people use after setup).
-          Press and hold each once — your mic turns on, then release to stop.
-          Nothing is sent for transcription or voice actions during this step;
-          we only verify the keys work.
+          These are Lexi’s default shortcuts. Press and hold each once — your mic
+          turns on, then release to stop. Nothing is sent to transcription or
+          voice actions here; we only check the keys. The floating pill appears
+          on the next step when you try Lexi for real.
         </p>
         <div
           className="permissions-progress hotkey-test-progress"

@@ -542,7 +542,7 @@ function App() {
     !isInitialized;
 
   // Returning users: start tap only after loading (never during splash — avoids stale isCompleted race).
-  // First-run users: OnboardingFlow starts the listener only after the Permissions step (hotkey-test+).
+  // First-run users: OnboardingFlow starts the listener after Permissions (shortcuts + try-it).
   useEffect(() => {
     if (!isCompleted || showLoading) return;
     invoke("start_global_key_listener").catch(() => {});
