@@ -1078,7 +1078,11 @@
 }
 
 .permissions-restart-note__btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--lexi-primary-muted) 35%, var(--lexi-surface-elevated));
+  background: color-mix(
+    in srgb,
+    var(--lexi-primary-muted) 35%,
+    var(--lexi-surface-elevated)
+  );
   border-color: color-mix(in srgb, var(--lexi-primary) 22%, var(--lexi-border));
 }
 
@@ -1270,7 +1274,9 @@
   gap: 0.75rem;
 }
 
-.onboarding-step-content--permissions .step-actions-row--with-back .permissions-continue-btn {
+.onboarding-step-content--permissions
+  .step-actions-row--with-back
+  .permissions-continue-btn {
   width: 100%;
   min-width: 0;
   font-weight: 600;

@@ -1941,13 +1941,15 @@ button.transcripts-page-header__hotkeys-btn:focus-visible {
   width: min(17rem, calc(100vw - 2.5rem));
 }
 
-.transcripts-page-heading__tooltip-wrap:hover .transcripts-page-heading__tooltip,
+.transcripts-page-heading__tooltip-wrap:hover
+  .transcripts-page-heading__tooltip,
 .transcripts-page-heading__tooltip-wrap:focus-within
   .transcripts-page-heading__tooltip {
   transform: translate(10px, -50%);
 }
 
-.transcripts-page-heading__tooltip-wrap .transcripts-page-heading__tooltip::after {
+.transcripts-page-heading__tooltip-wrap
+  .transcripts-page-heading__tooltip::after {
   top: 50%;
   left: -5px;
   right: auto;

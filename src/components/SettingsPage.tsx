@@ -779,7 +779,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </button>
               </div>
             </div>
-
           </div>
         )}
 
