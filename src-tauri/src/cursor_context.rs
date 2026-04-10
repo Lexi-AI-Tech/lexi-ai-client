@@ -68,7 +68,7 @@ pub fn get_cursor_context() -> Option<CursorContext> {
 
 /// Returns the frontmost (active) application name.
 #[cfg(target_os = "macos")]
-fn get_frontmost_application_name() -> Option<String> {
+pub fn get_frontmost_application_name() -> Option<String> {
     let active = active_win_pos_rs::get_active_window().ok()?;
     let name = active.app_name;
     if name.is_empty() {
