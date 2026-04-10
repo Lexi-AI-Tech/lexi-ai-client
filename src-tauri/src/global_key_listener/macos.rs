@@ -1,6 +1,7 @@
 //! macOS Native Event Tap Listener
 
 use crate::RecordingCommand;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::watch;
@@ -15,6 +16,22 @@ use objc2_core_graphics::{
 use objc2_foundation::NSAutoreleasePool;
 use std::os::raw::c_void;
 use std::ptr::{null_mut, NonNull};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+static LAST_EVENT_EPOCH_MS: AtomicU64 = AtomicU64::new(0);
+
+fn now_epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+fn reset_tracker_state(state: &GlobalListenerState) {
+    if let Ok(mut tracker) = state.tracker.try_lock() {
+        *tracker = KeyStateTracker::new();
+    }
+}
 
 /// Convert macOS virtual keycode to our internal Key enum
 fn macos_keycode_to_key(keycode: i64) -> Key {
@@ -126,6 +143,7 @@ unsafe extern "C-unwind" fn raw_callback(
             if let Some(state) = lock_guard.as_ref() {
                 if let Some(tap) = state.tap.as_ref() {
                     CGEvent::tap_enable(&*tap, true);
+                    reset_tracker_state(state);
                     eprintln!(
                         "⚠️  CGEventTap was disabled; re-enabled automatically ({:?})",
                         _type
@@ -144,6 +162,8 @@ unsafe extern "C-unwind" fn raw_callback(
         CGEventType::KeyUp => false,
         _ => return cg_event.as_ptr(), // Ignore mouse/scroll
     };
+
+    LAST_EVENT_EPOCH_MS.store(now_epoch_ms(), Ordering::Relaxed);
 
     let keycode =
         CGEvent::integer_value_field(Some(cg_event.as_ref()), CGEventField::KeyboardEventKeycode);
@@ -315,6 +335,7 @@ pub(crate) fn start_listener(
 
         CGEvent::tap_enable(&*tap, true);
 
+        LAST_EVENT_EPOCH_MS.store(now_epoch_ms(), Ordering::Relaxed);
         println!("✅ Native macOS CGEventTap started");
         CFRunLoop::run();
     });
@@ -330,9 +351,20 @@ pub(crate) fn re_enable_tap() {
             if let Some(tap) = state.tap.as_ref() {
                 println!("🔄 Re-enabling CGEventTap after wake...");
                 CGEvent::tap_enable(&*tap, true);
+                reset_tracker_state(state);
+                LAST_EVENT_EPOCH_MS.store(now_epoch_ms(), Ordering::Relaxed);
             } else {
                 eprintln!("⚠️  Cannot re-enable CGEventTap: Tap was not initialized.");
             }
         }
     }
+}
+
+pub(crate) fn last_event_age_ms() -> Option<u64> {
+    let last = LAST_EVENT_EPOCH_MS.load(Ordering::Relaxed);
+    if last == 0 {
+        return None;
+    }
+    let now = now_epoch_ms();
+    Some(now.saturating_sub(last))
 }

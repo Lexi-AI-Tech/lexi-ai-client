@@ -187,6 +187,49 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
         // during sleep — a full restart is the cleanest way to recover.
         #[cfg(target_os = "macos")]
         sleep_watcher::start_watcher(app.clone());
+
+        // Watchdog: if the event tap stops delivering events mid-run, attempt recovery.
+        // This is a lightweight alternative to "quit and relaunch fixes it".
+        #[cfg(target_os = "macos")]
+        {
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                use tokio::time::{interval, Duration};
+                let mut tick = interval(Duration::from_secs(15));
+                loop {
+                    tick.tick().await;
+                    let Some(age_ms) = crate::global_key_listener::last_event_age_ms() else {
+                        continue;
+                    };
+                    // If we haven't seen *any* keyboard events for a while, the tap may be dead.
+                    // 60s is long enough to avoid false positives during brief idle periods,
+                    // but still short enough to auto-heal quickly when Fn stops working.
+                    if age_ms > 60_000 {
+                        eprintln!(
+                            "⚠️  [key_listener watchdog] no events for {}ms; attempting re-enable",
+                            age_ms
+                        );
+                        crate::global_key_listener::re_enable_tap();
+
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        let age2_ms = crate::global_key_listener::last_event_age_ms().unwrap_or(age_ms);
+                        if age2_ms > 120_000 {
+                            eprintln!(
+                                "❌ [key_listener watchdog] still stale after re-enable ({}ms); consider restarting app",
+                                age2_ms
+                            );
+                            // If Tauri exposes restart on this handle/version, use it.
+                            // Otherwise we just keep retrying re-enable in future ticks.
+                            #[allow(unused_must_use)]
+                            {
+                                // This may not exist on all platforms/builds; compilation will confirm.
+                                let _ = app_handle.restart();
+                            }
+                        }
+                    }
+                }
+            });
+        }
     }
     Ok(())
 }

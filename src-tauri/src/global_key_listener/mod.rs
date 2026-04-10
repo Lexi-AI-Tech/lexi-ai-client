@@ -411,3 +411,15 @@ pub fn re_enable_tap() {
         macos::re_enable_tap();
     }
 }
+
+/// Returns the milliseconds since the last observed keyboard event (macOS only).
+pub fn last_event_age_ms() -> Option<u64> {
+    #[cfg(target_os = "macos")]
+    {
+        return macos::last_event_age_ms();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
+    }
+}
