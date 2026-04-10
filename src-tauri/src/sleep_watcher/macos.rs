@@ -10,8 +10,8 @@
 
 /// Registers a macOS observer for sleep/wake notifications.
 ///
-/// When the system wakes from sleep, waits for macOS to fully restore services,
-/// then re-enables the global key listener.
+/// When the system wakes from sleep, re-enables the global key listener after a short delay
+/// and once more shortly after (HID/event services can lag right after wake).
 pub fn start_sleep_watcher(app_handle: tauri::AppHandle) {
     use objc::declare::ClassDecl;
     use objc::runtime::{Class, Object, Sel};
@@ -31,12 +31,28 @@ pub fn start_sleep_watcher(app_handle: tauri::AppHandle) {
             decl.add_ivar::<*mut std::ffi::c_void>("_appHandle");
 
             extern "C" fn handle_wake(_this: &Object, _sel: Sel, _notif: *mut Object) {
-                println!("☀️  System woke from sleep — re-initializing resources in 7s...");
+                println!("☀️  System woke from sleep — re-enabling keyboard listener shortly...");
                 std::thread::spawn(move || {
-                    // Wait for macOS to fully restore services after wake
-                    std::thread::sleep(std::time::Duration::from_secs(7));
-                    println!("🔄 Wake delay complete, re-enabling global keyboard listener...");
+                    // No fixed API delay: HID / event taps sometimes need a moment right after wake.
+                    // Short wait + a second attempt beats a single long (e.g. 7s) block.
+                    const FIRST_MS: u64 = 400;
+                    const RETRY_MS: u64 = 1200;
+
+                    std::thread::sleep(std::time::Duration::from_millis(FIRST_MS));
                     crate::global_key_listener::re_enable_tap();
+                    let en1 = crate::global_key_listener::event_tap_is_enabled();
+                    println!(
+                        "🔄 Post-wake: keyboard listener re-enable 1/2 (tap enabled: {:?})",
+                        en1
+                    );
+
+                    std::thread::sleep(std::time::Duration::from_millis(RETRY_MS));
+                    crate::global_key_listener::re_enable_tap();
+                    let en2 = crate::global_key_listener::event_tap_is_enabled();
+                    println!(
+                        "🔄 Post-wake: keyboard listener re-enable 2/2 (tap enabled: {:?})",
+                        en2
+                    );
                 });
             }
 

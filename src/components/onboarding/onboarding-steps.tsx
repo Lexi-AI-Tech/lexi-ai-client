@@ -406,7 +406,8 @@ export function PermissionsStep({
       <div className="permissions-restart-note">
         <p className="permissions-restart-note__text">
           Sometimes the permission status above may not update right away after
-          you allow access in System Settings. You may need to restart the app to refresh.
+          you allow access in System Settings. You may need to restart the app
+          to refresh.
         </p>
         <button
           type="button"
@@ -543,8 +544,7 @@ export function SetupStep({
     };
   }, []);
 
-  const verifiedCount =
-    (transcriptionTested ? 1 : 0) + (actionTested ? 1 : 0);
+  const verifiedCount = (transcriptionTested ? 1 : 0) + (actionTested ? 1 : 0);
   const canContinue =
     !configLoading &&
     transcriptionHotkeys.length > 0 &&
@@ -563,10 +563,10 @@ export function SetupStep({
       <div className="step-header">
         <h1 className="step-title">Try your shortcuts</h1>
         <p className="step-description">
-          These are Lexi’s default shortcuts. Press and hold each once — your mic
-          turns on, then release to stop. Nothing is sent to transcription or
-          voice actions here; we only check the keys. The floating pill appears
-          on the next step when you try Lexi for real.
+          These are Lexi’s default shortcuts. Press and hold each once — your
+          mic turns on, then release to stop. Nothing is sent to transcription
+          or voice actions here; we only check the keys. The floating pill
+          appears on the next step when you try Lexi for real.
         </p>
         <div
           className="permissions-progress hotkey-test-progress"

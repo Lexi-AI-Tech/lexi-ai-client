@@ -43,18 +43,14 @@ const RELEASE_NOTES_MD_COMPONENTS: Components = {
       {children}
     </h3>
   ),
-  p: ({ children }) => (
-    <p style={{ margin: "0 0 8px 0" }}>{children}</p>
-  ),
+  p: ({ children }) => <p style={{ margin: "0 0 8px 0" }}>{children}</p>,
   ul: ({ children }) => (
     <ul style={{ margin: "0 0 8px 0", paddingLeft: "20px" }}>{children}</ul>
   ),
   ol: ({ children }) => (
     <ol style={{ margin: "0 0 8px 0", paddingLeft: "20px" }}>{children}</ol>
   ),
-  li: ({ children }) => (
-    <li style={{ marginBottom: "4px" }}>{children}</li>
-  ),
+  li: ({ children }) => <li style={{ marginBottom: "4px" }}>{children}</li>,
   strong: ({ children }) => (
     <strong style={{ fontWeight: 600, color: "#111827" }}>{children}</strong>
   ),
@@ -253,7 +249,9 @@ export const UpdateModal: React.FC = () => {
           }}
         >
           <ReactMarkdown components={RELEASE_NOTES_MD_COMPONENTS}>
-            {updateDetails?.notes || update.body || "No release notes provided."}
+            {updateDetails?.notes ||
+              update.body ||
+              "No release notes provided."}
           </ReactMarkdown>
         </div>
 

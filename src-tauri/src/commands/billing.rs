@@ -37,7 +37,7 @@ pub async fn get_billing_usage(app: AppHandle) -> Result<BillingUsageResponse, S
 
     let url = format!("{}/api/v1/billing/usage", crate::config::api_base_url());
 
-    utils::log_api_request("Get billing usage (current period)", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let client = crate::utils::create_http_client();
     let response = client

@@ -54,7 +54,7 @@ pub async fn create_room(app: AppHandle, name: String) -> Result<Room, String> {
 
     let payload = RoomCreate { name };
 
-    utils::log_api_request("Create a new room", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     let response = client
         .post(&url)
@@ -239,7 +239,7 @@ pub async fn list_rooms(app: AppHandle) -> Result<Vec<Room>, String> {
     let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
 
-    utils::log_api_request("List user's rooms", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let response = client
         .get(&url)
@@ -273,7 +273,7 @@ pub async fn get_room_details(
     let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
 
-    utils::log_api_request("Get room details", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let response = client
         .get(&url)
@@ -310,7 +310,7 @@ pub async fn update_room(
 
     let payload = RoomUpdate { name };
 
-    utils::log_api_request("Update room details", "PATCH", &url);
+    utils::log_api_request("PATCH", &url);
 
     let response = client
         .patch(&url)
@@ -354,7 +354,7 @@ pub async fn update_speaker(
         "speaker_map": speaker_map
     });
 
-    utils::log_api_request("Update speaker names in room", "PATCH", &url);
+    utils::log_api_request("PATCH", &url);
 
     let response = client
         .patch(&url)

@@ -124,7 +124,7 @@ pub async fn get_default_hotkeys(app: AppHandle) -> Result<DefaultHotkeysRespons
         utils::get_system_type()
     )));
 
-    utils::log_api_request("Fetch default hotkeys from server", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let response = client
         .get(&url)
@@ -172,7 +172,7 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
     let client = crate::utils::create_http_client();
     let url = app_config::get_url(Some(&format!("system_type={}", utils::get_system_type())));
 
-    utils::log_api_request("Fetch app configuration from server", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let response = client
         .get(&url)
@@ -324,12 +324,6 @@ fn update_hotkey_state(app: &AppHandle, config: &AppConfig) {
             let _ = action_hotkey_state.0.send(action_hotkeys.clone());
         }
     }
-
-    // Keep shortcuts command cache hot so transcription pipeline does not need
-    // to fetch app config on every recording.
-    let commands_map =
-        crate::shortcuts::build_commands_map(config.shortcuts.as_deref().unwrap_or(&[]));
-    crate::shortcuts::set_cached_commands(app, commands_map);
 }
 
 /// Convert server response to local AppConfig format
@@ -439,7 +433,7 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(),
     let url = app_config::update_url();
     let request_body = build_request_body(config);
 
-    utils::log_api_request("Sync app configuration to cloud", "PUT", &url);
+    utils::log_api_request("PUT", &url);
 
     match client
         .put(&url)

@@ -178,8 +178,15 @@ impl AssistantService {
             let form = build_form(&audio_data, &focused_app)?;
 
             // Build the request URL
-            let url = assistant::transcribe_url();
-            utils::log_api_request("Transcribe audio to text", "POST", &url);
+            let system_type = utils::get_system_type();
+            let device_type = utils::get_device_type();
+            let url = format!(
+                "{}?system_type={}&device_type={}",
+                assistant::transcribe_url(),
+                urlencoding::encode(system_type),
+                urlencoding::encode(device_type)
+            );
+            utils::log_api_request("POST", &url);
             let mut request = self.client.post(&url).multipart(form);
             request = request.header("Authorization", format!("Bearer {}", current_token));
 

@@ -76,27 +76,31 @@ impl TextInjector {
     ///
     /// # Note
     /// This method temporarily overwrites the clipboard contents. The original
-    /// clipboard is not preserved by default for performance. If you need to
-    /// preserve it, uncomment the clipboard save/restore code below.
+    /// clipboard is preserved on a best-effort basis.
     pub fn inject_text(&self, text: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut clipboard = Clipboard::new()?;
+
+        let original_clipboard_text = clipboard.get_text().ok();
 
         // Step 1: Set clipboard to the text we want to inject
         // arboard handles UTF-8 encoding and special characters automatically
         clipboard.set_text(text)?;
 
         // Small delay to ensure clipboard is ready
-        thread::sleep(Duration::from_millis(50));
+        thread::sleep(Duration::from_millis(80));
 
         // Step 2: Simulate paste keystroke via keyboard_simulator module
         // Handles platform-specific implementation (AppleScript on macOS, enigo on Windows/Linux)
         crate::keyboard_simulator::simulate_paste()?;
 
         // Brief delay to ensure paste processes (some apps need a moment)
-        thread::sleep(Duration::from_millis(50));
+        thread::sleep(Duration::from_millis(350));
 
-        // Step 3: Flush clipboard so injected text doesn't remain in clipboard
-        let _ = clipboard.clear();
+        if let Some(original) = original_clipboard_text {
+            let _ = clipboard.set_text(original);
+        } else if clipboard.get_text().ok().as_deref() == Some(text) {
+            let _ = clipboard.clear();
+        }
 
         Ok(())
     }

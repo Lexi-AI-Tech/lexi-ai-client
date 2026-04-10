@@ -38,7 +38,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::atomic::AtomicBool;
+#[cfg(target_os = "macos")]
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
+#[cfg(target_os = "macos")]
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[cfg(target_os = "macos")]
+static KEY_LISTENER_DISABLED_LOG_MS: AtomicU64 = AtomicU64::new(0);
+#[cfg(target_os = "macos")]
+static KEY_LISTENER_HARD_RESET_MS: AtomicU64 = AtomicU64::new(0);
 use tauri::{Emitter, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
@@ -61,7 +70,6 @@ mod os_permissions; // macOS permission requests and checks (microphone, accessi
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
-mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 #[cfg(target_os = "macos")]
 mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config) // Meetings module
@@ -80,7 +88,7 @@ use google_oauth::OAuthState;
 
 use state::{
     ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, MeetingState,
-    OnboardingRecordingDryRun, RoomState, ShortcutCommandsCache, ShortcutCommandsState,
+    OnboardingRecordingDryRun, RoomState,
 };
 use window::show_and_focus_main_window;
 
@@ -188,6 +196,71 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
         // during sleep — a full restart is the cleanest way to recover.
         #[cfg(target_os = "macos")]
         sleep_watcher::start_watcher(app.clone());
+
+        // Watchdog: recover when macOS disables the CGEventTap (`CGEventTapIsEnabled == false`).
+        // We intentionally do *not* use "time since last keyboard event" — that false-alarms when
+        // the user is mouse-only or simply not typing.
+        #[cfg(target_os = "macos")]
+        {
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                use tokio::time::{interval, Duration};
+
+                fn epoch_ms() -> u64 {
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_millis() as u64)
+                        .unwrap_or(0)
+                }
+
+                const TICK_SECS: u64 = 30;
+                const DISABLED_LOG_COOLDOWN_MS: u64 = 120_000;
+                const HARD_RESET_COOLDOWN_MS: u64 = 60_000;
+
+                let mut tick = interval(Duration::from_secs(TICK_SECS));
+                loop {
+                    tick.tick().await;
+
+                    let Some(enabled) = crate::global_key_listener::event_tap_is_enabled() else {
+                        continue;
+                    };
+                    if enabled {
+                        continue;
+                    }
+
+                    let now = epoch_ms();
+                    let last_log = KEY_LISTENER_DISABLED_LOG_MS.load(Ordering::Relaxed);
+                    if last_log == 0 || now.saturating_sub(last_log) >= DISABLED_LOG_COOLDOWN_MS {
+                        eprintln!(
+                            "⚠️  [key_listener watchdog] CGEventTap is disabled; re-enabling"
+                        );
+                        KEY_LISTENER_DISABLED_LOG_MS.store(now, Ordering::Relaxed);
+                    }
+
+                    crate::global_key_listener::re_enable_tap();
+                    tokio::time::sleep(Duration::from_millis(800)).await;
+
+                    if crate::global_key_listener::event_tap_is_enabled() != Some(false) {
+                        continue;
+                    }
+
+                    let last_reset = KEY_LISTENER_HARD_RESET_MS.load(Ordering::Relaxed);
+                    if last_reset != 0 && now.saturating_sub(last_reset) < HARD_RESET_COOLDOWN_MS {
+                        continue;
+                    }
+                    KEY_LISTENER_HARD_RESET_MS.store(epoch_ms(), Ordering::Relaxed);
+
+                    eprintln!(
+                        "❌ [key_listener watchdog] tap still disabled after re-enable; hard reset + restart"
+                    );
+                    crate::global_key_listener::hard_reset_tap();
+                    #[allow(unused_must_use)]
+                    {
+                        let _ = app_handle.restart();
+                    }
+                }
+            });
+        }
     }
     Ok(())
 }
@@ -397,12 +470,6 @@ pub fn main() {
             let recording_state_arc = Arc::new(Mutex::new(false));
             app.manage(HotkeyWatchState(config_tx));
             app.manage(ActionHotkeyWatchState(action_hotkey_tx));
-            app.manage(ShortcutCommandsState(Arc::new(Mutex::new(
-                ShortcutCommandsCache {
-                    commands: std::collections::HashMap::new(),
-                    last_refreshed_at: None,
-                },
-            ))));
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });

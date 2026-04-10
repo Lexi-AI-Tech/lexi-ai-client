@@ -161,7 +161,7 @@ impl ActionService {
 
         // Build the request URL using centralized endpoint
         let url = action::perform_url();
-        utils::log_api_request("Perform voice action", "POST", &url);
+        utils::log_api_request("POST", &url);
         let mut request = self.client.post(&url).multipart(form);
 
         // Add authorization header if token is provided

@@ -666,9 +666,8 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
             // Use only the frontmost app to decide where the meeting is: emit only if the focused
             // app is in the mic-using list.
             #[cfg(target_os = "macos")]
-            let frontmost_name = crate::cursor_context::get_cursor_context()
-                .and_then(|c| c.app_name)
-                .unwrap_or_default();
+            let frontmost_name =
+                crate::cursor_context::get_frontmost_application_name().unwrap_or_default();
             #[cfg(not(target_os = "macos"))]
             let frontmost_name = String::new();
             let Some(best_app) = candidate_apps

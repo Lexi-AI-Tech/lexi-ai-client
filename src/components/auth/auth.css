@@ -170,6 +170,46 @@
   flex-wrap: wrap;
 }
 
+.auth-login-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-legal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--lexi-text-muted, #5f6368);
+}
+
+.auth-legal__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.auth-legal__row input[type="checkbox"] {
+  margin-top: 2px;
+}
+
+.auth-legal__link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: var(--lexi-primary, #1a73e8);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.auth-legal__link:hover {
+  color: color-mix(in srgb, var(--lexi-primary, #1a73e8) 85%, #000);
+}
+
 .auth-error {
   padding: 12px;
   background: #fce8e6;

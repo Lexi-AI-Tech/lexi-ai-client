@@ -385,7 +385,8 @@ button.actions-page-header__hotkeys-btn:focus-visible {
 }
 
 .actions-page-heading__tooltip-wrap:hover .actions-page-heading__tooltip,
-.actions-page-heading__tooltip-wrap:focus-within .actions-page-heading__tooltip {
+.actions-page-heading__tooltip-wrap:focus-within
+  .actions-page-heading__tooltip {
   transform: translate(10px, -50%);
 }
 

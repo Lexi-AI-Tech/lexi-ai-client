@@ -1,6 +1,6 @@
 {
   "name": "lexi-ai",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "AI Productivity tool",
   "author": "anadi45",
   "main": "src-tauri/src/main.rs",

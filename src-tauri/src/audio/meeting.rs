@@ -105,18 +105,32 @@ impl MacosSystemAudioStream {
         let agg_device = ca::AggregateDevice::with_desc(&agg_desc)
             .map_err(|e| format!("AggregateDevice::with_desc: {:?}", e))?;
 
-        thread::sleep(Duration::from_millis(300));
-
         let host = cpal::default_host();
-        let device = host
-            .input_devices()
-            .map_err(|e| e.to_string())?
-            .find(|d| {
-                d.name()
-                    .map(|n| n == SYSTEM_AUDIO_TAP_NAME)
-                    .unwrap_or(false)
-            })
-            .ok_or_else(|| format!("input device '{}' not found", SYSTEM_AUDIO_TAP_NAME))?;
+        let mut device_opt = None;
+        let mut attempts = 0;
+        let max_attempts = 20;
+
+        while attempts < max_attempts {
+            thread::sleep(Duration::from_millis(150));
+            if let Ok(mut devices) = host.input_devices() {
+                if let Some(dev) = devices.find(|d| {
+                    d.name()
+                        .map(|n| n == SYSTEM_AUDIO_TAP_NAME)
+                        .unwrap_or(false)
+                }) {
+                    device_opt = Some(dev);
+                    break;
+                }
+            }
+            attempts += 1;
+        }
+
+        let device = device_opt.ok_or_else(|| {
+            format!(
+                "input device '{}' not found after {} retries",
+                SYSTEM_AUDIO_TAP_NAME, max_attempts
+            )
+        })?;
 
         let config = device
             .default_input_config()

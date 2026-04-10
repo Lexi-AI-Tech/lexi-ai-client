@@ -411,3 +411,40 @@ pub fn re_enable_tap() {
         macos::re_enable_tap();
     }
 }
+
+/// Force-recreate the macOS CGEventTap + runloop thread.
+///
+/// This is a stronger recovery than `re_enable_tap()`. Some sleep/wake transitions can leave
+/// the tap in a state where `tap_enable(true)` succeeds but no events flow.
+pub fn hard_reset_tap() {
+    #[cfg(target_os = "macos")]
+    {
+        macos::hard_reset_tap();
+    }
+}
+
+/// Returns the milliseconds since the last observed keyboard event (macOS only).
+#[allow(dead_code)] // Kept for diagnostics / future Tauri commands; watchdog uses `event_tap_is_enabled`.
+pub fn last_event_age_ms() -> Option<u64> {
+    #[cfg(target_os = "macos")]
+    {
+        return macos::last_event_age_ms();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
+    }
+}
+
+/// Whether the current CGEventTap is enabled (`CGEventTapIsEnabled`). `None` if no tap exists yet.
+#[cfg(target_os = "macos")]
+pub fn event_tap_is_enabled() -> Option<bool> {
+    macos::event_tap_is_enabled()
+}
+
+/// Milliseconds since the event tap last invoked its callback (any event type).
+#[cfg(target_os = "macos")]
+#[allow(dead_code)] // Kept for diagnostics; primary recovery uses `CGEventTapIsEnabled`.
+pub fn last_tap_callback_age_ms() -> Option<u64> {
+    macos::last_tap_callback_age_ms()
+}
