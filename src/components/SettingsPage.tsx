@@ -28,6 +28,9 @@ import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import { check } from "@tauri-apps/plugin-updater";
 import { checkUpdateDetails } from "../hooks/useAutoUpdater";
 
+const TERMS_URL = "https://www.speaklexi.com/terms";
+const PRIVACY_URL = "https://www.speaklexi.com/privacy";
+
 type DefaultHotkeysResponse = {
   hotkeys: string[];
   action_hotkeys: string[];
@@ -429,11 +432,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Removed auto-save useEffect in favor of manual Save Settings button
 
-  const handleToggleAutostart = () => {
-    const currentValue = selectedAutostart ?? autostartEnabled ?? false;
-    setSelectedAutostart(!currentValue);
-  };
-
   const handleToggleEnhanceTranscription = () => {
     const currentValue =
       selectedEnhanceTranscription ?? enhanceTranscription ?? false;
@@ -468,6 +466,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       toast.error(`Update failed: ${error?.message || "Unknown error"}`);
     } finally {
       setIsCheckingUpdate(false);
+    }
+  };
+
+  const openExternal = async (url: string) => {
+    try {
+      await invoke("open_external_url", { url });
+    } catch (e) {
+      console.error("Failed to open external url:", e);
     }
   };
 
@@ -574,7 +580,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div>
+      <div className="settings-layout">
         {activeSection === "account" && (
           <div>
             <div className="panel panel--lg">
@@ -773,6 +779,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </button>
               </div>
             </div>
+
           </div>
         )}
 
@@ -814,22 +821,44 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         )}
 
-        <div className="settings-save-bar">
-          <button
-            type="button"
-            onClick={handleSaveSettings}
-            disabled={isUpdating || !hasChanges()}
-            className="btn-save"
-          >
-            {isUpdating ? (
-              <>
-                <div className="spinner-small" />
-                Saving...
-              </>
-            ) : (
-              "Save Settings"
-            )}
-          </button>
+        <div className="settings-footer-area">
+          <div className="settings-save-bar">
+            <button
+              type="button"
+              onClick={handleSaveSettings}
+              disabled={isUpdating || !hasChanges()}
+              className="btn-save"
+            >
+              {isUpdating ? (
+                <>
+                  <div className="spinner-small" />
+                  Saving...
+                </>
+              ) : (
+                "Save Settings"
+              )}
+            </button>
+          </div>
+
+          <div className="settings-legal-footer" aria-label="Legal links">
+            <span>By using Lexi AI, you agree to our </span>
+            <button
+              type="button"
+              className="settings-legal-link"
+              onClick={() => openExternal(TERMS_URL)}
+            >
+              Terms
+            </button>
+            <span> and </span>
+            <button
+              type="button"
+              className="settings-legal-link"
+              onClick={() => openExternal(PRIVACY_URL)}
+            >
+              Privacy Policy
+            </button>
+            <span>.</span>
+          </div>
         </div>
       </div>
     </div>
