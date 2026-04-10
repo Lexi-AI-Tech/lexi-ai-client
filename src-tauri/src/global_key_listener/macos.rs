@@ -19,6 +19,9 @@ use std::ptr::{null_mut, NonNull};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 static LAST_EVENT_EPOCH_MS: AtomicU64 = AtomicU64::new(0);
+/// Updated on every CGEventTap callback (keyboard, mouse, tap-disabled pings, etc.).
+/// Used to distinguish “user idle on keyboard” from “tap not delivering anything”.
+static LAST_TAP_CALLBACK_EPOCH_MS: AtomicU64 = AtomicU64::new(0);
 
 fn now_epoch_ms() -> u64 {
     SystemTime::now()
@@ -121,6 +124,7 @@ struct GlobalListenerState {
     meeting_recording_rx: watch::Receiver<bool>,
     tracker: Arc<Mutex<KeyStateTracker>>,
     tap: Option<CFRetained<CFMachPort>>,
+    run_loop: Option<CFRetained<CFRunLoop>>,
 }
 // CFRetained<CFMachPort> is !Send and !Sync, so we must unsafe impl it for the struct.
 unsafe impl Send for GlobalListenerState {}
@@ -132,6 +136,9 @@ unsafe extern "C-unwind" fn raw_callback(
     cg_event: NonNull<CGEvent>,
     _user_info: *mut c_void,
 ) -> *mut CGEvent {
+    // Any invocation means the tap + run loop are still delivering (not keyboard-specific).
+    LAST_TAP_CALLBACK_EPOCH_MS.store(now_epoch_ms(), Ordering::Relaxed);
+
     // macOS can disable event taps if the callback is slow or due to user input.
     // If we don't re-enable, hotkeys silently stop working while the app keeps running.
     if matches!(
@@ -299,8 +306,13 @@ pub(crate) fn start_listener(
         meeting_recording_rx,
         tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
         tap: None,
+        run_loop: None,
     });
 
+    spawn_tap_thread();
+}
+
+fn spawn_tap_thread() {
     std::thread::spawn(move || unsafe {
         let _pool = NSAutoreleasePool::new();
         let callback: CGEventTapCallBack = Some(raw_callback);
@@ -331,11 +343,18 @@ pub(crate) fn start_listener(
         }
 
         let current_loop = CFRunLoop::current().unwrap();
+        if let Ok(mut lock_guard) = GLOBAL_STATE.lock() {
+            if let Some(state) = lock_guard.as_mut() {
+                state.run_loop = Some(current_loop.clone());
+            }
+        }
         current_loop.add_source(Some(&loop_source), kCFRunLoopCommonModes);
 
         CGEvent::tap_enable(&*tap, true);
 
-        LAST_EVENT_EPOCH_MS.store(now_epoch_ms(), Ordering::Relaxed);
+        let now = now_epoch_ms();
+        LAST_EVENT_EPOCH_MS.store(now, Ordering::Relaxed);
+        LAST_TAP_CALLBACK_EPOCH_MS.store(now, Ordering::Relaxed);
         println!("✅ Native macOS CGEventTap started");
         CFRunLoop::run();
     });
@@ -349,10 +368,8 @@ pub(crate) fn re_enable_tap() {
     if let Ok(lock_guard) = GLOBAL_STATE.lock() {
         if let Some(state) = lock_guard.as_ref() {
             if let Some(tap) = state.tap.as_ref() {
-                println!("🔄 Re-enabling CGEventTap after wake...");
                 CGEvent::tap_enable(&*tap, true);
                 reset_tracker_state(state);
-                LAST_EVENT_EPOCH_MS.store(now_epoch_ms(), Ordering::Relaxed);
             } else {
                 eprintln!("⚠️  Cannot re-enable CGEventTap: Tap was not initialized.");
             }
@@ -360,8 +377,97 @@ pub(crate) fn re_enable_tap() {
     }
 }
 
+/// Hard reset: stop old runloop + recreate event tap thread.
+pub(crate) fn hard_reset_tap() {
+    // Capture the state we need to recreate the tap thread.
+    let (old_tap, old_loop, app, recording_tx, config_rx, action_hotkey_rx, recording_state, meeting_recording_rx) =
+        match GLOBAL_STATE.lock() {
+            Ok(mut guard) => {
+                let Some(state) = guard.as_mut() else {
+                    eprintln!("⚠️  Cannot hard reset CGEventTap: Global state missing.");
+                    return;
+                };
+
+                println!("🧯 Hard resetting CGEventTap (recreate tap + runloop)...");
+
+                let old_tap = state.tap.take();
+                let old_loop = state.run_loop.take();
+
+                // Clone the inputs needed to re-create a listener state.
+                let app = state.app.clone();
+                let recording_tx = state.recording_tx.clone();
+                let config_rx = state.config_rx.clone();
+                let action_hotkey_rx = state.action_hotkey_rx.clone();
+                let recording_state = state.recording_state.clone();
+                let meeting_recording_rx = state.meeting_recording_rx.clone();
+
+                // Reset tracker immediately so we don't carry stuck modifier state across resets.
+                reset_tracker_state(state);
+
+                (
+                    old_tap,
+                    old_loop,
+                    app,
+                    recording_tx,
+                    config_rx,
+                    action_hotkey_rx,
+                    recording_state,
+                    meeting_recording_rx,
+                )
+            }
+            Err(_) => {
+                eprintln!("⚠️  Cannot hard reset CGEventTap: Global state lock poisoned.");
+                return;
+            }
+        };
+
+    // Disable old tap (best effort).
+    if let Some(tap) = old_tap.as_ref() {
+        CGEvent::tap_enable(&*tap, false);
+    }
+
+    // Stop the old runloop so the old tap thread can exit cleanly (best effort).
+    if let Some(loop_ref) = old_loop.as_ref() {
+        loop_ref.stop();
+    }
+
+    // Re-initialize global state and spawn a fresh tap thread.
+    *GLOBAL_STATE.lock().unwrap() = Some(GlobalListenerState {
+        app,
+        recording_tx,
+        config_rx,
+        action_hotkey_rx,
+        recording_state,
+        meeting_recording_rx,
+        tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+        tap: None,
+        run_loop: None,
+    });
+
+    spawn_tap_thread();
+}
+
+#[allow(dead_code)]
 pub(crate) fn last_event_age_ms() -> Option<u64> {
     let last = LAST_EVENT_EPOCH_MS.load(Ordering::Relaxed);
+    if last == 0 {
+        return None;
+    }
+    let now = now_epoch_ms();
+    Some(now.saturating_sub(last))
+}
+
+/// `None` if the listener has not registered a tap yet (or lock failed).
+pub(crate) fn event_tap_is_enabled() -> Option<bool> {
+    let lock_guard = GLOBAL_STATE.lock().ok()?;
+    let state = lock_guard.as_ref()?;
+    let tap = state.tap.as_ref()?;
+    Some(CGEvent::tap_is_enabled(&*tap))
+}
+
+#[allow(dead_code)]
+pub(crate) fn last_tap_callback_age_ms() -> Option<u64> {
+    let last = LAST_TAP_CALLBACK_EPOCH_MS.load(Ordering::Relaxed);
     if last == 0 {
         return None;
     }
