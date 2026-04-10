@@ -225,7 +225,7 @@ pub async fn get_server_onboarding_status(
         version_param
     );
 
-    utils::log_api_request("Get server onboarding status", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let client = crate::utils::create_http_client();
     let response = client
@@ -268,7 +268,7 @@ pub async fn complete_server_onboarding(
         crate::config::api_base_url()
     );
 
-    utils::log_api_request("Complete server onboarding", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     let body = serde_json::json!({
         "system_type": system_type,

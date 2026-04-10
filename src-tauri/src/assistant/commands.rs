@@ -82,7 +82,7 @@ pub async fn get_transcripts(
         query_string
     );
 
-    utils::log_api_request("Get paginated list of transcripts", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let client = crate::utils::create_http_client();
     let response = client
@@ -134,7 +134,7 @@ pub async fn get_transcript(app: AppHandle, transcript_id: String) -> Result<Tra
         transcript_id
     );
 
-    utils::log_api_request("Get specific transcript by ID", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let client = crate::utils::create_http_client();
     let response = client
@@ -186,7 +186,7 @@ pub async fn delete_transcript(app: AppHandle, transcript_id: String) -> Result<
         transcript_id
     );
 
-    utils::log_api_request("Delete transcript by ID", "DELETE", &url);
+    utils::log_api_request("DELETE", &url);
 
     let client = crate::utils::create_http_client();
     let response = client

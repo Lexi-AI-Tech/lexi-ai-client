@@ -23,13 +23,9 @@ pub fn get_device_type() -> &'static str {
     "desktop"
 }
 
-/// Log an API request with its purpose, method, and URL
-/// This helps track all API calls made to the server
-pub fn log_api_request(_purpose: &str, _method: &str, _url: &str) {
-    println!(
-        "🌐 API Request: {} {} | Purpose: {}",
-        _method, _url, _purpose
-    );
+/// Log an API request method and URL.
+pub fn log_api_request(method: &str, url: &str) {
+    println!("🌐 API Request: {} {}", method, url);
 }
 
 /// Creates a reqwest client with a strict timeout to prevent indefinite hangs

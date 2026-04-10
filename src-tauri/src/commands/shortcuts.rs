@@ -42,7 +42,7 @@ pub async fn get_shortcuts(app: AppHandle) -> Result<Vec<Shortcut>, String> {
         urlencoding::encode(&system_type)
     );
 
-    utils::log_api_request("Get all shortcuts", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let client = crate::utils::create_http_client();
     let response = client
@@ -94,7 +94,7 @@ pub async fn create_shortcut(
         urlencoding::encode(&system_type)
     );
 
-    utils::log_api_request("Create new shortcut", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     let client = crate::utils::create_http_client();
     let response = client
@@ -150,7 +150,7 @@ pub async fn update_shortcut(
         urlencoding::encode(&system_type)
     );
 
-    utils::log_api_request("Update shortcut", "PUT", &url);
+    utils::log_api_request("PUT", &url);
 
     let client = crate::utils::create_http_client();
     let response = client
@@ -202,7 +202,7 @@ pub async fn delete_shortcut(app: AppHandle, shortcut_id: String) -> Result<(), 
         urlencoding::encode(&system_type)
     );
 
-    utils::log_api_request("Delete shortcut", "DELETE", &url);
+    utils::log_api_request("DELETE", &url);
 
     let client = crate::utils::create_http_client();
     let response = client

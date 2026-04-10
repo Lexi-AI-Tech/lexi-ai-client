@@ -77,7 +77,7 @@ pub async fn create_meeting(
 
     let payload = MeetingCreate { name, platform };
 
-    utils::log_api_request("Create a new meeting", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     let response = client
         .post(&url)
@@ -276,7 +276,7 @@ pub(crate) async fn update_meeting_on_server(
 
     let payload = MeetingUpdate { name, status };
 
-    utils::log_api_request("Update meeting details", "PATCH", &url);
+    utils::log_api_request("PATCH", &url);
 
     let response = client
         .patch(&url)
@@ -423,7 +423,7 @@ pub async fn list_meetings(app: AppHandle) -> Result<Vec<Meeting>, String> {
     let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/meetings", crate::config::api_base_url());
 
-    utils::log_api_request("List user's meetings", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let response = client
         .get(&url)
@@ -461,7 +461,7 @@ pub async fn get_meeting_details(
         meeting_id
     );
 
-    utils::log_api_request("Get meeting details", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let response = client
         .get(&url)
@@ -507,7 +507,7 @@ pub async fn delete_meeting(app: AppHandle, meeting_id: String) -> Result<(), St
         meeting_id
     );
 
-    utils::log_api_request("Delete meeting", "DELETE", &url);
+    utils::log_api_request("DELETE", &url);
 
     let response = client
         .delete(&url)
@@ -554,7 +554,7 @@ pub async fn stream_meeting_summary(
         if regenerate { "?regenerate=true" } else { "" }
     );
 
-    utils::log_api_request("Stream meeting summary", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     let client = crate::utils::create_http_client_long_timeout();
     // Explicit empty body so proxies (e.g. nginx) receive Content-Length: 0. POST with no body
@@ -664,7 +664,7 @@ pub async fn add_meeting_note(
         return Err("Note text is required".to_string());
     }
 
-    utils::log_api_request("Add meeting note", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     let response = client
         .post(&url)
@@ -707,7 +707,7 @@ pub async fn send_meeting_chat(
 
     let payload = MeetingChatRequest { content, history };
 
-    utils::log_api_request("Send meeting message", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     let response = client
         .post(&url)
@@ -753,7 +753,7 @@ pub async fn get_meeting_suggested_questions(
         meeting_id
     );
 
-    utils::log_api_request("Get meeting suggested questions", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let response = client
         .get(&url)
@@ -808,7 +808,7 @@ pub async fn create_doc_from_meeting(
         "instructions": instructions.trim(),
     });
 
-    utils::log_api_request("Create doc from meeting", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     let response = client
         .post(&url)

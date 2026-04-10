@@ -186,7 +186,7 @@ impl AssistantService {
                 urlencoding::encode(system_type),
                 urlencoding::encode(device_type)
             );
-            utils::log_api_request("Transcribe audio to text", "POST", &url);
+            utils::log_api_request("POST", &url);
             let mut request = self.client.post(&url).multipart(form);
             request = request.header("Authorization", format!("Bearer {}", current_token));
 

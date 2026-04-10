@@ -311,7 +311,7 @@ async fn refresh_access_token(
     });
 
     println!("🔄 Attempting to refresh access token...");
-    utils::log_api_request("Refresh access token", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     match client
         .post(&url)
@@ -669,7 +669,7 @@ pub async fn get_current_user(app: AppHandle) -> Result<UserInfo, String> {
 
     let url = format!("{}/api/v1/auth/me", crate::config::api_base_url());
 
-    utils::log_api_request("Get current user information", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let client = crate::utils::create_http_client();
     let response = client
@@ -712,7 +712,7 @@ pub async fn logout(app: AppHandle) -> Result<(), String> {
 
     let url = format!("{}/api/v1/auth/logout", crate::config::api_base_url());
 
-    utils::log_api_request("Logout from backend", "POST", &url);
+    utils::log_api_request("POST", &url);
 
     let client = crate::utils::create_http_client();
     let response = client

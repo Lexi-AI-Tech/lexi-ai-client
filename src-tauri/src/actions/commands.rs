@@ -62,7 +62,7 @@ pub async fn get_action_history(
         query_string
     );
 
-    utils::log_api_request("Get paginated action history", "GET", &url);
+    utils::log_api_request("GET", &url);
 
     let client = crate::utils::create_http_client();
     let response = client
@@ -109,7 +109,7 @@ pub async fn delete_action_history(app: AppHandle, action_id: String) -> Result<
         action_id
     );
 
-    utils::log_api_request("Delete action history entry", "DELETE", &url);
+    utils::log_api_request("DELETE", &url);
 
     let client = crate::utils::create_http_client();
     let response = client
