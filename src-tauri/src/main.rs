@@ -61,7 +61,6 @@ mod os_permissions; // macOS permission requests and checks (microphone, accessi
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
-mod shortcuts; // Voice command shortcuts that replace transcriptions with predefined values
 #[cfg(target_os = "macos")]
 mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config) // Meetings module
@@ -80,7 +79,7 @@ use google_oauth::OAuthState;
 
 use state::{
     ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, MeetingState,
-    OnboardingRecordingDryRun, RoomState, ShortcutCommandsCache, ShortcutCommandsState,
+    OnboardingRecordingDryRun, RoomState,
 };
 use window::show_and_focus_main_window;
 
@@ -397,12 +396,6 @@ pub fn main() {
             let recording_state_arc = Arc::new(Mutex::new(false));
             app.manage(HotkeyWatchState(config_tx));
             app.manage(ActionHotkeyWatchState(action_hotkey_tx));
-            app.manage(ShortcutCommandsState(Arc::new(Mutex::new(
-                ShortcutCommandsCache {
-                    commands: std::collections::HashMap::new(),
-                    last_refreshed_at: None,
-                },
-            ))));
             app.manage(HotkeyRecordingState {
                 is_recording: recording_state_arc.clone(),
             });

@@ -11,7 +11,6 @@
 use super::service::AssistantService;
 
 use crate::commands::auth::get_auth_token_async;
-use crate::shortcuts::check_command;
 
 use crate::text_injector::TextInjector;
 use std::time::Instant;
@@ -93,20 +92,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
                 // Only process if transcription is not empty
                 if !transcription.trim().is_empty() {
-                    // Check if transcription matches a shortcut command (from app config)
-                    let text_to_inject = check_command(&app_handle_for_task, &transcription)
-                        .await
-                        .unwrap_or_else(|| transcription.clone());
-
-                    if text_to_inject != transcription {
-                        println!(
-                            "🔧 Command detected: '{}' -> '{}'",
-                            transcription.trim(),
-                            text_to_inject
-                        );
-                    }
-
-                    // Inject the text (or shortcut replacement)
+                    let text_to_inject = transcription.clone();
                     let injector = TextInjector::new();
                     match injector.inject_text(&text_to_inject) {
                         Ok(_) => {
