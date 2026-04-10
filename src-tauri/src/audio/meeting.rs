@@ -125,8 +125,12 @@ impl MacosSystemAudioStream {
             attempts += 1;
         }
 
-        let device = device_opt
-            .ok_or_else(|| format!("input device '{}' not found after {} retries", SYSTEM_AUDIO_TAP_NAME, max_attempts))?;
+        let device = device_opt.ok_or_else(|| {
+            format!(
+                "input device '{}' not found after {} retries",
+                SYSTEM_AUDIO_TAP_NAME, max_attempts
+            )
+        })?;
 
         let config = device
             .default_input_config()

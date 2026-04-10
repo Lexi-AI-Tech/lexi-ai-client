@@ -380,46 +380,54 @@ pub(crate) fn re_enable_tap() {
 /// Hard reset: stop old runloop + recreate event tap thread.
 pub(crate) fn hard_reset_tap() {
     // Capture the state we need to recreate the tap thread.
-    let (old_tap, old_loop, app, recording_tx, config_rx, action_hotkey_rx, recording_state, meeting_recording_rx) =
-        match GLOBAL_STATE.lock() {
-            Ok(mut guard) => {
-                let Some(state) = guard.as_mut() else {
-                    eprintln!("⚠️  Cannot hard reset CGEventTap: Global state missing.");
-                    return;
-                };
-
-                println!("🧯 Hard resetting CGEventTap (recreate tap + runloop)...");
-
-                let old_tap = state.tap.take();
-                let old_loop = state.run_loop.take();
-
-                // Clone the inputs needed to re-create a listener state.
-                let app = state.app.clone();
-                let recording_tx = state.recording_tx.clone();
-                let config_rx = state.config_rx.clone();
-                let action_hotkey_rx = state.action_hotkey_rx.clone();
-                let recording_state = state.recording_state.clone();
-                let meeting_recording_rx = state.meeting_recording_rx.clone();
-
-                // Reset tracker immediately so we don't carry stuck modifier state across resets.
-                reset_tracker_state(state);
-
-                (
-                    old_tap,
-                    old_loop,
-                    app,
-                    recording_tx,
-                    config_rx,
-                    action_hotkey_rx,
-                    recording_state,
-                    meeting_recording_rx,
-                )
-            }
-            Err(_) => {
-                eprintln!("⚠️  Cannot hard reset CGEventTap: Global state lock poisoned.");
+    let (
+        old_tap,
+        old_loop,
+        app,
+        recording_tx,
+        config_rx,
+        action_hotkey_rx,
+        recording_state,
+        meeting_recording_rx,
+    ) = match GLOBAL_STATE.lock() {
+        Ok(mut guard) => {
+            let Some(state) = guard.as_mut() else {
+                eprintln!("⚠️  Cannot hard reset CGEventTap: Global state missing.");
                 return;
-            }
-        };
+            };
+
+            println!("🧯 Hard resetting CGEventTap (recreate tap + runloop)...");
+
+            let old_tap = state.tap.take();
+            let old_loop = state.run_loop.take();
+
+            // Clone the inputs needed to re-create a listener state.
+            let app = state.app.clone();
+            let recording_tx = state.recording_tx.clone();
+            let config_rx = state.config_rx.clone();
+            let action_hotkey_rx = state.action_hotkey_rx.clone();
+            let recording_state = state.recording_state.clone();
+            let meeting_recording_rx = state.meeting_recording_rx.clone();
+
+            // Reset tracker immediately so we don't carry stuck modifier state across resets.
+            reset_tracker_state(state);
+
+            (
+                old_tap,
+                old_loop,
+                app,
+                recording_tx,
+                config_rx,
+                action_hotkey_rx,
+                recording_state,
+                meeting_recording_rx,
+            )
+        }
+        Err(_) => {
+            eprintln!("⚠️  Cannot hard reset CGEventTap: Global state lock poisoned.");
+            return;
+        }
+    };
 
     // Disable old tap (best effort).
     if let Some(tap) = old_tap.as_ref() {

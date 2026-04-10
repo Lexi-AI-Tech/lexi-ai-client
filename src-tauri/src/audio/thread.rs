@@ -278,8 +278,7 @@ pub fn spawn_recording_thread(
 
                                 let app_handle_clone = app_handle.clone();
                                 let mode = ctx.mode;
-                                let dry_stop =
-                                    onboarding_skip_backend.load(Ordering::Acquire);
+                                let dry_stop = onboarding_skip_backend.load(Ordering::Acquire);
                                 tauri::async_runtime::spawn(async move {
                                     if dry_stop {
                                         return;
@@ -407,10 +406,8 @@ pub fn spawn_recording_thread(
                         let dry_sw = onboarding_skip_backend.load(Ordering::Acquire);
                         tauri::async_runtime::spawn(async move {
                             if dry_sw {
-                                let _ = app_handle_clone.emit(
-                                    "onboarding_hotkey_verify",
-                                    json!({ "mode": "action" }),
-                                );
+                                let _ = app_handle_clone
+                                    .emit("onboarding_hotkey_verify", json!({ "mode": "action" }));
                                 return;
                             }
                             app_handle_clone
