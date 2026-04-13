@@ -7,15 +7,7 @@
 
 import React, { useCallback, useEffect, useState, useRef, useId } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  Copy,
-  Check,
-  Trash2,
-  Play,
-  Pause,
-  AudioLines,
-  Info,
-} from "lucide-react";
+import { Copy, Check, Trash2, AudioLines, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
 import type { Transcript, TauriAppConfig } from "../types";
@@ -28,7 +20,7 @@ import "./home/home.css";
 import "../styles/components/hotkey-selector.css";
 
 const TRANSCRIPTION_HELP =
-  "Press and hold your configured hotkey in any app while you speak. Release to stop—text is inserted at the cursor and saved here. Copy, play audio, or delete entries from the list below.";
+  "Press and hold your configured hotkey in any app while you speak. Release to stop—text is inserted at the cursor and saved here. Copy or delete entries from the list below.";
 
 function renderTranscriptsHeaderKeyCap(
   key: string,
@@ -141,11 +133,6 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-
-  // Audio playback state
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const [audioProgress, setAudioProgress] = useState<number>(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // App icons for the App column (macOS: data URLs from get_app_icon)
   const [appIcons, setAppIcons] = useState<Record<string, string | null>>({});
@@ -289,40 +276,6 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
     }
   };
 
-  // Audio playback handlers
-  const handlePlayAudio = (transcriptId: string, audioUrl: string) => {
-    // If same audio is playing, pause it
-    if (playingId === transcriptId && audioRef.current) {
-      audioRef.current.pause();
-      setPlayingId(null);
-      return;
-    }
-
-    // Stop any currently playing audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-
-    // Create new audio element
-    const audio = new Audio(audioUrl);
-    audioRef.current = audio;
-
-    audio.addEventListener("timeupdate", () => {
-      if (audio.duration) {
-        setAudioProgress((audio.currentTime / audio.duration) * 100);
-      }
-    });
-
-    audio.addEventListener("ended", () => {
-      setPlayingId(null);
-      setAudioProgress(0);
-    });
-
-    audio.play();
-    setPlayingId(transcriptId);
-    setAudioProgress(0);
-  };
-
   // Same as HomePage: always show the page shell; show loading/login/content inside (no full-page gate)
   const showContent = authStore.isInitialized;
   const showLogin = authStore.isInitialized && !authStore.isAuthenticated;
@@ -436,7 +389,6 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
                   ? transcript.enhanced_text!
                   : transcript.original_text || "";
                 const hasText = !!displayText;
-                const isPlaying = playingId === transcript.id;
 
                 const copyText =
                   isEnhanced && transcript.enhanced_text
@@ -476,61 +428,6 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
                     <div className="transcript-card__body">
                       <div className="transcript-card__row">
                         <div className="transcript-display-cell transcript-display-cell--card transcript-card__main">
-                          {/* Minimal Audio Player */}
-                          {transcript.audio_file_url && (
-                            <div className="transcript-audio-cell">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handlePlayAudio(
-                                    transcript.id,
-                                    transcript.audio_file_url as string,
-                                  )
-                                }
-                                className={`transcript-play-btn ${
-                                  isPlaying ? "playing" : ""
-                                }`}
-                                title={isPlaying ? "Pause" : "Play audio"}
-                              >
-                                {isPlaying && (
-                                  <svg
-                                    className="transcript-progress-ring"
-                                    aria-hidden
-                                  >
-                                    <circle
-                                      cx="14"
-                                      cy="14"
-                                      r="12"
-                                      fill="none"
-                                      stroke="rgba(255,255,255,0.2)"
-                                      strokeWidth="2"
-                                    />
-                                    <circle
-                                      cx="14"
-                                      cy="14"
-                                      r="12"
-                                      fill="none"
-                                      stroke="#fff"
-                                      strokeWidth="2"
-                                      strokeDasharray={`${audioProgress * 0.754} 75.4`}
-                                      strokeLinecap="round"
-                                    />
-                                  </svg>
-                                )}
-                                {isPlaying ? (
-                                  <Pause size={12} fill="currentColor" />
-                                ) : (
-                                  <Play
-                                    size={12}
-                                    fill="currentColor"
-                                    className="icon-play-offset"
-                                  />
-                                )}
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Transcript Text */}
                           <div className="transcript-text-cell">
                             {hasText ? (
                               <span className="transcript-item-text">
