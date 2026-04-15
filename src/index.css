@@ -2015,15 +2015,39 @@ button.transcripts-page-header__hotkeys-btn:focus-visible {
 }
 
 .transcripts-empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  padding: 24px;
-  color: var(--lexi-text-muted);
+  padding: 3rem 1.5rem;
+  gap: 0.75rem;
+}
+
+.transcripts-empty-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: var(--lexi-primary-muted);
+  color: var(--lexi-primary);
+  margin-bottom: 0.25rem;
+}
+
+.transcripts-empty-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--lexi-text);
+  margin: 0;
 }
 
 .transcripts-empty-sub {
-  font-size: 11px;
-  margin-top: 8px;
-  opacity: 0.7;
+  font-size: 0.8125rem;
+  color: var(--lexi-text-faint);
+  margin: 0;
+  max-width: 280px;
+  line-height: 1.5;
 }
 
 /* ==========================
@@ -2032,14 +2056,15 @@ button.transcripts-page-header__hotkeys-btn:focus-visible {
 .transcripts-cards {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.5rem;
   margin-top: 0;
 }
 
 .transcripts-page__content {
-  margin-top: 1.75rem;
+  margin-top: 1.5rem;
 }
 
+/* --- Generic card classes (shared by Shortcuts, Actions pages) --- */
 .transcript-card {
   background: var(--lexi-surface-elevated);
   border: 1px solid var(--lexi-border);
@@ -2048,21 +2073,18 @@ button.transcripts-page-header__hotkeys-btn:focus-visible {
   box-shadow: var(--lexi-shadow-sm);
   transition:
     border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    box-shadow 150ms ease;
 }
 
 .transcript-card:hover {
   border-color: var(--lexi-border-subtle);
   box-shadow: var(--lexi-shadow-md);
-  transform: translateY(-1px);
 }
 
 .transcript-card__header {
   margin-bottom: 0.35rem;
 }
 
-/* Time + focused app grouped on the left (not split across the card above actions). */
 .transcript-card__meta {
   display: flex;
   flex-direction: row;
@@ -2093,71 +2115,164 @@ button.transcripts-page-header__hotkeys-btn:focus-visible {
   justify-content: flex-end;
 }
 
-/* Compact action buttons only for the cards list. */
-.transcripts-cards .transcript-action-btn {
-  width: 26px;
-  height: 26px;
-}
-
-/* Remove extra right padding on the transcript text/audio group in cards. */
-.transcripts-cards .transcript-display-cell {
-  padding-right: 0;
-}
-
-/* Compact play/progress UI inside cards (only impacts cards layout). */
-.transcripts-cards .transcript-play-btn {
-  width: 26px;
-  height: 26px;
-}
-
-.transcripts-cards .transcript-progress-ring {
-  width: 26px;
-  height: 26px;
-}
-
-/* When used in a card (not a table cell), remove extra right padding. */
-.transcript-display-cell--card {
-  padding-right: 0;
-}
-
-/* Compact layout: keep play/text + copy/delete in the same row. */
-.transcripts-cards .transcript-card__row {
+.transcript-card__row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.transcripts-cards .transcript-card__main {
+.transcript-card__main {
   flex: 1;
   min-width: 0;
 }
 
-/* Prevent copy/delete from wrapping onto another line in compact cards. */
-.transcripts-cards .transcript-actions-cell {
-  flex-wrap: nowrap;
-  gap: 6px;
+/* --- Transcripts list card overrides (text-first, hover-reveal) --- */
+.transcripts-cards .transcript-card {
+  position: relative;
+  background: var(--lexi-surface-elevated);
+  border: 1px solid var(--lexi-border);
+  border-radius: 0.875rem;
+  padding: 1rem 1.125rem;
+  box-shadow: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
-/* Subtler app label in the card header. */
-.transcripts-cards .transcript-cell-app__icon {
-  width: 16px;
-  height: 16px;
+.transcripts-cards .transcript-card:hover {
+  border-color: var(--lexi-border-subtle);
+  box-shadow: var(--lexi-shadow-sm);
 }
 
-.transcripts-cards .transcript-cell-app__name {
-  font-size: 11px;
+/* Text area — the hero of each card */
+.transcript-card__text {
+  padding-right: 4.5rem; /* space for hover-reveal actions */
+}
+
+.transcript-card__text .transcript-item-text {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--lexi-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.transcript-card__text .transcript-item-empty {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  font-style: italic;
   color: var(--lexi-text-faint);
+}
+
+/* Metadata footer row */
+.transcript-card__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--lexi-text-faint);
+}
+
+.transcripts-cards .transcript-card__date {
+  font-size: inherit;
+  color: inherit;
+}
+
+.transcript-card__dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--lexi-text-faint);
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.transcripts-cards .transcript-card__app {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex: none;
+}
+
+.transcript-card__app-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.transcript-card__app-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 500;
 }
 
-/* Clamp transcript text to 2 lines in cards to keep height compact. */
-.transcripts-cards .transcript-item-text,
-.transcripts-cards .transcript-item-empty {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.transcript-card__words {
+  white-space: nowrap;
+}
+
+.transcript-card__enhanced-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-radius: 4px;
+  letter-spacing: 0.01em;
+}
+
+/* Action buttons — always visible, positioned top-right (transcripts list only) */
+.transcripts-cards .transcript-card__actions {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Compact action buttons in transcripts list */
+.transcripts-cards .transcript-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 0.375rem;
+  border: 1px solid var(--lexi-border);
+  background: var(--lexi-surface-elevated);
+  color: var(--lexi-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+.transcripts-cards .transcript-action-btn:hover {
+  background: var(--lexi-surface-overlay);
+  color: var(--lexi-text);
+}
+
+.transcripts-cards .transcript-action-btn--copy.copied {
+  background: #dcfce7;
+  border-color: #22c55e;
+  color: #16a34a;
+}
+
+.transcripts-cards .transcript-action-btn--delete:hover {
+  background: var(--lexi-danger-muted);
+  border-color: #fecaca;
+  color: #dc2626;
 }
 
 .transcripts-list-wrapper {

@@ -354,15 +354,21 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
             transcripts.length === 0 && (
               <motion.div
                 key="transcripts-empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.4 }}
               >
                 <div className="transcripts-empty-wrap">
-                  <p>No transcripts yet.</p>
+                  <div className="transcripts-empty-icon">
+                    <AudioLines size={28} strokeWidth={1.5} />
+                  </div>
+                  <p className="transcripts-empty-title">
+                    No transcriptions yet
+                  </p>
                   <p className="transcripts-empty-sub">
-                    Start recording to create your first transcript!
+                    Press and hold your hotkey while speaking — your
+                    transcriptions will appear here.
                   </p>
                 </div>
               </motion.div>
@@ -395,6 +401,10 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
                     ? transcript.enhanced_text
                     : transcript.original_text || "";
 
+                const wordCount = isEnhanced
+                  ? transcript.enhanced_text_word_count
+                  : transcript.original_text_word_count;
+
                 return (
                   <motion.div
                     ref={isLastElement ? lastElementRef : undefined}
@@ -402,84 +412,91 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
                     className="transcript-card"
                     variants={CARD_VARIANTS}
                   >
-                    <div className="transcript-card__header">
-                      <div className="transcript-card__meta">
-                        <div className="transcript-card__date">
-                          {formatDateRelative(transcript.created_at)}
-                        </div>
-                        <div className="transcript-card__app">
-                          <div className="transcript-cell-app__content">
-                            {iconUrl ? (
-                              <img
-                                src={iconUrl}
-                                alt=""
-                                className="transcript-cell-app__icon"
-                                title={appName || undefined}
-                              />
-                            ) : null}
-                            <span className="transcript-cell-app__name">
-                              {appName || "—"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                    {/* Hover-reveal actions — top-right */}
+                    <div className="transcript-card__actions">
+                      {copyText ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleCopyToClipboard(copyText, transcript.id)
+                          }
+                          className={`transcript-action-btn transcript-action-btn--copy ${
+                            copiedId === transcript.id ? "copied" : ""
+                          }`}
+                          title={
+                            copiedId === transcript.id
+                              ? "Copied!"
+                              : "Copy transcript"
+                          }
+                        >
+                          {copiedId === transcript.id ? (
+                            <Check size={14} strokeWidth={2.5} />
+                          ) : (
+                            <Copy size={14} />
+                          )}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => openDeleteConfirm(transcript.id)}
+                        disabled={!!deletingId}
+                        className="transcript-action-btn transcript-action-btn--delete"
+                        title="Delete transcript"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
 
-                    <div className="transcript-card__body">
-                      <div className="transcript-card__row">
-                        <div className="transcript-display-cell transcript-display-cell--card transcript-card__main">
-                          <div className="transcript-text-cell">
-                            {hasText ? (
-                              <span className="transcript-item-text">
-                                {displayText}
-                              </span>
-                            ) : (
-                              <span className="transcript-item-empty">
-                                {transcript.status === "processing"
-                                  ? "Processing..."
-                                  : "No text available"}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                    {/* Text — the hero */}
+                    <div className="transcript-card__text">
+                      {hasText ? (
+                        <span className="transcript-item-text">
+                          {displayText}
+                        </span>
+                      ) : (
+                        <span className="transcript-item-empty">
+                          {transcript.status === "processing"
+                            ? "Processing..."
+                            : "No text available"}
+                        </span>
+                      )}
+                    </div>
 
-                        <div className="transcript-card__actions">
-                          <div className="transcript-actions-cell">
-                            {copyText ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleCopyToClipboard(copyText, transcript.id)
-                                }
-                                className={`transcript-action-btn transcript-action-btn--copy ${
-                                  copiedId === transcript.id ? "copied" : ""
-                                }`}
-                                title={
-                                  copiedId === transcript.id
-                                    ? "Copied!"
-                                    : "Copy transcript"
-                                }
-                              >
-                                {copiedId === transcript.id ? (
-                                  <Check size={16} strokeWidth={2.5} />
-                                ) : (
-                                  <Copy size={16} />
-                                )}
-                              </button>
-                            ) : null}
-
-                            <button
-                              type="button"
-                              onClick={() => openDeleteConfirm(transcript.id)}
-                              disabled={!!deletingId}
-                              className="transcript-action-btn transcript-action-btn--delete"
-                              title="Delete transcript"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                    {/* Metadata footer */}
+                    <div className="transcript-card__footer">
+                      <span className="transcript-card__date">
+                        {formatDateRelative(transcript.created_at)}
+                      </span>
+                      <span className="transcript-card__dot" />
+                      <span className="transcript-card__app">
+                        {iconUrl ? (
+                          <img
+                            src={iconUrl}
+                            alt=""
+                            className="transcript-card__app-icon"
+                            title={appName || undefined}
+                          />
+                        ) : null}
+                        <span className="transcript-card__app-name">
+                          {appName || "Unknown"}
+                        </span>
+                      </span>
+                      {wordCount ? (
+                        <>
+                          <span className="transcript-card__dot" />
+                          <span className="transcript-card__words">
+                            {wordCount} {wordCount === 1 ? "word" : "words"}
+                          </span>
+                        </>
+                      ) : null}
+                      {isEnhanced ? (
+                        <>
+                          <span className="transcript-card__dot" />
+                          <span className="transcript-card__enhanced-badge">
+                            Enhanced
+                          </span>
+                        </>
+                      ) : null}
                     </div>
                   </motion.div>
                 );
