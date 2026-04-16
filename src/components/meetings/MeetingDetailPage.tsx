@@ -1179,7 +1179,10 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                               ))}
                               {isSendingChat && (
                                 <div className="meeting-detail-rail__msg meeting-detail-rail__msg--assistant meeting-detail-rail__msg--loading">
-                                  <span className="meeting-detail-rail__loading-dots" />
+                                  <span
+                                    className="meeting-detail-rail__loading-spinner"
+                                    aria-hidden
+                                  />
                                 </div>
                               )}
                             </div>
