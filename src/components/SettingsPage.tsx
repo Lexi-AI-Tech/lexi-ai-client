@@ -72,6 +72,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     null,
   );
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Updater state
@@ -477,6 +478,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
+  const handleUpgradeToPro = async () => {
+    try {
+      setIsUpgrading(true);
+      const result = await invoke<{ session_id: string; checkout_url: string | null }>(
+        "create_billing_checkout",
+        { planType: "pro" }
+      );
+      
+      if (result.checkout_url) {
+        await openExternal(result.checkout_url);
+      } else {
+        toast.error("Could not retrieve checkout URL");
+      }
+    } catch (e: any) {
+      console.error("Failed to create checkout session:", e);
+      toast.error(e?.message || "Failed to start checkout process");
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
+
   const ToggleSwitch: React.FC<{
     enabled: boolean;
     onToggle: () => void;
@@ -583,9 +605,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       <div className="settings-layout">
         {activeSection === "account" && (
           <div>
-            <div className="panel panel--lg">
+            <div className="panel panel--lg mb-16">
               <div className="panel__label panel__label--spaced">Account</div>
               <GoogleLoginButton />
+            </div>
+            <div className="panel panel--lg">
+              <div className="settings-row">
+                <div className="settings-row__content">
+                  <div className="settings-row__title">Subscription</div>
+                  <div className="settings-row__desc">
+                    Upgrade to Pro to unlock advanced features.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUpgradeToPro}
+                  disabled={isUpgrading || isLoading}
+                  className="btn btn--primary"
+                  style={{ margin: 0 }}
+                >
+                  {isUpgrading ? "Starting Checkout..." : "Upgrade to Pro"}
+                </button>
+              </div>
             </div>
           </div>
         )}

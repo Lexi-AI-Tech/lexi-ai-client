@@ -111,7 +111,7 @@ use commands::auth::{
     get_current_user, get_pkce_verifier, has_auth_data, logout, refresh_auth_token,
     start_google_login, store_auth_data,
 };
-use commands::billing::get_billing_usage;
+use commands::billing::{get_billing_usage, create_billing_checkout};
 use commands::docs::{
     create_doc, create_doc_from_audio, delete_doc, get_doc, get_docs, start_doc_recording,
     stop_doc_recording, update_doc,
@@ -357,6 +357,7 @@ pub fn main() {
             get_analytics_stats,
             get_analytics_chart,
             get_billing_usage,
+            create_billing_checkout,
             get_action_history,
             delete_action_history,
             get_shortcuts,

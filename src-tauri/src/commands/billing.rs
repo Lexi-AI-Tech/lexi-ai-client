@@ -63,3 +63,53 @@ pub async fn get_billing_usage(app: AppHandle) -> Result<BillingUsageResponse, S
 
     serde_json::from_value(data).map_err(|e| format!("Failed to deserialize response: {}", e))
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CheckoutResponse {
+    pub session_id: String,
+    pub checkout_url: Option<String>,
+}
+
+#[tauri::command]
+pub async fn create_billing_checkout(app: AppHandle, plan_type: String) -> Result<CheckoutResponse, String> {
+    let auth_token = match get_auth_token_async(&app).await {
+        Ok(token) => token,
+        Err(_) => {
+            crate::commands::auth::handle_auth_expired(&app);
+            return Err("Authentication required".to_string());
+        }
+    };
+
+    let url = format!("{}/api/v1/billing/checkout", crate::config::api_base_url());
+
+    utils::log_api_request("POST", &url);
+
+    let client = crate::utils::create_http_client();
+    let body = serde_json::json!({
+        "plan_type": plan_type
+    });
+    
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Server error ({}): {}", status, error_text));
+    }
+
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    serde_json::from_value(data).map_err(|e| format!("Failed to deserialize response: {}", e))
+}
