@@ -485,7 +485,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         "create_billing_checkout",
         { planType: "pro" }
       );
-      
+
       if (result.checkout_url) {
         await openExternal(result.checkout_url);
       } else {
@@ -493,7 +493,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       }
     } catch (e: any) {
       console.error("Failed to create checkout session:", e);
-      toast.error(e?.message || "Failed to start checkout process");
+      toast.error("Failed to start checkout process");
     } finally {
       setIsUpgrading(false);
     }
@@ -548,7 +548,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </h2>
         <div className="panel panel--center">
           <p className="panel__message">Sign in to access your settings</p>
-          <GoogleLoginButton onSuccess={() => {}} onError={() => {}} />
+          <GoogleLoginButton onSuccess={() => { }} onError={() => { }} />
         </div>
       </div>
     );
@@ -649,8 +649,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <span>
                     {selectedLanguage
                       ? SUPPORTED_LANGUAGES.find(
-                          (l) => l.value === selectedLanguage,
-                        )?.label || "Select language"
+                        (l) => l.value === selectedLanguage,
+                      )?.label || "Select language"
                       : "Auto Detect Language"}
                   </span>
                   <ChevronDown
