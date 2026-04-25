@@ -10,7 +10,6 @@ import { motion } from "framer-motion";
 import { Atom, FileText, Mic, Video, AudioLines, Zap } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import { useToast } from "../toast/useToast";
 import { UpgradeModal } from "../UpgradeModal";
 import type {
   ActionHistory,
@@ -60,17 +59,20 @@ const FEATURE_LABELS: Record<string, string> = {
   "assistant.speech_to_text": "Transcriptions",
   "meetings.create": "Meeting",
   "actions.perform": "Actions",
+  "docs.create": "Docs",
 };
 
 const FEATURE_USAGE_SUFFIX: Record<string, string> = {
   "assistant.speech_to_text": "words",
   "meetings.create": "sessions",
   "actions.perform": "actions",
+  "docs.create": "docs",
 };
 
 const PLAN_USAGE_FEATURE_ORDER = [
   "assistant.speech_to_text",
   "meetings.create",
+  "docs.create",
   "actions.perform",
 ] as const;
 
@@ -270,7 +272,6 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigate,
 }) => {
   const { user, isAuthenticated } = useAuthStore();
-  const toast = useToast();
 
   const [recentActivityTab, setRecentActivityTab] =
     useState<RecentActivityTabId>("transcripts");

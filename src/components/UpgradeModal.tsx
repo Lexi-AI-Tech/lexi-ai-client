@@ -46,6 +46,13 @@ const PLAN_COMPARISON: PlanFeatureRow[] = [
     freeLimit: 1000,
   },
   {
+    key: "docs.create",
+    label: "Docs",
+    freeLimitLabel: "5 docs / week",
+    proLimitLabel: "Unlimited",
+    freeLimit: 5,
+  },
+  {
     key: "meetings.create",
     label: "Meetings",
     freeLimitLabel: "5 sessions / month",
@@ -65,6 +72,7 @@ const FEATURE_USAGE_SUFFIX: Record<string, string> = {
   "assistant.speech_to_text": "words",
   "meetings.create": "sessions",
   "actions.perform": "actions",
+  "docs.create": "docs",
 };
 
 function featureUsageSuffix(key: string): string {

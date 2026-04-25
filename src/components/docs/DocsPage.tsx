@@ -12,6 +12,11 @@ import type { Doc } from "../../types";
 import { useToast } from "../toast/useToast";
 import { DocsListPage } from "./DocsListPage";
 import { RichTextEditor, type RichTextEditorRef } from "./RichTextEditor";
+import { UpgradeModal } from "../UpgradeModal";
+import {
+  formatUserFacingApiErrorFromUnknown,
+  isUsageQuotaExceededError,
+} from "../../utils/userFacingApiError";
 import "./docs.css";
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -71,6 +76,16 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   onEntryIntentConsumed,
 }) => {
   const toast = useToast();
+
+  const isQuotaExceeded = useCallback((err: unknown) => {
+    const raw =
+      typeof err === "string"
+        ? err
+        : err instanceof Error
+          ? err.message
+          : String(err ?? "");
+    return isUsageQuotaExceededError(raw);
+  }, []);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -89,6 +104,7 @@ export const DocsPage: React.FC<DocsPageProps> = ({
   const [isDocRecording, setIsDocRecording] = useState(false);
   const [isCreatingDocFromAudio, setIsCreatingDocFromAudio] = useState(false);
   const [isGeneratingMeetingDoc, setIsGeneratingMeetingDoc] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const ignoreMeetingGenResultRef = useRef(false);
   /** Local title for the current doc to avoid setDocs on every keystroke */
   const [editingTitle, setEditingTitle] = useState("");
@@ -200,7 +216,11 @@ export const DocsPage: React.FC<DocsPageProps> = ({
               toast.success("Content added from voice");
             } catch (err) {
               console.error("Create doc from audio failed:", err);
-              toast.error("Failed to create doc from audio");
+              const msg = formatUserFacingApiErrorFromUnknown(err);
+              if (isQuotaExceeded(err)) {
+                setShowUpgradeModal(true);
+              }
+              toast.error(msg);
             } finally {
               setIsCreatingDocFromAudio(false);
             }
@@ -311,7 +331,11 @@ export const DocsPage: React.FC<DocsPageProps> = ({
       } catch (err) {
         if (!ignoreMeetingGenResultRef.current) {
           console.error("Create doc from meeting failed:", err);
-          toast.error(err);
+          const msg = formatUserFacingApiErrorFromUnknown(err);
+          if (isQuotaExceeded(err)) {
+            setShowUpgradeModal(true);
+          }
+          toast.error(msg);
         }
       } finally {
         setIsGeneratingMeetingDoc(false);
@@ -330,7 +354,11 @@ export const DocsPage: React.FC<DocsPageProps> = ({
       toast.success("Doc created");
     } catch (err) {
       console.error("Failed to create doc:", err);
-      toast.error("Failed to create doc");
+      const msg = formatUserFacingApiErrorFromUnknown(err);
+      if (isQuotaExceeded(err)) {
+        setShowUpgradeModal(true);
+      }
+      toast.error(msg);
     }
   };
 
@@ -451,6 +479,9 @@ export const DocsPage: React.FC<DocsPageProps> = ({
     <div
       className={`docs-page ${showDetailView || showGeneratingMeeting ? "docs-page--detail" : ""}`}
     >
+      {showUpgradeModal && (
+        <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
+      )}
       {showGeneratingMeeting && (
         <>
           <div className="docs-page-header">
