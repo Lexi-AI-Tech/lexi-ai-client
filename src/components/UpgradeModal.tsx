@@ -41,9 +41,9 @@ const PLAN_COMPARISON: PlanFeatureRow[] = [
   {
     key: "assistant.speech_to_text",
     label: "Transcriptions",
-    freeLimitLabel: "1,000 words / month",
+    freeLimitLabel: "2,000 words / week",
     proLimitLabel: "Unlimited",
-    freeLimit: 1000,
+    freeLimit: 2000,
   },
   {
     key: "docs.create",
@@ -55,14 +55,14 @@ const PLAN_COMPARISON: PlanFeatureRow[] = [
   {
     key: "meetings.create",
     label: "Meetings",
-    freeLimitLabel: "5 sessions / month",
+    freeLimitLabel: "5 sessions / week",
     proLimitLabel: "Unlimited",
     freeLimit: 5,
   },
   {
     key: "actions.perform",
     label: "Actions",
-    freeLimitLabel: "20 actions / month",
+    freeLimitLabel: "20 actions / week",
     proLimitLabel: "Unlimited",
     freeLimit: 20,
   },
@@ -193,7 +193,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 Free
               </div>
               <div className="upgrade-plan-price">
-                $0
+                $ 0
                 <span className="upgrade-plan-price__period">/ mo</span>
               </div>
               <p className="upgrade-plan-sublabel">Current plan</p>
@@ -256,7 +256,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 Pro
               </div>
               <div className="upgrade-plan-price">
-                $20
+                $ 20
                 <span className="upgrade-plan-price__period">/ mo</span>
               </div>
               <p className="upgrade-plan-sublabel">
