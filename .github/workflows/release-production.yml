@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            target: aarch64-apple-darwin
+            target: universal-apple-darwin
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -40,6 +40,10 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust Targets for Universal Build
+        if: matrix.os == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Install dependencies
         run: npm install
@@ -128,9 +132,9 @@ jobs:
           APP_RELEASES_API_KEY: ${{ secrets.APP_RELEASES_API_KEY }}
         run: |
           VERSION="${{ env.VERSION }}"
-          TARGET="darwin"
+          TARGET="universal-apple-darwin"
           BUNDLE_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Lexi AI.app.tar.gz"
-          DMG_ORIGINAL="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Lexi AI_${VERSION}_aarch64.dmg"
+          DMG_ORIGINAL="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Lexi AI_${VERSION}_universal.dmg"
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/LexiAI-Installer.dmg"
           cp "$DMG_ORIGINAL" "$DMG_PATH"
           SIG_CONTENT=$(cat "$BUNDLE_PATH.sig")
