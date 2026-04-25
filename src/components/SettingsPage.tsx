@@ -477,7 +477,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
-
   const ToggleSwitch: React.FC<{
     enabled: boolean;
     onToggle: () => void;
@@ -527,7 +526,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </h2>
         <div className="panel panel--center">
           <p className="panel__message">Sign in to access your settings</p>
-          <GoogleLoginButton onSuccess={() => { }} onError={() => { }} />
+          <GoogleLoginButton onSuccess={() => {}} onError={() => {}} />
         </div>
       </div>
     );
@@ -609,8 +608,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <span>
                     {selectedLanguage
                       ? SUPPORTED_LANGUAGES.find(
-                        (l) => l.value === selectedLanguage,
-                      )?.label || "Select language"
+                          (l) => l.value === selectedLanguage,
+                        )?.label || "Select language"
                       : "Auto Detect Language"}
                   </span>
                   <ChevronDown

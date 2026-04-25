@@ -94,19 +94,32 @@ function main() {
   }
 
   const isUniversal = args.includes("--universal");
-  const filteredArgs = args.filter(a => a !== "--universal");
+  const filteredArgs = args.filter((a) => a !== "--universal");
 
   let child;
   if (isUniversal) {
     // If universal, run tauri build directly to ensure --target goes to tauri, not cargo
-    const tauriArgs = ["tauri", "build", "--target", "universal-apple-darwin", "--", "--features", "custom-protocol", ...filteredArgs];
+    const tauriArgs = [
+      "tauri",
+      "build",
+      "--target",
+      "universal-apple-darwin",
+      "--",
+      "--features",
+      "custom-protocol",
+      ...filteredArgs,
+    ];
     child = spawn("npx", tauriArgs, {
       cwd: root,
       stdio: "inherit",
       env: process.env,
     });
   } else {
-    const buildArgs = ["run", "build", ...filteredArgs.length ? ["--", ...filteredArgs] : []];
+    const buildArgs = [
+      "run",
+      "build",
+      ...(filteredArgs.length ? ["--", ...filteredArgs] : []),
+    ];
     child = spawn("npm", buildArgs, {
       cwd: root,
       stdio: "inherit",

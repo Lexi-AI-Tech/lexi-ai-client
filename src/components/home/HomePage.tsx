@@ -708,8 +708,12 @@ export const HomePage: React.FC<HomePageProps> = ({
               <h2 className="section-title">Plan Usage</h2>
               {billingUsage && (
                 <div className="billing-usage-meta">
-                  <span className={`billing-plan-badge${isProPlan(billingUsage.plan_type) ? " is-pro" : ""}`}>
-                    {isProPlan(billingUsage.plan_type) && <Zap size={10} fill="#ffffff" color="#ffffff" />}
+                  <span
+                    className={`billing-plan-badge${isProPlan(billingUsage.plan_type) ? " is-pro" : ""}`}
+                  >
+                    {isProPlan(billingUsage.plan_type) && (
+                      <Zap size={10} fill="#ffffff" color="#ffffff" />
+                    )}
                     {billingUsage.plan_type}
                   </span>
                   {!isProPlan(billingUsage.plan_type) && (

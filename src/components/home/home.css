@@ -577,8 +577,15 @@
 /* Pro plan section — premium card look */
 .billing-usage-section.is-pro-plan {
   border-color: var(--lexi-border);
-  background: linear-gradient(145deg, var(--lexi-primary-muted) 0%, var(--lexi-surface-overlay) 40%, var(--lexi-surface-elevated) 100%);
-  box-shadow: 0 0 0 1px var(--lexi-border-subtle), var(--lexi-shadow-sm);
+  background: linear-gradient(
+    145deg,
+    var(--lexi-primary-muted) 0%,
+    var(--lexi-surface-overlay) 40%,
+    var(--lexi-surface-elevated) 100%
+  );
+  box-shadow:
+    0 0 0 1px var(--lexi-border-subtle),
+    var(--lexi-shadow-sm);
   position: relative;
   overflow: hidden;
 }
@@ -591,7 +598,11 @@
   width: 180px;
   height: 180px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--lexi-primary-muted) 0%, transparent 70%);
+  background: radial-gradient(
+    circle,
+    var(--lexi-primary-muted) 0%,
+    transparent 70%
+  );
   pointer-events: none;
 }
 

@@ -99,24 +99,32 @@ interface UpgradeModalProps {
 
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
   const toast = useToast();
-  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(null);
+  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(
+    null,
+  );
   const [isUpgrading, setIsUpgrading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     invoke<BillingUsageResponse>("get_billing_usage")
-      .then((data) => { if (!cancelled) setBillingUsage(data); })
-      .catch((err) => { console.error("Failed to fetch billing usage:", err); });
-    return () => { cancelled = true; };
+      .then((data) => {
+        if (!cancelled) setBillingUsage(data);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch billing usage:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleUpgrade = useCallback(async () => {
     try {
       setIsUpgrading(true);
-      const result = await invoke<{ session_id: string; checkout_url: string | null }>(
-        "create_billing_checkout",
-        { planType: "pro" }
-      );
+      const result = await invoke<{
+        session_id: string;
+        checkout_url: string | null;
+      }>("create_billing_checkout", { planType: "pro" });
       if (result.checkout_url) {
         await invoke("open_external_url", { url: result.checkout_url });
         onClose();
@@ -129,17 +137,19 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
     } finally {
       setIsUpgrading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose]);
 
   const usageMap = new Map<string, FeatureUsageEntry>(
-    (billingUsage?.features ?? []).map((f) => [f.feature_key, f])
+    (billingUsage?.features ?? []).map((f) => [f.feature_key, f]),
   );
 
   return (
     <div
       className="upgrade-modal-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="upgrade-modal"
@@ -176,7 +186,6 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
 
         {/* ── Plan cards ── */}
         <div className="upgrade-modal__plans">
-
           {/* Free plan */}
           <div className="upgrade-plan-card upgrade-plan-card--free">
             <div className="upgrade-plan-header">
@@ -195,7 +204,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 const entry = usageMap.get(row.key);
                 const used = entry?.used ?? 0;
                 const limit = row.freeLimit;
-                const pct = limit != null && limit > 0 ? Math.min(1, used / limit) : 0;
+                const pct =
+                  limit != null && limit > 0 ? Math.min(1, used / limit) : 0;
                 const isNearLimit = pct >= 0.8;
                 const isAtLimit = pct >= 1;
 
@@ -204,7 +214,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                     <div className="upgrade-plan-feature__row">
                       <CheckIcon pro={false} />
                       <div className="upgrade-plan-feature__text">
-                        <span className="upgrade-plan-feature__label">{row.label}</span>
+                        <span className="upgrade-plan-feature__label">
+                          {row.label}
+                        </span>
                         <span
                           className={`upgrade-plan-feature__sublabel${isNearLimit ? " upgrade-plan-feature__sublabel--warn" : ""}`}
                         >
@@ -247,7 +259,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 $20
                 <span className="upgrade-plan-price__period">/ mo</span>
               </div>
-              <p className="upgrade-plan-sublabel">Everything in Free — no limits</p>
+              <p className="upgrade-plan-sublabel">
+                Everything in Free — no limits
+              </p>
             </div>
 
             <div className="upgrade-plan-divider" />
@@ -258,8 +272,12 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                   <div className="upgrade-plan-feature__row">
                     <CheckIcon pro={true} />
                     <div className="upgrade-plan-feature__pro-inner">
-                      <span className="upgrade-plan-feature__label">{row.label}</span>
-                      <span className="upgrade-plan-unlimited-pill">∞ Unlimited</span>
+                      <span className="upgrade-plan-feature__label">
+                        {row.label}
+                      </span>
+                      <span className="upgrade-plan-unlimited-pill">
+                        ∞ Unlimited
+                      </span>
                     </div>
                   </div>
                   <div className="upgrade-plan-feature__spacer" />

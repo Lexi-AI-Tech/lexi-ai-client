@@ -71,7 +71,10 @@ pub struct CheckoutResponse {
 }
 
 #[tauri::command]
-pub async fn create_billing_checkout(app: AppHandle, plan_type: String) -> Result<CheckoutResponse, String> {
+pub async fn create_billing_checkout(
+    app: AppHandle,
+    plan_type: String,
+) -> Result<CheckoutResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
         Err(_) => {
@@ -88,7 +91,7 @@ pub async fn create_billing_checkout(app: AppHandle, plan_type: String) -> Resul
     let body = serde_json::json!({
         "plan_type": plan_type
     });
-    
+
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
