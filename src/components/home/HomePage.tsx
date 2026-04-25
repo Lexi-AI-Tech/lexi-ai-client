@@ -7,7 +7,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Atom, FileText, Mic, Video, AudioLines } from "lucide-react";
+import { Atom, FileText, Mic, Video, AudioLines, Zap } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 import { useToast } from "../toast/useToast";
@@ -58,7 +58,7 @@ const UPGRADE_URL = "https://speaklexi.com";
 const RECENT_ACTIVITY_LIMIT = 5;
 
 const FEATURE_LABELS: Record<string, string> = {
-  "assistant.speech_to_text": "Assistant",
+  "assistant.speech_to_text": "Transcriptions",
   "meetings.create": "Meeting",
   "actions.perform": "Actions",
 };
@@ -701,7 +701,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         {/* Right: Plan Usage */}
         <motion.section
-          className="billing-usage-section"
+          className={`billing-usage-section${billingUsage && isProPlan(billingUsage.plan_type) ? " is-pro-plan" : ""}`}
           variants={itemVariants}
         >
           <div className="section-header">
@@ -709,7 +709,8 @@ export const HomePage: React.FC<HomePageProps> = ({
               <h2 className="section-title">Plan Usage</h2>
               {billingUsage && (
                 <div className="billing-usage-meta">
-                  <span className="billing-plan-badge">
+                  <span className={`billing-plan-badge${isProPlan(billingUsage.plan_type) ? " is-pro" : ""}`}>
+                    {isProPlan(billingUsage.plan_type) && <Zap size={10} fill="#ffffff" color="#ffffff" />}
                     {billingUsage.plan_type}
                   </span>
                   {!isProPlan(billingUsage.plan_type) && (
@@ -778,7 +779,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                         <span className="billing-feature-usage">
                           {isUnlimited ? (
                             <span className="billing-usage-unlimited">
-                              Unlimited
+                              ∞ Unlimited
                             </span>
                           ) : (
                             <>

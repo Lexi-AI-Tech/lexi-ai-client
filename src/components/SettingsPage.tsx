@@ -25,6 +25,7 @@ import { useUpdaterStore } from "../store/updaterStore";
 import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
+import { UpgradeModal } from "./UpgradeModal";
 import { check } from "@tauri-apps/plugin-updater";
 import { checkUpdateDetails } from "../hooks/useAutoUpdater";
 
@@ -72,8 +73,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     null,
   );
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isUpgrading, setIsUpgrading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Updater state
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -478,25 +479,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
-  const handleUpgradeToPro = async () => {
-    try {
-      setIsUpgrading(true);
-      const result = await invoke<{ session_id: string; checkout_url: string | null }>(
-        "create_billing_checkout",
-        { planType: "pro" }
-      );
-
-      if (result.checkout_url) {
-        await openExternal(result.checkout_url);
-      } else {
-        toast.error("Could not retrieve checkout URL");
-      }
-    } catch (e: any) {
-      console.error("Failed to create checkout session:", e);
-      toast.error("Failed to start checkout process");
-    } finally {
-      setIsUpgrading(false);
-    }
+  const handleOpenUpgradeModal = () => {
+    setShowUpgradeModal(true);
   };
 
   const ToggleSwitch: React.FC<{
@@ -614,17 +598,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="settings-row__content">
                   <div className="settings-row__title">Subscription</div>
                   <div className="settings-row__desc">
-                    Upgrade to Pro to unlock advanced features.
+                    Upgrade to Pro to unlock unlimited transcription, meetings, and actions.
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={handleUpgradeToPro}
-                  disabled={isUpgrading || isLoading}
+                  id="settings-upgrade-btn"
+                  onClick={handleOpenUpgradeModal}
+                  disabled={isLoading}
                   className="btn btn--primary"
                   style={{ margin: 0 }}
                 >
-                  {isUpgrading ? "Starting Checkout..." : "Upgrade to Pro"}
+                  Upgrade
                 </button>
               </div>
             </div>
@@ -901,6 +886,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
+      )}
     </div>
   );
 };

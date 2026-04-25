@@ -560,7 +560,62 @@
 }
 
 .billing-usage-unlimited {
-  color: var(--lexi-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #047857;
+  background: rgba(5, 150, 105, 0.1);
+  border: 1px solid rgba(5, 150, 105, 0.2);
+  border-radius: 999px;
+  padding: 0.1875rem 0.5rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* Pro plan section — premium card look */
+.billing-usage-section.is-pro-plan {
+  border-color: rgba(5, 150, 105, 0.35);
+  background: linear-gradient(145deg, #ecfdf5 0%, #f0fdf4 40%, var(--lexi-surface-elevated) 100%);
+  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.06), var(--lexi-shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.billing-usage-section.is-pro-plan::before {
+  content: "";
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(5, 150, 105, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Pro badge — solid filled pill */
+.billing-plan-badge.is-pro {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #ffffff;
+  padding: 0.1875rem 0.625rem;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Pro feature rows — no bottom divider, just spacing */
+.billing-usage-section.is-pro-plan .billing-feature-row {
+  border-bottom-color: rgba(5, 150, 105, 0.12);
+  padding-bottom: 0.625rem;
+  gap: 0;
+}
+
+.billing-usage-section.is-pro-plan .billing-feature-name {
+  font-weight: 600;
+  color: #1f2937;
 }
 
 /* ============================================
