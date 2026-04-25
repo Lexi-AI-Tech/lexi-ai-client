@@ -25,7 +25,6 @@ import { useUpdaterStore } from "../store/updaterStore";
 import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
-import { UpgradeModal } from "./UpgradeModal";
 import { check } from "@tauri-apps/plugin-updater";
 import { checkUpdateDetails } from "../hooks/useAutoUpdater";
 
@@ -74,7 +73,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   );
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Updater state
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -479,9 +477,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
-  const handleOpenUpgradeModal = () => {
-    setShowUpgradeModal(true);
-  };
 
   const ToggleSwitch: React.FC<{
     enabled: boolean;
@@ -589,29 +584,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       <div className="settings-layout">
         {activeSection === "account" && (
           <div>
-            <div className="panel panel--lg mb-16">
+            <div className="panel panel--lg">
               <div className="panel__label panel__label--spaced">Account</div>
               <GoogleLoginButton />
-            </div>
-            <div className="panel panel--lg">
-              <div className="settings-row">
-                <div className="settings-row__content">
-                  <div className="settings-row__title">Subscription</div>
-                  <div className="settings-row__desc">
-                    Upgrade to Pro to unlock unlimited transcription, meetings, and actions.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  id="settings-upgrade-btn"
-                  onClick={handleOpenUpgradeModal}
-                  disabled={isLoading}
-                  className="btn btn--primary"
-                  style={{ margin: 0 }}
-                >
-                  Upgrade
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -886,11 +861,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Upgrade Modal */}
-      {showUpgradeModal && (
-        <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
-      )}
     </div>
   );
 };
