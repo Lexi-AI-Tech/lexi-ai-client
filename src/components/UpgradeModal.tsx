@@ -47,14 +47,14 @@ const PLAN_COMPARISON: PlanFeatureRow[] = [
   },
   {
     key: "meetings.create",
-    label: "Meeting Sessions",
+    label: "Meetings",
     freeLimitLabel: "5 sessions / month",
     proLimitLabel: "Unlimited",
     freeLimit: 5,
   },
   {
     key: "actions.perform",
-    label: "AI Actions",
+    label: "Actions",
     freeLimitLabel: "20 actions / month",
     proLimitLabel: "Unlimited",
     freeLimit: 20,
@@ -236,7 +236,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 Pro
               </div>
               <div className="upgrade-plan-price">
-                $9
+                $20
                 <span className="upgrade-plan-price__period">/ mo</span>
               </div>
               <p className="upgrade-plan-sublabel">Everything in Free — no limits</p>
@@ -278,7 +278,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
             ) : (
               <>
                 <Zap size={16} />
-                Upgrade to Pro — $9 / month
+                Upgrade to Pro — $20 / month
               </>
             )}
           </button>

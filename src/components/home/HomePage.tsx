@@ -11,6 +11,7 @@ import { Atom, FileText, Mic, Video, AudioLines, Zap } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 import { useToast } from "../toast/useToast";
+import { UpgradeModal } from "../UpgradeModal";
 import type {
   ActionHistory,
   PaginatedActionHistoryResponse,
@@ -51,8 +52,6 @@ type RecentActivityTabId = "transcripts" | "meetings" | "actions";
 function byCreatedAtDesc<T extends { created_at: string }>(a: T, b: T): number {
   return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 }
-
-const UPGRADE_URL = "https://speaklexi.com";
 
 /** Max items per category in Recent Activity (tabs + API page size). */
 const RECENT_ACTIVITY_LIMIT = 5;
@@ -280,6 +279,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [recentLoading, setRecentLoading] = useState(false);
   const [meetingsLoading, setMeetingsLoading] = useState(false);
   const [actionsLoading, setActionsLoading] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(
     null,
@@ -455,13 +455,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   const recentActivityLoading =
     recentLoading || meetingsLoading || actionsLoading;
 
-  const handleUpgradeClick = useCallback(async () => {
-    try {
-      await invoke("open_external_url", { url: UPGRADE_URL });
-    } catch (e) {
-      console.error("Failed to open upgrade URL:", e);
-      toast.error(e);
-    }
+  const handleUpgradeClick = useCallback(() => {
+    setShowUpgradeModal(true);
   }, []);
 
   const showUpgradeCta =
@@ -477,6 +472,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       initial="hidden"
       animate="visible"
     >
+      {showUpgradeModal && (
+        <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
+      )}
       {/* ── Greeting ── */}
       <motion.header className="home-greeting" variants={itemVariants}>
         <div className="greeting-section">
