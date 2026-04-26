@@ -43,6 +43,8 @@ function main() {
         "Usage:",
         "  npm run build:mac",
         "",
+        "Always produces a Universal Binary (aarch64 + x86_64).",
+        "",
         "Env loading order (does not override already-set env):",
         "  1) .env.build.mac (preferred)",
         "  2) .env",
@@ -93,7 +95,17 @@ function main() {
     process.exit(1);
   }
 
-  const child = spawn("npm", ["run", "build"], {
+  // Always build a Universal Binary so the DMG works on both Intel and Apple Silicon.
+  const tauriArgs = [
+    "tauri",
+    "build",
+    "--target",
+    "universal-apple-darwin",
+    "--",
+    "--features",
+    "custom-protocol",
+  ];
+  const child = spawn("npx", tauriArgs, {
     cwd: root,
     stdio: "inherit",
     env: process.env,

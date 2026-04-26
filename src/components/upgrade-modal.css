@@ -1,0 +1,447 @@
+/* ============================================================
+   Upgrade Modal
+   Uses app CSS variables defined in index.css (:root).
+   ============================================================ */
+
+/* ── Overlay ── */
+.upgrade-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(46, 59, 47, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 20px;
+}
+
+/* ── Dialog shell ── */
+.upgrade-modal {
+  background: var(--lexi-surface-elevated);
+  border-radius: 20px;
+  width: 640px;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow:
+    0 24px 80px rgba(46, 59, 47, 0.14),
+    0 8px 24px rgba(46, 59, 47, 0.08);
+  border: 1px solid var(--lexi-border);
+  position: relative;
+  color: var(--lexi-text);
+}
+
+/* ── Header ── */
+.upgrade-modal__header {
+  padding: 28px 28px 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.upgrade-modal__header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.upgrade-modal__icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--lexi-primary-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--lexi-primary);
+}
+
+.upgrade-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lexi-text);
+  letter-spacing: -0.02em;
+}
+
+.upgrade-modal__subtitle {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--lexi-text-faint);
+}
+
+.upgrade-modal__close-btn {
+  background: var(--lexi-surface-overlay);
+  border: none;
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lexi-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.upgrade-modal__close-btn:hover {
+  background: var(--lexi-border);
+}
+
+.upgrade-modal__close-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── Plan cards grid ── */
+.upgrade-modal__plans {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 20px 28px;
+}
+
+/* ── Shared card base ── */
+.upgrade-plan-card {
+  border-radius: 16px;
+  padding: 20px;
+}
+
+/* Free card */
+.upgrade-plan-card--free {
+  border: 1.5px solid var(--lexi-border-subtle);
+  background: var(--lexi-surface);
+}
+
+/* Pro card */
+.upgrade-plan-card--pro {
+  border: 2px solid var(--lexi-primary);
+  background: linear-gradient(
+    145deg,
+    var(--lexi-primary-muted) 0%,
+    var(--lexi-surface-overlay) 45%,
+    var(--lexi-surface-elevated) 100%
+  );
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px var(--lexi-border-subtle),
+    0 8px 28px rgba(46, 59, 47, 0.1);
+}
+
+/* Decorative radial glow blob */
+.upgrade-plan-card--pro::before {
+  content: "";
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--lexi-primary-muted) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* ── Plan header (badge + price) ── */
+.upgrade-plan-header {
+  margin-bottom: 14px;
+}
+
+.upgrade-plan-card--pro .upgrade-plan-header {
+  margin-bottom: 16px;
+}
+
+/* Tier badge pill */
+.upgrade-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 100px;
+  padding: 3px 10px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.upgrade-plan-badge--free {
+  background: var(--lexi-surface-overlay);
+  color: var(--lexi-text-muted);
+}
+
+.upgrade-plan-badge--pro {
+  background: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  padding: 3px 12px;
+  box-shadow: 0 2px 6px rgba(46, 59, 47, 0.18);
+}
+
+/* "Best Value" label inside Pro card (absolute) */
+.upgrade-plan-best-value {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: var(--lexi-primary);
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--lexi-primary-foreground);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(46, 59, 47, 0.18);
+}
+
+/* Price */
+.upgrade-plan-price {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--lexi-text);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.upgrade-plan-card--pro .upgrade-plan-price {
+  font-size: 28px;
+  letter-spacing: -0.04em;
+}
+
+.upgrade-plan-price__period {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--lexi-text-faint);
+  margin-left: 3px;
+  letter-spacing: 0;
+}
+
+/* Sub-label below price */
+.upgrade-plan-sublabel {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--lexi-text-faint);
+}
+
+.upgrade-plan-card--pro .upgrade-plan-sublabel {
+  color: var(--lexi-primary-hover);
+  font-weight: 600;
+}
+
+/* Divider inside Pro card */
+.upgrade-plan-divider {
+  height: 1px;
+  background: var(--lexi-border-subtle);
+  margin-bottom: 14px;
+}
+
+/* ── Feature rows ── */
+.upgrade-plan-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.upgrade-plan-feature {
+  /* wrapper for label row + bar/spacer row */
+}
+
+.upgrade-plan-feature__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+/* Check icon circle */
+.upgrade-plan-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--lexi-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--lexi-text-faint);
+}
+
+.upgrade-plan-check--pro {
+  background: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
+}
+
+/* Label + sub-label */
+.upgrade-plan-feature__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.upgrade-plan-feature__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lexi-text);
+}
+
+.upgrade-plan-card--pro .upgrade-plan-feature__label {
+  font-weight: 600;
+}
+
+.upgrade-plan-feature__sublabel {
+  display: block;
+  font-size: 11px;
+  color: var(--lexi-text-faint);
+}
+
+.upgrade-plan-feature__sublabel--warn {
+  color: var(--lexi-danger);
+  font-weight: 600;
+}
+
+/* Pro feature inner: label + pill on same row */
+.upgrade-plan-feature__pro-inner {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+/* Unlimited pill badge */
+.upgrade-plan-unlimited-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--lexi-primary-hover);
+  background: var(--lexi-primary-muted);
+  border: 1px solid var(--lexi-border-subtle);
+  border-radius: 100px;
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Usage bar (free plan) */
+.upgrade-plan-usage-bar-wrap {
+  margin-left: 26px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.upgrade-plan-usage-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--lexi-border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.upgrade-plan-usage-bar__fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--lexi-primary);
+  transition: width 0.3s;
+}
+
+.upgrade-plan-usage-bar__fill--warn {
+  background: var(--lexi-toast-warning-text, #d97706);
+}
+
+.upgrade-plan-usage-bar__fill--danger {
+  background: var(--lexi-danger);
+}
+
+.upgrade-plan-usage-count {
+  font-size: 10px;
+  color: var(--lexi-text-faint);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.upgrade-plan-usage-count--warn {
+  color: var(--lexi-danger);
+}
+
+/* Spacer that mirrors the bar row height in the Pro card */
+.upgrade-plan-feature__spacer {
+  height: 18px;
+  margin-left: 26px;
+}
+
+/* ── Footer CTA ── */
+.upgrade-modal__footer {
+  padding: 0 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.upgrade-modal__cta-btn {
+  width: 100%;
+  padding: 13px 20px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  background: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease,
+    box-shadow 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(46, 59, 47, 0.22);
+  letter-spacing: -0.01em;
+}
+
+.upgrade-modal__cta-btn:hover:not(:disabled) {
+  background: var(--lexi-primary-hover);
+}
+
+.upgrade-modal__cta-btn:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.upgrade-modal__cta-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  box-shadow: none;
+  background: var(--lexi-text-faint);
+}
+
+.upgrade-modal__cta-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.upgrade-modal__legal {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--lexi-text-faint);
+}

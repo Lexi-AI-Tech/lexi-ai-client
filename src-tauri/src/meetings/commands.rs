@@ -577,7 +577,24 @@ pub async fn stream_meeting_summary(
     let mut buffer = Vec::<u8>::new();
 
     while let Some(chunk_result) = stream.next().await {
-        let chunk = chunk_result.map_err(|e| format!("Stream read error: {}", e))?;
+        let chunk = match chunk_result {
+            Ok(c) => c,
+            Err(e) => {
+                let msg = format!(
+                    "Failed to generate meeting summary. Please try again. (Stream read error: {})",
+                    e
+                );
+                let _ = app.emit(
+                    "meeting-summary-stream",
+                    &MeetingSummaryStreamPayload {
+                        line: None,
+                        done: None,
+                        error: Some(msg.clone()),
+                    },
+                );
+                return Err(msg);
+            }
+        };
         buffer.extend_from_slice(&chunk);
 
         // Process complete lines (NDJSON)
@@ -629,16 +646,17 @@ pub async fn stream_meeting_summary(
         }
     }
 
-    // Stream ended without {"done": true}; emit done anyway so frontend can finalize
+    // Stream ended without {"done": true}; treat as failure (avoid partial summaries).
+    let msg = "Failed to generate meeting summary. Please try again.".to_string();
     let _ = app.emit(
         "meeting-summary-stream",
         &MeetingSummaryStreamPayload {
             line: None,
-            done: Some(true),
-            error: None,
+            done: None,
+            error: Some(msg.clone()),
         },
     );
-    Ok(())
+    Err(msg)
 }
 
 /// Add a user note to the meeting transcript (typed during the meeting).

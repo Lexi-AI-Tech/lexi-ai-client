@@ -136,6 +136,9 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   );
   const [streamingLines, setStreamingLines] = useState<SummaryLine[]>([]);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryStreamError, setSummaryStreamError] = useState<string | null>(
+    null,
+  );
   /** False once get_meeting_details finishes for this meeting; avoids "Generate" flash before we know server state. */
   const [isMeetingDetailsLoading, setIsMeetingDetailsLoading] = useState(
     () => !summarySeedFromMeeting(meeting),
@@ -300,10 +303,18 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
             console.error("Meeting summary stream error:", payload.error);
             streamingForMeetingIdRef.current = null;
             setIsGeneratingSummary(false);
+            // Discard partial stream; keep prior `activeSummary` (if any).
+            setStreamingLines([]);
+            setSummaryStreamError(
+              payload.error ||
+                "Failed to generate meeting summary. Please try again.",
+            );
+            toast.error(payload.error);
             return;
           }
           if (payload.done) {
             suggestedQuestionsFetchedByStreamRef.current = true;
+            setSummaryStreamError(null);
             setStreamingLines((prev) => {
               const full = prev.map((l) => l.raw).join("\n");
               setActiveSummary(full || null);
@@ -423,8 +434,8 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       return;
     }
     setIsGeneratingSummary(true);
+    setSummaryStreamError(null);
     setStreamingLines([]);
-    setActiveSummary(null);
     setSuggestedQuestions(null);
     setIsLoadingSuggestedQuestions(true);
     streamingForMeetingIdRef.current = meetingId;
@@ -437,7 +448,13 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       console.error("Failed to generate meeting summary:", error);
       streamingForMeetingIdRef.current = null;
       setIsGeneratingSummary(false);
-      toast.error(error);
+      const msg = error instanceof Error ? error.message : String(error);
+      // Don't keep partially streamed content on failure.
+      setStreamingLines([]);
+      setSummaryStreamError(
+        msg || "Failed to generate meeting summary. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       // Don't flip `isGeneratingSummary` here.
       // We rely on the `meeting-summary-stream` { done: true } event so the UI
@@ -985,6 +1002,23 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                           style={{ width: "72%" }}
                           aria-hidden
                         />
+                      </div>
+                    ) : summaryStreamError && !isGeneratingSummary ? (
+                      <div className="meeting-detail-empty-state">
+                        <h4 className="meeting-detail-empty-state__title">
+                          Failed to generate summary
+                        </h4>
+                        <p className="meeting-detail-empty-state__hint">
+                          {summaryStreamError}
+                        </p>
+                        <button
+                          type="button"
+                          className="meeting-detail-empty-state__btn"
+                          onClick={() => handleGenerateSummary(false)}
+                          disabled={!meetingId || isGeneratingSummary}
+                        >
+                          Try again
+                        </button>
                       </div>
                     ) : (
                       <div className="meeting-detail-empty-state">
