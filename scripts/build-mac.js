@@ -43,6 +43,8 @@ function main() {
         "Usage:",
         "  npm run build:mac",
         "",
+        "Always produces a Universal Binary (aarch64 + x86_64).",
+        "",
         "Env loading order (does not override already-set env):",
         "  1) .env.build.mac (preferred)",
         "  2) .env",
@@ -93,39 +95,21 @@ function main() {
     process.exit(1);
   }
 
-  const isUniversal = args.includes("--universal");
-  const filteredArgs = args.filter((a) => a !== "--universal");
-
-  let child;
-  if (isUniversal) {
-    // If universal, run tauri build directly to ensure --target goes to tauri, not cargo
-    const tauriArgs = [
-      "tauri",
-      "build",
-      "--target",
-      "universal-apple-darwin",
-      "--",
-      "--features",
-      "custom-protocol",
-      ...filteredArgs,
-    ];
-    child = spawn("npx", tauriArgs, {
-      cwd: root,
-      stdio: "inherit",
-      env: process.env,
-    });
-  } else {
-    const buildArgs = [
-      "run",
-      "build",
-      ...(filteredArgs.length ? ["--", ...filteredArgs] : []),
-    ];
-    child = spawn("npm", buildArgs, {
-      cwd: root,
-      stdio: "inherit",
-      env: process.env,
-    });
-  }
+  // Always build a Universal Binary so the DMG works on both Intel and Apple Silicon.
+  const tauriArgs = [
+    "tauri",
+    "build",
+    "--target",
+    "universal-apple-darwin",
+    "--",
+    "--features",
+    "custom-protocol",
+  ];
+  const child = spawn("npx", tauriArgs, {
+    cwd: root,
+    stdio: "inherit",
+    env: process.env,
+  });
 
   child.on("exit", (code) => process.exit(code ?? 1));
   child.on("error", () => process.exit(1));

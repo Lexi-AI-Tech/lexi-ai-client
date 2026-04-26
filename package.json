@@ -10,7 +10,6 @@
     "build": "tauri build -- --features custom-protocol",
     "build:tauri": "tauri build -- --features custom-protocol",
     "build:mac": "node scripts/build-mac.js",
-    "build:mac:universal": "npm run build:mac -- --universal",
     "dev:frontend": "vite",
     "build:frontend": "vite build",
     "preview": "vite preview",
