@@ -27,6 +27,12 @@ import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import { check } from "@tauri-apps/plugin-updater";
 import { checkUpdateDetails } from "../hooks/useAutoUpdater";
+import { UpgradeModal } from "./UpgradeModal";
+
+type CurrentSubscriptionResponse = {
+  plan_type: string;
+  subscription_status: string | null;
+};
 
 const TERMS_URL = "https://www.speaklexi.com/terms";
 const PRIVACY_URL = "https://www.speaklexi.com/privacy";
@@ -59,6 +65,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   const authStore = useAuthStore();
   const toast = useToast();
+  const [subscription, setSubscription] =
+    useState<CurrentSubscriptionResponse | null>(
+    null,
+  );
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(
     null,
@@ -142,6 +154,66 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
     loadConfig();
   }, []);
+
+  const isProPlan = (planType: string | undefined | null): boolean =>
+    (planType ?? "").trim().toLowerCase() === "pro";
+
+  const refreshSubscription = async () => {
+    if (!authStore.isAuthenticated) return;
+    try {
+      setBillingLoading(true);
+      const s = await invoke<CurrentSubscriptionResponse>("get_current_subscription");
+      setSubscription(s);
+    } catch (err) {
+      setSubscription(null);
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
+  // Fetch billing usage when Settings opens and when switching to Account tab.
+  useEffect(() => {
+    if (!authStore.isAuthenticated) return;
+    if (activeSection !== "account") return;
+    refreshSubscription();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, authStore.isAuthenticated]);
+
+  const isProActive = (sub: CurrentSubscriptionResponse | null) =>
+    !!sub && isProPlan(sub.plan_type) && (sub.subscription_status ?? "").trim() === "active";
+
+  const isFreePlan = (planType: string | undefined | null): boolean =>
+    (planType ?? "").trim().toLowerCase() === "free";
+
+  const handleCancelSubscription = async () => {
+    const ok = window.confirm(
+      "Cancel your subscription at the end of the current billing period?",
+    );
+    if (!ok) return;
+    try {
+      await invoke("cancel_billing_subscription");
+      toast.success("Cancellation scheduled. You'll keep Pro until period end.");
+      await refreshSubscription();
+    } catch (err) {
+      console.error("Failed to cancel subscription:", err);
+      toast.error("Failed to cancel subscription");
+    }
+  };
+
+  // If UpgradeModal completes an upgrade, it dispatches `lexi:plan-updated`.
+  useEffect(() => {
+    if (!authStore.isAuthenticated) return;
+    const onPlanUpdated = () => {
+      if (activeSection === "account") {
+        refreshSubscription();
+      }
+    };
+    window.addEventListener("lexi:plan-updated", onPlanUpdated);
+    return () => {
+      window.removeEventListener("lexi:plan-updated", onPlanUpdated);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, authStore.isAuthenticated]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -583,9 +655,77 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       <div className="settings-layout">
         {activeSection === "account" && (
           <div>
+            {showUpgradeModal && (
+              <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
+            )}
             <div className="panel panel--lg">
               <div className="panel__label panel__label--spaced">Account</div>
               <GoogleLoginButton />
+
+              {authStore.isAuthenticated && (
+                <div style={{ marginTop: 14 }}>
+                  <div
+                    className="panel"
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>Subscription</span>
+                        <span
+                          className="docs-editor-toolbar-pill docs-editor-toolbar-pill--muted"
+                          style={{
+                            textTransform: "capitalize",
+                            fontSize: 12,
+                          }}
+                        >
+                          {billingLoading ? "Loading…" : subscription?.plan_type ?? "—"}
+                        </span>
+                      </div>
+                      <div className="settings-hint" style={{ marginTop: 0 }}>
+                        {isFreePlan(subscription?.plan_type)
+                          ? "You're on the Free plan."
+                          : isProPlan(subscription?.plan_type)
+                            ? "You're on the Pro plan."
+                            : "Plan information unavailable."}
+                      </div>
+                    </div>
+
+                    <div className="btn-row" style={{ marginTop: 0 }}>
+                      {!billingLoading && isFreePlan(subscription?.plan_type) && (
+                        <button
+                          type="button"
+                          className="btn-save"
+                          onClick={() => setShowUpgradeModal(true)}
+                        >
+                          Upgrade
+                        </button>
+                      )}
+                      {!billingLoading && isProActive(subscription) && (
+                        <button
+                          type="button"
+                          className="btn btn--outline"
+                          onClick={handleCancelSubscription}
+                        >
+                          Cancel subscription
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
