@@ -32,6 +32,8 @@ import { UpgradeModal } from "./UpgradeModal";
 type CurrentSubscriptionResponse = {
   plan_type: string;
   subscription_status: string | null;
+  cancel_at_period_end: boolean;
+  next_billing_date: string | null;
 };
 
 const TERMS_URL = "https://www.speaklexi.com/terms";
@@ -71,6 +73,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   );
   const [billingLoading, setBillingLoading] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [confirmCancelSub, setConfirmCancelSub] = useState(false);
+  const [isCancelingSub, setIsCancelingSub] = useState(false);
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(
     null,
@@ -179,24 +183,30 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, authStore.isAuthenticated]);
 
-  const isProActive = (sub: CurrentSubscriptionResponse | null) =>
-    !!sub && isProPlan(sub.plan_type) && (sub.subscription_status ?? "").trim() === "active";
+  const isProActive = (sub: CurrentSubscriptionResponse | null) => {
+    if (!sub) return false;
+    if (!isProPlan(sub.plan_type)) return false;
+    if (sub.cancel_at_period_end) return false;
+    // Some older users may not have dodo_subscription_status populated; treat as active.
+    const s = (sub.subscription_status ?? "").trim().toLowerCase();
+    return s === "" || s === "active";
+  };
 
   const isFreePlan = (planType: string | undefined | null): boolean =>
     (planType ?? "").trim().toLowerCase() === "free";
 
   const handleCancelSubscription = async () => {
-    const ok = window.confirm(
-      "Cancel your subscription at the end of the current billing period?",
-    );
-    if (!ok) return;
     try {
+      setIsCancelingSub(true);
       await invoke("cancel_billing_subscription");
       toast.success("Cancellation scheduled. You'll keep Pro until period end.");
       await refreshSubscription();
+      setConfirmCancelSub(false);
     } catch (err) {
       console.error("Failed to cancel subscription:", err);
       toast.error("Failed to cancel subscription");
+    } finally {
+      setIsCancelingSub(false);
     }
   };
 
@@ -701,26 +711,72 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             ? "You're on the Pro plan."
                             : "Plan information unavailable."}
                       </div>
+                      {subscription?.cancel_at_period_end &&
+                        subscription?.next_billing_date && (
+                          <div className="settings-hint" style={{ marginTop: 0 }}>
+                            Pro remains active until{" "}
+                            {new Date(subscription.next_billing_date).toLocaleDateString()}
+                            .
+                          </div>
+                        )}
                     </div>
 
                     <div className="btn-row" style={{ marginTop: 0 }}>
                       {!billingLoading && isFreePlan(subscription?.plan_type) && (
                         <button
                           type="button"
-                          className="btn-save"
+                          className="btn btn--primary"
                           onClick={() => setShowUpgradeModal(true)}
                         >
                           Upgrade
                         </button>
                       )}
                       {!billingLoading && isProActive(subscription) && (
-                        <button
-                          type="button"
-                          className="btn btn--outline"
-                          onClick={handleCancelSubscription}
-                        >
-                          Cancel subscription
-                        </button>
+                        <>
+                          {!confirmCancelSub ? (
+                            <button
+                              type="button"
+                              className="btn btn--outline"
+                              onClick={() => setConfirmCancelSub(true)}
+                              disabled={isCancelingSub}
+                            >
+                              Cancel subscription
+                            </button>
+                          ) : (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                flexWrap: "wrap",
+                                justifyContent: "flex-end",
+                              }}
+                            >
+                              <span
+                                className="settings-hint"
+                                style={{ margin: 0, maxWidth: 260 }}
+                              >
+                                Cancel at the end of your current billing period?
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn--outline"
+                                onClick={() => setConfirmCancelSub(false)}
+                                disabled={isCancelingSub}
+                              >
+                                Keep
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn--primary"
+                                onClick={handleCancelSubscription}
+                                disabled={isCancelingSub}
+                              >
+                                {isCancelingSub ? "Canceling…" : "Confirm cancel"}
+                              </button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

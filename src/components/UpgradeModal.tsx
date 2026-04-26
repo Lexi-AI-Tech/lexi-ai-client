@@ -394,7 +394,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 ) : (
                   <>
                     <Zap size={16} />
-                    Upgrade to Pro — $20 / month
+                    Upgrade to Pro — $ 20 / month
                   </>
                 )}
               </button>

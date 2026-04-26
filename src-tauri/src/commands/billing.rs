@@ -80,6 +80,8 @@ pub struct CancelSubscriptionResponse {
 pub struct CurrentSubscriptionResponse {
     pub plan_type: String,
     pub subscription_status: Option<String>,
+    pub cancel_at_period_end: bool,
+    pub next_billing_date: Option<String>,
 }
 
 #[tauri::command]
