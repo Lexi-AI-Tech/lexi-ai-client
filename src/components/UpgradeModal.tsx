@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { X, Check, Zap } from "lucide-react";
 import { useToast } from "./toast/useToast";
@@ -103,6 +103,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
     null,
   );
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [isAwaitingUpgrade, setIsAwaitingUpgrade] = useState(false);
+  const [upgradePollAttempts, setUpgradePollAttempts] = useState(0);
+  const pollInFlightRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,6 +121,54 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
     };
   }, []);
 
+  const refreshBillingUsage = useCallback(async (): Promise<BillingUsageResponse | null> => {
+    try {
+      const data = await invoke<BillingUsageResponse>("get_billing_usage");
+      setBillingUsage(data);
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }, []);
+
+  const isPro = (planType: string | undefined | null) =>
+    (planType ?? "").trim().toLowerCase() === "pro";
+
+  const pollForUpgrade = useCallback(async () => {
+    if (pollInFlightRef.current) return;
+    pollInFlightRef.current = true;
+    try {
+      setUpgradePollAttempts((n) => n + 1);
+      const latest = await refreshBillingUsage();
+      if (latest && isPro(latest.plan_type)) {
+        // Pull a fresh access token so any plan/entitlement claims update immediately.
+        try {
+          await invoke<boolean>("refresh_auth_token");
+        } catch (e) {
+          // Even if refresh fails, plan is upgraded server-side; user can still retry actions.
+        }
+        await refreshBillingUsage();
+        try {
+          // Bring focus back to the app via Rust (more reliable on macOS).
+          await invoke("show_main_window");
+        } catch (e) {
+          // Best-effort; focusing can fail depending on OS/window state.
+        }
+        try {
+          // Tell the rest of the app to refresh any cached plan/usage UI.
+          window.dispatchEvent(new Event("lexi:plan-updated"));
+        } catch {
+          // noop
+        }
+        toast.success("You're on Pro. Enjoy unlimited access.");
+        setIsAwaitingUpgrade(false);
+        onClose();
+      }
+    } finally {
+      pollInFlightRef.current = false;
+    }
+  }, [onClose, refreshBillingUsage, toast]);
+
   const handleUpgrade = useCallback(async () => {
     try {
       setIsUpgrading(true);
@@ -127,7 +178,10 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
       }>("create_billing_checkout", { planType: "pro" });
       if (result.checkout_url) {
         await invoke("open_external_url", { url: result.checkout_url });
-        onClose();
+        // Keep the modal open and switch to a "processing" state.
+        setIsAwaitingUpgrade(true);
+        // One immediate attempt in case webhook has already landed.
+        void pollForUpgrade();
       } else {
         toast.error("Could not retrieve checkout URL");
       }
@@ -138,7 +192,23 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
       setIsUpgrading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClose]);
+  }, [pollForUpgrade]);
+
+  // When the app regains focus / becomes visible, re-check upgrade status.
+  useEffect(() => {
+    if (!isAwaitingUpgrade) return;
+    const onVisibleOrFocus = () => {
+      if (!isAwaitingUpgrade) return;
+      if (document.visibilityState === "hidden") return;
+      void pollForUpgrade();
+    };
+    window.addEventListener("focus", onVisibleOrFocus);
+    document.addEventListener("visibilitychange", onVisibleOrFocus);
+    return () => {
+      window.removeEventListener("focus", onVisibleOrFocus);
+      document.removeEventListener("visibilitychange", onVisibleOrFocus);
+    };
+  }, [isAwaitingUpgrade, pollForUpgrade]);
 
   const usageMap = new Map<string, FeatureUsageEntry>(
     (billingUsage?.features ?? []).map((f) => [f.feature_key, f]),
@@ -289,29 +359,51 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
 
         {/* ── Footer CTA ── */}
         <div className="upgrade-modal__footer">
-          <button
-            id="upgrade-modal-cta-btn"
-            type="button"
-            className="upgrade-modal__cta-btn"
-            onClick={handleUpgrade}
-            disabled={isUpgrading}
-          >
-            {isUpgrading ? (
-              <>
+          {isAwaitingUpgrade ? (
+            <>
+              <button
+                id="upgrade-modal-cta-btn"
+                type="button"
+                className="upgrade-modal__cta-btn"
+                onClick={pollForUpgrade}
+                disabled={isUpgrading}
+              >
                 <div className="upgrade-modal__cta-spinner" />
-                Opening Checkout…
-              </>
-            ) : (
-              <>
-                <Zap size={16} />
-                Upgrade to Pro — $20 / month
-              </>
-            )}
-          </button>
+                Checking upgrade status…
+              </button>
+              <p className="upgrade-modal__legal">
+                If you just completed checkout, return to this window. We’ll
+                update your plan automatically.{" "}
+                {upgradePollAttempts > 1 ? `(Checked ${upgradePollAttempts}×)` : ""}
+              </p>
+            </>
+          ) : (
+            <>
+              <button
+                id="upgrade-modal-cta-btn"
+                type="button"
+                className="upgrade-modal__cta-btn"
+                onClick={handleUpgrade}
+                disabled={isUpgrading}
+              >
+                {isUpgrading ? (
+                  <>
+                    <div className="upgrade-modal__cta-spinner" />
+                    Opening Checkout…
+                  </>
+                ) : (
+                  <>
+                    <Zap size={16} />
+                    Upgrade to Pro — $20 / month
+                  </>
+                )}
+              </button>
 
-          <p className="upgrade-modal__legal">
-            Cancel anytime · Secure checkout via Dodo Payments
-          </p>
+              <p className="upgrade-modal__legal">
+                Cancel anytime · Secure checkout via Dodo Payments
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

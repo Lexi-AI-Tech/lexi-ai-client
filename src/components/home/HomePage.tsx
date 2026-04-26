@@ -300,6 +300,18 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   }, [isAuthenticated]);
 
+  // Refresh plan/usage when upgrade completes elsewhere (e.g. checkout).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const onPlanUpdated = () => {
+      void fetchBillingUsage();
+    };
+    window.addEventListener("lexi:plan-updated", onPlanUpdated);
+    return () => {
+      window.removeEventListener("lexi:plan-updated", onPlanUpdated);
+    };
+  }, [fetchBillingUsage, isAuthenticated]);
+
   const fetchRecentTranscripts = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
