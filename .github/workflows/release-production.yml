@@ -132,7 +132,7 @@ jobs:
           APP_RELEASES_API_KEY: ${{ secrets.APP_RELEASES_API_KEY }}
         run: |
           VERSION="${{ env.VERSION }}"
-          TARGET="universal-apple-darwin"
+          TARGET="darwin"
           BUNDLE_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Lexi AI.app.tar.gz"
           DMG_ORIGINAL="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Lexi AI_${VERSION}_universal.dmg"
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/LexiAI-Installer.dmg"
