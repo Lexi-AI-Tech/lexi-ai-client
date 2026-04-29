@@ -9,6 +9,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Atom, FileText, Mic, Video, AudioLines, Zap } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useAuthStore } from "../../store/authStore";
 import { UpgradeModal } from "../UpgradeModal";
 import type {
@@ -352,6 +353,73 @@ export const HomePage: React.FC<HomePageProps> = ({
       console.error("Failed to fetch meetings:", err);
     }
   }, [isAuthenticated]);
+
+  // ---------------------------------------------------------------------------
+  // Live refresh: keep Home in sync with background work.
+  // - action_success: Action finished (history + usage change)
+  // - transcription_success: Transcription finished (history + usage change)
+  // - meeting-recording-stopped / meeting-detected: meetings list changes
+  // Also refresh on window focus as a safety net.
+  // ---------------------------------------------------------------------------
+
+  const refreshTimeoutRef = React.useRef<number | null>(null);
+  const scheduleHomeRefresh = useCallback(
+    (kinds: Array<"billing" | "transcripts" | "actions" | "meetings">) => {
+      if (!isAuthenticated) return;
+      if (refreshTimeoutRef.current != null) {
+        window.clearTimeout(refreshTimeoutRef.current);
+      }
+      refreshTimeoutRef.current = window.setTimeout(() => {
+        refreshTimeoutRef.current = null;
+        if (kinds.includes("billing")) void fetchBillingUsage();
+        if (kinds.includes("transcripts")) void fetchRecentTranscripts();
+        if (kinds.includes("actions")) void fetchRecentActions();
+        if (kinds.includes("meetings")) void fetchMeetings();
+      }, 200);
+    },
+    [fetchBillingUsage, fetchMeetings, fetchRecentActions, fetchRecentTranscripts, isAuthenticated],
+  );
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let disposed = false;
+    const unsubs: Array<() => void> = [];
+    const add = (u: () => void) => {
+      if (disposed) u();
+      else unsubs.push(u);
+    };
+
+    // Action completion → actions + billing
+    listen("action_success", () => {
+      if (!disposed) scheduleHomeRefresh(["actions", "billing"]);
+    }).then((u) => add(u));
+
+    // Transcription completion → transcripts + billing
+    listen("transcription_success", () => {
+      if (!disposed) scheduleHomeRefresh(["transcripts", "billing"]);
+    }).then((u) => add(u));
+
+    // Meeting lifecycle → meetings list
+    listen("meeting-recording-stopped", () => {
+      if (!disposed) scheduleHomeRefresh(["meetings"]);
+    }).then((u) => add(u));
+    listen("meeting-detected", () => {
+      if (!disposed) scheduleHomeRefresh(["meetings"]);
+    }).then((u) => add(u));
+
+    const onFocus = () => scheduleHomeRefresh(["billing", "transcripts", "actions", "meetings"]);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      disposed = true;
+      unsubs.forEach((u) => u());
+      window.removeEventListener("focus", onFocus);
+      if (refreshTimeoutRef.current != null) {
+        window.clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
+    };
+  }, [isAuthenticated, scheduleHomeRefresh]);
 
   // Effects
   useEffect(() => {

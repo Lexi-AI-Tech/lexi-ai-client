@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Play, Pause, Trash2, Copy, Check, Atom, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
@@ -141,6 +142,35 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
 
   const pageSize = 20;
 
+  const loadActionsPage = useCallback(
+    async ({
+      pageToLoad,
+    }: {
+      pageToLoad: number;
+    }) => {
+      return await invoke<PaginatedActionHistoryResponse>(
+        "get_action_history",
+        { page: pageToLoad, pageSize },
+      );
+    },
+    [pageSize],
+  );
+
+  const refreshActions = useCallback(async () => {
+    if (!authStore.isInitialized || !authStore.isAuthenticated) return;
+    setIsLoading(true);
+    try {
+      // Always refresh from page 1 so newly-created actions appear immediately.
+      const data = await loadActionsPage({ pageToLoad: 1 });
+      setActions(data.actions);
+      setTotalPages(data.total_pages);
+      setTotal(data.total);
+      setPage(1);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [authStore.isAuthenticated, authStore.isInitialized, loadActionsPage]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -266,10 +296,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     let cancelled = false;
     (async () => {
       try {
-        const data = await invoke<PaginatedActionHistoryResponse>(
-          "get_action_history",
-          { page, pageSize },
-        );
+        const data = await loadActionsPage({ pageToLoad: page });
         if (cancelled) return;
         setActions((prev) =>
           page === 1 ? data.actions : [...prev, ...data.actions],
@@ -302,7 +329,42 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [authStore.isInitialized, authStore.isAuthenticated, page]);
+  }, [authStore.isInitialized, authStore.isAuthenticated, page, loadActionsPage, toast, authStore]);
+
+  // Live-update: when an action completes in the background, refresh this page.
+  useEffect(() => {
+    if (!authStore.isInitialized || !authStore.isAuthenticated) return;
+    let mounted = true;
+    const unlistens: Array<() => void> = [];
+    (async () => {
+      try {
+        const unlistenSuccess = await listen("action_success", () => {
+          if (!mounted) return;
+          void refreshActions();
+        });
+        if (mounted) unlistens.push(unlistenSuccess);
+        else unlistenSuccess();
+      } catch (e) {
+        console.warn("Failed to subscribe to action_success:", e);
+      }
+    })();
+    return () => {
+      mounted = false;
+      unlistens.forEach((fn) => fn());
+    };
+  }, [authStore.isAuthenticated, authStore.isInitialized, refreshActions]);
+
+  // Safety net: when the window is focused again, refresh page 1 once.
+  useEffect(() => {
+    if (!authStore.isInitialized || !authStore.isAuthenticated) return;
+    const onFocus = () => {
+      void refreshActions();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [authStore.isAuthenticated, authStore.isInitialized, refreshActions]);
 
   useEffect(() => {
     if (!actions.length) return;
