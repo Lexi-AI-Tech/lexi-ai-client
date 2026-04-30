@@ -401,13 +401,19 @@ export const HomePage: React.FC<HomePageProps> = ({
 
     // Meeting lifecycle → meetings list
     listen("meeting-recording-stopped", () => {
-      if (!disposed) scheduleHomeRefresh(["meetings"]);
+      if (!disposed) scheduleHomeRefresh(["meetings", "billing"]);
     }).then((u) => add(u));
     listen("meeting-detected", () => {
-      if (!disposed) scheduleHomeRefresh(["meetings"]);
+      if (!disposed) scheduleHomeRefresh(["meetings", "billing"]);
     }).then((u) => add(u));
 
-    const onFocus = () => scheduleHomeRefresh(["billing", "transcripts", "actions", "meetings"]);
+    // Docs are created/updated via Tauri commands which emit docs_changed.
+    listen("docs_changed", () => {
+      if (!disposed) scheduleHomeRefresh(["billing"]);
+    }).then((u) => add(u));
+
+    const onFocus = () =>
+      scheduleHomeRefresh(["billing", "transcripts", "actions", "meetings"]);
     window.addEventListener("focus", onFocus);
 
     return () => {

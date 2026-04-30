@@ -7,7 +7,19 @@ use crate::commands::auth::get_auth_token_async;
 use crate::RecordingCommand;
 use crate::RecordingCommandTx;
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 use tauri::{AppHandle, Manager};
+
+fn emit_docs_changed(app: &AppHandle, doc_id: Option<&str>, kind: &str) {
+    // Best-effort: UI should still function if emitting fails.
+    let _ = app.emit(
+        "docs_changed",
+        serde_json::json!({
+            "kind": kind,
+            "docId": doc_id,
+        }),
+    );
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Doc {
@@ -166,7 +178,9 @@ pub async fn create_doc(
         "content": content
     });
     let value = docs_request(&app, "POST", &url, Some(body)).await?;
-    parse_doc_from_value(&value)
+    let doc = parse_doc_from_value(&value)?;
+    emit_docs_changed(&app, Some(doc.id.as_str()), "created");
+    Ok(doc)
 }
 
 /// Update an existing doc on the backend.
@@ -181,7 +195,9 @@ pub async fn update_doc(app: AppHandle, payload: UpdateDocRequest) -> Result<Doc
         body.insert("content".to_string(), serde_json::Value::String(c));
     }
     let value = docs_request(&app, "PATCH", &url, Some(serde_json::Value::Object(body))).await?;
-    parse_doc_from_value(&value)
+    let doc = parse_doc_from_value(&value)?;
+    emit_docs_changed(&app, Some(doc.id.as_str()), "updated");
+    Ok(doc)
 }
 
 /// Delete a doc on the backend.
@@ -189,6 +205,7 @@ pub async fn update_doc(app: AppHandle, payload: UpdateDocRequest) -> Result<Doc
 pub async fn delete_doc(app: AppHandle, payload: DeleteDocRequest) -> Result<(), String> {
     let url = crate::api_endpoints::docs::doc_url(&payload.doc_id);
     docs_request(&app, "DELETE", &url, None).await?;
+    emit_docs_changed(&app, Some(payload.doc_id.as_str()), "deleted");
     Ok(())
 }
 

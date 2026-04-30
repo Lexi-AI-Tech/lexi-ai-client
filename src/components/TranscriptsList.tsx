@@ -7,6 +7,7 @@
 
 import React, { useCallback, useEffect, useState, useRef, useId } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Copy, Check, Trash2, AudioLines, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { KEY_SYMBOLS } from "../lib/keySymbols";
@@ -141,6 +142,29 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
     [],
   );
 
+  const refreshTranscripts = useCallback(async () => {
+    if (!authStore.isInitialized || !authStore.isAuthenticated) return;
+    setLoading(true);
+    try {
+      const response = await invoke<{
+        transcripts: Transcript[];
+        total: number;
+        page: number;
+        page_size: number;
+        total_pages: number;
+      }>("get_transcripts", { page: 1, pageSize: 10 });
+      setTranscripts(response.transcripts);
+      setTotalPages(response.total_pages);
+      setTotal(response.total);
+      setPage(1);
+    } catch (err: any) {
+      console.error("Failed to refresh transcripts:", err);
+      toast.error(err?.message || "Failed to refresh transcripts");
+    } finally {
+      setLoading(false);
+    }
+  }, [authStore.isAuthenticated, authStore.isInitialized, toast]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -221,6 +245,41 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
       cancelled = true;
     };
   }, [authStore.isInitialized, authStore.isAuthenticated, page]);
+
+  // Live-update: when a transcription completes in the background, refresh this list.
+  useEffect(() => {
+    if (!authStore.isInitialized || !authStore.isAuthenticated) return;
+    let mounted = true;
+    const unlistens: Array<() => void> = [];
+    (async () => {
+      try {
+        const unlistenSuccess = await listen("transcription_success", () => {
+          if (!mounted) return;
+          void refreshTranscripts();
+        });
+        if (mounted) unlistens.push(unlistenSuccess);
+        else unlistenSuccess();
+      } catch (e) {
+        console.warn("Failed to subscribe to transcription_success:", e);
+      }
+    })();
+    return () => {
+      mounted = false;
+      unlistens.forEach((fn) => fn());
+    };
+  }, [authStore.isAuthenticated, authStore.isInitialized, refreshTranscripts]);
+
+  // Safety net: when the window is focused again, refresh page 1 once.
+  useEffect(() => {
+    if (!authStore.isInitialized || !authStore.isAuthenticated) return;
+    const onFocus = () => {
+      void refreshTranscripts();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [authStore.isAuthenticated, authStore.isInitialized, refreshTranscripts]);
 
   // Fetch app icons for unique focused_app names (macOS only; Tauri returns data URL or null)
   useEffect(() => {
