@@ -746,6 +746,19 @@ textarea.form-input {
   justify-content: space-between;
 }
 
+.select-trigger__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.select-trigger__indicator {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .select-trigger:hover:not(:disabled) {
   border-color: var(--lexi-border);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
@@ -777,10 +790,12 @@ textarea.form-input {
 }
 
 .select-option {
-  width: 100%;
+  width: calc(100% - 16px);
+  margin: 0 8px;
   padding: 10px 16px;
   background: transparent;
   border: none;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -798,6 +813,24 @@ textarea.form-input {
 .select-option .check {
   color: var(--lexi-text);
   flex-shrink: 0;
+}
+
+.select-option__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.lang-flag {
+  width: 18px;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.lang-auto-icon {
+  color: var(--lexi-primary);
 }
 
 .dropdown-chevron {

@@ -7,6 +7,7 @@ import {
   Power,
   Keyboard,
   Atom,
+  Sparkles,
   ChevronDown,
   Check,
   RefreshCw,
@@ -61,6 +62,37 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
   label: getLanguageName(code),
 }));
 
+const LANGUAGE_FLAGS: Record<string, string> = {
+  en: "🇺🇸",
+  es: "🇪🇸",
+  fr: "🇫🇷",
+  de: "🇩🇪",
+  it: "🇮🇹",
+  pt: "🇵🇹",
+  ru: "🇷🇺",
+  ja: "🇯🇵",
+  ko: "🇰🇷",
+  zh: "🇨🇳",
+  ar: "🇸🇦",
+  hi: "🇮🇳",
+  nl: "🇳🇱",
+  pl: "🇵🇱",
+  tr: "🇹🇷",
+  sv: "🇸🇪",
+  da: "🇩🇰",
+  no: "🇳🇴",
+  fi: "🇫🇮",
+};
+
+const getLanguageFlag = (code: string): string | null => {
+  const c = (code || "").trim().toLowerCase();
+  if (!c || c === "auto") return null;
+  return LANGUAGE_FLAGS[c] ?? null;
+};
+
+const normalizeLanguage = (value: LanguageCode | null | undefined): LanguageCode =>
+  (value ?? LanguageCode.AUTO) as LanguageCode;
+
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   initialSection = null,
   onInitialSectionConsumed,
@@ -76,8 +108,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [confirmCancelSub, setConfirmCancelSub] = useState(false);
   const [isCancelingSub, setIsCancelingSub] = useState(false);
   const [config, setConfig] = useState<TauriAppConfig | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(
-    null,
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
+    LanguageCode.AUTO,
   );
   const [selectedAutostart, setSelectedAutostart] = useState<boolean | null>(
     null,
@@ -137,11 +169,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         if (loadedConfig.languages && loadedConfig.languages.length > 0) {
           const firstLanguage = loadedConfig.languages[0] as LanguageCode;
           if (Object.values(LanguageCode).includes(firstLanguage)) {
-            setSelectedLanguage(firstLanguage);
+            setSelectedLanguage(normalizeLanguage(firstLanguage));
           }
         } else {
-          // Backend didn't provide a language, keep it null
-          setSelectedLanguage(null);
+          // Backend didn't provide a language, default to auto
+          setSelectedLanguage(LanguageCode.AUTO);
         }
         setSelectedAutostart(loadedConfig.launch_on_system_startup ?? null);
         setSelectedEnhanceTranscription(
@@ -329,9 +361,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const handleSaveSettings = async () => {
     // Check if anything changed using the same logic as hasChanges
     const languageChanged =
-      selectedLanguage !== null &&
-      selectedLanguage !== undefined &&
-      selectedLanguage !== currentLanguage;
+      normalizeLanguage(selectedLanguage) !== normalizeLanguage(currentLanguage);
 
     const currentAutostart = autostartEnabled ?? false;
     const autostartChanged =
@@ -374,8 +404,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     try {
       const updates: Partial<TauriAppConfig> = {};
 
-      if (languageChanged && selectedLanguage !== null) {
-        updates.languages = [selectedLanguage];
+      if (languageChanged) {
+        updates.languages = [normalizeLanguage(selectedLanguage)];
       }
       if (autostartChanged && selectedAutostart !== null) {
         updates.launch_on_system_startup = selectedAutostart;
@@ -400,7 +430,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         updatedConfig.languages &&
         updatedConfig.languages.length > 0
       ) {
-        setSelectedLanguage(updatedConfig.languages[0] as LanguageCode);
+        setSelectedLanguage(
+          normalizeLanguage(updatedConfig.languages[0] as LanguageCode),
+        );
       }
       if (
         autostartChanged &&
@@ -471,9 +503,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const hasChanges = () => {
     // Compare language
     const languageChanged =
-      selectedLanguage !== null &&
-      selectedLanguage !== undefined &&
-      selectedLanguage !== currentLanguage;
+      normalizeLanguage(selectedLanguage) !== normalizeLanguage(currentLanguage);
 
     // Compare autostart
     const currentAutostart = autostartEnabled ?? false;
@@ -801,12 +831,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   disabled={isUpdating || isLoading}
                   className="select-trigger"
                 >
-                  <span>
-                    {selectedLanguage
-                      ? SUPPORTED_LANGUAGES.find(
-                          (l) => l.value === selectedLanguage,
-                        )?.label || "Select language"
-                      : "Auto Detect Language"}
+                  <span className="select-trigger__left">
+                    <span>
+                      {selectedLanguage === LanguageCode.AUTO
+                        ? "Auto Detect Language"
+                        : SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)
+                            ?.label || "Select language"}
+                    </span>
+                    <span className="select-trigger__indicator" aria-hidden="true">
+                      {selectedLanguage !== LanguageCode.AUTO ? (
+                        <span className="lang-flag">
+                          {getLanguageFlag(selectedLanguage) ?? ""}
+                        </span>
+                      ) : (
+                        <Sparkles size={16} className="lang-auto-icon" />
+                      )}
+                    </span>
                   </span>
                   <ChevronDown
                     size={18}
@@ -819,15 +859,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedLanguage(null);
+                          setSelectedLanguage(LanguageCode.AUTO);
                           setIsLanguageDropdownOpen(false);
                         }}
                         className="select-option"
                       >
                         <span>Auto Detect Language</span>
-                        {!selectedLanguage && (
-                          <Check size={16} className="check flex-shrink-0" />
-                        )}
+                        <span className="select-option__right">
+                          <Sparkles
+                            size={16}
+                            className="lang-auto-icon flex-shrink-0"
+                            aria-hidden="true"
+                          />
+                          {selectedLanguage === LanguageCode.AUTO && (
+                            <Check size={16} className="check flex-shrink-0" />
+                          )}
+                        </span>
                       </button>
                       {SUPPORTED_LANGUAGES.filter(
                         (lang) => lang.value !== "auto",
@@ -842,9 +889,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                           className="select-option"
                         >
                           <span>{lang.label}</span>
-                          {selectedLanguage === lang.value && (
-                            <Check size={16} className="check flex-shrink-0" />
-                          )}
+                          <span className="select-option__right">
+                            <span className="lang-flag" aria-hidden="true">
+                              {getLanguageFlag(lang.value) ?? ""}
+                            </span>
+                            {selectedLanguage === lang.value && (
+                              <Check size={16} className="check flex-shrink-0" />
+                            )}
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -852,11 +904,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 )}
               </div>
               <div className="settings-hint">
-                {selectedLanguage === "auto"
+                {selectedLanguage === LanguageCode.AUTO
                   ? "Automatically detected from your audio input."
-                  : selectedLanguage
-                    ? `Transcription will be limited to ${SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label || selectedLanguage}`
-                    : "No language selected"}
+                  : `Transcription will be limited to ${SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)?.label || selectedLanguage}`}
               </div>
             </div>
 
