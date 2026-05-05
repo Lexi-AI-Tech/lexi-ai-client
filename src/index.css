@@ -783,6 +783,14 @@ textarea.form-input {
   max-height: 300px;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Keep scroll behavior but hide visible scrollbars */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+
+.select-dropdown::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .select-dropdown__list {
@@ -811,7 +819,7 @@ textarea.form-input {
 }
 
 .select-option .check {
-  color: var(--lexi-text);
+  color: var(--lexi-primary);
   flex-shrink: 0;
 }
 
