@@ -53,6 +53,24 @@ pub mod assistant {
     }
 }
 
+/// Cache warmup endpoints
+pub mod cache {
+    use super::*;
+
+    pub const WARMUP: &str = "/cache/user/warmup";
+
+    pub fn warmup_url(system_type: &str, device_type: &str) -> String {
+        format!(
+            "{}{}{}?system_type={}&device_type={}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            WARMUP,
+            system_type,
+            device_type
+        )
+    }
+}
+
 /// App Config endpoints
 pub mod app_config {
     use super::*;

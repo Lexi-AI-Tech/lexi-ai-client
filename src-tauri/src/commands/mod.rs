@@ -7,6 +7,7 @@ pub mod analytics;
 pub mod app_config;
 pub mod auth;
 pub mod billing;
+pub mod cache;
 pub mod docs;
 pub mod hotkey;
 pub mod notes;

@@ -112,8 +112,10 @@ use commands::auth::{
     start_google_login, store_auth_data,
 };
 use commands::billing::{
-    cancel_billing_subscription, create_billing_checkout, get_billing_usage, get_current_subscription,
+    cancel_billing_subscription, create_billing_checkout, get_billing_usage,
+    get_current_subscription,
 };
+use commands::cache::user_cache_warmup;
 use commands::docs::{
     create_doc, create_doc_from_audio, delete_doc, get_doc, get_docs, start_doc_recording,
     stop_doc_recording, update_doc,
@@ -204,7 +206,6 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
         // the user is mouse-only or simply not typing.
         #[cfg(target_os = "macos")]
         {
-            let app_handle = app.clone();
             tauri::async_runtime::spawn(async move {
                 use tokio::time::{interval, Duration};
 
@@ -218,19 +219,61 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
                 const TICK_SECS: u64 = 30;
                 const DISABLED_LOG_COOLDOWN_MS: u64 = 120_000;
                 const HARD_RESET_COOLDOWN_MS: u64 = 60_000;
+                // If the tap is "enabled" but the callback hasn't fired for a long time,
+                // it may be in the zombie state described in `global_key_listener::hard_reset_tap()`.
+                //
+                // Keep this threshold high to avoid false positives when the user is simply idle.
+                const ZOMBIE_CALLBACK_AGE_MS: u64 = 5 * 60 * 1000; // 5 minutes
+                const ZOMBIE_CONFIRM_TICKS: u8 = 2; // require consecutive confirmations
 
                 let mut tick = interval(Duration::from_secs(TICK_SECS));
+                let mut zombie_suspect_ticks: u8 = 0;
                 loop {
                     tick.tick().await;
 
                     let Some(enabled) = crate::global_key_listener::event_tap_is_enabled() else {
                         continue;
                     };
+                    let callback_age_ms = crate::global_key_listener::last_tap_callback_age_ms();
+
+                    let now = epoch_ms();
                     if enabled {
+                        // Enabled can still be "broken": detect zombie state using callback liveness.
+                        if let Some(age) = callback_age_ms {
+                            if age >= ZOMBIE_CALLBACK_AGE_MS {
+                                zombie_suspect_ticks = zombie_suspect_ticks.saturating_add(1);
+                            } else {
+                                zombie_suspect_ticks = 0;
+                            }
+                        } else {
+                            zombie_suspect_ticks = 0;
+                        }
+
+                        if zombie_suspect_ticks < ZOMBIE_CONFIRM_TICKS {
+                            continue;
+                        }
+
+                        // Confirmed zombie state: attempt a hard reset of the tap thread.
+                        let last_reset = KEY_LISTENER_HARD_RESET_MS.load(Ordering::Relaxed);
+                        if last_reset != 0
+                            && now.saturating_sub(last_reset) < HARD_RESET_COOLDOWN_MS
+                        {
+                            continue;
+                        }
+                        KEY_LISTENER_HARD_RESET_MS.store(now, Ordering::Relaxed);
+
+                        eprintln!(
+                            "❌ [key_listener watchdog] CGEventTap looks zombie (enabled=true, last callback age: {:?}ms); hard resetting tap thread",
+                            callback_age_ms
+                        );
+                        crate::global_key_listener::hard_reset_tap();
+                        zombie_suspect_ticks = 0;
                         continue;
                     }
 
-                    let now = epoch_ms();
+                    // Tap is disabled (explicitly). Try re-enable first, then hard reset if needed.
+                    zombie_suspect_ticks = 0;
+
                     let last_log = KEY_LISTENER_DISABLED_LOG_MS.load(Ordering::Relaxed);
                     if last_log == 0 || now.saturating_sub(last_log) >= DISABLED_LOG_COOLDOWN_MS {
                         eprintln!(
@@ -250,16 +293,12 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
                     if last_reset != 0 && now.saturating_sub(last_reset) < HARD_RESET_COOLDOWN_MS {
                         continue;
                     }
-                    KEY_LISTENER_HARD_RESET_MS.store(epoch_ms(), Ordering::Relaxed);
+                    KEY_LISTENER_HARD_RESET_MS.store(now, Ordering::Relaxed);
 
                     eprintln!(
-                        "❌ [key_listener watchdog] tap still disabled after re-enable; hard reset + restart"
+                        "❌ [key_listener watchdog] tap still disabled after re-enable; hard resetting tap thread"
                     );
                     crate::global_key_listener::hard_reset_tap();
-                    #[allow(unused_must_use)]
-                    {
-                        let _ = app_handle.restart();
-                    }
                 }
             });
         }
@@ -362,6 +401,7 @@ pub fn main() {
             create_billing_checkout,
             cancel_billing_subscription,
             get_current_subscription,
+            user_cache_warmup,
             get_action_history,
             delete_action_history,
             get_shortcuts,
@@ -451,6 +491,14 @@ pub fn main() {
                     Ok(_) => println!("✅ Auth token valid on startup"),
                     Err(_) => println!("ℹ️  No valid auth token - user needs to login"),
                 }
+            });
+
+            // Periodic user cache warmup (server-side caches) — runs in Rust so it keeps
+            // working even if the WebView throttles timers while app is backgrounded.
+            let app_handle_for_cache_warmup = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                commands::cache::start_user_cache_warmup_scheduler(app_handle_for_cache_warmup)
+                    .await;
             });
 
             // Initialize and position the pill window at the center of the screen

@@ -133,8 +133,9 @@ pub async fn create_billing_checkout(
 
 /// POST /api/v1/billing/cancel-subscription — cancel subscription at period end.
 #[tauri::command]
-pub async fn cancel_billing_subscription(app: AppHandle) -> Result<CancelSubscriptionResponse, String>
-{
+pub async fn cancel_billing_subscription(
+    app: AppHandle,
+) -> Result<CancelSubscriptionResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
         Err(_) => {
@@ -188,7 +189,10 @@ pub async fn get_current_subscription(
         }
     };
 
-    let url = format!("{}/api/v1/billing/subscription", crate::config::api_base_url());
+    let url = format!(
+        "{}/api/v1/billing/subscription",
+        crate::config::api_base_url()
+    );
 
     utils::log_api_request("GET", &url);
 

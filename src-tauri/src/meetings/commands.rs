@@ -849,5 +849,15 @@ pub async fn create_doc_from_meeting(
 
     let doc = crate::commands::docs::parse_doc_from_value(&data)
         .map_err(|e| format!("Invalid doc response: {}", e))?;
+    // Best-effort: used by the frontend to refresh billing + docs list.
+    let _ = app.emit(
+        "docs_changed",
+        serde_json::json!({
+            "kind": "created",
+            "docId": doc.id,
+            "source": "meeting",
+            "meetingId": meeting_id,
+        }),
+    );
     Ok(doc)
 }
