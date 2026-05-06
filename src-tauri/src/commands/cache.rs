@@ -82,6 +82,17 @@ pub async fn start_user_cache_warmup_scheduler(app: AppHandle) {
     let mut tick = interval(Duration::from_secs(CHECK_EVERY_SECS));
     let mut last_warmup_at: u64 = 0;
 
+    // Best-effort: attempt an immediate warmup on app startup so we don't wait
+    // for the first interval tick.
+    if let Ok(Some(auth)) = secure_storage::get_auth_data(&app) {
+        if is_token_valid(&auth) {
+            let now = unix_now_secs();
+            let _ = get_auth_token_async(&app).await;
+            let _ = user_cache_warmup(app.clone()).await;
+            last_warmup_at = now;
+        }
+    }
+
     loop {
         tick.tick().await;
 
