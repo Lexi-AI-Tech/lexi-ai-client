@@ -112,7 +112,8 @@ use commands::auth::{
     start_google_login, store_auth_data,
 };
 use commands::billing::{
-    cancel_billing_subscription, create_billing_checkout, get_billing_usage, get_current_subscription,
+    cancel_billing_subscription, create_billing_checkout, get_billing_usage,
+    get_current_subscription,
 };
 use commands::cache::user_cache_warmup;
 use commands::docs::{
@@ -254,7 +255,8 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
 
                         // Confirmed zombie state: attempt a hard reset of the tap thread.
                         let last_reset = KEY_LISTENER_HARD_RESET_MS.load(Ordering::Relaxed);
-                        if last_reset != 0 && now.saturating_sub(last_reset) < HARD_RESET_COOLDOWN_MS
+                        if last_reset != 0
+                            && now.saturating_sub(last_reset) < HARD_RESET_COOLDOWN_MS
                         {
                             continue;
                         }

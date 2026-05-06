@@ -143,11 +143,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   const pageSize = 20;
 
   const loadActionsPage = useCallback(
-    async ({
-      pageToLoad,
-    }: {
-      pageToLoad: number;
-    }) => {
+    async ({ pageToLoad }: { pageToLoad: number }) => {
       return await invoke<PaginatedActionHistoryResponse>(
         "get_action_history",
         { page: pageToLoad, pageSize },
@@ -329,7 +325,14 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [authStore.isInitialized, authStore.isAuthenticated, page, loadActionsPage, toast, authStore]);
+  }, [
+    authStore.isInitialized,
+    authStore.isAuthenticated,
+    page,
+    loadActionsPage,
+    toast,
+    authStore,
+  ]);
 
   // Live-update: when an action completes in the background, refresh this page.
   useEffect(() => {

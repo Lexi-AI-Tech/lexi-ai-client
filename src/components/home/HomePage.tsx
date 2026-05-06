@@ -377,7 +377,13 @@ export const HomePage: React.FC<HomePageProps> = ({
         if (kinds.includes("meetings")) void fetchMeetings();
       }, 200);
     },
-    [fetchBillingUsage, fetchMeetings, fetchRecentActions, fetchRecentTranscripts, isAuthenticated],
+    [
+      fetchBillingUsage,
+      fetchMeetings,
+      fetchRecentActions,
+      fetchRecentTranscripts,
+      isAuthenticated,
+    ],
   );
 
   useEffect(() => {

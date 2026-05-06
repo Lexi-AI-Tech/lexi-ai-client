@@ -90,8 +90,9 @@ const getLanguageFlag = (code: string): string | null => {
   return LANGUAGE_FLAGS[c] ?? null;
 };
 
-const normalizeLanguage = (value: LanguageCode | null | undefined): LanguageCode =>
-  (value ?? LanguageCode.AUTO) as LanguageCode;
+const normalizeLanguage = (
+  value: LanguageCode | null | undefined,
+): LanguageCode => (value ?? LanguageCode.AUTO) as LanguageCode;
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   initialSection = null,
@@ -100,9 +101,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const authStore = useAuthStore();
   const toast = useToast();
   const [subscription, setSubscription] =
-    useState<CurrentSubscriptionResponse | null>(
-    null,
-  );
+    useState<CurrentSubscriptionResponse | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [confirmCancelSub, setConfirmCancelSub] = useState(false);
@@ -198,7 +197,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     if (!authStore.isAuthenticated) return;
     try {
       setBillingLoading(true);
-      const s = await invoke<CurrentSubscriptionResponse>("get_current_subscription");
+      const s = await invoke<CurrentSubscriptionResponse>(
+        "get_current_subscription",
+      );
       setSubscription(s);
     } catch (err) {
       setSubscription(null);
@@ -231,7 +232,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     try {
       setIsCancelingSub(true);
       await invoke("cancel_billing_subscription");
-      toast.success("Cancellation scheduled. You'll keep Pro until period end.");
+      toast.success(
+        "Cancellation scheduled. You'll keep Pro until period end.",
+      );
       await refreshSubscription();
       setConfirmCancelSub(false);
     } catch (err) {
@@ -361,7 +364,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const handleSaveSettings = async () => {
     // Check if anything changed using the same logic as hasChanges
     const languageChanged =
-      normalizeLanguage(selectedLanguage) !== normalizeLanguage(currentLanguage);
+      normalizeLanguage(selectedLanguage) !==
+      normalizeLanguage(currentLanguage);
 
     const currentAutostart = autostartEnabled ?? false;
     const autostartChanged =
@@ -503,7 +507,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const hasChanges = () => {
     // Compare language
     const languageChanged =
-      normalizeLanguage(selectedLanguage) !== normalizeLanguage(currentLanguage);
+      normalizeLanguage(selectedLanguage) !==
+      normalizeLanguage(currentLanguage);
 
     // Compare autostart
     const currentAutostart = autostartEnabled ?? false;
@@ -714,7 +719,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       gap: 12,
                     }}
                   >
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                      }}
+                    >
                       <div
                         style={{
                           display: "flex",
@@ -731,7 +742,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             fontSize: 12,
                           }}
                         >
-                          {billingLoading ? "Loading…" : subscription?.plan_type ?? "—"}
+                          {billingLoading
+                            ? "Loading…"
+                            : (subscription?.plan_type ?? "—")}
                         </span>
                       </div>
                       <div className="settings-hint" style={{ marginTop: 0 }}>
@@ -743,24 +756,30 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       </div>
                       {subscription?.cancel_at_period_end &&
                         subscription?.next_billing_date && (
-                          <div className="settings-hint" style={{ marginTop: 0 }}>
+                          <div
+                            className="settings-hint"
+                            style={{ marginTop: 0 }}
+                          >
                             Pro remains active until{" "}
-                            {new Date(subscription.next_billing_date).toLocaleDateString()}
+                            {new Date(
+                              subscription.next_billing_date,
+                            ).toLocaleDateString()}
                             .
                           </div>
                         )}
                     </div>
 
                     <div className="btn-row" style={{ marginTop: 0 }}>
-                      {!billingLoading && isFreePlan(subscription?.plan_type) && (
-                        <button
-                          type="button"
-                          className="btn btn--primary"
-                          onClick={() => setShowUpgradeModal(true)}
-                        >
-                          Upgrade
-                        </button>
-                      )}
+                      {!billingLoading &&
+                        isFreePlan(subscription?.plan_type) && (
+                          <button
+                            type="button"
+                            className="btn btn--primary"
+                            onClick={() => setShowUpgradeModal(true)}
+                          >
+                            Upgrade
+                          </button>
+                        )}
                       {!billingLoading && isProActive(subscription) && (
                         <>
                           {!confirmCancelSub ? (
@@ -786,7 +805,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 className="settings-hint"
                                 style={{ margin: 0, maxWidth: 260 }}
                               >
-                                Cancel at the end of your current billing period?
+                                Cancel at the end of your current billing
+                                period?
                               </span>
                               <button
                                 type="button"
@@ -802,7 +822,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 onClick={handleCancelSubscription}
                                 disabled={isCancelingSub}
                               >
-                                {isCancelingSub ? "Canceling…" : "Confirm cancel"}
+                                {isCancelingSub
+                                  ? "Canceling…"
+                                  : "Confirm cancel"}
                               </button>
                             </div>
                           )}
@@ -835,10 +857,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <span>
                       {selectedLanguage === LanguageCode.AUTO
                         ? "Auto Detect Language"
-                        : SUPPORTED_LANGUAGES.find((l) => l.value === selectedLanguage)
-                            ?.label || "Select language"}
+                        : SUPPORTED_LANGUAGES.find(
+                            (l) => l.value === selectedLanguage,
+                          )?.label || "Select language"}
                     </span>
-                    <span className="select-trigger__indicator" aria-hidden="true">
+                    <span
+                      className="select-trigger__indicator"
+                      aria-hidden="true"
+                    >
                       {selectedLanguage !== LanguageCode.AUTO ? (
                         <span className="lang-flag">
                           {getLanguageFlag(selectedLanguage) ?? ""}
@@ -894,7 +920,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                               {getLanguageFlag(lang.value) ?? ""}
                             </span>
                             {selectedLanguage === lang.value && (
-                              <Check size={16} className="check flex-shrink-0" />
+                              <Check
+                                size={16}
+                                className="check flex-shrink-0"
+                              />
                             )}
                           </span>
                         </button>

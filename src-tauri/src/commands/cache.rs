@@ -26,7 +26,8 @@ pub async fn user_cache_warmup(app: AppHandle) -> Result<CacheWarmupResponse, St
         }
     };
 
-    let url = crate::api_endpoints::cache::warmup_url(utils::get_system_type(), utils::get_device_type());
+    let url =
+        crate::api_endpoints::cache::warmup_url(utils::get_system_type(), utils::get_device_type());
     utils::log_api_request("POST", &url);
 
     let client = crate::utils::create_http_client();
@@ -116,4 +117,3 @@ pub async fn start_user_cache_warmup_scheduler(app: AppHandle) {
         last_warmup_at = now;
     }
 }
-

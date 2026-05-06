@@ -121,15 +121,16 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
     };
   }, []);
 
-  const refreshBillingUsage = useCallback(async (): Promise<BillingUsageResponse | null> => {
-    try {
-      const data = await invoke<BillingUsageResponse>("get_billing_usage");
-      setBillingUsage(data);
-      return data;
-    } catch (e) {
-      return null;
-    }
-  }, []);
+  const refreshBillingUsage =
+    useCallback(async (): Promise<BillingUsageResponse | null> => {
+      try {
+        const data = await invoke<BillingUsageResponse>("get_billing_usage");
+        setBillingUsage(data);
+        return data;
+      } catch (e) {
+        return null;
+      }
+    }, []);
 
   const isPro = (planType: string | undefined | null) =>
     (planType ?? "").trim().toLowerCase() === "pro";
@@ -263,8 +264,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                 Free
               </div>
               <div className="upgrade-plan-price">
-                $ 0
-                <span className="upgrade-plan-price__period">/ mo</span>
+                $ 0<span className="upgrade-plan-price__period">/ mo</span>
               </div>
               <p className="upgrade-plan-sublabel">Current plan</p>
             </div>
@@ -374,7 +374,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
               <p className="upgrade-modal__legal">
                 If you just completed checkout, return to this window. We’ll
                 update your plan automatically.{" "}
-                {upgradePollAttempts > 1 ? `(Checked ${upgradePollAttempts}×)` : ""}
+                {upgradePollAttempts > 1
+                  ? `(Checked ${upgradePollAttempts}×)`
+                  : ""}
               </p>
             </>
           ) : (
