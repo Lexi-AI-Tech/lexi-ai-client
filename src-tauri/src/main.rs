@@ -114,6 +114,7 @@ use commands::auth::{
 use commands::billing::{
     cancel_billing_subscription, create_billing_checkout, get_billing_usage, get_current_subscription,
 };
+use commands::cache::user_cache_warmup;
 use commands::docs::{
     create_doc, create_doc_from_audio, delete_doc, get_doc, get_docs, start_doc_recording,
     stop_doc_recording, update_doc,
@@ -398,6 +399,7 @@ pub fn main() {
             create_billing_checkout,
             cancel_billing_subscription,
             get_current_subscription,
+            user_cache_warmup,
             get_action_history,
             delete_action_history,
             get_shortcuts,
@@ -487,6 +489,14 @@ pub fn main() {
                     Ok(_) => println!("✅ Auth token valid on startup"),
                     Err(_) => println!("ℹ️  No valid auth token - user needs to login"),
                 }
+            });
+
+            // Periodic user cache warmup (server-side caches) — runs in Rust so it keeps
+            // working even if the WebView throttles timers while app is backgrounded.
+            let app_handle_for_cache_warmup = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                commands::cache::start_user_cache_warmup_scheduler(app_handle_for_cache_warmup)
+                    .await;
             });
 
             // Initialize and position the pill window at the center of the screen
