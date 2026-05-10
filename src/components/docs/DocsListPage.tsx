@@ -17,6 +17,9 @@ function docContentToPlainText(markdown: string | undefined): string {
 
   let raw = markdown;
 
+  // TipTap markdown can include non-breaking spaces/entities to preserve empty lines.
+  raw = raw.replace(/&nbsp;/gi, " ").replace(/\u00A0/g, " ");
+
   // Drop fenced code blocks entirely for previews.
   raw = raw.replace(/```[\s\S]*?```/g, " ");
 
@@ -36,6 +39,10 @@ function docContentToPlainText(markdown: string | undefined): string {
   raw = raw.replace(/\*\*([^*]+)\*\*/g, "$1");
   raw = raw.replace(/\*([^*]+)\*/g, "$1");
   raw = raw.replace(/~~([^~]+)~~/g, "$1");
+
+  // Remove any remaining HTML tags/entities from previews.
+  raw = raw.replace(/<\/?[^>]+>/g, " ");
+  raw = raw.replace(/&[a-zA-Z]+;/g, " ");
 
   raw = raw.replace(/\s+/g, " ").trim();
   if (raw.length <= PREVIEW_MAX_LENGTH) return raw;
