@@ -25,7 +25,7 @@ fn emit_docs_changed(app: &AppHandle, doc_id: Option<&str>, kind: &str) {
 pub struct Doc {
     pub id: String,
     pub title: String,
-    /// LexiDoc JSON string (API canonical `content`)
+    /// Markdown string (API canonical `content`)
     pub content: String,
     pub created_at: String,
     pub updated_at: String,
