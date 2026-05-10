@@ -10,6 +10,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import type { Content } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { Markdown } from "@tiptap/markdown";
 import {
   Bold,
   Italic,
@@ -30,8 +31,8 @@ export interface DocSelection {
 }
 
 export interface RichTextEditorRef {
-  /** Insert structured TipTap JSON (full doc or content array) at current position or end */
-  insertStructuredContent: (json: string) => void;
+  /** Insert Markdown at current position or end */
+  insertStructuredContent: (markdown: string) => void;
   /** Get current selection range and text, or null if empty */
   getSelection: () => DocSelection | null;
   /** Replace the given range with new text (split by double newlines into paragraphs). Only this section is changed. */
@@ -39,11 +40,11 @@ export interface RichTextEditorRef {
 }
 
 export interface RichTextEditorProps {
-  /** Initial content: TipTap/ProseMirror JSON document as string */
+  /** Initial content: Markdown string */
   content?: string;
   placeholder?: string;
   editable?: boolean;
-  onUpdate?: (json: string) => void;
+  onUpdate?: (markdown: string) => void;
   onTitleChange?: (title: string) => void;
   /** Called when selection changes; null when selection is empty */
   onSelectionChange?: (selection: DocSelection | null) => void;
@@ -54,19 +55,6 @@ export interface RichTextEditorProps {
   /** Optional class for the wrapper */
   className?: string;
 }
-
-const parseContent = (content: string | undefined): Content | undefined => {
-  if (!content || !content.trim()) return undefined;
-  try {
-    const parsed = JSON.parse(content) as { type?: string };
-    if (!parsed || typeof parsed !== "object" || parsed.type !== "doc") {
-      return undefined;
-    }
-    return parsed as Content;
-  } catch {
-    return undefined;
-  }
-};
 
 export const RichTextEditor = forwardRef<
   RichTextEditorRef,
@@ -100,8 +88,13 @@ export const RichTextEditor = forwardRef<
         heading: { levels: [1, 2, 3] },
       }),
       Placeholder.configure({ placeholder }),
+      Markdown,
     ],
-    content: parseContent(content),
+    // Provide initial content as Markdown (parsed by @tiptap/markdown).
+    content: content ?? "",
+    // @tiptap/markdown augments EditorOptions with contentType at runtime,
+    // but the @tiptap/react types in this repo don't pick it up reliably.
+    ...( { contentType: "markdown" } as any ),
     editable,
     editorProps: {
       attributes: {
@@ -109,8 +102,8 @@ export const RichTextEditor = forwardRef<
       },
     },
     onUpdate: ({ editor }) => {
-      const json = JSON.stringify(editor.getJSON());
-      onUpdate?.(json);
+      const md = (editor as any).getMarkdown?.() ?? "";
+      onUpdate?.(md);
       setToolbarVersion((v) => v + 1);
     },
     onSelectionUpdate: ({ editor }) => {
@@ -154,11 +147,11 @@ export const RichTextEditor = forwardRef<
     if (!editor || editor.isDestroyed) return;
     if (prevContentPropRef.current === content) return;
     prevContentPropRef.current = content;
-    const next = parseContent(content);
-    editor.commands.setContent(
-      next ?? { type: "doc", content: [{ type: "paragraph" }] },
-      { emitUpdate: false },
-    );
+    // Ensure markdown is parsed correctly when switching docs.
+    (editor.commands as any).setContent(content ?? "", {
+      emitUpdate: false,
+      contentType: "markdown",
+    });
   }, [editor, content]);
 
   useEffect(() => {
@@ -175,32 +168,28 @@ export const RichTextEditor = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
-      insertStructuredContent(json: string) {
+      insertStructuredContent(markdown: string) {
         if (!editor) return;
         try {
-          const parsed = JSON.parse(json) as {
-            type?: string;
-            content?: Content[];
-          };
-          const nodes =
-            parsed?.type === "doc" && Array.isArray(parsed.content)
-              ? parsed.content
-              : [parsed as Content];
-          editor.chain().focus().insertContent(nodes).run();
-          onUpdateRef.current?.(JSON.stringify(editor.getJSON()));
+          editor.chain().focus().run();
+          // Use the command API so we can pass contentType reliably.
+          (editor.commands as any).insertContent(markdown, {
+            contentType: "markdown",
+          });
+          onUpdateRef.current?.(((editor as any).getMarkdown?.() as string) ?? "");
           return;
-        } catch {
-          // fall through to plain text insert
+        } catch (_) {
+          // fall through
         }
         try {
           editor
             .chain()
             .focus()
             .insertContent([
-              { type: "paragraph", content: [{ type: "text", text: json }] },
+              { type: "paragraph", content: [{ type: "text", text: markdown }] },
             ])
             .run();
-          onUpdateRef.current?.(JSON.stringify(editor.getJSON()));
+          onUpdateRef.current?.(((editor as any).getMarkdown?.() as string) ?? "");
         } catch (_) {}
       },
       getSelection(): DocSelection | null {
@@ -226,7 +215,7 @@ export const RichTextEditor = forwardRef<
           .deleteRange({ from, to })
           .insertContentAt(from, contentNodes)
           .run();
-        onUpdateRef.current?.(JSON.stringify(editor.getJSON()));
+        onUpdateRef.current?.(((editor as any).getMarkdown?.() as string) ?? "");
       },
     }),
     [editor],

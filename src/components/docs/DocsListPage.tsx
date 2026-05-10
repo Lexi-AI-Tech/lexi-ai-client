@@ -11,32 +11,42 @@ const DOCS_HELP =
 
 const PREVIEW_MAX_LENGTH = 140;
 
-/** Extract plain text only from TipTap JSON (no formatting). */
-function docContentToPlainText(contentJson: string | undefined): string {
-  if (!contentJson?.trim()) return "";
-  try {
-    const doc = JSON.parse(contentJson) as {
-      text?: string;
-      content?: unknown[];
-    };
-    const parts: string[] = [];
-    function visit(
-      n: { text?: string; content?: unknown[] } | undefined,
-    ): void {
-      if (!n) return;
-      if (typeof n.text === "string") parts.push(n.text);
-      if (Array.isArray(n.content))
-        n.content.forEach((c) =>
-          visit(c as { text?: string; content?: unknown[] }),
-        );
-    }
-    visit(doc);
-    const raw = parts.join(" ").replace(/\s+/g, " ").trim();
-    if (raw.length <= PREVIEW_MAX_LENGTH) return raw;
-    return raw.slice(0, PREVIEW_MAX_LENGTH).trim() + "…";
-  } catch {
-    return "";
-  }
+/** Extract plain text preview from Markdown (no formatting). */
+function docContentToPlainText(markdown: string | undefined): string {
+  if (!markdown?.trim()) return "";
+
+  let raw = markdown;
+
+  // TipTap markdown can include non-breaking spaces/entities to preserve empty lines.
+  raw = raw.replace(/&nbsp;/gi, " ").replace(/\u00A0/g, " ");
+
+  // Drop fenced code blocks entirely for previews.
+  raw = raw.replace(/```[\s\S]*?```/g, " ");
+
+  // Links: [text](url) -> text
+  raw = raw.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1");
+
+  // Inline code: `code` -> code
+  raw = raw.replace(/`([^`]+)`/g, "$1");
+
+  // Headings / blockquotes / list markers
+  raw = raw.replace(/^\s{0,3}#{1,6}\s+/gm, "");
+  raw = raw.replace(/^\s{0,3}>\s?/gm, "");
+  raw = raw.replace(/^\s*[-*+]\s+/gm, "");
+  raw = raw.replace(/^\s*\d+\.\s+/gm, "");
+
+  // Emphasis markers
+  raw = raw.replace(/\*\*([^*]+)\*\*/g, "$1");
+  raw = raw.replace(/\*([^*]+)\*/g, "$1");
+  raw = raw.replace(/~~([^~]+)~~/g, "$1");
+
+  // Remove any remaining HTML tags/entities from previews.
+  raw = raw.replace(/<\/?[^>]+>/g, " ");
+  raw = raw.replace(/&[a-zA-Z]+;/g, " ");
+
+  raw = raw.replace(/\s+/g, " ").trim();
+  if (raw.length <= PREVIEW_MAX_LENGTH) return raw;
+  return raw.slice(0, PREVIEW_MAX_LENGTH).trim() + "…";
 }
 
 function DocsPageHeading() {
