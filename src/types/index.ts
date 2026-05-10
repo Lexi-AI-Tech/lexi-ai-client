@@ -222,7 +222,7 @@ export interface PaginatedNotesResponse {
 export interface Doc {
   id: string;
   title: string;
-  /** TipTap/ProseMirror JSON document as string */
+  /** Markdown string (canonical) */
   content: string;
   created_at: string;
   updated_at: string;
