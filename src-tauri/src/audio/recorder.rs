@@ -57,20 +57,26 @@ impl AudioRecorder {
         // Get the default audio host for the current platform
         let host = cpal::default_host();
 
-        // Prefer the built-in laptop mic over external devices (e.g. AirPods).
-        // Enumerate all input devices and pick the first one whose name contains
-        // "MacBook" or "Built-in"; fall back to the system default otherwise.
-        let builtin_device = host.input_devices().ok().and_then(|mut devices| {
-            devices.find(|d| {
-                let name = d.name().unwrap_or_default();
-                name.contains("MacBook") || name.contains("Built-in")
+        // Prefer the built-in laptop mic over external devices (e.g. AirPods) on macOS.
+        // On other platforms, just use the system default input device.
+        #[cfg(target_os = "macos")]
+        let device = {
+            let builtin_device = host.input_devices().ok().and_then(|mut devices| {
+                devices.find(|d| {
+                    let name = d.name().unwrap_or_default();
+                    name.contains("MacBook") || name.contains("Built-in")
+                })
+            });
+            builtin_device.unwrap_or_else(|| {
+                host.default_input_device()
+                    .expect("Failed to get default input device")
             })
-        });
+        };
 
-        let device = builtin_device.unwrap_or_else(|| {
-            host.default_input_device()
-                .expect("Failed to get default input device")
-        });
+        #[cfg(not(target_os = "macos"))]
+        let device = host
+            .default_input_device()
+            .expect("Failed to get default input device");
 
         // Log the audio input source
         println!(

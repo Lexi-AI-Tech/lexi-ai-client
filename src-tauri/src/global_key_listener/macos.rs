@@ -30,8 +30,8 @@ fn now_epoch_ms() -> u64 {
         .unwrap_or(0)
 }
 
-fn reset_tracker_state(state: &GlobalListenerState) {
-    if let Ok(mut tracker) = state.tracker.try_lock() {
+fn reset_tracker_state(state: &MacGlobalKeyListenerState) {
+    if let Ok(mut tracker) = state.context.tracker.try_lock() {
         *tracker = KeyStateTracker::new();
     }
 }
@@ -112,23 +112,19 @@ fn macos_keycode_to_key(keycode: i64) -> Key {
 
 // Global state block required for the free-standing C callback
 lazy_static::lazy_static! {
-    static ref GLOBAL_STATE: Mutex<Option<GlobalListenerState>> = Mutex::new(None);
+    static ref GLOBAL_STATE: Mutex<Option<MacGlobalKeyListenerState>> = Mutex::new(None);
 }
 
-struct GlobalListenerState {
-    app: AppHandle,
-    recording_tx: mpsc::Sender<RecordingCommand>,
-    config_rx: watch::Receiver<Vec<String>>,
-    action_hotkey_rx: watch::Receiver<Vec<String>>,
-    recording_state: Arc<Mutex<bool>>,
-    meeting_recording_rx: watch::Receiver<bool>,
-    tracker: Arc<Mutex<KeyStateTracker>>,
+use super::GlobalKeyListenerContext;
+
+struct MacGlobalKeyListenerState {
+    context: GlobalKeyListenerContext,
     tap: Option<CFRetained<CFMachPort>>,
     run_loop: Option<CFRetained<CFRunLoop>>,
 }
 // CFRetained<CFMachPort> is !Send and !Sync, so we must unsafe impl it for the struct.
-unsafe impl Send for GlobalListenerState {}
-unsafe impl Sync for GlobalListenerState {}
+unsafe impl Send for MacGlobalKeyListenerState {}
+unsafe impl Sync for MacGlobalKeyListenerState {}
 
 unsafe extern "C-unwind" fn raw_callback(
     _proxy: CGEventTapProxy,
@@ -205,13 +201,14 @@ unsafe extern "C-unwind" fn raw_callback(
     if let Ok(mut lock_guard) = GLOBAL_STATE.try_lock() {
         if let Some(state) = lock_guard.as_mut() {
             let is_recording_mode = state
+                .context
                 .recording_state
                 .try_lock()
                 .map(|g| *g)
                 .unwrap_or(false);
 
             if is_recording_mode {
-                let app_clone = state.app.clone();
+                let app_clone = state.context.app.clone();
                 let internal_key_str = key_to_string(&internal_key);
                 tauri::async_runtime::spawn(async move {
                     let _ = app_clone.emit(
@@ -227,17 +224,17 @@ unsafe extern "C-unwind" fn raw_callback(
                 } else {
                     format!("key_release: {:?}", key_to_string(&internal_key))
                 };
-                let app_clone = state.app.clone();
+                let app_clone = state.context.app.clone();
                 tauri::async_runtime::spawn(async move {
                     let _ = app_clone.emit("global-input", &event_str);
                 });
             }
 
-            if let Ok(mut tracker) = state.tracker.try_lock() {
+            if let Ok(mut tracker) = state.context.tracker.try_lock() {
                 tracker.update_key_state(&key_str, is_actual_press);
 
-                let recording_hotkeys_guard = state.config_rx.borrow();
-                let action_hotkeys_guard = state.action_hotkey_rx.borrow();
+                let recording_hotkeys_guard = state.context.config_rx.borrow();
+                let action_hotkeys_guard = state.context.action_hotkey_rx.borrow();
 
                 let cmds = tracker.process_events(
                     &*action_hotkeys_guard,
@@ -257,15 +254,15 @@ unsafe extern "C-unwind" fn raw_callback(
                                     | RecordingCommand::SwitchToAction
                                     | RecordingCommand::SwitchToAssistant
                             );
-                            if is_start_cmd && *state.meeting_recording_rx.borrow() {
+                            if is_start_cmd && *state.context.meeting_recording_rx.borrow() {
                                 continue; // Disable assistant and action mode while meeting is running
                             }
-                            if let Err(e) = state.recording_tx.send(c) {
+                            if let Err(e) = state.context.recording_tx.send(c) {
                                 eprintln!("Failed to send command: {:?}", e);
                             }
                         }
                         HotkeyCommandResult::SendStopAfter(stop_cmd, delay) => {
-                            let tx = state.recording_tx.clone();
+                            let tx = state.context.recording_tx.clone();
                             tauri::async_runtime::spawn(async move {
                                 tokio::time::sleep(delay).await;
                                 let _ = tx.send(stop_cmd);
@@ -440,14 +437,16 @@ pub(crate) fn hard_reset_tap() {
     }
 
     // Re-initialize global state and spawn a fresh tap thread.
-    *GLOBAL_STATE.lock().unwrap() = Some(GlobalListenerState {
-        app,
-        recording_tx,
-        config_rx,
-        action_hotkey_rx,
-        recording_state,
-        meeting_recording_rx,
-        tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+    *GLOBAL_STATE.lock().unwrap() = Some(MacGlobalKeyListenerState {
+        context: GlobalKeyListenerContext {
+            app,
+            recording_tx,
+            config_rx,
+            action_hotkey_rx,
+            recording_state,
+            meeting_recording_rx,
+            tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+        },
         tap: None,
         run_loop: None,
     });

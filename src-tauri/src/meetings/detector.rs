@@ -611,7 +611,7 @@ fn run_listener_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
 
 pub fn start_meeting_detector(app_handle: AppHandle) {
     println!("[detector] start_meeting_detector called");
-    let (tx_std, rx_std) = mpsc::channel::<Vec<AppInfo>>();
+    let (_tx_std, rx_std) = mpsc::channel::<Vec<AppInfo>>();
     let (tx_tokio, mut rx_tokio) = tokio::sync::mpsc::channel::<Vec<AppInfo>>(8);
 
     std::thread::spawn(move || {
@@ -665,10 +665,10 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
                 .collect();
             // Use only the frontmost app to decide where the meeting is: emit only if the focused
             // app is in the mic-using list.
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             let frontmost_name =
                 crate::cursor_context::get_frontmost_application_name().unwrap_or_default();
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
             let frontmost_name = String::new();
             let Some(best_app) = candidate_apps
                 .iter()

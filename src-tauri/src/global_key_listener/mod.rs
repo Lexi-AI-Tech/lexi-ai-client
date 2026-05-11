@@ -20,6 +20,20 @@ use tokio::sync::watch;
 #[cfg(target_os = "macos")]
 mod macos;
 
+#[cfg(target_os = "windows")]
+mod windows;
+
+// Common context shared between platform-specific key listener states
+pub struct GlobalKeyListenerContext {
+    pub app: AppHandle,
+    pub recording_tx: mpsc::Sender<RecordingCommand>,
+    pub config_rx: watch::Receiver<Vec<String>>,
+    pub action_hotkey_rx: watch::Receiver<Vec<String>>,
+    pub recording_state: Arc<Mutex<bool>>,
+    pub meeting_recording_rx: watch::Receiver<bool>,
+    pub tracker: Arc<Mutex<KeyStateTracker>>,
+}
+
 // ============================================================================
 // Internal Minimal Key Mapper
 // ============================================================================
@@ -399,7 +413,19 @@ pub fn start_listener(
         );
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        windows::start_listener(
+            app,
+            recording_tx,
+            config_rx,
+            action_hotkey_rx,
+            recording_state,
+            meeting_recording_rx,
+        );
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         eprintln!("Global key listener natively unsupported on this target via this module.");
     }
