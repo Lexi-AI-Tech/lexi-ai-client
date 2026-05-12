@@ -54,7 +54,21 @@ tauri-plugin-os = "2.3.2"
 tauri-plugin-http = "2.5.7"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-winapi = { version = "0.3", features = ["winuser", "libloaderapi", "processthreadsapi", "errhandlingapi", "minwindef", "debugapi"] }
+winapi = { version = "0.3", features = [
+    "winuser",
+    "libloaderapi",
+    "processthreadsapi",
+    "errhandlingapi",
+    "minwindef",
+    "debugapi",
+    "handleapi",
+    "winbase",
+    "tlhelp32",
+    "shellapi",
+    "wingdi",
+    "winver",
+] }
+png = "0.17"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.24"
