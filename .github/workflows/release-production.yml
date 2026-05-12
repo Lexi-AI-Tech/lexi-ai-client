@@ -11,14 +11,8 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release-prod:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            target: universal-apple-darwin
-    runs-on: ${{ matrix.os }}
-
+  preflight:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -28,7 +22,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Check if tag already exists (Fail Fast)
+      - name: Check if tag already exists (fail fast, once per release)
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "Checking if tag v$VERSION already exists on remote..."
@@ -37,6 +31,30 @@ jobs:
             exit 1
           fi
           echo "✅ Version v$VERSION is new. Proceeding..."
+
+  build-and-release-prod:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: universal-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -71,8 +89,7 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
 
-      - name: Check version match (macOS)
-        if: matrix.os == 'macos-latest'
+      - name: Check version match
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
           TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
@@ -149,3 +166,41 @@ jobs:
                -F "installer_file=@$DMG_PATH" \
                --fail --show-error
           echo "Successfully uploaded to Lexi AI Production Server!"
+
+      - name: Publish update manifest to Lexi AI Prod Server (Windows)
+        if: success() && matrix.os == 'windows-latest'
+        env:
+          UPDATE_POST_URL: "https://server.speaklexi.com/api/v1/updates"
+          APP_RELEASES_API_KEY: ${{ secrets.APP_RELEASES_API_KEY }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ env.VERSION }}"
+          TARGET="windows"
+          NSIS_DIR="src-tauri/target/${{ matrix.target }}/release/bundle/nsis"
+          shopt -s nullglob
+          setups=("$NSIS_DIR"/*-setup.exe)
+          if [ ${#setups[@]} -eq 0 ]; then
+            echo "❌ No NSIS *-setup.exe under $NSIS_DIR"
+            ls -la "$NSIS_DIR" || true
+            exit 1
+          fi
+          SETUP_EXE="${setups[0]}"
+          SIG_FILE="$SETUP_EXE.sig"
+          if [ ! -f "$SIG_FILE" ]; then
+            echo "❌ Missing updater signature: $SIG_FILE"
+            exit 1
+          fi
+          INSTALLER_PATH="$NSIS_DIR/LexiAI-Setup.exe"
+          cp "$SETUP_EXE" "$INSTALLER_PATH"
+          SIG_CONTENT=$(cat "$SIG_FILE")
+          echo "Uploading Windows release to production server..."
+          curl -X POST "$UPDATE_POST_URL" \
+               -H "X-API-Key: $APP_RELEASES_API_KEY" \
+               -F "version=$VERSION" \
+               -F "target=$TARGET" \
+               -F "notes=$RELEASE_NOTES" \
+               -F "updater_signature=$SIG_CONTENT" \
+               -F "updater_file=@$SETUP_EXE" \
+               -F "installer_file=@$INSTALLER_PATH" \
+               --fail --show-error
+          echo "Successfully uploaded Windows build to Lexi AI Production Server!"
