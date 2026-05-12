@@ -13,12 +13,14 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { ToastProvider } from "./components/toast/ToastProvider";
 import { UpdateModal } from "./components/UpdateModal";
+import { WindowsTitleBar } from "./components/WindowsTitleBar";
 import "./index.css";
 
 // Get the root DOM element and render the App component
 // The ! operator asserts that the element exists (it should, as it's in index.html)
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
+    <WindowsTitleBar />
     <App />
     <ToastProvider />
     <UpdateModal />

@@ -1,7 +1,8 @@
 //! Title bar customization for the main window.
 //!
-//! Removes the window title and, on macOS, sets the title bar to use the same
-//! background colour as the app so it blends with the content area.
+//! Clears the window title. On macOS, the native transparent title bar uses the
+//! app surface colour. On Windows, native decorations are disabled so the web UI
+//! can provide a matching strip (see `WindowsTitleBar` in the frontend).
 
 use tauri::WebviewWindow;
 

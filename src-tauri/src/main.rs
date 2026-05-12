@@ -75,7 +75,7 @@ mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config) // Meetings module
 
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
-mod titlebar; // Title bar customization (hide title, match background on macOS)
+mod titlebar; // Title bar: macOS tint, Windows frameless + shadow
 mod tray; // System tray icon creation and event handling
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations

@@ -85,6 +85,9 @@
   --lexi-toast-info-bg: var(--lexi-surface-overlay);
   --lexi-toast-info-text: var(--lexi-text);
   --lexi-toast-info-border: var(--lexi-border);
+
+  /* Windows frameless caption (Rust disables native decorations) */
+  --lexi-win-titlebar-height: 36px;
 }
 
 * {
@@ -139,6 +142,70 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Reserve top inset for fixed Windows caption bar (see WindowsTitleBar.tsx) */
+body.lexi-windows-frameless {
+  padding-top: var(--lexi-win-titlebar-height);
+}
+
+/* Windows custom caption — same surface as macOS title bar blend */
+.windows-titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--lexi-win-titlebar-height);
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background: var(--lexi-surface);
+  border-bottom: 1px solid var(--lexi-border-subtle);
+  z-index: 100000;
+  user-select: none;
+}
+
+.windows-titlebar__drag {
+  flex: 1;
+  min-width: 0;
+}
+
+.windows-titlebar__controls {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.windows-titlebar__btn {
+  width: 46px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lexi-text-muted);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.windows-titlebar__btn:hover {
+  background: rgba(46, 59, 47, 0.08);
+  color: var(--lexi-text);
+}
+
+.windows-titlebar__btn--close:hover {
+  background: var(--lexi-danger);
+  color: #ffffff;
+}
+
+body.lexi-windows-frameless .onboarding-container {
+  min-height: calc(100vh - var(--lexi-win-titlebar-height));
+}
+
+body.lexi-windows-frameless .app {
+  height: calc(100vh - var(--lexi-win-titlebar-height));
+  max-height: calc(100vh - var(--lexi-win-titlebar-height));
 }
 
 .app {
