@@ -33,6 +33,23 @@ use std::error::Error;
 use std::thread;
 use std::time::Duration;
 
+/// After simulating paste, the target app or the shell may still hold the clipboard briefly
+/// on Windows. Retrying improves chances of putting the prior plain-text value back.
+fn restore_clipboard_text_best_effort(clipboard: &mut Clipboard, original: &str) {
+    #[cfg(target_os = "windows")]
+    let attempts: usize = 15;
+    #[cfg(not(target_os = "windows"))]
+    let attempts: usize = 4;
+
+    for i in 0..attempts {
+        if clipboard.set_text(original).is_ok() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(35 + i as u64 * 12));
+    }
+    eprintln!("lexi: could not restore prior clipboard text after inject (clipboard may still hold transcription)");
+}
+
 /// TextInjector provides cross-platform functionality to inject text into the active application
 ///
 /// This implementation uses:
@@ -59,10 +76,10 @@ impl TextInjector {
     /// Injects text into the currently active application
     ///
     /// This method:
-    /// 1. Saves the current clipboard content (optional preservation)
+    /// 1. Saves the current plain-text clipboard content when readable
     /// 2. Copies the provided text to the system clipboard
     /// 3. Simulates a paste keystroke (Cmd+V on macOS, Ctrl+V elsewhere)
-    /// 4. Optionally restores the original clipboard content
+    /// 4. Restores the saved plain text on a best-effort basis (with retries on Windows)
     ///
     /// The text is inserted at the current cursor position in whatever application
     /// is currently active (text editor, browser, terminal, etc.).
@@ -75,12 +92,15 @@ impl TextInjector {
     /// * `Err(Box<dyn Error>)` - An error if clipboard or key simulation fails
     ///
     /// # Note
-    /// This method temporarily overwrites the clipboard contents. The original
-    /// clipboard is preserved on a best-effort basis.
+    /// This method temporarily overwrites the clipboard. Prior plain text is restored on a
+    /// best-effort basis (non-text formats, such as images, are not preserved).
     pub fn inject_text(&self, text: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut clipboard = Clipboard::new()?;
 
-        let original_clipboard_text = clipboard.get_text().ok();
+        // Only plain text is preserved. If get_text fails (busy clipboard, non-text formats),
+        // do not clear afterward — the old branch cleared when the read failed but the
+        // clipboard still matched the injection, which made a bad situation worse on Windows.
+        let previous_plain_text = clipboard.get_text().ok();
 
         // Step 1: Set clipboard to the text we want to inject
         // arboard handles UTF-8 encoding and special characters automatically
@@ -94,12 +114,13 @@ impl TextInjector {
         crate::keyboard_simulator::simulate_paste()?;
 
         // Brief delay to ensure paste processes (some apps need a moment)
+        #[cfg(target_os = "windows")]
+        thread::sleep(Duration::from_millis(420));
+        #[cfg(not(target_os = "windows"))]
         thread::sleep(Duration::from_millis(350));
 
-        if let Some(original) = original_clipboard_text {
-            let _ = clipboard.set_text(original);
-        } else if clipboard.get_text().ok().as_deref() == Some(text) {
-            let _ = clipboard.clear();
+        if let Some(ref original) = previous_plain_text {
+            restore_clipboard_text_best_effort(&mut clipboard, original);
         }
 
         Ok(())
