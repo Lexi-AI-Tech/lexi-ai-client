@@ -17,14 +17,17 @@ use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::debugapi::OutputDebugStringW;
 use winapi::um::winuser::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-    KBDLLHOOKSTRUCT, MSG, PeekMessageW, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN,
-    WM_SYSKEYUP, PM_NOREMOVE,
+    GetAsyncKeyState, KBDLLHOOKSTRUCT, MSG, PeekMessageW, VK_LMENU, VK_LWIN, VK_MENU, VK_RMENU,
+    VK_RWIN, VK_SHIFT, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    PM_NOREMOVE,
 };
 
 use lazy_static::lazy_static;
 use std::ptr::null_mut;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 // ============================================================================
 // Global State for the Hook Callback
@@ -36,6 +39,10 @@ use super::GlobalKeyListenerContext;
 lazy_static! {
     static ref GLOBAL_STATE: Mutex<Option<WindowsGlobalKeyListenerState>> = Mutex::new(None);
 }
+
+/// Updated whenever the low-level hook callback fires.
+/// If this stops advancing (e.g. app focused case), we switch to a polling fallback.
+static LAST_HOOK_EPOCH_MS: AtomicU64 = AtomicU64::new(0);
 
 struct WindowsGlobalKeyListenerState {
     context: GlobalKeyListenerContext,
@@ -150,6 +157,7 @@ unsafe extern "system" fn keyboard_hook_callback(
     l_param: LPARAM,
 ) -> LRESULT {
     if n_code >= 0 {
+        LAST_HOOK_EPOCH_MS.store(now_epoch_ms(), Ordering::Relaxed);
         let kb_struct = &*(l_param as *const KBDLLHOOKSTRUCT);
         let vk_code = kb_struct.vkCode;
 
@@ -258,6 +266,156 @@ unsafe extern "system" fn keyboard_hook_callback(
     CallNextHookEx(null_mut(), n_code, w_param, l_param)
 }
 
+fn now_epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+fn log_key(vk_code: u32, is_press: bool, raw_key_str: &str, key_str: &str) {
+    let edge = if is_press { "down" } else { "up" };
+    println!(
+        "🎹 [key_debug][windows] vk={} edge={} raw='{}' normalized='{}'",
+        vk_code, edge, raw_key_str, key_str
+    );
+    let dbg = format!(
+        "[key_debug][windows] vk={} edge={} raw='{}' normalized='{}'\0",
+        vk_code, edge, raw_key_str, key_str
+    );
+    let wide: Vec<u16> = OsStr::new(&dbg).encode_wide().collect();
+    unsafe {
+        OutputDebugStringW(wide.as_ptr());
+    }
+}
+
+fn process_key_event(vk_code: u32, is_press: bool) {
+    let internal_key = vk_to_key(vk_code);
+    let raw_key_str = key_to_string(&internal_key);
+    let key_str = normalize_key_string_platform(&raw_key_str);
+    log_key(vk_code, is_press, &raw_key_str, &key_str);
+
+    if let Ok(mut lock_guard) = GLOBAL_STATE.try_lock() {
+        if let Some(state) = lock_guard.as_mut() {
+            // Hotkey recording mode: emit key events to frontend
+            let is_recording_mode = state
+                .context
+                .recording_state
+                .try_lock()
+                .map(|g| *g)
+                .unwrap_or(false);
+
+            if is_recording_mode {
+                let app_clone = state.context.app.clone();
+                let internal_key_str = raw_key_str.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = app_clone.emit(
+                        "hotkey-recorded",
+                        serde_json::json!({
+                            "key": internal_key_str,
+                            "modifiers": []
+                        }),
+                    );
+                });
+            }
+
+            if let Ok(mut tracker) = state.context.tracker.try_lock() {
+                tracker.update_key_state(&key_str, is_press);
+
+                let recording_hotkeys = state.context.config_rx.borrow().clone();
+                let action_hotkeys = state.context.action_hotkey_rx.borrow().clone();
+
+                let cmds = tracker.process_events(
+                    &action_hotkeys,
+                    &recording_hotkeys,
+                    &key_str,
+                    is_press,
+                );
+
+                for cmd in cmds {
+                    match cmd {
+                        HotkeyCommandResult::SendNow(c) => {
+                            let is_start_cmd = matches!(
+                                c,
+                                RecordingCommand::Start
+                                    | RecordingCommand::ActionStart
+                                    | RecordingCommand::SwitchToAction
+                                    | RecordingCommand::SwitchToAssistant
+                            );
+                            if is_start_cmd && *state.context.meeting_recording_rx.borrow() {
+                                continue;
+                            }
+                            let _ = state.context.recording_tx.send(c);
+                        }
+                        HotkeyCommandResult::SendStopAfter(stop_cmd, delay) => {
+                            let tx = state.context.recording_tx.clone();
+                            tauri::async_runtime::spawn(async move {
+                                tokio::time::sleep(delay).await;
+                                let _ = tx.send(stop_cmd);
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn start_polling_fallback_thread() {
+    std::thread::spawn(move || {
+        // Watch a conservative set of keys (modifiers + A-Z + 0-9). This is cheap enough and
+        // keeps the fallback generic for future config changes.
+        let mut watched: Vec<u32> = Vec::new();
+
+        // Modifiers (include generic + side-specific variants)
+        watched.extend_from_slice(&[
+            0x11, // VK_CONTROL
+            0xA2, // VK_LCONTROL
+            0xA3, // VK_RCONTROL
+            VK_MENU as u32,  // Alt (generic)
+            VK_LMENU as u32, // Alt left
+            VK_RMENU as u32, // Alt right
+            VK_SHIFT as u32, // Shift (generic)
+            VK_LWIN as u32,  // Win left
+            VK_RWIN as u32,  // Win right
+        ]);
+
+        // A-Z
+        for vk in 0x41u32..=0x5Au32 {
+            watched.push(vk);
+        }
+        // 0-9
+        for vk in 0x30u32..=0x39u32 {
+            watched.push(vk);
+        }
+
+        use std::collections::HashMap;
+        let mut prev: HashMap<u32, bool> = HashMap::new();
+
+        loop {
+            std::thread::sleep(Duration::from_millis(16));
+
+            // Only activate polling when the hook hasn't delivered anything recently.
+            // This matches the "app focused => hook silent" behavior without duplicating events
+            // during normal operation.
+            let now = now_epoch_ms();
+            let last = LAST_HOOK_EPOCH_MS.load(Ordering::Relaxed);
+            if last != 0 && now.saturating_sub(last) < 250 {
+                continue;
+            }
+
+            for &vk in &watched {
+                let down = unsafe { (GetAsyncKeyState(vk as i32) & 0x8000) != 0 };
+                let was = *prev.get(&vk).unwrap_or(&false);
+                if down != was {
+                    prev.insert(vk, down);
+                    process_key_event(vk, down);
+                }
+            }
+        }
+    });
+}
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -288,6 +446,9 @@ pub(crate) fn start_listener(
         // deliver callbacks because the queue isn't created yet.
         let mut msg: MSG = std::mem::zeroed();
         let _ = PeekMessageW(&mut msg, null_mut(), 0, 0, PM_NOREMOVE);
+
+        // Start the fallback poller (it stays idle unless the hook goes silent).
+        start_polling_fallback_thread();
 
         let hook = SetWindowsHookExW(
             WH_KEYBOARD_LL,
