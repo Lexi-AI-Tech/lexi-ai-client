@@ -55,7 +55,7 @@ use tokio::sync::watch;
 // Module declarations for core functionality
 mod actions; // Voice actions (triggered by hotkeys)
 mod api_endpoints; // Centralized API endpoint definitions
-mod app_icon; // macOS app icon for Transcript List app column
+mod app_icon; // `app_icon/` — platform app icons (macOS, Windows)
 mod assistant; // Recording thread management
 mod audio;
 mod commands;

@@ -135,7 +135,7 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // App icons for the App column (macOS: data URLs from get_app_icon)
+  // App icons for the App column (PNG data URLs from Tauri get_app_icon on macOS / Windows)
   const [appIcons, setAppIcons] = useState<Record<string, string | null>>({});
   const appIconsRequestedRef = useRef<Set<string>>(new Set());
   const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(
@@ -281,7 +281,7 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
     };
   }, [authStore.isAuthenticated, authStore.isInitialized, refreshTranscripts]);
 
-  // Fetch app icons for unique focused_app names (macOS only; Tauri returns data URL or null)
+  // Fetch app icons for unique focused_app names (Tauri returns data URL or null)
   useEffect(() => {
     transcripts.forEach((t) => {
       const name = (t.focused_app || "").trim();
