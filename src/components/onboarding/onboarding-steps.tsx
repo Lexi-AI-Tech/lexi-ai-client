@@ -26,10 +26,17 @@ type DefaultHotkeysResponse = {
   action_hotkeys: string[];
 };
 
-const LOCAL_HOTKEY_FALLBACK: DefaultHotkeysResponse = {
-  hotkeys: ["Fn"],
-  action_hotkeys: ["Fn+Control"],
-};
+function getLocalHotkeyFallback(systemType: string): DefaultHotkeysResponse {
+  return systemType === "mac"
+    ? {
+        hotkeys: ["Fn"],
+        action_hotkeys: ["Fn+Control"],
+      }
+    : {
+        hotkeys: ["Control+Windows"],
+        action_hotkeys: ["Control+Alt+Windows"],
+      };
+}
 
 const HOW_TO_SETUP_URL = "https://speaklexi.com/how-to-setup";
 
@@ -37,7 +44,7 @@ const HOW_TO_SETUP_URL = "https://speaklexi.com/how-to-setup";
  * Labels for the try-it step: prefer `get_app_config`, fill empty sides with
  * `get_default_hotkeys` (same server defaults as the hotkey dry-run), then local fallback.
  */
-async function resolveHotkeysForTryItStep(): Promise<DefaultHotkeysResponse> {
+async function resolveHotkeysForTryItStep(systemType: string): Promise<DefaultHotkeysResponse> {
   let hotkeys: string[] = [];
   let action_hotkeys: string[] = [];
   try {
@@ -59,9 +66,11 @@ async function resolveHotkeysForTryItStep(): Promise<DefaultHotkeysResponse> {
   } catch {
     // Same path as Rust `local_onboarding_hotkey_fallback`
   }
-  if (!hotkeys.length) hotkeys = [...LOCAL_HOTKEY_FALLBACK.hotkeys];
+  
+  const fallback = getLocalHotkeyFallback(systemType);
+  if (!hotkeys.length) hotkeys = [...fallback.hotkeys];
   if (!action_hotkeys.length)
-    action_hotkeys = [...LOCAL_HOTKEY_FALLBACK.action_hotkeys];
+    action_hotkeys = [...fallback.action_hotkeys];
   return { hotkeys, action_hotkeys };
 }
 
@@ -80,14 +89,17 @@ const BETWEEN_MS = 320;
 
 // Step 1: Welcome
 export function WelcomeStep({
+  systemType,
   onNext,
   onBack,
   showBack,
 }: {
+  systemType: string;
   onNext: () => void | Promise<void>;
   onBack?: () => void | Promise<void>;
   showBack?: boolean;
 }) {
+  const isMac = systemType === "mac";
   const { isAuthenticated } = useAuthStore();
   const [wordIdx, setWordIdx] = useState(0);
   const [charIdx, setCharIdx] = useState(0);
@@ -128,7 +140,7 @@ export function WelcomeStep({
       <div className="step-header">
         <h1 className="step-title">Welcome to Lexi AI</h1>
         <p className="step-description">
-          The voice-first OS that works across every app on your Mac.
+          The voice-first OS that works across every app on your {isMac ? "Mac" : "PC"}.
         </p>
         <p className="step-description">
           Dictate, meet, write, act — all connected through your voice.
@@ -482,10 +494,12 @@ export function PermissionsStep({
 
 // Step 3: Hotkeys — press each once; dry-run skips pill (see `onboarding_hotkey_verify` in Rust).
 export function SetupStep({
+  systemType,
   onNext,
   onBack,
   showBack,
 }: {
+  systemType: string;
   onNext: () => void | Promise<void>;
   onBack?: () => void | Promise<void>;
   showBack?: boolean;
@@ -511,8 +525,9 @@ export function SetupStep({
       } catch (e) {
         console.error("SetupStep: begin_onboarding_hotkey_dry_run failed", e);
         if (!cancelled) {
-          setTranscriptionHotkeys(["Fn"]);
-          setActionHotkeys(["Fn+Control"]);
+          const fallback = getLocalHotkeyFallback(systemType);
+          setTranscriptionHotkeys(fallback.hotkeys);
+          setActionHotkeys(fallback.action_hotkeys);
         }
       } finally {
         if (!cancelled) setConfigLoading(false);
@@ -706,10 +721,12 @@ export function SetupStep({
 
 // Step 4: Give it a try — real transcription & actions (no dry-run)
 export function TryItStep({
+  systemType,
   onComplete,
   onBack,
   showBack,
 }: {
+  systemType: string;
   onComplete: () => void | Promise<void>;
   onBack?: () => void | Promise<void>;
   showBack?: boolean;
@@ -728,7 +745,7 @@ export function TryItStep({
     let cancelled = false;
     (async () => {
       try {
-        const { hotkeys, action_hotkeys } = await resolveHotkeysForTryItStep();
+        const { hotkeys, action_hotkeys } = await resolveHotkeysForTryItStep(systemType);
         if (!cancelled) {
           setTranscriptionHotkeys(hotkeys);
           setActionHotkeys(action_hotkeys);
