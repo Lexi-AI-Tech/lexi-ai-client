@@ -14,13 +14,17 @@ use super::{key_to_string, HotkeyCommandResult, Key, KeyStateTracker};
 
 use winapi::shared::minwindef::{LPARAM, LRESULT, WPARAM};
 use winapi::um::libloaderapi::GetModuleHandleW;
+use winapi::um::debugapi::OutputDebugStringW;
 use winapi::um::winuser::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-    KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    KBDLLHOOKSTRUCT, MSG, PeekMessageW, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN,
+    WM_SYSKEYUP, PM_NOREMOVE,
 };
 
 use lazy_static::lazy_static;
 use std::ptr::null_mut;
+use std::ffi::OsStr;
+use std::os::windows::ffi::OsStrExt;
 
 // ============================================================================
 // Global State for the Hook Callback
@@ -164,6 +168,13 @@ unsafe extern "system" fn keyboard_hook_callback(
             "🎹 [key_debug][windows] vk={} edge={} raw='{}' normalized='{}'",
             vk_code, edge, raw_key_str, key_str
         );
+        // Also send to the Windows debugger output stream (useful when stdout capture is flaky).
+        let dbg = format!(
+            "[key_debug][windows] vk={} edge={} raw='{}' normalized='{}'\0",
+            vk_code, edge, raw_key_str, key_str
+        );
+        let wide: Vec<u16> = OsStr::new(&dbg).encode_wide().collect();
+        OutputDebugStringW(wide.as_ptr());
 
         if let Ok(mut lock_guard) = GLOBAL_STATE.try_lock() {
             if let Some(state) = lock_guard.as_mut() {
@@ -272,6 +283,12 @@ pub(crate) fn start_listener(
     });
 
     std::thread::spawn(move || unsafe {
+        // Ensure this thread has a message queue before installing the hook.
+        // Without this, some environments can install the hook successfully but never
+        // deliver callbacks because the queue isn't created yet.
+        let mut msg: MSG = std::mem::zeroed();
+        let _ = PeekMessageW(&mut msg, null_mut(), 0, 0, PM_NOREMOVE);
+
         let hook = SetWindowsHookExW(
             WH_KEYBOARD_LL,
             Some(keyboard_hook_callback),
@@ -289,7 +306,6 @@ pub(crate) fn start_listener(
         // Message pump — required to keep the hook alive.
         // GetMessageW blocks until a message is available; the hook callback
         // fires on the same thread via the Windows message dispatch mechanism.
-        let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
             DispatchMessageW(&msg);
         }
