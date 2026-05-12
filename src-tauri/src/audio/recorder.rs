@@ -47,6 +47,36 @@ pub struct AudioRecorder {
     recording_active: Arc<AtomicBool>,
 }
 
+/// Resolves the same input device used by [`AudioRecorder::new`].
+///
+/// **macOS:** Prefers the **built-in** microphone when we can find it by device name (`MacBook`
+/// or `Built-in`). Apple laptops usually ship with a higher-quality close-field mic than typical
+/// Bluetooth headsets (e.g. AirPods), so we avoid accidentally recording through a worse default
+/// when the OS has routed input to an external device. If no built-in match is found, falls back
+/// to the system default input device.
+///
+/// **Windows / Linux:** Uses the host’s **default input device** only (same as the OS “default
+/// microphone” in sound settings).
+pub fn try_prioritized_input_device() -> Option<Device> {
+    let host = cpal::default_host();
+
+    #[cfg(target_os = "macos")]
+    {
+        let builtin_device = host.input_devices().ok().and_then(|mut devices| {
+            devices.find(|d| {
+                let name = d.name().unwrap_or_default();
+                name.contains("MacBook") || name.contains("Built-in")
+            })
+        });
+        builtin_device.or_else(|| host.default_input_device())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        host.default_input_device()
+    }
+}
+
 impl AudioRecorder {
     /// Creates a new AudioRecorder instance
     ///
@@ -54,28 +84,7 @@ impl AudioRecorder {
     /// and its default configuration (sample rate, channels, format).
     /// This will typically use the system's default microphone.
     pub fn new() -> Self {
-        // Get the default audio host for the current platform
-        let host = cpal::default_host();
-
-        // Prefer the built-in laptop mic over external devices (e.g. AirPods) on macOS.
-        // On other platforms, just use the system default input device.
-        #[cfg(target_os = "macos")]
-        let device = {
-            let builtin_device = host.input_devices().ok().and_then(|mut devices| {
-                devices.find(|d| {
-                    let name = d.name().unwrap_or_default();
-                    name.contains("MacBook") || name.contains("Built-in")
-                })
-            });
-            builtin_device.unwrap_or_else(|| {
-                host.default_input_device()
-                    .expect("Failed to get default input device")
-            })
-        };
-
-        #[cfg(not(target_os = "macos"))]
-        let device = host
-            .default_input_device()
+        let device = try_prioritized_input_device()
             .expect("Failed to get default input device");
 
         // Log the audio input source

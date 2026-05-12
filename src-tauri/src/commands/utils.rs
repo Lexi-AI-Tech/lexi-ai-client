@@ -28,14 +28,18 @@ pub fn get_system_type() -> &'static str {
 /// # Returns
 /// * `Ok(())` - Successfully copied to clipboard
 /// * `Err(String)` - Error message if copy failed
-#[tauri::command]
-pub fn copy_to_clipboard(text: String) -> Result<(), String> {
+pub(crate) fn copy_plain_text_to_clipboard(text: &str) -> Result<(), String> {
     let mut clipboard =
         Clipboard::new().map_err(|e| format!("Failed to access clipboard: {}", e))?;
     clipboard
         .set_text(text)
         .map_err(|e| format!("Failed to set clipboard text: {}", e))?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn copy_to_clipboard(text: String) -> Result<(), String> {
+    copy_plain_text_to_clipboard(&text)
 }
 
 /// Open an https URL in the system default browser (macOS `open`, Windows `start`, Linux `xdg-open`).
