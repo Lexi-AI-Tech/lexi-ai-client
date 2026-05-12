@@ -294,14 +294,16 @@ pub(crate) fn start_listener(
     recording_state: Arc<Mutex<bool>>,
     meeting_recording_rx: watch::Receiver<bool>,
 ) {
-    *GLOBAL_STATE.lock().unwrap() = Some(GlobalListenerState {
-        app: app.clone(),
-        recording_tx,
-        config_rx,
-        action_hotkey_rx,
-        recording_state,
-        meeting_recording_rx,
-        tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+    *GLOBAL_STATE.lock().unwrap() = Some(MacGlobalKeyListenerState {
+        context: GlobalKeyListenerContext {
+            app: app.clone(),
+            recording_tx,
+            config_rx,
+            action_hotkey_rx,
+            recording_state,
+            meeting_recording_rx,
+            tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+        },
         tap: None,
         run_loop: None,
     });
@@ -399,12 +401,12 @@ pub(crate) fn hard_reset_tap() {
             let old_loop = state.run_loop.take();
 
             // Clone the inputs needed to re-create a listener state.
-            let app = state.app.clone();
-            let recording_tx = state.recording_tx.clone();
-            let config_rx = state.config_rx.clone();
-            let action_hotkey_rx = state.action_hotkey_rx.clone();
-            let recording_state = state.recording_state.clone();
-            let meeting_recording_rx = state.meeting_recording_rx.clone();
+            let app = state.context.app.clone();
+            let recording_tx = state.context.recording_tx.clone();
+            let config_rx = state.context.config_rx.clone();
+            let action_hotkey_rx = state.context.action_hotkey_rx.clone();
+            let recording_state = state.context.recording_state.clone();
+            let meeting_recording_rx = state.context.meeting_recording_rx.clone();
 
             // Reset tracker immediately so we don't carry stuck modifier state across resets.
             reset_tracker_state(state);
