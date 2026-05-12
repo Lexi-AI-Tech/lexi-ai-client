@@ -6,7 +6,21 @@ use std::sync::{mpsc, Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::watch;
 
-use super::{key_to_string, normalize_key_string, HotkeyCommandResult, Key, KeyStateTracker};
+use super::{
+    key_to_string, normalize_key_string_common, HotkeyCommandResult, Key, KeyStateTracker,
+};
+
+/// macOS-specific key name normalization.
+///
+/// Canonical modifier naming on macOS uses `"Command"` (Cmd). We also accept `"win"`/`"windows"`
+/// as aliases for Command to support cross-platform configs pasted from Windows.
+pub(crate) fn normalize_key_string_platform(key: &str) -> String {
+    let k = key.trim().to_lowercase();
+    match k.as_str() {
+        "cmd" | "command" | "meta" | "super" | "win" | "windows" => "Command".to_string(),
+        _ => normalize_key_string_common(key),
+    }
+}
 
 use objc2_core_foundation::{kCFRunLoopCommonModes, CFMachPort, CFRetained, CFRunLoop};
 use objc2_core_graphics::{
@@ -195,7 +209,14 @@ unsafe extern "C-unwind" fn raw_callback(
     };
 
     let internal_key = macos_keycode_to_key(keycode);
-    let key_str = normalize_key_string(&key_to_string(&internal_key));
+    let raw_key_str = key_to_string(&internal_key);
+    let key_str = normalize_key_string_platform(&raw_key_str);
+
+    let edge = if is_actual_press { "down" } else { "up" };
+    println!(
+        "🎹 [key_debug][macos] keycode={} type={:?} edge={} raw='{}' normalized='{}'",
+        keycode, _type, edge, raw_key_str, key_str
+    );
 
     // Process safely without keeping the lock too long
     if let Ok(mut lock_guard) = GLOBAL_STATE.try_lock() {

@@ -108,6 +108,11 @@ pub enum Key {
 // Convert internal Key to string presentation
 pub(crate) fn key_to_string(key: &Key) -> String {
     match key {
+        // On Windows, `Key::Command` represents the Win key.
+        // We keep OS-canonical display/config strings to avoid cross-OS confusion.
+        #[cfg(target_os = "windows")]
+        Key::Command => "Windows".to_string(),
+        #[cfg(not(target_os = "windows"))]
         Key::Command => "Command".to_string(),
         Key::Control => "Control".to_string(),
         Key::Option => "Option".to_string(),
@@ -176,9 +181,16 @@ pub(crate) fn key_to_string(key: &Key) -> String {
 
 /// Normalize config hotkey string for comparison
 pub(crate) fn normalize_key_string(key: &str) -> String {
+    normalize_key_string_common(key)
+}
+
+/// Common (OS-agnostic) hotkey normalization.
+///
+/// Platform modules can call this to reuse canonicalization rules after applying any
+/// OS-specific alias mapping (e.g. Win key vs Cmd key naming).
+pub(crate) fn normalize_key_string_common(key: &str) -> String {
     let k = key.trim().to_lowercase();
     match k.as_str() {
-        "cmd" | "command" | "meta" | "super" => "Command".to_string(),
         "ctrl" | "control" => "Control".to_string(),
         "option" | "alt" => "Option".to_string(),
         "shift" => "Shift".to_string(),

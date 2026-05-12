@@ -10,7 +10,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::watch;
 
-use super::{key_to_string, normalize_key_string, HotkeyCommandResult, Key, KeyStateTracker};
+use super::{key_to_string, HotkeyCommandResult, Key, KeyStateTracker};
 
 use winapi::shared::minwindef::{LPARAM, LRESULT, WPARAM};
 use winapi::um::libloaderapi::GetModuleHandleW;
@@ -26,6 +26,7 @@ use std::ptr::null_mut;
 // Global State for the Hook Callback
 // ============================================================================
 
+use super::normalize_key_string_common;
 use super::GlobalKeyListenerContext;
 
 lazy_static! {
@@ -34,6 +35,20 @@ lazy_static! {
 
 struct WindowsGlobalKeyListenerState {
     context: GlobalKeyListenerContext,
+}
+
+/// Windows-specific key name normalization.
+///
+/// We keep the canonical name `"Windows"` (not `"Command"`) so onboarding defaults like
+/// `Control+Windows` match what the listener emits.
+pub(crate) fn normalize_key_string_platform(key: &str) -> String {
+    let k = key.trim().to_lowercase();
+    match k.as_str() {
+        "win" | "windows" | "lwin" | "rwin" => "Windows".to_string(),
+        // Accept "command" as an alias on Windows for backward compatibility with older stored configs.
+        "cmd" | "command" | "meta" | "super" => "Windows".to_string(),
+        _ => normalize_key_string_common(key),
+    }
 }
 
 // Required because AppHandle is Send+Sync but the mutex wrapper needs explicit marking
@@ -141,7 +156,14 @@ unsafe extern "system" fn keyboard_hook_callback(
         };
 
         let internal_key = vk_to_key(vk_code);
-        let key_str = normalize_key_string(&key_to_string(&internal_key));
+        let raw_key_str = key_to_string(&internal_key);
+        let key_str = normalize_key_string_platform(&raw_key_str);
+
+        let edge = if is_press { "down" } else { "up" };
+        println!(
+            "🎹 [key_debug][windows] vk={} edge={} raw='{}' normalized='{}'",
+            vk_code, edge, raw_key_str, key_str
+        );
 
         if let Ok(mut lock_guard) = GLOBAL_STATE.try_lock() {
             if let Some(state) = lock_guard.as_mut() {
