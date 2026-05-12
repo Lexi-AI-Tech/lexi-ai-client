@@ -276,10 +276,21 @@ pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
     println!("✅ Synced: app icon shown = {}", show_icon);
 }
 
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn sync_dock_icon_status(_app: &AppHandle, _config: &AppConfig) {
-    // Only supported on macOS
+/// When `show_icon` is false, hide the main window from the taskbar (tray remains).
+#[cfg(target_os = "windows")]
+pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
+    let show_icon = config.show_icon.unwrap_or(true);
+    let skip_taskbar = !show_icon;
+    if let Some(window) = app.get_webview_window("main") {
+        if let Err(e) = window.set_skip_taskbar(skip_taskbar) {
+            eprintln!("⚠️ Failed to set_skip_taskbar on main window: {}", e);
+        }
+    }
+    println!("✅ Synced: taskbar icon (main window) shown = {}", show_icon);
 }
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+pub(crate) fn sync_dock_icon_status(_app: &AppHandle, _config: &AppConfig) {}
 
 /// Merge provided config into current config (only updates provided fields)
 fn merge_config(current: &mut AppConfig, provided: AppConfig) {

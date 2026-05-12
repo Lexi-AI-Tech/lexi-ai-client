@@ -137,6 +137,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   >("general");
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
+  const [dockOrTaskbarIconPlatform, setDockOrTaskbarIconPlatform] = useState<
+    "mac" | "windows" | null
+  >(null);
 
   useEffect(() => {
     if (!initialSection) return;
@@ -188,6 +191,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     };
 
     loadConfig();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void invoke<string>("get_system_type")
+      .then((t) => {
+        if (cancelled) return;
+        if (t === "mac" || t === "windows") {
+          setDockOrTaskbarIconPlatform(t);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const isProPlan = (planType: string | undefined | null): boolean =>
@@ -986,15 +1004,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
             </div>
             */}
-            {navigator.userAgent.toLowerCase().includes("mac") && (
+            {dockOrTaskbarIconPlatform && (
               <div className="panel panel--lg mb-24">
                 <div className="settings-row">
                   <div className="settings-row__content">
                     <div className="settings-row__title">
-                      Show App Icon in Dock
+                      {dockOrTaskbarIconPlatform === "mac"
+                        ? "Show App Icon in Dock"
+                        : "Show App Icon in Taskbar"}
                     </div>
                     <div className="settings-row__desc">
-                      Display Lexi in the macOS Dock.
+                      {dockOrTaskbarIconPlatform === "mac"
+                        ? "Display Lexi in the macOS Dock."
+                        : "Display Lexi in the Windows taskbar."}
                     </div>
                   </div>
                   <ToggleSwitch
