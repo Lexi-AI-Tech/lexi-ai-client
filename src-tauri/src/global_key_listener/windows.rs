@@ -405,7 +405,7 @@ fn start_polling_fallback_thread() {
             }
 
             for &vk in &watched {
-                let down = unsafe { (GetAsyncKeyState(vk as i32) & 0x8000) != 0 };
+                let down = unsafe { ((GetAsyncKeyState(vk as i32) as u16) & 0x8000) != 0 };
                 let was = *prev.get(&vk).unwrap_or(&false);
                 if down != was {
                     prev.insert(vk, down);
