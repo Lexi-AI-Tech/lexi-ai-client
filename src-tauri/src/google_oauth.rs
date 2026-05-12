@@ -121,8 +121,10 @@ fn open_browser(url: &str, app: AppHandle) {
             }
             #[cfg(target_os = "windows")]
             {
-                Command::new("cmd")
-                    .args(["/C", "start", &url_clone])
+                // Use rundll32 instead of cmd /C start to avoid issues with '&' in the URL
+                // being interpreted as command separators by cmd.exe.
+                Command::new("rundll32")
+                    .args(["url.dll,FileProtocolHandler", &url_clone])
                     .spawn()
             }
             #[cfg(target_os = "linux")]
