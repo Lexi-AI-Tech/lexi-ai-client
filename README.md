@@ -1,6 +1,16 @@
 # Lexi AI Client
 
-Speech-to-text overlay app for macOS built with Tauri and React.
+Speech-to-text overlay app for macOS and Windows built with Tauri and React.
+
+## Table of Contents
+
+- [Setup](#setup)
+  - [Prerequisites](#prerequisites)
+  - [Installation - macOS](#installation---macos)
+  - [Installation - Windows](#installation---windows)
+- [Development](#development)
+- [Building](#building)
+- [Troubleshooting](#troubleshooting)
 
 ## Setup
 
@@ -8,9 +18,9 @@ Speech-to-text overlay app for macOS built with Tauri and React.
 
 - Node.js (v18 or higher)
 - Rust (latest stable)
-- macOS (for development)
+- **Windows Only**: Visual Studio 2022 Developer Command Prompt (required for building native dependencies)
 
-### Installation
+### Installation - macOS
 
 1. **Clone the repository**:
 
@@ -22,6 +32,26 @@ Speech-to-text overlay app for macOS built with Tauri and React.
 2. **Install dependencies**:
 
    ```bash
+   npm install
+   ```
+
+### Installation - Windows
+
+1. **Open Developer Command Prompt**: It is required to use the "Visual Studio 2022 Developer Command Prompt" to set up the project and ensure that native C/Rust dependencies build correctly.
+
+   ```cmd
+   cd %USERPROFILE%\Desktop\lexi\lexi-ai-client
+   ```
+
+2. **Clone the repository** (if not already done):
+
+   ```cmd
+   git clone <your-repo-url>
+   ```
+
+3. **Install dependencies**:
+
+   ```cmd
    npm install
    ```
 
@@ -84,67 +114,14 @@ This is useful for debugging issues in the production build, as all debug output
 
 Without notarization and stapling, users installing from the DMG will see **"Lexi AI can't be opened"**. The DMG must contain the **stapled** app (not the one Tauri outputs), so use the release script or CI—do not distribute the raw DMG from `npm run build`.
 
-**Option A: Local build (recommended script)**
+**Local build (recommended script)**
 
-**Build script:** `./build-release.sh` does the full flow (build → notarize & staple app → recreate DMG with stapled app → notarize & staple DMG) and writes the stapled DMG to `release/` (gitignored).
+From the project root, set your Apple Developer credentials as environment variables and run the release script. The script handles the full flow: builds, notarizes and staples the app, recreates the DMG with that app, then notarizes and staples the DMG, and finally copies the stapled DMG into the `release/` directory (gitignored).
 
 ```bash
-export APPLE_ID="saivallampati6@gmail.com"
-export APPLE_PASSWORD="ylra-xsdw-debh-qavs"
-export APPLE_TEAM_ID="FWLCJN85BF"
+export APPLE_ID="your-apple-id@example.com"
+export APPLE_PASSWORD="your-app-specific-password"
+export APPLE_TEAM_ID="YOUR_TEAM_ID"
+
 ./build-release.sh
-```
-
-From the project root, set Apple credentials and run the release script. The script builds, notarizes and staples the app, recreates the DMG with that app, then notarizes and staples the DMG, and copies the final file into `release/` (gitignored).
-
-```bash
-export APPLE_ID="saivallampati6@gmail.com"
-export APPLE_PASSWORD="ylra-xsdw-debh-qavs"
-export APPLE_TEAM_ID="FWLCJN85BF"
-
-npm run tauri build
-```
-
-or
-
-```bash
-xcrun notarytool submit \
-"/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg" \
---apple-id "saivallampati6@gmail.com" \
---password "ylra-xsdw-debh-qavs" \
---team-id "FWLCJN85BF" \
---wait
-```
-
-Staple the app
-
-```bash
-xcrun stapler staple \
-"/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/macos/Lexi AI.app"
-```
-
-Staple the dmg
-
-```bash
-xcrun stapler staple \
-"/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
-```
-
-Final Gatekeeper Test
-
-```bash
-spctl -a -vvv -t install \
-"/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
-```
-
-Staple Check
-
-```bash
-spctl -a -vvv -t install "/Users/ranjeetbaraik/Desktop/personal/lexi/lexi-ai-client/src-tauri/target/release/bundle/dmg/Lexi AI_0.1.0_aarch64.dmg"
-```
-
-Tauri Build
-
-```bash
-APPLE_ID="saivallampati6@gmail.com" APPLE_PASSWORD="ylra-xsdw-debh-qavs" APPLE_TEAM_ID="FWLCJN85BF" npm run tauri build
 ```

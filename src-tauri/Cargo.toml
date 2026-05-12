@@ -20,7 +20,7 @@ custom-protocol = ["tauri/custom-protocol"]
 [dependencies]
 tauri = { version = "2.10.2", features = [ "devtools", "tray-icon"] }
 tauri-plugin-store = "2.4.2"
-tauri-plugin-single-instance = "2.4.0"
+tauri-plugin-single-instance = { version = "2.4.0", features = ["deep-link"] }
 tauri-plugin-deep-link = "2.4.7"
 tauri-plugin-autostart = "2.5.1"
 
@@ -39,11 +39,6 @@ cpal = "0.15"
 reqwest = { version = "0.11", features = ["json", "multipart", "stream"] }
 hound = "3.5" # For WAV encoding
 chrono = "0.4"
-cocoa = "0.24"
-objc = "0.2"
-# Native macOS event listener
-objc2-core-graphics = "0.3.2"
-objc2-core-foundation = "0.3.2"
 lazy_static = "1.4.0"
 arboard = "3.4"  # Cross-platform clipboard
 active-win-pos-rs = "0.9"  # Active window / frontmost app
@@ -57,7 +52,38 @@ tauri-plugin-updater = "2.10.0"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-os = "2.3.2"
 tauri-plugin-http = "2.5.7"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.48", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Threading",
+] }
+winapi = { version = "0.3", features = [
+    "winuser",
+    "libloaderapi",
+    "processthreadsapi",
+    "errhandlingapi",
+    "minwindef",
+    "debugapi",
+    "handleapi",
+    "winbase",
+    "tlhelp32",
+    "shellapi",
+    "wingdi",
+    "winver",
+] }
+png = "0.17"
+
 [target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.24"
+objc = "0.2"
+# Native macOS event listener
+objc2-core-graphics = "0.3.2"
+objc2-core-foundation = "0.3.2"
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel" }  # macOS NSPanel for advanced window behaviors
 macos-accessibility-client = "0.0"
 objc2-foundation = "0.3.2"

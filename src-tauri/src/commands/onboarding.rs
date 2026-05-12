@@ -52,9 +52,18 @@ impl Default for OnboardingState {
 }
 
 /// Step order for navigation
+#[cfg(target_os = "macos")]
 const STEP_ORDER: &[OnboardingStep] = &[
     OnboardingStep::Welcome,
     OnboardingStep::Permissions,
+    OnboardingStep::HotkeyTest,
+    OnboardingStep::MicrophoneTest,
+    OnboardingStep::Home,
+];
+
+#[cfg(target_os = "windows")]
+const STEP_ORDER: &[OnboardingStep] = &[
+    OnboardingStep::Welcome,
     OnboardingStep::HotkeyTest,
     OnboardingStep::MicrophoneTest,
     OnboardingStep::Home,

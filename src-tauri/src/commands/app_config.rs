@@ -468,11 +468,28 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(),
     }
 }
 
-/// Fallback when server default-hotkeys API is unavailable (typical macOS defaults).
+/// Fallback when server default-hotkeys API is unavailable.
 fn local_onboarding_hotkey_fallback() -> DefaultHotkeysResponse {
-    DefaultHotkeysResponse {
-        hotkeys: vec!["Fn".to_string()],
-        action_hotkeys: vec!["Fn+Control".to_string()],
+    #[cfg(target_os = "macos")]
+    {
+        DefaultHotkeysResponse {
+            hotkeys: vec!["Fn".to_string()],
+            action_hotkeys: vec!["Fn+Control".to_string()],
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        DefaultHotkeysResponse {
+            hotkeys: vec!["Control+Windows".to_string()],
+            action_hotkeys: vec!["Control+Alt+Windows".to_string()],
+        }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        DefaultHotkeysResponse {
+            hotkeys: vec!["Control".to_string()],
+            action_hotkeys: vec!["Control+Shift".to_string()],
+        }
     }
 }
 

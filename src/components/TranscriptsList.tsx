@@ -10,7 +10,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Copy, Check, Trash2, AudioLines, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { KEY_SYMBOLS } from "../lib/keySymbols";
+import { useKeycapLayout } from "../hooks/useKeycapLayout";
+import { lookupKeycap, type KeycapLayout } from "../lib/keySymbols";
+import { HotkeyKeycapSymbol } from "./HotkeyKeycapSymbol";
 import type { Transcript, TauriAppConfig } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
@@ -27,15 +29,13 @@ function renderTranscriptsHeaderKeyCap(
   key: string,
   keyIndex: number,
   totalKeys: number,
+  layout: KeycapLayout | null,
 ) {
-  const keyName = key.trim().toLowerCase();
-  const keyInfo = KEY_SYMBOLS[keyName];
+  const keyInfo = layout !== null ? lookupKeycap(key, layout) : undefined;
   return (
     <span key={`${keyIndex}-${key}`} className="hotkey-selector__key-row">
       <span className="hotkey-selector__key-cap">
-        {keyInfo ? (
-          <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>
-        ) : null}
+        <HotkeyKeycapSymbol part={key} layout={layout} />
         <span className="hotkey-selector__key-label">
           {keyInfo ? keyInfo.label : key.trim()}
         </span>
@@ -86,6 +86,7 @@ function TranscriptsPageHeader({
   transcriptionHotkeys: string[];
   onOpenHotkeysSettings?: () => void;
 }) {
+  const keycapLayout = useKeycapLayout();
   return (
     <div className="transcripts-page__header">
       <TranscriptsPageHeading />
@@ -105,7 +106,12 @@ function TranscriptsPageHeader({
               >
                 <div className="hotkey-selector__chip">
                   {keys.map((k, keyIndex) =>
-                    renderTranscriptsHeaderKeyCap(k, keyIndex, keys.length),
+                    renderTranscriptsHeaderKeyCap(
+                      k,
+                      keyIndex,
+                      keys.length,
+                      keycapLayout,
+                    ),
                   )}
                 </div>
               </div>
@@ -135,7 +141,7 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // App icons for the App column (macOS: data URLs from get_app_icon)
+  // App icons for the App column (PNG data URLs from Tauri get_app_icon on macOS / Windows)
   const [appIcons, setAppIcons] = useState<Record<string, string | null>>({});
   const appIconsRequestedRef = useRef<Set<string>>(new Set());
   const [transcriptionHotkeys, setTranscriptionHotkeys] = useState<string[]>(
@@ -281,7 +287,7 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
     };
   }, [authStore.isAuthenticated, authStore.isInitialized, refreshTranscripts]);
 
-  // Fetch app icons for unique focused_app names (macOS only; Tauri returns data URL or null)
+  // Fetch app icons for unique focused_app names (Tauri returns data URL or null)
   useEffect(() => {
     transcripts.forEach((t) => {
       const name = (t.focused_app || "").trim();

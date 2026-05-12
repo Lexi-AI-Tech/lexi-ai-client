@@ -12,6 +12,9 @@
 //! - **Always on Top**: Floats above all other windows including fullscreen apps
 //! - **Visible on All Workspaces**: Appears across all macOS spaces/desktops
 //! - **Transparent**: No window decorations, fully transparent background
+//! - **Windows**: Undecorated window shadow is disabled so DWM does not paint a
+//!   light border / backdrop behind the transparent WebView (otherwise the pill
+//!   appears inside a white “card”).
 //! - **Skip Taskbar**: Doesn't appear in Dock or app switcher
 //! - **Non-Focusable**: Doesn't steal focus from active application
 //!
@@ -105,6 +108,9 @@ fn create_pill_window(app: &AppHandle) -> Result<(), String> {
         .always_on_top(true)
         .visible_on_all_workspaces(true)
         .decorations(false)
+        // Windows: undecorated + default shadow draws a light “plate” (1px border + backdrop)
+        // around the HWND; transparent WebView then looks like a white card behind the pill.
+        .shadow(false)
         .transparent(true)
         .skip_taskbar(true)
         .position(position_x, position_y)

@@ -6,7 +6,21 @@ use std::sync::{mpsc, Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::watch;
 
-use super::{key_to_string, normalize_key_string, HotkeyCommandResult, Key, KeyStateTracker};
+use super::{
+    key_to_string, normalize_key_string_common, HotkeyCommandResult, Key, KeyStateTracker,
+};
+
+/// macOS-specific key name normalization.
+///
+/// Canonical modifier naming on macOS uses `"Command"` (Cmd). We also accept `"win"`/`"windows"`
+/// as aliases for Command to support cross-platform configs pasted from Windows.
+pub(crate) fn normalize_key_string_platform(key: &str) -> String {
+    let k = key.trim().to_lowercase();
+    match k.as_str() {
+        "cmd" | "command" | "meta" | "super" | "win" | "windows" => "Command".to_string(),
+        _ => normalize_key_string_common(key),
+    }
+}
 
 use objc2_core_foundation::{kCFRunLoopCommonModes, CFMachPort, CFRetained, CFRunLoop};
 use objc2_core_graphics::{
@@ -30,8 +44,8 @@ fn now_epoch_ms() -> u64 {
         .unwrap_or(0)
 }
 
-fn reset_tracker_state(state: &GlobalListenerState) {
-    if let Ok(mut tracker) = state.tracker.try_lock() {
+fn reset_tracker_state(state: &MacGlobalKeyListenerState) {
+    if let Ok(mut tracker) = state.context.tracker.try_lock() {
         *tracker = KeyStateTracker::new();
     }
 }
@@ -112,23 +126,19 @@ fn macos_keycode_to_key(keycode: i64) -> Key {
 
 // Global state block required for the free-standing C callback
 lazy_static::lazy_static! {
-    static ref GLOBAL_STATE: Mutex<Option<GlobalListenerState>> = Mutex::new(None);
+    static ref GLOBAL_STATE: Mutex<Option<MacGlobalKeyListenerState>> = Mutex::new(None);
 }
 
-struct GlobalListenerState {
-    app: AppHandle,
-    recording_tx: mpsc::Sender<RecordingCommand>,
-    config_rx: watch::Receiver<Vec<String>>,
-    action_hotkey_rx: watch::Receiver<Vec<String>>,
-    recording_state: Arc<Mutex<bool>>,
-    meeting_recording_rx: watch::Receiver<bool>,
-    tracker: Arc<Mutex<KeyStateTracker>>,
+use super::GlobalKeyListenerContext;
+
+struct MacGlobalKeyListenerState {
+    context: GlobalKeyListenerContext,
     tap: Option<CFRetained<CFMachPort>>,
     run_loop: Option<CFRetained<CFRunLoop>>,
 }
 // CFRetained<CFMachPort> is !Send and !Sync, so we must unsafe impl it for the struct.
-unsafe impl Send for GlobalListenerState {}
-unsafe impl Sync for GlobalListenerState {}
+unsafe impl Send for MacGlobalKeyListenerState {}
+unsafe impl Sync for MacGlobalKeyListenerState {}
 
 unsafe extern "C-unwind" fn raw_callback(
     _proxy: CGEventTapProxy,
@@ -199,19 +209,27 @@ unsafe extern "C-unwind" fn raw_callback(
     };
 
     let internal_key = macos_keycode_to_key(keycode);
-    let key_str = normalize_key_string(&key_to_string(&internal_key));
+    let raw_key_str = key_to_string(&internal_key);
+    let key_str = normalize_key_string_platform(&raw_key_str);
+
+    let edge = if is_actual_press { "down" } else { "up" };
+    println!(
+        "🎹 [key_debug][macos] keycode={} type={:?} edge={} raw='{}' normalized='{}'",
+        keycode, _type, edge, raw_key_str, key_str
+    );
 
     // Process safely without keeping the lock too long
     if let Ok(mut lock_guard) = GLOBAL_STATE.try_lock() {
         if let Some(state) = lock_guard.as_mut() {
             let is_recording_mode = state
+                .context
                 .recording_state
                 .try_lock()
                 .map(|g| *g)
                 .unwrap_or(false);
 
             if is_recording_mode {
-                let app_clone = state.app.clone();
+                let app_clone = state.context.app.clone();
                 let internal_key_str = key_to_string(&internal_key);
                 tauri::async_runtime::spawn(async move {
                     let _ = app_clone.emit(
@@ -227,17 +245,17 @@ unsafe extern "C-unwind" fn raw_callback(
                 } else {
                     format!("key_release: {:?}", key_to_string(&internal_key))
                 };
-                let app_clone = state.app.clone();
+                let app_clone = state.context.app.clone();
                 tauri::async_runtime::spawn(async move {
                     let _ = app_clone.emit("global-input", &event_str);
                 });
             }
 
-            if let Ok(mut tracker) = state.tracker.try_lock() {
+            if let Ok(mut tracker) = state.context.tracker.try_lock() {
                 tracker.update_key_state(&key_str, is_actual_press);
 
-                let recording_hotkeys_guard = state.config_rx.borrow();
-                let action_hotkeys_guard = state.action_hotkey_rx.borrow();
+                let recording_hotkeys_guard = state.context.config_rx.borrow();
+                let action_hotkeys_guard = state.context.action_hotkey_rx.borrow();
 
                 let cmds = tracker.process_events(
                     &*action_hotkeys_guard,
@@ -257,15 +275,15 @@ unsafe extern "C-unwind" fn raw_callback(
                                     | RecordingCommand::SwitchToAction
                                     | RecordingCommand::SwitchToAssistant
                             );
-                            if is_start_cmd && *state.meeting_recording_rx.borrow() {
+                            if is_start_cmd && *state.context.meeting_recording_rx.borrow() {
                                 continue; // Disable assistant and action mode while meeting is running
                             }
-                            if let Err(e) = state.recording_tx.send(c) {
+                            if let Err(e) = state.context.recording_tx.send(c) {
                                 eprintln!("Failed to send command: {:?}", e);
                             }
                         }
                         HotkeyCommandResult::SendStopAfter(stop_cmd, delay) => {
-                            let tx = state.recording_tx.clone();
+                            let tx = state.context.recording_tx.clone();
                             tauri::async_runtime::spawn(async move {
                                 tokio::time::sleep(delay).await;
                                 let _ = tx.send(stop_cmd);
@@ -297,14 +315,16 @@ pub(crate) fn start_listener(
     recording_state: Arc<Mutex<bool>>,
     meeting_recording_rx: watch::Receiver<bool>,
 ) {
-    *GLOBAL_STATE.lock().unwrap() = Some(GlobalListenerState {
-        app: app.clone(),
-        recording_tx,
-        config_rx,
-        action_hotkey_rx,
-        recording_state,
-        meeting_recording_rx,
-        tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+    *GLOBAL_STATE.lock().unwrap() = Some(MacGlobalKeyListenerState {
+        context: GlobalKeyListenerContext {
+            app: app.clone(),
+            recording_tx,
+            config_rx,
+            action_hotkey_rx,
+            recording_state,
+            meeting_recording_rx,
+            tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+        },
         tap: None,
         run_loop: None,
     });
@@ -402,12 +422,12 @@ pub(crate) fn hard_reset_tap() {
             let old_loop = state.run_loop.take();
 
             // Clone the inputs needed to re-create a listener state.
-            let app = state.app.clone();
-            let recording_tx = state.recording_tx.clone();
-            let config_rx = state.config_rx.clone();
-            let action_hotkey_rx = state.action_hotkey_rx.clone();
-            let recording_state = state.recording_state.clone();
-            let meeting_recording_rx = state.meeting_recording_rx.clone();
+            let app = state.context.app.clone();
+            let recording_tx = state.context.recording_tx.clone();
+            let config_rx = state.context.config_rx.clone();
+            let action_hotkey_rx = state.context.action_hotkey_rx.clone();
+            let recording_state = state.context.recording_state.clone();
+            let meeting_recording_rx = state.context.meeting_recording_rx.clone();
 
             // Reset tracker immediately so we don't carry stuck modifier state across resets.
             reset_tracker_state(state);
@@ -440,14 +460,16 @@ pub(crate) fn hard_reset_tap() {
     }
 
     // Re-initialize global state and spawn a fresh tap thread.
-    *GLOBAL_STATE.lock().unwrap() = Some(GlobalListenerState {
-        app,
-        recording_tx,
-        config_rx,
-        action_hotkey_rx,
-        recording_state,
-        meeting_recording_rx,
-        tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+    *GLOBAL_STATE.lock().unwrap() = Some(MacGlobalKeyListenerState {
+        context: GlobalKeyListenerContext {
+            app,
+            recording_tx,
+            config_rx,
+            action_hotkey_rx,
+            recording_state,
+            meeting_recording_rx,
+            tracker: Arc::new(Mutex::new(KeyStateTracker::new())),
+        },
         tap: None,
         run_loop: None,
     });

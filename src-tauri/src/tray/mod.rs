@@ -28,7 +28,33 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Emitter, Manager};
 
+#[cfg(target_os = "windows")]
+use crate::commands::utils::copy_plain_text_to_clipboard;
 use crate::window::show_and_focus_main_window;
+
+async fn latest_transcript_display_text(app: AppHandle) -> Option<String> {
+    match crate::assistant::commands::get_transcripts(
+        app,
+        Some(1),
+        Some(1),
+        None,
+        Some("created_at".to_string()),
+        Some("desc".to_string()),
+    )
+    .await
+    {
+        Ok(resp) => resp.transcripts.first().map(|t| {
+            t.enhanced_text
+                .as_deref()
+                .unwrap_or(t.original_text.as_str())
+                .to_string()
+        }),
+        Err(e) => {
+            eprintln!("Failed to fetch last transcript: {}", e);
+            None
+        }
+    }
+}
 
 /// Initialize the system tray icon with menu items and event handlers
 ///
@@ -53,13 +79,24 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
     let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
     let start_meeting_item =
         MenuItem::with_id(app, "start_meeting", "Start Meeting", true, None::<&str>)?;
-    let paste_transcript_item = MenuItem::with_id(
+
+    #[cfg(target_os = "windows")]
+    let transcript_item = MenuItem::with_id(
+        app,
+        "copy_last_transcript",
+        "Copy Last Transcript",
+        true,
+        None::<&str>,
+    )?;
+    #[cfg(not(target_os = "windows"))]
+    let transcript_item = MenuItem::with_id(
         app,
         "paste_last_transcript",
         "Paste Last Transcript",
         true,
         None::<&str>,
     )?;
+
     let check_updates_item = MenuItem::with_id(
         app,
         "check_updates",
@@ -75,7 +112,7 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
         &[
             &show_item,
             &start_meeting_item,
-            &paste_transcript_item,
+            &transcript_item,
             &check_updates_item,
             &version_item,
             &quit_item,
@@ -148,34 +185,25 @@ fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                 });
             }
         }
+        #[cfg(target_os = "windows")]
+        "copy_last_transcript" => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(text) = latest_transcript_display_text(app.clone()).await {
+                    if let Err(e) = copy_plain_text_to_clipboard(&text) {
+                        eprintln!("Failed to copy last transcript: {}", e);
+                    }
+                }
+            });
+        }
+        #[cfg(not(target_os = "windows"))]
         "paste_last_transcript" => {
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
-                match crate::assistant::commands::get_transcripts(
-                    app.clone(),
-                    Some(1),
-                    Some(1),
-                    None,
-                    Some("created_at".to_string()),
-                    Some("desc".to_string()),
-                )
-                .await
-                {
-                    Ok(resp) => {
-                        if let Some(t) = resp.transcripts.first() {
-                            let text = t
-                                .enhanced_text
-                                .as_deref()
-                                .unwrap_or(t.original_text.as_str());
-                            let injector = crate::text_injector::TextInjector::new();
-                            match injector.inject_text(text) {
-                                Ok(_) => {}
-                                Err(e) => eprintln!("Failed to paste last transcript: {}", e),
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to fetch last transcript: {}", e);
+                if let Some(text) = latest_transcript_display_text(app.clone()).await {
+                    let injector = crate::text_injector::TextInjector::new();
+                    if let Err(e) = injector.inject_text(&text) {
+                        eprintln!("Failed to paste last transcript: {}", e);
                     }
                 }
             });

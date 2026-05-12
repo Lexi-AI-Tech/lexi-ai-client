@@ -7,6 +7,7 @@
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
+#[cfg(target_os = "macos")]
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 

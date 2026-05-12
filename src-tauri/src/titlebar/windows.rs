@@ -1,11 +1,11 @@
-//! Windows title bar styling.
-//!
-//! No additional styling beyond clearing the title; the transparent title bar
-//! and background colour are macOS-specific.
+//! Windows: frameless window with drop shadow so the shell matches the macOS
+//! transparent title bar look (no accent-coloured native caption bar).
 
 #![cfg(target_os = "windows")]
 
 use tauri::WebviewWindow;
 
-/// Windows: no extra title bar styling (title is cleared in mod).
-pub fn apply_style(_window: &WebviewWindow) {}
+pub fn apply_style(window: &WebviewWindow) {
+    let _ = window.set_decorations(false);
+    let _ = window.set_shadow(true);
+}
