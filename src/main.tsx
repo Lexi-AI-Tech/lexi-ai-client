@@ -14,7 +14,10 @@ import App from "./App";
 import { ToastProvider } from "./components/toast/ToastProvider";
 import { UpdateModal } from "./components/UpdateModal";
 import { WindowsTitleBar } from "./components/WindowsTitleBar";
+import { prefetchKeycapLayout } from "./lib/keySymbols";
 import "./index.css";
+
+prefetchKeycapLayout();
 
 // Get the root DOM element and render the App component
 // The ! operator asserts that the element exists (it should, as it's in index.html)

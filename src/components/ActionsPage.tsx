@@ -3,7 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Play, Pause, Trash2, Copy, Check, Atom, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { KEY_SYMBOLS } from "../lib/keySymbols";
+import { useKeycapLayout } from "../hooks/useKeycapLayout";
+import { lookupKeycap, type KeycapLayout } from "../lib/keySymbols";
+import { HotkeyKeycapSymbol } from "./HotkeyKeycapSymbol";
 import type {
   ActionHistory,
   PaginatedActionHistoryResponse,
@@ -25,15 +27,17 @@ import "../styles/components/hotkey-selector.css";
 const ACTIONS_HELP =
   "Hold your Action hotkey (configure it in Settings) and speak your command. With text selected in the active app, Lexi uses that selection as context—rewrite, summarize, or build on it. With nothing selected, you get a fresh generation from scratch. Output is pasted at the cursor and saved in this list.";
 
-function renderHeadingKeyCap(key: string, keyIndex: number, totalKeys: number) {
-  const keyName = key.trim().toLowerCase();
-  const keyInfo = KEY_SYMBOLS[keyName];
+function renderHeadingKeyCap(
+  key: string,
+  keyIndex: number,
+  totalKeys: number,
+  layout: KeycapLayout | null,
+) {
+  const keyInfo = layout !== null ? lookupKeycap(key, layout) : undefined;
   return (
     <span key={`${keyIndex}-${key}`} className="hotkey-selector__key-row">
       <span className="hotkey-selector__key-cap">
-        {keyInfo ? (
-          <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>
-        ) : null}
+        <HotkeyKeycapSymbol part={key} layout={layout} />
         <span className="hotkey-selector__key-label">
           {keyInfo ? keyInfo.label : key.trim()}
         </span>
@@ -84,6 +88,7 @@ function ActionsPageHeader({
   actionHotkeys: string[];
   onOpenHotkeysSettings?: () => void;
 }) {
+  const keycapLayout = useKeycapLayout();
   return (
     <div className="actions-page__header">
       <ActionsPageHeading />
@@ -103,7 +108,7 @@ function ActionsPageHeader({
               >
                 <div className="hotkey-selector__chip">
                   {keys.map((k, keyIndex) =>
-                    renderHeadingKeyCap(k, keyIndex, keys.length),
+                    renderHeadingKeyCap(k, keyIndex, keys.length, keycapLayout),
                   )}
                 </div>
               </div>

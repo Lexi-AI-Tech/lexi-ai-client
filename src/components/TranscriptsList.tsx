@@ -10,7 +10,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Copy, Check, Trash2, AudioLines, Info } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { KEY_SYMBOLS } from "../lib/keySymbols";
+import { useKeycapLayout } from "../hooks/useKeycapLayout";
+import { lookupKeycap, type KeycapLayout } from "../lib/keySymbols";
+import { HotkeyKeycapSymbol } from "./HotkeyKeycapSymbol";
 import type { Transcript, TauriAppConfig } from "../types";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
@@ -27,15 +29,13 @@ function renderTranscriptsHeaderKeyCap(
   key: string,
   keyIndex: number,
   totalKeys: number,
+  layout: KeycapLayout | null,
 ) {
-  const keyName = key.trim().toLowerCase();
-  const keyInfo = KEY_SYMBOLS[keyName];
+  const keyInfo = layout !== null ? lookupKeycap(key, layout) : undefined;
   return (
     <span key={`${keyIndex}-${key}`} className="hotkey-selector__key-row">
       <span className="hotkey-selector__key-cap">
-        {keyInfo ? (
-          <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>
-        ) : null}
+        <HotkeyKeycapSymbol part={key} layout={layout} />
         <span className="hotkey-selector__key-label">
           {keyInfo ? keyInfo.label : key.trim()}
         </span>
@@ -86,6 +86,7 @@ function TranscriptsPageHeader({
   transcriptionHotkeys: string[];
   onOpenHotkeysSettings?: () => void;
 }) {
+  const keycapLayout = useKeycapLayout();
   return (
     <div className="transcripts-page__header">
       <TranscriptsPageHeading />
@@ -105,7 +106,12 @@ function TranscriptsPageHeader({
               >
                 <div className="hotkey-selector__chip">
                   {keys.map((k, keyIndex) =>
-                    renderTranscriptsHeaderKeyCap(k, keyIndex, keys.length),
+                    renderTranscriptsHeaderKeyCap(
+                      k,
+                      keyIndex,
+                      keys.length,
+                      keycapLayout,
+                    ),
                   )}
                 </div>
               </div>
