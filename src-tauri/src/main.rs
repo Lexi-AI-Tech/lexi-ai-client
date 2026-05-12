@@ -330,6 +330,24 @@ pub fn main() {
         builder = builder.plugin(tauri_nspanel::init());
     }
 
+    // Must register before `tauri-plugin-deep-link` so Windows/Linux can forward protocol
+    // URLs from a second process to the running instance (see Tauri deep-linking docs).
+    builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        println!(
+            "🔄 Second instance launch detected (argv={argv:?}) — focusing main window"
+        );
+        show_and_focus_main_window(app.app_handle());
+
+        // Minimal backup retry
+        let app_handle = app.app_handle().clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            if !show_and_focus_main_window(&app_handle) {
+                eprintln!("❌ Backup show failed!");
+            }
+        });
+    }));
+
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -340,20 +358,7 @@ pub fn main() {
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
-        ))
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            println!("🔄 Second instance launch detected (e.g., from Spotlight or app icon)");
-            show_and_focus_main_window(app.app_handle());
-
-            // Minimal backup retry
-            let app_handle = app.app_handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(200));
-                if !show_and_focus_main_window(&app_handle) {
-                    eprintln!("❌ Backup show failed!");
-                }
-            });
-        }));
+        ));
 
     builder
         .manage(OAuthState::default())
@@ -464,6 +469,15 @@ pub fn main() {
             }
 
             let app_handle = app.handle();
+
+            // Associate configured schemes with this executable (Windows/Linux). Helps dev
+            // builds and edge cases where the installer did not register the handler.
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                if let Err(e) = app.deep_link().register_all() {
+                    eprintln!("⚠️  deep-link register_all failed: {}", e);
+                }
+            }
 
             // Handle deep links
             // Check if app was started via deep link
