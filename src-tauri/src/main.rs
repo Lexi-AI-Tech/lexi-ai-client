@@ -48,7 +48,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 static KEY_LISTENER_DISABLED_LOG_MS: AtomicU64 = AtomicU64::new(0);
 #[cfg(target_os = "macos")]
 static KEY_LISTENER_HARD_RESET_MS: AtomicU64 = AtomicU64::new(0);
-use tauri::{Emitter, Manager, RunEvent};
+#[cfg(target_os = "macos")]
+use tauri::RunEvent;
+use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 

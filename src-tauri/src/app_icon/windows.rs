@@ -1,12 +1,13 @@
 //! Windows: match `focused_app` against running processes → exe icon via Shell / GDI → PNG data URL.
 
-use std::ffi::{c_void, OsStr, OsString};
+use std::ffi::{OsStr, OsString};
 use std::mem;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
 use png::{BitDepth, ColorType, Encoder};
+use winapi::ctypes::c_void;
 use winapi::shared::minwindef::{FALSE, UINT};
 use winapi::shared::windef::{HBITMAP, HICON};
 use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
@@ -322,11 +323,13 @@ unsafe fn hicon_to_png_data_url(hicon: HICON) -> Option<String> {
     ReleaseDC(std::ptr::null_mut(), screen);
 
     let mut png_bytes = Vec::new();
-    let mut enc = Encoder::new(&mut png_bytes, w, h);
-    enc.set_color(ColorType::Rgba);
-    enc.set_depth(BitDepth::Eight);
-    let mut writer = enc.write_header().ok()?;
-    writer.write_image_data(&rgba).ok()?;
+    {
+        let mut enc = Encoder::new(&mut png_bytes, w, h);
+        enc.set_color(ColorType::Rgba);
+        enc.set_depth(BitDepth::Eight);
+        let mut writer = enc.write_header().ok()?;
+        writer.write_image_data(&rgba).ok()?;
+    }
 
     let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
     Some(format!("data:image/png;base64,{}", b64))

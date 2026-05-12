@@ -4,11 +4,15 @@
 
 use std::collections::HashMap;
 use std::sync::mpsc;
+#[cfg(target_os = "macos")]
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(target_os = "macos")]
+use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::{MeetingState, RoomState};
+#[cfg(target_os = "macos")]
 use crate::window::show_and_focus_main_window;
 
 #[derive(Clone, Debug, serde::Serialize)]
