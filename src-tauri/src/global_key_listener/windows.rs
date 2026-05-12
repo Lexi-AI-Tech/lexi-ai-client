@@ -363,34 +363,26 @@ fn process_key_event(vk_code: u32, is_press: bool) {
 
 fn start_polling_fallback_thread() {
     std::thread::spawn(move || {
-        // Watch a conservative set of keys (modifiers + A-Z + 0-9). This is cheap enough and
-        // keeps the fallback generic for future config changes.
-        let mut watched: Vec<u32> = Vec::new();
-
-        // Modifiers (include generic + side-specific variants)
-        watched.extend_from_slice(&[
-            0x11, // VK_CONTROL
-            0xA2, // VK_LCONTROL
-            0xA3, // VK_RCONTROL
-            VK_MENU as u32,  // Alt (generic)
-            VK_LMENU as u32, // Alt left
-            VK_RMENU as u32, // Alt right
-            VK_SHIFT as u32, // Shift (generic)
-            VK_LWIN as u32,  // Win left
-            VK_RWIN as u32,  // Win right
-        ]);
-
-        // A-Z
-        for vk in 0x41u32..=0x5Au32 {
-            watched.push(vk);
-        }
-        // 0-9
-        for vk in 0x30u32..=0x39u32 {
-            watched.push(vk);
-        }
-
+        // Polling fallback aggregates modifier variants into ONE canonical key state.
+        // This avoids flicker where generic + side-specific VKs disagree and all map to the same
+        // normalized string (e.g. "Control"), which would otherwise cause false press/release edges.
         use std::collections::HashMap;
-        let mut prev: HashMap<u32, bool> = HashMap::new();
+        let mut prev: HashMap<String, bool> = HashMap::new();
+
+        let is_vk_down = |vk: i32| unsafe { ((GetAsyncKeyState(vk) as u16) & 0x8000) != 0 };
+
+        fn set_modifier_state(
+            prev: &mut HashMap<String, bool>,
+            key: &str,
+            representative_vk: u32,
+            down: bool,
+        ) {
+            let was = *prev.get(key).unwrap_or(&false);
+            if down != was {
+                prev.insert(key.to_string(), down);
+                process_key_event(representative_vk, down);
+            }
+        }
 
         loop {
             std::thread::sleep(Duration::from_millis(16));
@@ -404,11 +396,36 @@ fn start_polling_fallback_thread() {
                 continue;
             }
 
-            for &vk in &watched {
-                let down = unsafe { ((GetAsyncKeyState(vk as i32) as u16) & 0x8000) != 0 };
-                let was = *prev.get(&vk).unwrap_or(&false);
+            // Modifiers: OR all variants into a single canonical state.
+            let control_down = is_vk_down(0x11) || is_vk_down(0xA2) || is_vk_down(0xA3);
+            let option_down =
+                is_vk_down(VK_MENU as i32) || is_vk_down(VK_LMENU as i32) || is_vk_down(VK_RMENU as i32);
+            let shift_down = is_vk_down(VK_SHIFT as i32);
+            let windows_down = is_vk_down(VK_LWIN as i32) || is_vk_down(VK_RWIN as i32);
+
+            set_modifier_state(&mut prev, "Control", 0x11u32, control_down); // VK_CONTROL
+            set_modifier_state(&mut prev, "Option", VK_MENU as u32, option_down);
+            set_modifier_state(&mut prev, "Shift", VK_SHIFT as u32, shift_down);
+            set_modifier_state(&mut prev, "Windows", VK_LWIN as u32, windows_down);
+
+            // A-Z
+            for vk in 0x41u32..=0x5Au32 {
+                let down = is_vk_down(vk as i32);
+                let k = format!("vk:{}", vk);
+                let was = *prev.get(&k).unwrap_or(&false);
                 if down != was {
-                    prev.insert(vk, down);
+                    prev.insert(k, down);
+                    process_key_event(vk, down);
+                }
+            }
+
+            // 0-9
+            for vk in 0x30u32..=0x39u32 {
+                let down = is_vk_down(vk as i32);
+                let k = format!("vk:{}", vk);
+                let was = *prev.get(&k).unwrap_or(&false);
+                if down != was {
+                    prev.insert(k, down);
                     process_key_event(vk, down);
                 }
             }
