@@ -86,10 +86,10 @@ fn vk_to_key(vk: u32) -> Key {
         0x38 => Key::Num8,
         0x39 => Key::Num9,
         // Modifiers
-        0xA0 | 0xA1 | 0x10 => Key::Shift,     // VK_LSHIFT, VK_RSHIFT, VK_SHIFT
-        0xA2 | 0xA3 | 0x11 => Key::Control,   // VK_LCONTROL, VK_RCONTROL, VK_CONTROL
-        0xA4 | 0xA5 | 0x12 => Key::Option,    // VK_LMENU, VK_RMENU, VK_MENU (Alt)
-        0x5B | 0x5C => Key::Command,           // VK_LWIN, VK_RWIN
+        0xA0 | 0xA1 | 0x10 => Key::Shift, // VK_LSHIFT, VK_RSHIFT, VK_SHIFT
+        0xA2 | 0xA3 | 0x11 => Key::Control, // VK_LCONTROL, VK_RCONTROL, VK_CONTROL
+        0xA4 | 0xA5 | 0x12 => Key::Option, // VK_LMENU, VK_RMENU, VK_MENU (Alt)
+        0x5B | 0x5C => Key::Command,      // VK_LWIN, VK_RWIN
         // Special keys
         0x0D => Key::Enter,     // VK_RETURN
         0x1B => Key::Escape,    // VK_ESCAPE

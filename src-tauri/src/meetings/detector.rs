@@ -611,7 +611,7 @@ fn run_listener_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
 
 pub fn start_meeting_detector(app_handle: AppHandle) {
     println!("[detector] start_meeting_detector called");
-    let (_tx_std, rx_std) = mpsc::channel::<Vec<AppInfo>>();
+    let (tx_std, rx_std) = mpsc::channel::<Vec<AppInfo>>();
     let (tx_tokio, mut rx_tokio) = tokio::sync::mpsc::channel::<Vec<AppInfo>>(8);
 
     std::thread::spawn(move || {
@@ -624,6 +624,9 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
 
     #[cfg(target_os = "macos")]
     std::thread::spawn(move || run_listener_thread(tx_std));
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = tx_std;
 
     let app_detect = app_handle.clone();
     tauri::async_runtime::spawn(async move {
