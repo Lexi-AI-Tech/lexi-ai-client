@@ -62,7 +62,7 @@ const PLAN_COMPARISON: PlanFeatureRow[] = [
   {
     key: "actions.perform",
     label: "Actions",
-    freeLimitLabel: "20 actions / week",
+    freeLimitLabel: "10 actions / week",
     proLimitLabel: "Unlimited",
     freeLimit: 20,
   },
