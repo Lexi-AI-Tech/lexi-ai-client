@@ -631,7 +631,20 @@ export const Pill: React.FC = () => {
           }
         });
 
-        // Listen for meeting detected — show pill with 5s countdown, click to start
+        // WebView2 can stop painting the transparent pill after OS sleep until the surface is nudged.
+        const unlistenPostResume = await listen("pill_post_resume_refresh", () => {
+          requestAnimationFrame(() => {
+            const root = document.getElementById("root");
+            if (!root) return;
+            const prev = root.style.opacity;
+            root.style.opacity = "0.999";
+            requestAnimationFrame(() => {
+              root.style.opacity = prev;
+            });
+          });
+        });
+
+        // Meeting detected — show pill with countdown, click to start
         const unlistenMeetingDetected = await listen(
           "meeting-detected",
           async (event: { payload: MeetingDetectedPayload }) => {
@@ -676,6 +689,7 @@ export const Pill: React.FC = () => {
           unlistenTtsSpeaking();
           unlistenTtsSuccess();
           unlistenTtsError();
+          unlistenPostResume();
           unlistenMeetingDetected();
         };
       } catch (error) {

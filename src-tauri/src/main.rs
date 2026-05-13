@@ -73,7 +73,7 @@ mod pill; // Pill overlay window creation, positioning, and visibility managemen
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 #[cfg(target_os = "macos")]
-mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
+mod sleep_watcher; // macOS: CGEventTap wake; Windows: pill WebView refresh after resume
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config) // Meetings module
 
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
@@ -523,6 +523,9 @@ pub fn main() {
             if let Err(e) = pill::init_pill_window(app_handle.clone()) {
                 eprintln!("Failed to initialize pill window: {}", e);
             }
+
+            #[cfg(target_os = "windows")]
+            sleep_watcher::start_windows_power_watcher(app_handle.clone());
 
             // Channel to communicate with the recording thread
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread

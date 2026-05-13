@@ -235,3 +235,47 @@ pub fn init_pill_window(app: AppHandle) -> Result<(), String> {
         Err("Pill window not found after creation".to_string())
     }
 }
+
+/// After Windows resumes from sleep, WebView2 can leave a transparent pill window fully
+/// transparent (animations run but nothing paints). Nudge HWND size and re-show on top.
+#[cfg(target_os = "windows")]
+pub fn refresh_pill_after_system_resume(app: &AppHandle) {
+    use std::time::Duration;
+
+    use tauri::{Emitter, PhysicalSize};
+
+    let Some(pill) = app.get_webview_window("pill") else {
+        return;
+    };
+
+    let is_visible = pill.is_visible().unwrap_or(true);
+    let Ok(size) = pill.inner_size() else {
+        let _ = pill.set_always_on_top(true);
+        if is_visible {
+            let _ = pill.show();
+        }
+        let _ = app.emit("pill_post_resume_refresh", ());
+        return;
+    };
+
+    let w = size.width.max(1);
+    let h = size.height.max(1);
+
+    let _ = pill.set_size(PhysicalSize::new(w + 1, h));
+    let _ = pill.set_always_on_top(true);
+    if is_visible {
+        let _ = pill.show();
+    }
+
+    let app_clone = app.clone();
+    let pill_clone = pill.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let _ = pill_clone.set_size(PhysicalSize::new(w, h));
+        let _ = pill_clone.set_always_on_top(true);
+        if is_visible {
+            let _ = pill_clone.show();
+        }
+        let _ = app_clone.emit("pill_post_resume_refresh", ());
+    });
+}
