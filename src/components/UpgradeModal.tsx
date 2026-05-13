@@ -64,7 +64,7 @@ const PLAN_COMPARISON: PlanFeatureRow[] = [
     label: "Actions",
     freeLimitLabel: "10 actions / week",
     proLimitLabel: "Unlimited",
-    freeLimit: 20,
+    freeLimit: 10,
   },
 ];
 
