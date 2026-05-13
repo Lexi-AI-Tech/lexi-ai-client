@@ -319,8 +319,9 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
 /// 6. Registers Tauri commands for permissions, OAuth, text injection, and pill window control
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
-    println!(
-        "🔧 Configuration loaded - API Base URL: {}",
+    // Print to stderr to avoid Windows `tauri dev` stdout status-line truncation/interleaving.
+    eprintln!(
+        "\n🔧 Configuration loaded - API Base URL: {}\n",
         config::api_base_url()
     );
 

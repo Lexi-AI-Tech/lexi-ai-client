@@ -17,6 +17,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { Play, X } from "lucide-react";
 // import { playSound } from "./lib/soundUtils";
 // Note: Do NOT import index.css here - it adds opaque backgrounds that break transparency
+import "./pill.css";
 
 // Window size constants — window matches pill exactly in each state (no extra space)
 const IDLE_SIZE = { width: 50, height: 6.6 };
