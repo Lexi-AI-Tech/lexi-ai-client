@@ -140,7 +140,8 @@ export function WelcomeStep({
       <div className="step-header">
         <h1 className="step-title">Welcome to Lexi AI</h1>
         <p className="step-description">
-          The voice-first OS that works across every app on your {isMac ? "Mac" : "PC"}.
+          The voice-first layer that works across your apps on your{" "}
+          {isMac ? "Mac" : "Windows PC"}.
         </p>
         <p className="step-description">
           Dictate, meet, write, act — all connected through your voice.
