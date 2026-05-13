@@ -50,8 +50,9 @@ unsafe extern "system" fn power_callback(
 
     let app = unsafe { &*(context as *const AppHandle) };
     let app = app.clone();
+    let app_on_main = app.clone();
     let _ = app.run_on_main_thread(move || {
-        crate::pill::refresh_pill_after_system_resume(&app);
+        crate::pill::refresh_pill_after_system_resume(&app_on_main);
     });
 
     1

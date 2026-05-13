@@ -12,12 +12,9 @@ pub mod windows;
 ///
 /// On macOS, it registers for `NSWorkspace` notifications and re-enables
 /// the global keyboard listener upon waking from sleep.
+#[cfg(target_os = "macos")]
 pub fn start_watcher(app_handle: tauri::AppHandle) {
-    #[cfg(target_os = "macos")]
     macos::start_sleep_watcher(app_handle);
-
-    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
-    let _ = app_handle;
 }
 
 /// Windows: refresh the pill overlay after system resume (WebView2 + layered transparency).

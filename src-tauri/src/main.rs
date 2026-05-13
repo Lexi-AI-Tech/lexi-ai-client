@@ -72,7 +72,6 @@ mod os_permissions; // macOS permission requests and checks (microphone, accessi
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
-#[cfg(target_os = "macos")]
 mod sleep_watcher; // macOS: CGEventTap wake; Windows: pill WebView refresh after resume
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config) // Meetings module
 
