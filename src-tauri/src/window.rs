@@ -22,6 +22,7 @@ fn activate_app_ignoring_others() {
 }
 
 #[cfg(not(target_os = "macos"))]
+#[allow(dead_code)] // Only used on macOS; other targets call it only inside cfg(macos) blocks.
 fn activate_app_ignoring_others() {
     // No-op on other platforms
 }

@@ -51,6 +51,7 @@ pub fn spawn_process_tap_permission_attempt() {
 }
 
 #[cfg(not(target_os = "macos"))]
+#[allow(dead_code)] // Only meaningful on macOS; keep stub to avoid cfg noise at call sites.
 pub fn spawn_process_tap_permission_attempt() {}
 
 #[cfg(target_os = "macos")]

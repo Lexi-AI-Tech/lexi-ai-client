@@ -443,6 +443,7 @@ pub fn start_listener(
     }
 }
 
+#[allow(dead_code)] // macOS-only recovery hook; unused on Windows/Linux.
 pub fn re_enable_tap() {
     #[cfg(target_os = "macos")]
     {
@@ -454,6 +455,7 @@ pub fn re_enable_tap() {
 ///
 /// This is a stronger recovery than `re_enable_tap()`. Some sleep/wake transitions can leave
 /// the tap in a state where `tap_enable(true)` succeeds but no events flow.
+#[allow(dead_code)] // macOS-only recovery hook; unused on Windows/Linux.
 pub fn hard_reset_tap() {
     #[cfg(target_os = "macos")]
     {
