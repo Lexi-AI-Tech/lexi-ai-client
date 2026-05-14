@@ -20,6 +20,20 @@ use tokio::sync::watch;
 #[cfg(target_os = "macos")]
 mod macos;
 
+#[cfg(target_os = "windows")]
+mod windows;
+
+// Common context shared between platform-specific key listener states
+pub struct GlobalKeyListenerContext {
+    pub app: AppHandle,
+    pub recording_tx: mpsc::Sender<RecordingCommand>,
+    pub config_rx: watch::Receiver<Vec<String>>,
+    pub action_hotkey_rx: watch::Receiver<Vec<String>>,
+    pub recording_state: Arc<Mutex<bool>>,
+    pub meeting_recording_rx: watch::Receiver<bool>,
+    pub tracker: Arc<Mutex<KeyStateTracker>>,
+}
+
 // ============================================================================
 // Internal Minimal Key Mapper
 // ============================================================================
@@ -94,6 +108,11 @@ pub enum Key {
 // Convert internal Key to string presentation
 pub(crate) fn key_to_string(key: &Key) -> String {
     match key {
+        // On Windows, `Key::Command` represents the Win key.
+        // We keep OS-canonical display/config strings to avoid cross-OS confusion.
+        #[cfg(target_os = "windows")]
+        Key::Command => "Windows".to_string(),
+        #[cfg(not(target_os = "windows"))]
         Key::Command => "Command".to_string(),
         Key::Control => "Control".to_string(),
         Key::Option => "Option".to_string(),
@@ -162,9 +181,16 @@ pub(crate) fn key_to_string(key: &Key) -> String {
 
 /// Normalize config hotkey string for comparison
 pub(crate) fn normalize_key_string(key: &str) -> String {
+    normalize_key_string_common(key)
+}
+
+/// Common (OS-agnostic) hotkey normalization.
+///
+/// Platform modules can call this to reuse canonicalization rules after applying any
+/// OS-specific alias mapping (e.g. Win key vs Cmd key naming).
+pub(crate) fn normalize_key_string_common(key: &str) -> String {
     let k = key.trim().to_lowercase();
     match k.as_str() {
-        "cmd" | "command" | "meta" | "super" => "Command".to_string(),
         "ctrl" | "control" => "Control".to_string(),
         "option" | "alt" => "Option".to_string(),
         "shift" => "Shift".to_string(),
@@ -399,12 +425,25 @@ pub fn start_listener(
         );
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        windows::start_listener(
+            app,
+            recording_tx,
+            config_rx,
+            action_hotkey_rx,
+            recording_state,
+            meeting_recording_rx,
+        );
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         eprintln!("Global key listener natively unsupported on this target via this module.");
     }
 }
 
+#[allow(dead_code)] // macOS-only recovery hook; unused on Windows/Linux.
 pub fn re_enable_tap() {
     #[cfg(target_os = "macos")]
     {
@@ -416,6 +455,7 @@ pub fn re_enable_tap() {
 ///
 /// This is a stronger recovery than `re_enable_tap()`. Some sleep/wake transitions can leave
 /// the tap in a state where `tap_enable(true)` succeeds but no events flow.
+#[allow(dead_code)] // macOS-only recovery hook; unused on Windows/Linux.
 pub fn hard_reset_tap() {
     #[cfg(target_os = "macos")]
     {

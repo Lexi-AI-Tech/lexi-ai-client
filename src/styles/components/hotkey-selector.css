@@ -130,6 +130,20 @@
   color: rgba(46, 59, 47, 0.85);
 }
 
+/* Windows key only: SVG sits in symbol slot (see HotkeyKeycapSymbol) */
+.hotkey-selector__key-symbol--win-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  line-height: 0;
+}
+
+.hotkey-selector__win-svg {
+  display: block;
+  fill: currentColor;
+}
+
 .hotkey-selector__key-label {
   font-size: 10px;
   font-weight: 400;

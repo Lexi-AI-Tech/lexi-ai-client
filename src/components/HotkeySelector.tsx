@@ -7,8 +7,10 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { KEY_SYMBOLS } from "../lib/keySymbols";
+import { useKeycapLayout } from "../hooks/useKeycapLayout";
+import { lookupKeycap } from "../lib/keySymbols";
 import type { HotkeyConfig } from "../types";
+import { HotkeyKeycapSymbol } from "./HotkeyKeycapSymbol";
 import { useToast } from "./toast/useToast";
 import "../styles/components/hotkey-selector.css";
 
@@ -36,6 +38,7 @@ export function HotkeySelector({
   titleIcon,
 }: HotkeySelectorProps) {
   const toast = useToast();
+  const keycapLayout = useKeycapLayout();
   const [hotkeys, setHotkeys] = useState<string[]>(value.hotkeys);
   const [isRecording, setIsRecording] = useState(false);
   const [currentKeys, setCurrentKeys] = useState<Set<string>>(new Set());
@@ -78,10 +81,7 @@ export function HotkeySelector({
   const normalizeKey = (key: string): string => {
     const keyMap: Record<string, string> = {
       Control: "Ctrl",
-      Meta:
-        typeof navigator !== "undefined" && navigator.platform.includes("Mac")
-          ? "Cmd"
-          : "Win",
+      Meta: keycapLayout === "mac" ? "Cmd" : "Win",
       Alt: "Alt",
       Shift: "Shift",
       " ": "Space", // Handle space key properly
@@ -188,23 +188,19 @@ export function HotkeySelector({
       if (unlistenFn) unlistenFn();
       if (settleTimer) clearTimeout(settleTimer);
     };
-  }, [isRecording, finalizeRecording]);
+  }, [isRecording, finalizeRecording, keycapLayout]);
 
   const removeHotkey = useCallback((index: number) => {
     setHotkeys((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   const renderKeyCap = (key: string, keyIndex: number, totalKeys: number) => {
-    const keyName = key.trim().toLowerCase();
-    const keyInfo = KEY_SYMBOLS[keyName];
+    const keyInfo =
+      keycapLayout !== null ? lookupKeycap(key, keycapLayout) : undefined;
     return (
       <span key={`${keyIndex}-${key}`} className="hotkey-selector__key-row">
         <span className="hotkey-selector__key-cap">
-          {keyInfo && (
-            <span className="hotkey-selector__key-symbol">
-              {keyInfo.symbol}
-            </span>
-          )}
+          <HotkeyKeycapSymbol part={key} layout={keycapLayout} />
           <span className="hotkey-selector__key-label">
             {keyInfo ? keyInfo.label : key.trim()}
           </span>

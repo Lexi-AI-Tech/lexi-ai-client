@@ -12,6 +12,9 @@
 //! - **Always on Top**: Floats above all other windows including fullscreen apps
 //! - **Visible on All Workspaces**: Appears across all macOS spaces/desktops
 //! - **Transparent**: No window decorations, fully transparent background
+//! - **Windows**: Undecorated window shadow is disabled so DWM does not paint a
+//!   light border / backdrop behind the transparent WebView (otherwise the pill
+//!   appears inside a white “card”).
 //! - **Skip Taskbar**: Doesn't appear in Dock or app switcher
 //! - **Non-Focusable**: Doesn't steal focus from active application
 //!
@@ -105,6 +108,9 @@ fn create_pill_window(app: &AppHandle) -> Result<(), String> {
         .always_on_top(true)
         .visible_on_all_workspaces(true)
         .decorations(false)
+        // Windows: undecorated + default shadow draws a light “plate” (1px border + backdrop)
+        // around the HWND; transparent WebView then looks like a white card behind the pill.
+        .shadow(false)
         .transparent(true)
         .skip_taskbar(true)
         .position(position_x, position_y)
@@ -228,4 +234,48 @@ pub fn init_pill_window(app: AppHandle) -> Result<(), String> {
     } else {
         Err("Pill window not found after creation".to_string())
     }
+}
+
+/// After Windows resumes from sleep, WebView2 can leave a transparent pill window fully
+/// transparent (animations run but nothing paints). Nudge HWND size and re-show on top.
+#[cfg(target_os = "windows")]
+pub fn refresh_pill_after_system_resume(app: &AppHandle) {
+    use std::time::Duration;
+
+    use tauri::{Emitter, PhysicalSize};
+
+    let Some(pill) = app.get_webview_window("pill") else {
+        return;
+    };
+
+    let is_visible = pill.is_visible().unwrap_or(true);
+    let Ok(size) = pill.inner_size() else {
+        let _ = pill.set_always_on_top(true);
+        if is_visible {
+            let _ = pill.show();
+        }
+        let _ = app.emit("pill_post_resume_refresh", ());
+        return;
+    };
+
+    let w = size.width.max(1);
+    let h = size.height.max(1);
+
+    let _ = pill.set_size(PhysicalSize::new(w + 1, h));
+    let _ = pill.set_always_on_top(true);
+    if is_visible {
+        let _ = pill.show();
+    }
+
+    let app_clone = app.clone();
+    let pill_clone = pill.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let _ = pill_clone.set_size(PhysicalSize::new(w, h));
+        let _ = pill_clone.set_always_on_top(true);
+        if is_visible {
+            let _ = pill_clone.show();
+        }
+        let _ = app_clone.emit("pill_post_resume_refresh", ());
+    });
 }

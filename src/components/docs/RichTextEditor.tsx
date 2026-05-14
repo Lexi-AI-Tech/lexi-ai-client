@@ -94,7 +94,7 @@ export const RichTextEditor = forwardRef<
     content: content ?? "",
     // @tiptap/markdown augments EditorOptions with contentType at runtime,
     // but the @tiptap/react types in this repo don't pick it up reliably.
-    ...( { contentType: "markdown" } as any ),
+    ...({ contentType: "markdown" } as any),
     editable,
     editorProps: {
       attributes: {
@@ -176,7 +176,9 @@ export const RichTextEditor = forwardRef<
           (editor.commands as any).insertContent(markdown, {
             contentType: "markdown",
           });
-          onUpdateRef.current?.(((editor as any).getMarkdown?.() as string) ?? "");
+          onUpdateRef.current?.(
+            ((editor as any).getMarkdown?.() as string) ?? "",
+          );
           return;
         } catch (_) {
           // fall through
@@ -186,10 +188,15 @@ export const RichTextEditor = forwardRef<
             .chain()
             .focus()
             .insertContent([
-              { type: "paragraph", content: [{ type: "text", text: markdown }] },
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: markdown }],
+              },
             ])
             .run();
-          onUpdateRef.current?.(((editor as any).getMarkdown?.() as string) ?? "");
+          onUpdateRef.current?.(
+            ((editor as any).getMarkdown?.() as string) ?? "",
+          );
         } catch (_) {}
       },
       getSelection(): DocSelection | null {
@@ -215,7 +222,9 @@ export const RichTextEditor = forwardRef<
           .deleteRange({ from, to })
           .insertContentAt(from, contentNodes)
           .run();
-        onUpdateRef.current?.(((editor as any).getMarkdown?.() as string) ?? "");
+        onUpdateRef.current?.(
+          ((editor as any).getMarkdown?.() as string) ?? "",
+        );
       },
     }),
     [editor],

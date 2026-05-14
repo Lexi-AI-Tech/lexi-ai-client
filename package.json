@@ -1,6 +1,6 @@
 {
   "name": "lexi-ai",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "AI Productivity tool",
   "author": "anadi45",
   "main": "src-tauri/src/main.rs",
@@ -10,6 +10,7 @@
     "build": "tauri build -- --features custom-protocol",
     "build:tauri": "tauri build -- --features custom-protocol",
     "build:mac": "node scripts/build-mac.js",
+    "build:windows": "node scripts/build-windows.js",
     "dev:frontend": "vite",
     "build:frontend": "vite build",
     "preview": "vite preview",
@@ -18,7 +19,7 @@
   },
   "dependencies": {
     "@choochmeque/tauri-plugin-google-auth-api": "^0.1.2",
-    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-http": "^2.5.7",
     "@tauri-apps/plugin-os": "^2.3.2",
     "@tauri-apps/plugin-process": "^2.3.1",
@@ -30,6 +31,7 @@
     "@tiptap/pm": "^3.20.0",
     "@tiptap/react": "^3.20.0",
     "@tiptap/starter-kit": "^3.20.0",
+    "country-flag-icons": "^1.6.17",
     "dotenv": "^17.3.1",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
@@ -41,7 +43,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.10.1",
+    "@tauri-apps/cli": "^2.11.1",
     "@types/node": "^25.0.3",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

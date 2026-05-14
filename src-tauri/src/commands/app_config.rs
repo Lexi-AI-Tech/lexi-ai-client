@@ -276,10 +276,21 @@ pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
     println!("✅ Synced: app icon shown = {}", show_icon);
 }
 
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn sync_dock_icon_status(_app: &AppHandle, _config: &AppConfig) {
-    // Only supported on macOS
+/// When `show_icon` is false, hide the main window from the taskbar (tray remains).
+#[cfg(target_os = "windows")]
+pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
+    let show_icon = config.show_icon.unwrap_or(true);
+    let skip_taskbar = !show_icon;
+    if let Some(window) = app.get_webview_window("main") {
+        if let Err(e) = window.set_skip_taskbar(skip_taskbar) {
+            eprintln!("⚠️ Failed to set_skip_taskbar on main window: {}", e);
+        }
+    }
+    println!("✅ Synced: taskbar icon (main window) shown = {}", show_icon);
 }
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+pub(crate) fn sync_dock_icon_status(_app: &AppHandle, _config: &AppConfig) {}
 
 /// Merge provided config into current config (only updates provided fields)
 fn merge_config(current: &mut AppConfig, provided: AppConfig) {
@@ -468,11 +479,28 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(),
     }
 }
 
-/// Fallback when server default-hotkeys API is unavailable (typical macOS defaults).
+/// Fallback when server default-hotkeys API is unavailable.
 fn local_onboarding_hotkey_fallback() -> DefaultHotkeysResponse {
-    DefaultHotkeysResponse {
-        hotkeys: vec!["Fn".to_string()],
-        action_hotkeys: vec!["Fn+Control".to_string()],
+    #[cfg(target_os = "macos")]
+    {
+        DefaultHotkeysResponse {
+            hotkeys: vec!["Fn".to_string()],
+            action_hotkeys: vec!["Fn+Control".to_string()],
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        DefaultHotkeysResponse {
+            hotkeys: vec!["Control+Windows".to_string()],
+            action_hotkeys: vec!["Control+Alt+Windows".to_string()],
+        }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        DefaultHotkeysResponse {
+            hotkeys: vec!["Control".to_string()],
+            action_hotkeys: vec!["Control+Shift".to_string()],
+        }
     }
 }
 

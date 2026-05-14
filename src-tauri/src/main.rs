@@ -48,14 +48,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 static KEY_LISTENER_DISABLED_LOG_MS: AtomicU64 = AtomicU64::new(0);
 #[cfg(target_os = "macos")]
 static KEY_LISTENER_HARD_RESET_MS: AtomicU64 = AtomicU64::new(0);
-use tauri::{Emitter, Manager, RunEvent};
+#[cfg(target_os = "macos")]
+use tauri::RunEvent;
+use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::watch;
 
 // Module declarations for core functionality
 mod actions; // Voice actions (triggered by hotkeys)
 mod api_endpoints; // Centralized API endpoint definitions
-mod app_icon; // macOS app icon for Transcript List app column
+mod app_icon; // `app_icon/` — platform app icons (macOS, Windows)
 mod assistant; // Recording thread management
 mod audio;
 mod commands;
@@ -70,12 +72,11 @@ mod os_permissions; // macOS permission requests and checks (microphone, accessi
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
-#[cfg(target_os = "macos")]
-mod sleep_watcher; // macOS sleep/wake detection to restart rdev listener
+mod sleep_watcher; // macOS: CGEventTap wake; Windows: pill WebView refresh after resume
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config) // Meetings module
 
 mod text_injector; // Text injection into active application via clipboard + paste keystroke
-mod titlebar; // Title bar customization (hide title, match background on macOS)
+mod titlebar; // Title bar: macOS tint, Windows frameless + shadow
 mod tray; // System tray icon creation and event handling
 mod tts_service; // Text-to-speech service using ElevenLabs API
 mod utils; // Utility functions for common operations
@@ -317,8 +318,9 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
 /// 6. Registers Tauri commands for permissions, OAuth, text injection, and pill window control
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
-    println!(
-        "🔧 Configuration loaded - API Base URL: {}",
+    // Print to stderr to avoid Windows `tauri dev` stdout status-line truncation/interleaving.
+    eprintln!(
+        "\n🔧 Configuration loaded - API Base URL: {}\n",
         config::api_base_url()
     );
 
@@ -330,6 +332,24 @@ pub fn main() {
         builder = builder.plugin(tauri_nspanel::init());
     }
 
+    // Must register before `tauri-plugin-deep-link` so Windows/Linux can forward protocol
+    // URLs from a second process to the running instance (see Tauri deep-linking docs).
+    builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        println!(
+            "🔄 Second instance launch detected (argv={argv:?}) — focusing main window"
+        );
+        show_and_focus_main_window(app.app_handle());
+
+        // Minimal backup retry
+        let app_handle = app.app_handle().clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            if !show_and_focus_main_window(&app_handle) {
+                eprintln!("❌ Backup show failed!");
+            }
+        });
+    }));
+
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -340,20 +360,7 @@ pub fn main() {
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
-        ))
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            println!("🔄 Second instance launch detected (e.g., from Spotlight or app icon)");
-            show_and_focus_main_window(app.app_handle());
-
-            // Minimal backup retry
-            let app_handle = app.app_handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(200));
-                if !show_and_focus_main_window(&app_handle) {
-                    eprintln!("❌ Backup show failed!");
-                }
-            });
-        }));
+        ));
 
     builder
         .manage(OAuthState::default())
@@ -465,6 +472,15 @@ pub fn main() {
 
             let app_handle = app.handle();
 
+            // Associate configured schemes with this executable (Windows/Linux). Helps dev
+            // builds and edge cases where the installer did not register the handler.
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                if let Err(e) = app.deep_link().register_all() {
+                    eprintln!("⚠️  deep-link register_all failed: {}", e);
+                }
+            }
+
             // Handle deep links
             // Check if app was started via deep link
             if let Ok(Some(start_urls)) = app.deep_link().get_current() {
@@ -506,6 +522,9 @@ pub fn main() {
             if let Err(e) = pill::init_pill_window(app_handle.clone()) {
                 eprintln!("Failed to initialize pill window: {}", e);
             }
+
+            #[cfg(target_os = "windows")]
+            sleep_watcher::start_windows_power_watcher(app_handle.clone());
 
             // Channel to communicate with the recording thread
             // Sender is used by key listener to signal start/stop, receiver is used in the recording thread
@@ -640,12 +659,18 @@ pub fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
+            #[cfg(target_os = "macos")]
             if let RunEvent::Reopen { has_visible_windows, .. } = event {
                 println!(
                     "🍎 RunEvent::Reopen triggered (has_visible_windows: {})",
                     has_visible_windows
                 );
                 show_and_focus_main_window(app_handle);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = app_handle;
+                let _ = event;
             }
         });
 }

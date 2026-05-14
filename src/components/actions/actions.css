@@ -423,6 +423,11 @@ button.actions-page-header__hotkeys-btn:focus-visible {
   right: 5px;
 }
 
+.actions-page-header__hotkeys .hotkey-selector__win-svg {
+  width: 9px;
+  height: 9px;
+}
+
 .actions-page-header__hotkeys .hotkey-selector__key-label {
   font-size: 8px;
   line-height: 1.15;

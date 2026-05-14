@@ -11,11 +11,21 @@ import {
 } from "./onboarding-steps";
 import "./onboarding.css";
 
-const STEPS = ["Welcome", "Permissions", "Setup", "Try it"];
-
 export const OnboardingFlow: React.FC = () => {
+  const [systemType, setSystemType] = React.useState<string>("mac");
   const { currentStep, nextStep, previousStep, completeOnboarding } =
     useOnboardingStore();
+
+  React.useEffect(() => {
+    invoke<string>("get_system_type")
+      .then(setSystemType)
+      .catch((e) => console.error("Failed to get system type:", e));
+  }, []);
+
+  const IS_MACOS = systemType === "mac";
+  const STEPS = IS_MACOS 
+    ? ["Welcome", "Permissions", "Setup", "Try it"] 
+    : ["Welcome", "Setup", "Try it"];
 
   // After Permissions: shortcuts step uses dry-run (no pill); “Try it” uses full recording + pill.
   useEffect(() => {
@@ -26,6 +36,21 @@ export const OnboardingFlow: React.FC = () => {
   }, [currentStep]);
 
   const currentStepIndex = (() => {
+    switch (currentStep) {
+      case "welcome":
+        return 0;
+      case "permissions":
+        return 1; // Only reachable on macOS
+      case "hotkey-test":
+        return IS_MACOS ? 2 : 1;
+      case "microphone-test":
+        return IS_MACOS ? 3 : 2;
+      default:
+        return 0;
+    }
+  })();
+
+  const visualStep = (() => {
     switch (currentStep) {
       case "welcome":
         return 0;
@@ -61,15 +86,16 @@ export const OnboardingFlow: React.FC = () => {
         <main className="onboarding-main">
           <div className="onboarding-form-wrapper">
             <AnimatePresence mode="wait">
-              {currentStepIndex === 0 && (
+              {currentStep === "welcome" && (
                 <WelcomeStep
                   key="welcome"
+                  systemType={systemType}
                   onNext={nextStep}
                   onBack={previousStep}
                   showBack={showBack}
                 />
               )}
-              {currentStepIndex === 1 && (
+              {currentStep === "permissions" && IS_MACOS && (
                 <PermissionsStep
                   key="permissions"
                   onNext={nextStep}
@@ -77,17 +103,19 @@ export const OnboardingFlow: React.FC = () => {
                   showBack={showBack}
                 />
               )}
-              {currentStepIndex === 2 && (
+              {currentStep === "hotkey-test" && (
                 <SetupStep
                   key="setup"
+                  systemType={systemType}
                   onNext={nextStep}
                   onBack={previousStep}
                   showBack={showBack}
                 />
               )}
-              {currentStepIndex === 3 && (
+              {currentStep === "microphone-test" && (
                 <TryItStep
                   key="tryit"
+                  systemType={systemType}
                   onComplete={completeOnboarding}
                   onBack={previousStep}
                   showBack={showBack}
@@ -102,7 +130,7 @@ export const OnboardingFlow: React.FC = () => {
         className="onboarding-visual-area"
         data-onboarding-step={currentStepIndex}
       >
-        <VisualSide step={currentStepIndex} />
+        <VisualSide step={visualStep} />
       </div>
     </div>
   );

@@ -29,6 +29,7 @@ import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import { check } from "@tauri-apps/plugin-updater";
 import { checkUpdateDetails } from "../hooks/useAutoUpdater";
 import { UpgradeModal } from "./UpgradeModal";
+import { LanguageFlagIcon } from "./LanguageFlagIcon";
 
 type CurrentSubscriptionResponse = {
   plan_type: string;
@@ -61,34 +62,6 @@ const SUPPORTED_LANGUAGES = getAllLanguageCodes().map((code) => ({
   value: code,
   label: getLanguageName(code),
 }));
-
-const LANGUAGE_FLAGS: Record<string, string> = {
-  en: "🇺🇸",
-  es: "🇪🇸",
-  fr: "🇫🇷",
-  de: "🇩🇪",
-  it: "🇮🇹",
-  pt: "🇵🇹",
-  ru: "🇷🇺",
-  ja: "🇯🇵",
-  ko: "🇰🇷",
-  zh: "🇨🇳",
-  ar: "🇸🇦",
-  hi: "🇮🇳",
-  nl: "🇳🇱",
-  pl: "🇵🇱",
-  tr: "🇹🇷",
-  sv: "🇸🇪",
-  da: "🇩🇰",
-  no: "🇳🇴",
-  fi: "🇫🇮",
-};
-
-const getLanguageFlag = (code: string): string | null => {
-  const c = (code || "").trim().toLowerCase();
-  if (!c || c === "auto") return null;
-  return LANGUAGE_FLAGS[c] ?? null;
-};
 
 const normalizeLanguage = (
   value: LanguageCode | null | undefined,
@@ -137,6 +110,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   >("general");
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
+  const [dockOrTaskbarIconPlatform, setDockOrTaskbarIconPlatform] = useState<
+    "mac" | "windows" | null
+  >(null);
 
   useEffect(() => {
     if (!initialSection) return;
@@ -188,6 +164,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     };
 
     loadConfig();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void invoke<string>("get_system_type")
+      .then((t) => {
+        if (cancelled) return;
+        if (t === "mac" || t === "windows") {
+          setDockOrTaskbarIconPlatform(t);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const isProPlan = (planType: string | undefined | null): boolean =>
@@ -866,9 +857,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       aria-hidden="true"
                     >
                       {selectedLanguage !== LanguageCode.AUTO ? (
-                        <span className="lang-flag">
-                          {getLanguageFlag(selectedLanguage) ?? ""}
-                        </span>
+                        <LanguageFlagIcon languageCode={selectedLanguage} />
                       ) : (
                         <Sparkles size={16} className="lang-auto-icon" />
                       )}
@@ -916,9 +905,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                         >
                           <span>{lang.label}</span>
                           <span className="select-option__right">
-                            <span className="lang-flag" aria-hidden="true">
-                              {getLanguageFlag(lang.value) ?? ""}
-                            </span>
+                            <LanguageFlagIcon languageCode={lang.value} />
                             {selectedLanguage === lang.value && (
                               <Check
                                 size={16}
@@ -986,15 +973,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
             </div>
             */}
-            {navigator.userAgent.toLowerCase().includes("mac") && (
+            {dockOrTaskbarIconPlatform && (
               <div className="panel panel--lg mb-24">
                 <div className="settings-row">
                   <div className="settings-row__content">
                     <div className="settings-row__title">
-                      Show App Icon in Dock
+                      {dockOrTaskbarIconPlatform === "mac"
+                        ? "Show App Icon in Dock"
+                        : "Show App Icon in Taskbar"}
                     </div>
                     <div className="settings-row__desc">
-                      Display Lexi in the macOS Dock.
+                      {dockOrTaskbarIconPlatform === "mac"
+                        ? "Display Lexi in the macOS Dock."
+                        : "Display Lexi in the Windows taskbar."}
                     </div>
                   </div>
                   <ToggleSwitch

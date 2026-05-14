@@ -4,37 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pill Overlay</title>
-    <style>
-      /* Critical: Ensure complete transparency for pill overlay window */
-      *,
-      *::before,
-      *::after {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      html,
-      body,
-      #root {
-        margin: 0;
-        padding: 0;
-        background: transparent !important;
-        background-color: transparent !important;
-        overflow: hidden;
-        width: 100%;
-        height: 100%;
-        border-radius: 18px;
-      }
-      /* Spin animation for loader */
-      @keyframes spin {
-        from {
-          transform: rotate(0deg);
-        }
-        to {
-          transform: rotate(360deg);
-        }
-      }
-    </style>
   </head>
   <body>
     <div id="root"></div>

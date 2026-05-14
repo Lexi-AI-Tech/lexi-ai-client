@@ -15,6 +15,7 @@
 //! - **Linux**: Needs X11 (enigo's Wayland support is experimental)
 
 use std::error::Error;
+#[cfg(target_os = "macos")]
 use std::process::Command;
 
 #[cfg(not(target_os = "macos"))]
