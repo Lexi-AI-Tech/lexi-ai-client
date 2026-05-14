@@ -31,6 +31,7 @@
     "@tiptap/pm": "^3.20.0",
     "@tiptap/react": "^3.20.0",
     "@tiptap/starter-kit": "^3.20.0",
+    "country-flag-icons": "^1.6.17",
     "dotenv": "^17.3.1",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
