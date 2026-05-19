@@ -492,7 +492,7 @@ fn local_onboarding_hotkey_fallback() -> DefaultHotkeysResponse {
     {
         DefaultHotkeysResponse {
             hotkeys: vec!["Control+Windows".to_string()],
-            action_hotkeys: vec!["Control+Alt+Windows".to_string()],
+            action_hotkeys: vec!["Control+Alt".to_string()],
         }
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]

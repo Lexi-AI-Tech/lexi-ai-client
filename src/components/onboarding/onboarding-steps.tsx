@@ -34,7 +34,7 @@ function getLocalHotkeyFallback(systemType: string): DefaultHotkeysResponse {
       }
     : {
         hotkeys: ["Control+Windows"],
-        action_hotkeys: ["Control+Alt+Windows"],
+        action_hotkeys: ["Control+Alt"],
       };
 }
 
