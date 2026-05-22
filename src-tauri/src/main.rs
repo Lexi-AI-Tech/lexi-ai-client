@@ -157,6 +157,8 @@ pub enum RecordingCommand {
     DocStop,           // Stop recording for doc and emit transcript
     SwitchToAction,    // Mode dynamically switched to Action
     SwitchToAssistant, // Mode dynamically switched to Assistant
+    /// macOS: open/close an input stream once so CoreAudio is ready before the first hotkey.
+    WarmupMic,
 }
 
 /// Shared sender for recording commands (used by key listener and by doc recording commands).
@@ -195,6 +197,12 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
             params.meeting_recording_rx,
         );
         println!("✅ Global key listener started");
+
+        // Prime CoreAudio on macOS so the first Fn press captures audio (avoids needing an app restart).
+        #[cfg(target_os = "macos")]
+        if let Some(rec) = app.try_state::<RecordingCommandTx>() {
+            let _ = rec.0.send(RecordingCommand::WarmupMic);
+        }
 
         // Set up macOS sleep/wake watcher to restart the app after wake.
         // macOS destroys CGEventTap, stales HTTP sockets, and invalidates audio handles

@@ -5,6 +5,20 @@ mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 
+#[cfg(target_os = "macos")]
+mod session {
+    use lazy_static::lazy_static;
+    use std::sync::Mutex;
+
+    lazy_static! {
+        static ref CORE_AUDIO: Mutex<()> = Mutex::new(());
+    }
+
+    pub fn lock() -> std::sync::MutexGuard<'static, ()> {
+        CORE_AUDIO.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -71,6 +85,9 @@ impl AudioRecorder {
     }
 
     pub fn release_stream(&mut self) {
+        #[cfg(target_os = "macos")]
+        let _core_audio = session::lock();
+
         self.recording_active.store(false, Ordering::SeqCst);
         std::thread::sleep(Duration::from_millis(30));
         if let Some(stream) = self.stream.take() {
@@ -89,6 +106,9 @@ impl AudioRecorder {
         &mut self,
         stream_sender: Option<Sender<Vec<u8>>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        #[cfg(target_os = "macos")]
+        let _core_audio = session::lock();
+
         self.stream_tx = stream_sender;
 
         let audio_data = Arc::clone(&self.audio_data);
@@ -151,6 +171,9 @@ impl AudioRecorder {
     }
 
     pub fn stop_recording(&mut self) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+        #[cfg(target_os = "macos")]
+        let _core_audio = session::lock();
+
         self.recording_active.store(false, Ordering::SeqCst);
         std::thread::sleep(Duration::from_millis(30));
         if let Some(stream) = self.stream.take() {

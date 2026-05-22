@@ -136,6 +136,20 @@ pub fn spawn_recording_thread(
             // Map command to simple start/stop logic and mode
             // We unify Start/ActionStart and Stop/ActionStop logic here
             match (command, ctx.phase) {
+                // ── macOS MIC WARMUP ────────────────────────────────
+                (RecordingCommand::WarmupMic, RecordingPhase::Idle | RecordingPhase::Error(_)) => {
+                    #[cfg(target_os = "macos")]
+                    {
+                        if let Some(mut rec) = ctx.recorder.take() {
+                            rec.release_stream();
+                        }
+                        thread::sleep(CORE_AUDIO_RELEASE_DELAY);
+                        warmup_microphone();
+                    }
+                }
+
+                (RecordingCommand::WarmupMic, _) => {}
+
                 // ── START RECORDING ─────────────────────────────────
                 (RecordingCommand::Start, RecordingPhase::Idle | RecordingPhase::Error(_))
                 | (
@@ -466,4 +480,22 @@ pub fn spawn_recording_thread(
             }
         }
     });
+}
+
+/// Brief capture to prime CoreAudio after grant or app launch (macOS only).
+#[cfg(target_os = "macos")]
+fn warmup_microphone() {
+    println!("🎙️  Warming up microphone...");
+    let mut recorder = AudioRecorder::new();
+    match recorder.start_recording(None) {
+        Ok(_) => {
+            thread::sleep(Duration::from_millis(200));
+            recorder.release_stream();
+            println!("✅ Microphone warmup complete");
+        }
+        Err(e) => {
+            eprintln!("⚠️  Microphone warmup failed: {}", e);
+            recorder.release_stream();
+        }
+    }
 }
