@@ -1,7 +1,7 @@
 import React, { useId, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, Plus, Trash2, Edit, Info, Languages } from "lucide-react";
-import type { TauriAppConfig } from "../types";
+import type { AppConfig } from "../types";
 import { useAppConfigStore } from "../store/appConfigStore";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
@@ -59,10 +59,10 @@ export const VocabularyPage: React.FC = () => {
 
   const vocabulary = config?.vocabulary || [];
 
-  const updateConfig = async (updates: Partial<TauriAppConfig>) => {
+  const updateConfig = async (updates: Partial<AppConfig>) => {
     setIsUpdating(true);
     try {
-      await invoke<TauriAppConfig>("update_app_config", {
+      await invoke<AppConfig>("update_app_config", {
         config: updates,
       });
     } catch (err: any) {

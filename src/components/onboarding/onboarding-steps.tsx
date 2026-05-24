@@ -17,7 +17,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
 import { useAuthStore } from "../../store/authStore";
-import type { TauriAppConfig } from "../../types";
+import type { AppConfig } from "../../types";
 import { GoogleLoginButton } from "../auth/GoogleLoginButton";
 
 /** Matches Rust `DefaultHotkeysResponse` / `begin_onboarding_hotkey_dry_run` */
@@ -50,7 +50,7 @@ async function resolveHotkeysForTryItStep(
   let hotkeys: string[] = [];
   let action_hotkeys: string[] = [];
   try {
-    const cfg = await invoke<TauriAppConfig>("get_app_config");
+    const cfg = await invoke<AppConfig>("get_app_config");
     hotkeys = cfg.hotkeys?.filter(Boolean) ?? [];
     action_hotkeys = cfg.action_hotkeys?.filter(Boolean) ?? [];
   } catch {

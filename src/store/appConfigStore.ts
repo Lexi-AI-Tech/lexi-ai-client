@@ -7,9 +7,9 @@
 import React from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { TauriAppConfig } from "../types";
+import type { AppConfig } from "../types";
 
-let config: TauriAppConfig | null = null;
+let config: AppConfig | null = null;
 let isLoading = false;
 let isInitialized = false;
 let error: string | null = null;
@@ -26,7 +26,7 @@ const loadFromRust = async () => {
   notifyListeners();
 
   try {
-    config = await invoke<TauriAppConfig>("get_app_config");
+    config = await invoke<AppConfig>("get_app_config");
   } catch (e) {
     console.error("Failed to load app config from Rust:", e);
     error = e instanceof Error ? e.message : "Failed to load configuration";
@@ -43,7 +43,7 @@ const refreshFromCloud = async () => {
   notifyListeners();
 
   try {
-    config = await invoke<TauriAppConfig>("refresh_app_config");
+    config = await invoke<AppConfig>("refresh_app_config");
   } catch (e) {
     console.error("Failed to refresh app config from cloud:", e);
     error = e instanceof Error ? e.message : "Failed to refresh configuration";
@@ -75,7 +75,7 @@ export const appConfigStore = {
 };
 
 export function useAppConfigStore(): {
-  config: TauriAppConfig | null;
+  config: AppConfig | null;
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;

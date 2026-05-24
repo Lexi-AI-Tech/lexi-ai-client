@@ -19,7 +19,7 @@ import {
   getAllLanguageCodes,
   getLanguageName,
 } from "../lib/constants";
-import type { TauriAppConfig, HotkeyConfig } from "../types";
+import type { AppConfig, HotkeyConfig } from "../types";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useAuthStore } from "../store/authStore";
 import { useAppConfigStore } from "../store/appConfigStore";
@@ -85,7 +85,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [confirmCancelSub, setConfirmCancelSub] = useState(false);
   const [isCancelingSub, setIsCancelingSub] = useState(false);
-  const [config, setConfig] = useState<TauriAppConfig | null>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(
     LanguageCode.AUTO,
   );
@@ -129,7 +129,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   }, [initialSection]);
 
   // Derived values from config - no defaults, rely entirely on backend
-  const currentLanguage = config?.languages?.[0] as LanguageCode | undefined;
+  const currentLanguage = config?.languages?.[0];
   const autostartEnabled = config?.launch_on_system_startup;
   const enhanceTranscription = config?.enhance_transcription;
   const showIconEnabled = config?.show_icon;
@@ -143,7 +143,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setConfig(storeConfig);
 
     if (storeConfig.languages && storeConfig.languages.length > 0) {
-      const firstLanguage = storeConfig.languages[0] as LanguageCode;
+      const firstLanguage = storeConfig.languages[0];
       if (Object.values(LanguageCode).includes(firstLanguage)) {
         setSelectedLanguage(normalizeLanguage(firstLanguage));
       }
@@ -331,9 +331,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   }, []);
 
   // Generic update function for app config
-  const updateConfig = async (updates: Partial<TauriAppConfig>) => {
+  const updateConfig = async (updates: Partial<AppConfig>) => {
     try {
-      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
+      const updatedConfig = await invoke<AppConfig>("update_app_config", {
         config: updates,
       });
       setConfig(updatedConfig);
@@ -390,7 +390,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setIsUpdating(true);
 
     try {
-      const updates: Partial<TauriAppConfig> = {};
+      const updates: Partial<AppConfig> = {};
 
       if (languageChanged) {
         updates.languages = [normalizeLanguage(selectedLanguage)];
@@ -419,7 +419,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         updatedConfig.languages.length > 0
       ) {
         setSelectedLanguage(
-          normalizeLanguage(updatedConfig.languages[0] as LanguageCode),
+          normalizeLanguage(updatedConfig.languages[0]),
         );
       }
       if (
@@ -464,7 +464,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         "get_default_hotkeys",
       );
 
-      const updates: Partial<TauriAppConfig> = {
+      const updates: Partial<AppConfig> = {
         hotkeys: defaults.hotkeys.slice(0, 3),
         action_hotkeys: defaults.action_hotkeys.slice(0, 3),
       };
