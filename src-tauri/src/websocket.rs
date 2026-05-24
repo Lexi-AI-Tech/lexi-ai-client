@@ -168,10 +168,9 @@ pub async fn start_oauth_websocket(app: AppHandle, state: String) -> Result<(), 
                                                         });
                                                     } else {
                                                         // Fetch app config from server (first time after login)
-                                                        match app_config::fetch_config_from_server(&app_clone).await {
-                                                            Ok(mut config) => {
-                                                                println!("✅ App config fetched and synced after login");
-                                                                app_config::sync_autostart_status(&app_clone, &mut config);
+                                                        match app_config::hydrate_app_config_from_cloud(&app_clone).await {
+                                                            Ok(_) => {
+                                                                println!("✅ App config hydrated after login");
                                                             }
                                                             Err(e) => {
                                                                 eprintln!("⚠️  Failed to fetch app config after login: {}", e);

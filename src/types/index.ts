@@ -128,6 +128,7 @@ export interface TauriAppConfig {
   launch_on_system_startup?: boolean | null;
   show_icon?: boolean | null;
   vocabulary?: string[] | null;
+  shortcuts?: Shortcut[] | null;
 }
 
 // ============================================================================

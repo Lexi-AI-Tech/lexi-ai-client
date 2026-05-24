@@ -96,16 +96,8 @@ pub async fn start_room_recording(
         .await
         .map_err(|_| "Authentication required")?;
 
-    // Get language from app config
-    let app_config = crate::commands::app_config::get_app_config(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load app config: {}", e))?;
-
-    // Get first language from config, default to "auto"
-    let language_code = app_config
-        .languages
-        .and_then(|langs| langs.first().cloned())
-        .unwrap_or_else(|| "auto".to_string());
+    // Get language from local app config store
+    let language_code = crate::commands::app_config::get_primary_language_from_store(&app);
 
     // Create channel for streaming audio data (std::mpsc for audio_recorder)
     let (audio_tx, audio_rx) = mpsc::channel::<Vec<u8>>();

@@ -57,6 +57,8 @@ impl ActionService {
         audio_data: Option<Vec<u8>>,
         app_handle: &AppHandle,
         cursor_context: Option<&CursorContext>,
+        language: String,
+        vocabulary: Vec<String>,
     ) -> Option<ActionResponse> {
         let action_start = Instant::now();
 
@@ -101,7 +103,14 @@ impl ActionService {
 
         // Send action request to server
         match self
-            .send_action_request(audio_data, &app_name, selected_text, auth_token)
+            .send_action_request(
+                audio_data,
+                &app_name,
+                selected_text,
+                auth_token,
+                &language,
+                &vocabulary,
+            )
             .await
         {
             Ok(action_response) => {
@@ -142,9 +151,13 @@ impl ActionService {
         app_name: &str,
         selected_text: Option<String>,
         auth_token: Result<String, String>,
+        language: &str,
+        vocabulary: &[String],
     ) -> Result<ActionResponse, Box<dyn Error>> {
-        // Build multipart form
-        let mut form = multipart::Form::new().text("app_name", app_name.to_string());
+        let mut form = multipart::Form::new()
+            .text("app_name", app_name.to_string())
+            .text("language", language.to_string())
+            .text("vocabulary", serde_json::to_string(vocabulary)?);
 
         // Add audio file if provided
         if let Some(data) = audio_data {

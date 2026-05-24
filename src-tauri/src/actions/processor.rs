@@ -4,6 +4,7 @@
 //! Handles response by type: inject text only (text), or inject and play TTS (voice).
 
 use crate::actions::service::ActionService;
+use crate::commands::app_config::load_app_config;
 use crate::cursor_context::get_cursor_context;
 use crate::text_injector::TextInjector;
 // use crate::tts_service::TtsService;
@@ -27,10 +28,31 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
 
     let cursor_context = get_cursor_context();
 
+    let app_config = match load_app_config(&app_handle) {
+        Ok(config) => config,
+        Err(e) => {
+            app_handle.emit("action_error", e).unwrap_or_default();
+            return;
+        }
+    };
+
+    let language = app_config
+        .languages
+        .as_ref()
+        .and_then(|langs| langs.first().cloned())
+        .unwrap_or_else(|| "auto".to_string());
+    let vocabulary = app_config.vocabulary.unwrap_or_default();
+
     // Perform the action directly with audio data
     let action_service = ActionService::new();
     match action_service
-        .perform_action(Some(audio_data), &app_handle, cursor_context.as_ref())
+        .perform_action(
+            Some(audio_data),
+            &app_handle,
+            cursor_context.as_ref(),
+            language,
+            vocabulary,
+        )
         .await
     {
         Some(action_response) => {

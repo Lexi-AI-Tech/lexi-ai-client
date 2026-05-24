@@ -105,7 +105,7 @@ use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{
     begin_onboarding_hotkey_dry_run, end_onboarding_hotkey_dry_run, get_app_config,
-    get_default_hotkeys, update_app_config,
+    get_default_hotkeys, hydrate_app_config_from_cloud, refresh_app_config, update_app_config,
 };
 use commands::auth::{
     auth_get_state, clear_auth_data, get_api_base_url, get_auth_data, get_auth_token,
@@ -403,6 +403,7 @@ pub fn main() {
             get_default_hotkeys,
             begin_onboarding_hotkey_dry_run,
             end_onboarding_hotkey_dry_run,
+            refresh_app_config,
             update_app_config,
             get_system_type,
             copy_to_clipboard,
@@ -580,9 +581,9 @@ pub fn main() {
             // Fetch config in background after state is managed to ensure channels get updated
             let app_handle_for_config = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                println!("🔄 Background task: Fetching config from server...");
-                if let Err(e) = get_app_config(app_handle_for_config).await {
-                    println!("⚠️  Server config unavailable on startup: {}", e);
+                println!("🔄 Background task: Hydrating app config from cloud...");
+                if let Err(e) = hydrate_app_config_from_cloud(&app_handle_for_config).await {
+                    println!("⚠️  App config hydration unavailable on startup: {}", e);
                 }
             });
 

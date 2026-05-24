@@ -5,6 +5,7 @@
 
 pub mod analytics;
 pub mod app_config;
+pub mod app_config_store;
 pub mod auth;
 pub mod billing;
 pub mod cache;

@@ -22,6 +22,7 @@ import {
 import type { TauriAppConfig, HotkeyConfig } from "../types";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
 import { useAuthStore } from "../store/authStore";
+import { useAppConfigStore } from "../store/appConfigStore";
 import { useUpdaterStore } from "../store/updaterStore";
 import { HotkeySelector } from "./HotkeySelector";
 import { useToast } from "./toast/useToast";
@@ -72,6 +73,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onInitialSectionConsumed,
 }) => {
   const authStore = useAuthStore();
+  const { config: storeConfig, isLoading: configLoading, isInitialized: configInitialized } =
+    useAppConfigStore();
   const toast = useToast();
   const [subscription, setSubscription] =
     useState<CurrentSubscriptionResponse | null>(null);
@@ -131,40 +134,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const configHotkeys = config?.hotkeys || [];
   const configActionHotkeys = config?.action_hotkeys || [];
 
-  // Load app config on mount
+  // Sync local form state from app config store
   useEffect(() => {
-    const loadConfig = async () => {
-      setIsLoading(true);
+    if (!storeConfig) return;
+    setConfig(storeConfig);
 
-      try {
-        const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
-        setConfig(loadedConfig);
-
-        // Set selected values for all settings (only if backend provides them)
-        if (loadedConfig.languages && loadedConfig.languages.length > 0) {
-          const firstLanguage = loadedConfig.languages[0] as LanguageCode;
-          if (Object.values(LanguageCode).includes(firstLanguage)) {
-            setSelectedLanguage(normalizeLanguage(firstLanguage));
-          }
-        } else {
-          // Backend didn't provide a language, default to auto
-          setSelectedLanguage(LanguageCode.AUTO);
-        }
-        setSelectedAutostart(loadedConfig.launch_on_system_startup ?? null);
-        setSelectedEnhanceTranscription(
-          loadedConfig.enhance_transcription ?? null,
-        );
-        setSelectedShowIcon(loadedConfig.show_icon ?? null);
-      } catch (err: any) {
-        console.error("Failed to load app config:", err);
-        toast.error(err?.message || "Failed to load configuration");
-      } finally {
-        setIsLoading(false);
+    if (storeConfig.languages && storeConfig.languages.length > 0) {
+      const firstLanguage = storeConfig.languages[0] as LanguageCode;
+      if (Object.values(LanguageCode).includes(firstLanguage)) {
+        setSelectedLanguage(normalizeLanguage(firstLanguage));
       }
-    };
+    } else {
+      setSelectedLanguage(LanguageCode.AUTO);
+    }
+    setSelectedAutostart(storeConfig.launch_on_system_startup ?? null);
+    setSelectedEnhanceTranscription(storeConfig.enhance_transcription ?? null);
+    setSelectedShowIcon(storeConfig.show_icon ?? null);
+  }, [storeConfig]);
 
-    loadConfig();
-  }, []);
+  useEffect(() => {
+    setIsLoading(!configInitialized || configLoading);
+  }, [configInitialized, configLoading]);
 
   useEffect(() => {
     let cancelled = false;

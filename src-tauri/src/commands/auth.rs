@@ -203,15 +203,12 @@ pub async fn store_auth_data(app: AppHandle, data: AuthDataRequest) -> Result<()
 
     // After login, force fetch config from server and save it to Tauri Store
     // This ensures we get default settings from server and override any first launch config
-    match app_config::fetch_config_from_server(&app).await {
-        Ok(mut config) => {
-            println!("✅ App config fetched and saved after login");
-            // Sync autostart status with OS based on server config
-            app_config::sync_autostart_status(&app, &mut config);
+    match app_config::hydrate_app_config_from_cloud(&app).await {
+        Ok(_) => {
+            println!("✅ App config hydrated after login");
         }
         Err(e) => {
-            eprintln!("⚠️  Failed to fetch app config after login: {}", e);
-            // Don't fail the login if config fetch fails, but log it
+            eprintln!("⚠️  Failed to hydrate app config after login: {}", e);
         }
     }
 
@@ -246,6 +243,7 @@ pub async fn auth_get_state(app: AppHandle) -> Result<AuthUiStateResponse, Strin
 #[tauri::command]
 pub async fn clear_auth_data(app: AppHandle) -> Result<(), String> {
     secure_storage::clear_auth_data(&app)?;
+    let _ = crate::commands::app_config_store::clear_local_config(&app);
     emit_auth_state_changed(&app);
     Ok(())
 }
@@ -254,6 +252,7 @@ pub async fn clear_auth_data(app: AppHandle) -> Result<(), String> {
 /// resets onboarding so the user is sent back to re-authenticate, then emits auth_expired.
 pub fn handle_auth_expired(app: &AppHandle) {
     let _ = secure_storage::clear_auth_data(app);
+    let _ = crate::commands::app_config_store::clear_local_config(app);
     if let Err(e) = crate::commands::onboarding::reset_onboarding(app.clone()) {
         eprintln!("Failed to reset onboarding on auth expiry: {}", e);
     }
@@ -729,6 +728,7 @@ pub async fn logout(app: AppHandle) -> Result<(), String> {
 
     // Clear local auth data and reset onboarding so user sees onboarding on next launch
     secure_storage::clear_auth_data(&app)?;
+    let _ = crate::commands::app_config_store::clear_local_config(&app);
     if let Err(e) = crate::commands::onboarding::reset_onboarding(app.clone()) {
         eprintln!("Failed to reset onboarding on logout: {}", e);
     }
