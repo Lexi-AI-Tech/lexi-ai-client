@@ -41,7 +41,5 @@ export function HotkeyKeycapSymbol({ part, layout }: HotkeyKeycapSymbolProps) {
     );
   }
   if (!keyInfo.symbol) return null;
-  return (
-    <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>
-  );
+  return <span className="hotkey-selector__key-symbol">{keyInfo.symbol}</span>;
 }

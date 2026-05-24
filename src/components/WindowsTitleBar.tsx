@@ -44,9 +44,11 @@ export function WindowsTitleBar() {
     };
     sync();
     let unlisten: (() => void) | undefined;
-    void w.onResized(() => sync()).then((fn) => {
-      unlisten = fn;
-    });
+    void w
+      .onResized(() => sync())
+      .then((fn) => {
+        unlisten = fn;
+      });
     return () => {
       unlisten?.();
     };

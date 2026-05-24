@@ -6,10 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useKeycapLayout } from "../hooks/useKeycapLayout";
 import { lookupKeycap, type KeycapLayout } from "../lib/keySymbols";
 import { HotkeyKeycapSymbol } from "./HotkeyKeycapSymbol";
-import type {
-  ActionHistory,
-  PaginatedActionHistoryResponse,
-} from "../types";
+import type { ActionHistory, PaginatedActionHistoryResponse } from "../types";
 import { useAppConfigStore } from "../store/appConfigStore";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";

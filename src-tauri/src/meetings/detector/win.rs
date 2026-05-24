@@ -7,18 +7,20 @@ use windows::core::{ComInterface, HSTRING, PCWSTR, PWSTR};
 use windows::w;
 use windows::Win32::Foundation::{CloseHandle, MAX_PATH};
 use windows::Win32::Media::Audio::{
-    AudioSessionStateActive, IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator,
-    MMDeviceEnumerator, eCapture, eConsole,
+    eCapture, eConsole, AudioSessionStateActive, IAudioSessionControl2, IAudioSessionManager2,
+    IMMDeviceEnumerator, MMDeviceEnumerator,
 };
 use windows::Win32::Storage::FileSystem::{
     GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW,
 };
-use windows::Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx};
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
+};
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 
-use super::{AppInfo, score_app_for_meeting};
+use super::{score_app_for_meeting, AppInfo};
 
 pub(super) fn is_system_app_for_display(app: &AppInfo) -> bool {
     let id = app.id.to_lowercase();
@@ -117,7 +119,10 @@ fn get_file_description(process_path: &Path) -> Option<String> {
     let file_description =
         unsafe { std::slice::from_raw_parts(file_description_ptr.cast(), query_len as usize) };
     let file_description = String::from_utf16_lossy(file_description);
-    let trimmed = file_description.trim_matches(char::from(0)).trim().to_owned();
+    let trimmed = file_description
+        .trim_matches(char::from(0))
+        .trim()
+        .to_owned();
     if trimmed.is_empty() {
         None
     } else {

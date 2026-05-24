@@ -23,8 +23,8 @@ export const OnboardingFlow: React.FC = () => {
   }, []);
 
   const IS_MACOS = systemType === "mac";
-  const STEPS = IS_MACOS 
-    ? ["Welcome", "Permissions", "Setup", "Try it"] 
+  const STEPS = IS_MACOS
+    ? ["Welcome", "Permissions", "Setup", "Try it"]
     : ["Welcome", "Setup", "Try it"];
 
   // After Permissions: shortcuts step uses dry-run (no pill); “Try it” uses full recording + pill.

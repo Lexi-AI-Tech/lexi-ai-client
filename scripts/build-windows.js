@@ -89,13 +89,7 @@ function main() {
     process.exit(1);
   }
 
-  const tauriArgs = [
-    "tauri",
-    "build",
-    "--",
-    "--features",
-    "custom-protocol",
-  ];
+  const tauriArgs = ["tauri", "build", "--", "--features", "custom-protocol"];
   const child = spawn("npx", tauriArgs, {
     cwd: root,
     stdio: "inherit",

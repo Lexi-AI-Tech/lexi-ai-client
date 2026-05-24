@@ -99,10 +99,7 @@ pub async fn hydrate_app_config_from_cloud(app: &AppHandle) -> Result<AppConfig,
     match fetch_config_from_server(app).await {
         Ok(config) => {
             let config = apply_config_side_effects(app, config, true)?;
-            println!(
-                "✅ App config hydrated with hotkeys: {:?}",
-                config.hotkeys
-            );
+            println!("✅ App config hydrated with hotkeys: {:?}", config.hotkeys);
             Ok(config)
         }
         Err(e) => {
@@ -308,7 +305,10 @@ pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
             eprintln!("⚠️ Failed to set_skip_taskbar on main window: {}", e);
         }
     }
-    println!("✅ Synced: taskbar icon (main window) shown = {}", show_icon);
+    println!(
+        "✅ Synced: taskbar icon (main window) shown = {}",
+        show_icon
+    );
 }
 
 #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]

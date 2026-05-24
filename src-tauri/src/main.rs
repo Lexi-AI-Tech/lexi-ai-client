@@ -343,9 +343,7 @@ pub fn main() {
     // Must register before `tauri-plugin-deep-link` so Windows/Linux can forward protocol
     // URLs from a second process to the running instance (see Tauri deep-linking docs).
     builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-        println!(
-            "🔄 Second instance launch detected (argv={argv:?}) — focusing main window"
-        );
+        println!("🔄 Second instance launch detected (argv={argv:?}) — focusing main window");
         show_and_focus_main_window(app.app_handle());
 
         // Minimal backup retry

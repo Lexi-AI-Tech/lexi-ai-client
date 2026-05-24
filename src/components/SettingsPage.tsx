@@ -73,8 +73,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onInitialSectionConsumed,
 }) => {
   const authStore = useAuthStore();
-  const { config: storeConfig, isLoading: configLoading, isInitialized: configInitialized } =
-    useAppConfigStore();
+  const {
+    config: storeConfig,
+    isLoading: configLoading,
+    isInitialized: configInitialized,
+  } = useAppConfigStore();
   const toast = useToast();
   const [subscription, setSubscription] =
     useState<CurrentSubscriptionResponse | null>(null);

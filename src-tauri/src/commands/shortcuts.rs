@@ -2,8 +2,8 @@
 //!
 //! Tauri commands for managing shortcuts.
 
-use crate::commands::auth::get_auth_token_async;
 use crate::commands::app_config;
+use crate::commands::auth::get_auth_token_async;
 use crate::utils;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;

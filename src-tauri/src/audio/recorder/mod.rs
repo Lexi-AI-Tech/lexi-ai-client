@@ -60,8 +60,7 @@ pub struct AudioRecorder {
 
 impl AudioRecorder {
     pub fn new() -> Self {
-        let device = try_prioritized_input_device()
-            .expect("Failed to get default input device");
+        let device = try_prioritized_input_device().expect("Failed to get default input device");
 
         println!(
             "🎙️ Audio input device: {}",

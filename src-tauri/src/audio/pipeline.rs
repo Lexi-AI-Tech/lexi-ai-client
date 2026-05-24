@@ -56,10 +56,7 @@ fn downmix_to_mono(interleaved: &[f32], channels: usize) -> Vec<f32> {
         }
     }
 
-    let rms: Vec<f32> = sumsq
-        .iter()
-        .map(|&s| (s / frames as f32).sqrt())
-        .collect();
+    let rms: Vec<f32> = sumsq.iter().map(|&s| (s / frames as f32).sqrt()).collect();
 
     let mut active: Vec<usize> = rms
         .iter()

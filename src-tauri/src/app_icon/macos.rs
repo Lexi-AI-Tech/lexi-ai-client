@@ -2,8 +2,8 @@
 
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{
-    NSBitmapImageFileType, NSBitmapImageRep, NSBitmapImageRepPropertyKey, NSImage, NSRunningApplication,
-    NSWorkspace,
+    NSBitmapImageFileType, NSBitmapImageRep, NSBitmapImageRepPropertyKey, NSImage,
+    NSRunningApplication, NSWorkspace,
 };
 use objc2_foundation::{NSDictionary, NSString};
 
