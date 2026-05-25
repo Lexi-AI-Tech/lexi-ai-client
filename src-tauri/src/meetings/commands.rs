@@ -3,7 +3,6 @@
 //! Tauri commands for managing meetings and meeting recording.
 
 use crate::commands::auth::get_auth_token_async;
-use crate::commands::docs::Doc;
 use crate::state::MeetingState;
 use crate::utils;
 use futures_util::StreamExt;
@@ -804,62 +803,4 @@ pub async fn get_meeting_suggested_questions(
         .unwrap_or_default();
 
     Ok(questions)
-}
-
-/// Create a rich-text doc from a meeting (server generates content and stores the doc).
-#[tauri::command]
-pub async fn create_doc_from_meeting(
-    app: AppHandle,
-    meeting_id: String,
-    instructions: String,
-) -> Result<Doc, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .map_err(|_| "Authentication required")?;
-
-    let client = crate::utils::create_http_client_long_timeout();
-    let url = format!(
-        "{}/api/v1/meetings/{}/create-doc",
-        crate::config::api_base_url(),
-        meeting_id
-    );
-
-    let payload = serde_json::json!({
-        "instructions": instructions.trim(),
-    });
-
-    utils::log_api_request("POST", &url);
-
-    let response = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("Server error: {} - {}", status, body));
-    }
-
-    let data: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    let doc = crate::commands::docs::parse_doc_from_value(&data)
-        .map_err(|e| format!("Invalid doc response: {}", e))?;
-    // Best-effort: used by the frontend to refresh billing + docs list.
-    let _ = app.emit(
-        "docs_changed",
-        serde_json::json!({
-            "kind": "created",
-            "docId": doc.id,
-            "source": "meeting",
-            "meetingId": meeting_id,
-        }),
-    );
-    Ok(doc)
 }

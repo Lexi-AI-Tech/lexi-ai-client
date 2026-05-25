@@ -100,6 +100,11 @@ export interface AppConfig {
   shortcuts?: Shortcut[] | null;
 }
 
+export interface DocContentResponse {
+  title: string;
+  content: string;
+}
+
 // ============================================================================
 // Transcript Types
 // ============================================================================

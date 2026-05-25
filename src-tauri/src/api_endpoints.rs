@@ -152,6 +152,16 @@ pub mod docs {
             CREATE_DOC_FROM_AUDIO
         )
     }
+
+    pub fn create_doc_from_meeting_url(meeting_id: &str) -> String {
+        format!(
+            "{}{}{}/from-meeting/{}",
+            config::api_base_url(),
+            super::API_V1_PREFIX,
+            LIST,
+            meeting_id
+        )
+    }
 }
 
 /// Action endpoints

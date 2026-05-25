@@ -7,7 +7,8 @@
 
 use super::recorder::AudioRecorder;
 use crate::actions::processor::process_action_audio;
-use crate::assistant::processor::{process_audio, process_audio_for_doc};
+use crate::assistant::processor::process_audio;
+use crate::docs::processor::process_audio_for_doc;
 use crate::RecordingCommand;
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -327,7 +328,7 @@ pub fn spawn_recording_thread(
                                     tauri::async_runtime::spawn(async move {
                                         if mode_skip == RecordingMode::Doc {
                                             let _ = app_handle_clone.emit(
-                                                "doc_transcription_error",
+                                                "doc_from_audio_error",
                                                 "Recording too short",
                                             );
                                         } else {
@@ -354,8 +355,13 @@ pub fn spawn_recording_thread(
                                                 let _ = app_handle_done.emit("action_success", "");
                                             }
                                             RecordingMode::Doc => {
-                                                let _ = app_handle_done
-                                                    .emit("doc_transcription_ready", "");
+                                                let _ = app_handle_done.emit(
+                                                    "doc_from_audio_ready",
+                                                    serde_json::json!({
+                                                        "title": "",
+                                                        "content": ""
+                                                    }),
+                                                );
                                             }
                                         }
                                     });

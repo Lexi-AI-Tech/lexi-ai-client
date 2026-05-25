@@ -59,6 +59,7 @@ mod actions; // Voice actions (triggered by hotkeys)
 mod api_endpoints; // Centralized API endpoint definitions
 mod app_icon; // `app_icon/` — platform app icons (macOS, Windows)
 mod assistant; // Recording thread management
+mod docs; // Docs voice-to-text (transcribe into editor, no injection)
 mod audio;
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
@@ -118,7 +119,7 @@ use commands::billing::{
 };
 use commands::cache::user_cache_warmup;
 use commands::docs::{
-    create_doc, create_doc_from_audio, delete_doc, get_doc, get_docs, start_doc_recording,
+    create_doc, create_doc_from_meeting, delete_doc, get_doc, get_docs, start_doc_recording,
     stop_doc_recording, update_doc,
 };
 use commands::hotkey::{
@@ -139,10 +140,10 @@ use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type, open_external_url};
 use commands::window::{open_devtools, show_main_window};
 use meetings::commands::{
-    add_meeting_note, create_doc_from_meeting, create_meeting, delete_meeting,
-    dismiss_meeting_end_check_prompt, end_meeting_session, get_meeting_details,
-    get_meeting_suggested_questions, list_meetings, send_meeting_chat, start_meeting_recording,
-    stop_meeting_recording, stream_meeting_summary, update_meeting,
+    add_meeting_note, create_meeting, delete_meeting, dismiss_meeting_end_check_prompt,
+    end_meeting_session, get_meeting_details, get_meeting_suggested_questions, list_meetings,
+    send_meeting_chat, start_meeting_recording, stop_meeting_recording, stream_meeting_summary,
+    update_meeting,
 };
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
@@ -440,11 +441,11 @@ pub fn main() {
             get_docs,
             get_doc,
             create_doc,
+            create_doc_from_meeting,
             update_doc,
             delete_doc,
             start_doc_recording,
             stop_doc_recording,
-            create_doc_from_audio,
             create_room,
             list_rooms,
             get_room_details,
@@ -465,7 +466,6 @@ pub fn main() {
             delete_meeting,
             stream_meeting_summary,
             send_meeting_chat,
-            create_doc_from_meeting,
             get_app_icon,
             start_global_key_listener,
         ])
