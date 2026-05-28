@@ -4,6 +4,8 @@
 //! Listens for OAuth completion notifications and emits Tauri events to the frontend.
 
 use crate::commands::app_config;
+use crate::commands::billing;
+use crate::commands::feature_usage_store;
 use crate::secure_storage::{self, AuthData, UserData};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -21,6 +23,7 @@ struct WebSocketMessage {
     access_token: Option<String>,
     refresh_token: Option<String>,
     expires_in: Option<u64>,
+    feature_usage: Option<String>,
     user: Option<UserData>,
     error: Option<String>,
 }
@@ -158,6 +161,17 @@ pub async fn start_oauth_websocket(app: AppHandle, state: String) -> Result<(), 
                                                         user: Some(user.clone()),
                                                     };
 
+                                                    if let Some(ref feature_usage) =
+                                                        data.feature_usage
+                                                    {
+                                                        if !feature_usage.is_empty() {
+                                                            let _ = feature_usage_store::save_feature_usage(
+                                                                &app_clone,
+                                                                feature_usage,
+                                                            );
+                                                        }
+                                                    }
+
                                                     if let Err(e) = secure_storage::store_auth_data(&app_clone, &auth_data) {
                                                         eprintln!("⚠️  Failed to store auth data: {}", e);
                                                         let app_clone_emit = app_clone.clone();
@@ -174,6 +188,14 @@ pub async fn start_oauth_websocket(app: AppHandle, state: String) -> Result<(), 
                                                             }
                                                             Err(e) => {
                                                                 eprintln!("⚠️  Failed to fetch app config after login: {}", e);
+                                                            }
+                                                        }
+                                                        match billing::hydrate_feature_usage_from_cloud(&app_clone).await {
+                                                            Ok(_) => {
+                                                                println!("✅ Feature usage hydrated after login");
+                                                            }
+                                                            Err(e) => {
+                                                                eprintln!("⚠️  Failed to hydrate feature usage after login: {}", e);
                                                             }
                                                         }
                                                         // Emit success event with user data

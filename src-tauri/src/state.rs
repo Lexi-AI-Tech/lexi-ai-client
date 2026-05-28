@@ -32,8 +32,8 @@ pub struct HotkeyRecordingState {
 
 /// Room recording state
 ///
-/// Note: AudioRecorder and RoomWebSocket cannot be stored here because they contain
-/// types that are not Send+Sync on macOS. They are managed in dedicated threads instead.
+/// Note: AudioRecorder and RoomWebSocket are managed in a dedicated thread because
+/// macOS audio streams are not always Send+Sync across runtime boundaries.
 pub struct RoomState {
     pub is_recording: Mutex<bool>,
     pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
@@ -41,7 +41,8 @@ pub struct RoomState {
 
 /// Meeting recording state
 ///
-/// Note: AudioRecorder and MeetingWebSocket cannot be stored here for the same reasons as RoomState.
+/// Note: AudioRecorder and MeetingWebSocket cannot be stored here because they contain
+/// types that are not Send+Sync on macOS. They are managed in dedicated threads instead.
 pub struct MeetingState {
     pub is_recording: Mutex<bool>,
     pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,

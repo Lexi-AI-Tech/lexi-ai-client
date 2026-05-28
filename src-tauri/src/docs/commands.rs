@@ -125,6 +125,7 @@ async fn docs_request(
         _ => return Err("Unsupported method".to_string()),
     };
     req = req.header("Authorization", format!("Bearer {}", auth_token));
+    req = crate::utils::apply_feature_usage_header(app, req);
     if let Some(b) = body {
         req = req.header("Content-Type", "application/json").json(&b);
     }
@@ -132,6 +133,7 @@ async fn docs_request(
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
+    crate::utils::capture_feature_usage_header(app, &response);
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
@@ -263,8 +265,7 @@ pub async fn create_doc_from_meeting(
         .await
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    let doc = parse_doc_from_value(&data)
-        .map_err(|e| format!("Invalid doc response: {}", e))?;
+    let doc = parse_doc_from_value(&data).map_err(|e| format!("Invalid doc response: {}", e))?;
     let _ = app.emit(
         "docs_changed",
         serde_json::json!({
@@ -276,3 +277,4 @@ pub async fn create_doc_from_meeting(
     );
     Ok(doc)
 }
+

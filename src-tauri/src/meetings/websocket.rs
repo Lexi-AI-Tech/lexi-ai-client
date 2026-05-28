@@ -12,7 +12,30 @@ use tokio_tungstenite::{
     tungstenite::{client::IntoClientRequest, Message},
 };
 
-use crate::room_websocket::{ServerMessage, TranscriptMessage};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TranscriptMessage {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub text: Option<String>,
+    #[serde(rename = "start_time")]
+    pub start_time: Option<String>,
+    #[serde(rename = "end_time")]
+    pub end_time: Option<String>,
+    #[serde(rename = "speaker_id")]
+    pub speaker_id: Option<u32>,
+    /// message_type: "user_audio" (mic, right), "system_audio" (system, left), "user_note" (typed note).
+    #[serde(rename = "message_type")]
+    pub message_type: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServerMessage {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub message: Option<String>,
+}
 
 pub struct MeetingWebSocket {
     app: AppHandle,

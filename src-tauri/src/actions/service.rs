@@ -104,6 +104,7 @@ impl ActionService {
         // Send action request to server
         match self
             .send_action_request(
+                app_handle,
                 audio_data,
                 &app_name,
                 selected_text,
@@ -147,6 +148,7 @@ impl ActionService {
     /// Sends an action request to the Lexi AI Server
     async fn send_action_request(
         &self,
+        app_handle: &AppHandle,
         audio_data: Option<Vec<u8>>,
         app_name: &str,
         selected_text: Option<String>,
@@ -183,9 +185,11 @@ impl ActionService {
         } else {
             return Err("Authentication required".into());
         }
+        request = utils::apply_feature_usage_header(app_handle, request);
 
         // Send the request
         let res = request.send().await?;
+        utils::capture_feature_usage_header(app_handle, &res);
         let status = res.status();
 
         if !status.is_success() {

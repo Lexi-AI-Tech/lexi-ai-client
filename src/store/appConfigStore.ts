@@ -16,6 +16,26 @@ let error: string | null = null;
 
 const listeners = new Set<() => void>();
 
+type AppConfigSnapshot = {
+  config: AppConfig | null;
+  isLoading: boolean;
+  isInitialized: boolean;
+  error: string | null;
+};
+
+let snapshot: AppConfigSnapshot = {
+  config,
+  isLoading,
+  isInitialized,
+  error,
+};
+
+const updateSnapshot = () => {
+  // `useSyncExternalStore` requires `getSnapshot` to return a cached value
+  // that only changes when the underlying store changes.
+  snapshot = { config, isLoading, isInitialized, error };
+};
+
 const notifyListeners = () => {
   listeners.forEach((listener) => listener());
 };
@@ -23,6 +43,7 @@ const notifyListeners = () => {
 const loadFromRust = async () => {
   isLoading = true;
   error = null;
+  updateSnapshot();
   notifyListeners();
 
   try {
@@ -33,6 +54,7 @@ const loadFromRust = async () => {
   } finally {
     isLoading = false;
     isInitialized = true;
+    updateSnapshot();
     notifyListeners();
   }
 };
@@ -40,6 +62,7 @@ const loadFromRust = async () => {
 const refreshFromCloud = async () => {
   isLoading = true;
   error = null;
+  updateSnapshot();
   notifyListeners();
 
   try {
@@ -49,6 +72,7 @@ const refreshFromCloud = async () => {
     error = e instanceof Error ? e.message : "Failed to refresh configuration";
   } finally {
     isLoading = false;
+    updateSnapshot();
     notifyListeners();
   }
 };
@@ -66,7 +90,7 @@ export const appConfigStore = {
   },
 
   getSnapshot() {
-    return { config, isLoading, isInitialized, error };
+    return snapshot;
   },
 
   async refreshFromCloud() {
@@ -74,21 +98,18 @@ export const appConfigStore = {
   },
 };
 
-export function useAppConfigStore(): {
-  config: AppConfig | null;
-  isLoading: boolean;
-  isInitialized: boolean;
-  error: string | null;
+export function useAppConfigStore(): AppConfigSnapshot & {
   refreshFromCloud: () => Promise<void>;
 } {
-  const snapshot = React.useSyncExternalStore(
+  const snap = React.useSyncExternalStore(
     appConfigStore.subscribe,
     appConfigStore.getSnapshot,
     appConfigStore.getSnapshot,
   );
 
-  return {
-    ...snapshot,
-    refreshFromCloud: appConfigStore.refreshFromCloud,
-  };
+  // Keep return reference stable unless `snap` changes.
+  return React.useMemo(
+    () => ({ ...snap, refreshFromCloud: appConfigStore.refreshFromCloud }),
+    [snap],
+  );
 }

@@ -50,13 +50,15 @@ impl DocsService {
         let url = docs::create_doc_from_audio_url();
         utils::log_api_request("POST", &url);
 
-        let res = self
+        let request = self
             .client
             .post(&url)
             .multipart(form)
-            .header("Authorization", format!("Bearer {}", auth_token))
-            .send()
-            .await?;
+            .header("Authorization", format!("Bearer {}", auth_token));
+        let request = utils::apply_feature_usage_header(app_handle, request);
+
+        let res = request.send().await?;
+        utils::capture_feature_usage_header(app_handle, &res);
 
         let status = res.status();
         if !status.is_success() {

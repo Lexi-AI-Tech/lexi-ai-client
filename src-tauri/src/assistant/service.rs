@@ -206,9 +206,15 @@ impl AssistantService {
             utils::log_api_request("POST", &url);
             let mut request = self.client.post(&url).multipart(form);
             request = request.header("Authorization", format!("Bearer {}", current_token));
+            if let Some(handle) = &app_handle {
+                request = utils::apply_feature_usage_header(handle, request);
+            }
 
             // Send the initial request
             let res = request.send().await?;
+            if let Some(handle) = &app_handle {
+                utils::capture_feature_usage_header(handle, &res);
+            }
 
             let status = res.status();
             println!("🔍 DEBUG: Response status: {}", status);

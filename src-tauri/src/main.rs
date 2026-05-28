@@ -114,11 +114,12 @@ use commands::auth::{
     start_google_login, store_auth_data,
 };
 use commands::billing::{
-    cancel_billing_subscription, create_billing_checkout, get_billing_usage,
-    get_current_subscription,
+    cancel_billing_subscription, create_billing_checkout, get_current_subscription,
+    get_feature_usage,
 };
+use commands::billing::hydrate_feature_usage_from_cloud;
 use commands::cache::user_cache_warmup;
-use commands::docs::{
+use docs::commands::{
     create_doc, create_doc_from_meeting, delete_doc, get_doc, get_docs, start_doc_recording,
     stop_doc_recording, update_doc,
 };
@@ -412,7 +413,7 @@ pub fn main() {
             delete_transcript,
             get_analytics_stats,
             get_analytics_chart,
-            get_billing_usage,
+            get_feature_usage,
             create_billing_checkout,
             cancel_billing_subscription,
             get_current_subscription,
@@ -582,6 +583,15 @@ pub fn main() {
                 println!("🔄 Background task: Hydrating app config from cloud...");
                 if let Err(e) = hydrate_app_config_from_cloud(&app_handle_for_config).await {
                     println!("⚠️  App config hydration unavailable on startup: {}", e);
+                }
+            });
+
+            let app_handle_for_billing = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                println!("🔄 Background task: Hydrating feature usage from cloud...");
+                if let Err(e) = hydrate_feature_usage_from_cloud(&app_handle_for_billing).await
+                {
+                    println!("⚠️  Feature usage hydration unavailable on startup: {}", e);
                 }
             });
 

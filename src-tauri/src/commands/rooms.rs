@@ -1,26 +1,11 @@
-//! Room Commands
+//! Rooms Commands
 //!
-//! Tauri commands for managing rooms and room recording.
+//! Tauri commands for managing rooms and room recording/streaming.
 
 use crate::commands::auth::get_auth_token_async;
 use crate::state::RoomState;
-use crate::utils;
 use serde::{Deserialize, Serialize};
-use std::sync::mpsc;
-use std::thread;
 use tauri::{AppHandle, Emitter, State};
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Room {
-    pub id: String,
-    pub created_by: String,
-    pub updated_by: String,
-    pub name: String,
-    pub created_at: String,
-    pub updated_at: String,
-    pub speaker_map: Option<std::collections::HashMap<String, String>>,
-    pub transcripts: Option<Vec<RoomTranscriptSegment>>,
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RoomTranscriptSegment {
@@ -33,13 +18,32 @@ pub struct RoomTranscriptSegment {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RoomCreate {
+pub struct Room {
+    pub id: String,
+    pub created_by: String,
+    pub updated_by: String,
+    pub name: String,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(default)]
+    pub speaker_map: Option<serde_json::Value>,
+    #[serde(default)]
+    pub transcripts: Option<Vec<RoomTranscriptSegment>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateRoomRequest {
     pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RoomUpdate {
+pub struct UpdateRoomRequest {
     pub name: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SpeakerUpdateRequest {
+    pub speaker_map: serde_json::Value,
 }
 
 /// Create a new room
@@ -49,13 +53,10 @@ pub async fn create_room(app: AppHandle, name: String) -> Result<Room, String> {
         .await
         .map_err(|_| "Authentication required")?;
 
-    let client = crate::utils::create_http_client();
     let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
+    let client = crate::utils::create_http_client();
 
-    let payload = RoomCreate { name };
-
-    utils::log_api_request("POST", &url);
-
+    let payload = CreateRoomRequest { name };
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -67,23 +68,143 @@ pub async fn create_room(app: AppHandle, name: String) -> Result<Room, String> {
     if !response.status().is_success() {
         return Err(format!("Server error: {}", response.status()));
     }
-
-    let room: Room = response
-        .json()
+    response
+        .json::<Room>()
         .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    Ok(room)
+        .map_err(|e| format!("Failed to parse response: {}", e))
 }
 
-/// Start recording for a room with streaming
+/// List rooms for current user
+#[tauri::command]
+pub async fn list_rooms(app: AppHandle) -> Result<Vec<Room>, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
+    let client = crate::utils::create_http_client();
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+    response
+        .json::<Vec<Room>>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+/// Get room details (including transcripts)
+#[tauri::command]
+pub async fn get_room_details(app: AppHandle, room_id: String) -> Result<Room, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let url = format!(
+        "{}/api/v1/rooms/{}",
+        crate::config::api_base_url(),
+        room_id
+    );
+    let client = crate::utils::create_http_client();
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+    response
+        .json::<Room>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+/// Update room fields
+#[tauri::command]
+pub async fn update_room(
+    app: AppHandle,
+    room_id: String,
+    name: Option<String>,
+) -> Result<Room, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let url = format!(
+        "{}/api/v1/rooms/{}",
+        crate::config::api_base_url(),
+        room_id
+    );
+    let client = crate::utils::create_http_client();
+    let payload = UpdateRoomRequest { name };
+    let response = client
+        .patch(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+    response
+        .json::<Room>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+/// Update speaker names mapping
+#[tauri::command]
+pub async fn update_speaker(
+    app: AppHandle,
+    room_id: String,
+    speaker_map: serde_json::Value,
+) -> Result<Room, String> {
+    let auth_token = get_auth_token_async(&app)
+        .await
+        .map_err(|_| "Authentication required")?;
+
+    let url = format!(
+        "{}/api/v1/rooms/{}/speakers",
+        crate::config::api_base_url(),
+        room_id
+    );
+    let client = crate::utils::create_http_client();
+    let payload = SpeakerUpdateRequest { speaker_map };
+    let response = client
+        .patch(&url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+    response
+        .json::<Room>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+/// Start room recording: connects WebSocket + streams mic audio.
 #[tauri::command]
 pub async fn start_room_recording(
     app: AppHandle,
     room_id: String,
     state: State<'_, RoomState>,
 ) -> Result<(), String> {
-    // Check if already recording (drop lock before await)
     {
         let is_recording = state.is_recording.lock().unwrap();
         if *is_recording {
@@ -91,279 +212,86 @@ pub async fn start_room_recording(
         }
     }
 
-    // Get JWT token for WebSocket authentication
     let auth_token = get_auth_token_async(&app)
         .await
         .map_err(|_| "Authentication required")?;
 
-    // Get language from local app config store
+    // Connect room WS
     let language_code = crate::commands::app_config::get_primary_language_from_store(&app);
-
-    // Create channel for streaming audio data (std::mpsc for audio_recorder)
-    let (audio_tx, audio_rx) = mpsc::channel::<Vec<u8>>();
-
-    // Create WebSocket connection (async) - this will spawn tasks internally
-    let mut websocket = crate::room_websocket::RoomWebSocket::new(
-        app.clone(),
-        room_id.clone(),
-        auth_token,
-        language_code,
-    );
-
+    let mut websocket =
+        crate::room_websocket::RoomWebSocket::new(app.clone(), room_id.clone(), auth_token, language_code);
     websocket
         .connect()
         .await
         .map_err(|e| format!("Failed to connect WebSocket: {}", e))?;
 
-    // Wait for server to be ready before starting audio recording
-    println!("⏳ Waiting for server ready signal...");
-    let ready_rx = {
-        let mut ready_rx_guard = websocket.ready_rx.lock().unwrap();
-        ready_rx_guard.take()
-    };
-
+    // Wait for server ready
+    let ready_rx = { websocket.ready_rx.lock().unwrap().take() };
     if let Some(ready_rx) = ready_rx {
-        // Wait for ready signal (with timeout)
-        match tokio::time::timeout(tokio::time::Duration::from_secs(10), ready_rx).await {
-            Ok(Ok(_)) => {
-                println!("✅ Server ready - starting audio recording");
-            }
-            Ok(Err(_)) => {
-                return Err("Server ready channel closed unexpectedly".to_string());
-            }
-            Err(_) => {
-                return Err("Timeout waiting for server ready signal".to_string());
-            }
-        }
+        tokio::time::timeout(tokio::time::Duration::from_secs(10), ready_rx)
+            .await
+            .map_err(|_| "Timeout waiting for server ready signal".to_string())?
+            .map_err(|_| "Server ready channel closed unexpectedly".to_string())?;
     } else {
         return Err("Ready channel not initialized".to_string());
     }
 
-    // Get the audio_tx from websocket to forward chunks
-    let websocket_audio_tx = websocket.audio_tx.clone();
+    let ws_audio_tx = websocket
+        .audio_tx
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or_else(|| "WebSocket audio channel not initialized".to_string())?;
 
-    // Spawn thread to forward audio chunks from std::mpsc to WebSocket's tokio channel
-    // Use a blocking runtime handle to send to async channel from sync context
-    let rt_handle =
-        tokio::runtime::Handle::try_current().map_err(|_| "No tokio runtime available")?;
+    // Audio recorder thread (mic only)
+    let (stop_tx, stop_rx) = std::sync::mpsc::channel::<()>();
+    *state.command_tx.lock().unwrap() = Some(stop_tx);
 
-    thread::spawn(move || {
-        while let Ok(chunk) = audio_rx.recv() {
-            let guard = websocket_audio_tx.lock().unwrap();
-            if let Some(ref tx) = *guard {
-                // Send to tokio channel using blocking send
-                let tx_clone = tx.clone();
-                if let Err(e) = rt_handle.block_on(tx_clone.send(chunk)) {
-                    eprintln!("Failed to send audio chunk to WebSocket: {}", e);
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-    });
-
-    // Start audio recorder in a dedicated thread (AudioRecorder is not Send+Sync)
-    let app_for_recorder = app.clone();
-    let (recorder_tx, recorder_rx) = mpsc::channel::<()>();
-
-    thread::spawn(move || {
-        let mut recorder = crate::audio::recorder::AudioRecorder::new();
-
-        if let Err(e) = recorder.start_recording(Some(audio_tx)) {
-            eprintln!("Failed to start recording: {}", e);
-            let _ =
-                app_for_recorder.emit("room-websocket-error", format!("Recording failed: {}", e));
+    let app_for_thread = app.clone();
+    std::thread::spawn(move || {
+        let mut rec = crate::audio::recorder::AudioRecorder::new();
+        let tx_clone = ws_audio_tx.clone();
+        // Bridge cpal callback -> tokio mpsc sender via blocking_send
+        let (pcm_tx, pcm_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        if rec.start_recording(Some(pcm_tx)).is_err() {
+            let _ = app_for_thread.emit("room-recording-error", "Failed to start microphone");
             return;
         }
-
-        // Wait for stop signal
-        let _ = recorder_rx.recv();
-
-        // Stop recording
-        let _ = recorder.stop_recording();
+        loop {
+            if stop_rx.try_recv().is_ok() {
+                break;
+            }
+            match pcm_rx.recv_timeout(std::time::Duration::from_millis(50)) {
+                Ok(chunk) => {
+                    let _ = tx_clone.blocking_send(chunk);
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(_) => break,
+            }
+        }
+        rec.release_stream();
     });
 
-    // Store stop channel in state (this is Send+Sync)
-    *state.command_tx.lock().unwrap() = Some(recorder_tx);
     *state.is_recording.lock().unwrap() = true;
-
-    // Note: WebSocket connection is managed by spawned tasks in RoomWebSocket::connect()
-    // It will stay alive as long as the tasks are running
-
+    let _ = app.emit(
+        "room-recording-started",
+        serde_json::json!({ "roomId": room_id }),
+    );
     Ok(())
 }
 
-/// Stop recording and finalize the room
+/// Stop room recording (best-effort).
 #[tauri::command]
 pub async fn stop_room_recording_and_process(
-    _app: AppHandle,
+    app: AppHandle,
     state: State<'_, RoomState>,
-    _room_id: String,
-) -> Result<String, String> {
-    {
-        let mut is_recording = state.is_recording.lock().unwrap();
-        if !*is_recording {
-            return Err("Not recording".to_string());
-        }
-
-        // Send stop signal to recorder thread
-        {
-            let mut command_tx_guard = state.command_tx.lock().unwrap();
-            if let Some(tx) = command_tx_guard.take() {
-                let _ = tx.send(());
-            }
-        }
-
-        *is_recording = false;
+) -> Result<(), String> {
+    let stop_tx = { state.command_tx.lock().unwrap().take() };
+    if let Some(tx) = stop_tx {
+        let _ = tx.send(());
     }
-
-    Ok("Recording stopped".to_string())
+    *state.is_recording.lock().unwrap() = false;
+    let _ = app.emit("room-recording-stopped", ());
+    Ok(())
 }
 
-/// List user's rooms
-#[tauri::command]
-pub async fn list_rooms(app: AppHandle) -> Result<Vec<Room>, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .map_err(|_| "Authentication required")?;
-
-    let client = crate::utils::create_http_client();
-    let url = format!("{}/api/v1/rooms", crate::config::api_base_url());
-
-    utils::log_api_request("GET", &url);
-
-    let response = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
-    }
-
-    let rooms: Vec<Room> = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    Ok(rooms)
-}
-
-/// Get room details
-#[tauri::command]
-pub async fn get_room_details(
-    app: AppHandle,
-    room_id: String,
-) -> Result<serde_json::Value, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .map_err(|_| "Authentication required")?;
-
-    let client = crate::utils::create_http_client();
-    let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
-
-    utils::log_api_request("GET", &url);
-
-    let response = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
-    }
-
-    let room: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    Ok(room)
-}
-
-/// Update room details (e.g. status)
-#[tauri::command]
-pub async fn update_room(
-    app: AppHandle,
-    room_id: String,
-    name: Option<String>,
-) -> Result<serde_json::Value, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .map_err(|_| "Authentication required")?;
-
-    let client = crate::utils::create_http_client();
-    let url = format!("{}/api/v1/rooms/{}", crate::config::api_base_url(), room_id);
-
-    let payload = RoomUpdate { name };
-
-    utils::log_api_request("PATCH", &url);
-
-    let response = client
-        .patch(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
-    }
-
-    let room: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    Ok(room)
-}
-
-/// Update speaker names
-#[tauri::command]
-pub async fn update_speaker(
-    app: AppHandle,
-    room_id: String,
-    speaker_map: std::collections::HashMap<String, String>,
-) -> Result<serde_json::Value, String> {
-    let auth_token = get_auth_token_async(&app)
-        .await
-        .map_err(|_| "Authentication required")?;
-
-    let client = crate::utils::create_http_client();
-    let url = format!(
-        "{}/api/v1/rooms/{}/speakers",
-        crate::config::api_base_url(),
-        room_id
-    );
-
-    let payload = serde_json::json!({
-        "speaker_map": speaker_map
-    });
-
-    utils::log_api_request("PATCH", &url);
-
-    let response = client
-        .patch(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Server error: {}", response.status()));
-    }
-
-    let room: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    Ok(room)
-}

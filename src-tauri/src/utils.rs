@@ -1,5 +1,10 @@
 //! Utility functions for common operations across the application.
 
+use reqwest::RequestBuilder;
+use tauri::AppHandle;
+
+pub const FEATURE_USAGE_HEADER: &str = "X-Feature-Usage";
+
 /// Get the current system type as a string
 /// Returns "mac" for macOS, "windows" for Windows
 /// Panics on unsupported platforms
@@ -46,4 +51,29 @@ pub fn create_http_client_long_timeout() -> reqwest::Client {
         .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .unwrap_or_else(|_| reqwest::Client::new())
+}
+
+/// Attach feature usage JWT when present (metered API calls).
+pub fn apply_feature_usage_header(app: &AppHandle, builder: RequestBuilder) -> RequestBuilder {
+    if let Some(jwt) = crate::commands::feature_usage_store::get_feature_usage(app) {
+        builder.header(FEATURE_USAGE_HEADER, jwt)
+    } else {
+        builder
+    }
+}
+
+/// Persist refreshed feature usage JWT from a metered API response header.
+pub fn capture_feature_usage_header(app: &AppHandle, response: &reqwest::Response) {
+    if let Some(jwt) = response
+        .headers()
+        .get(FEATURE_USAGE_HEADER)
+        .and_then(|v| v.to_str().ok())
+    {
+        if !jwt.is_empty() {
+            if let Err(e) = crate::commands::feature_usage_store::save_feature_usage(app, jwt)
+            {
+                eprintln!("⚠️  Failed to save feature usage JWT: {}", e);
+            }
+        }
+    }
 }

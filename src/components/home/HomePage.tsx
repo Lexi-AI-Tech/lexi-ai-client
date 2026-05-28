@@ -35,7 +35,7 @@ interface FeatureUsageEntry {
   metered: boolean;
 }
 
-interface BillingUsageResponse {
+interface FeatureUsageResponse {
   plan_type: string;
   period_start: string;
   period_end: string;
@@ -283,7 +283,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [actionsLoading, setActionsLoading] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(
+  const [featureUsage, setFeatureUsage] = useState<FeatureUsageResponse | null>(
     null,
   );
   const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
@@ -291,13 +291,13 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [recentActions, setRecentActions] = useState<ActionHistory[]>([]);
 
   // Data fetching
-  const fetchBillingUsage = useCallback(async () => {
+  const fetchFeatureUsage = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      setBillingUsage(await invoke<BillingUsageResponse>("get_billing_usage"));
+      setFeatureUsage(await invoke<FeatureUsageResponse>("get_feature_usage"));
     } catch (err) {
-      console.error("Failed to fetch billing usage:", err);
-      setBillingUsage(null);
+      console.error("Failed to fetch feature usage:", err);
+      setFeatureUsage(null);
     }
   }, [isAuthenticated]);
 
@@ -305,13 +305,13 @@ export const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     if (!isAuthenticated) return;
     const onPlanUpdated = () => {
-      void fetchBillingUsage();
+      void fetchFeatureUsage();
     };
     window.addEventListener("lexi:plan-updated", onPlanUpdated);
     return () => {
       window.removeEventListener("lexi:plan-updated", onPlanUpdated);
     };
-  }, [fetchBillingUsage, isAuthenticated]);
+  }, [fetchFeatureUsage, isAuthenticated]);
 
   const fetchRecentTranscripts = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -371,14 +371,14 @@ export const HomePage: React.FC<HomePageProps> = ({
       }
       refreshTimeoutRef.current = window.setTimeout(() => {
         refreshTimeoutRef.current = null;
-        if (kinds.includes("billing")) void fetchBillingUsage();
+        if (kinds.includes("billing")) void fetchFeatureUsage();
         if (kinds.includes("transcripts")) void fetchRecentTranscripts();
         if (kinds.includes("actions")) void fetchRecentActions();
         if (kinds.includes("meetings")) void fetchMeetings();
       }, 200);
     },
     [
-      fetchBillingUsage,
+      fetchFeatureUsage,
       fetchMeetings,
       fetchRecentActions,
       fetchRecentTranscripts,
@@ -443,7 +443,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     setBillingLoading(true);
     (async () => {
       try {
-        await fetchBillingUsage();
+        await fetchFeatureUsage();
       } finally {
         if (!c) setBillingLoading(false);
       }
@@ -451,7 +451,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     return () => {
       c = true;
     };
-  }, [isAuthenticated, fetchBillingUsage]);
+  }, [isAuthenticated, fetchFeatureUsage]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -514,10 +514,10 @@ export const HomePage: React.FC<HomePageProps> = ({
   const userName = user?.name?.split(" ")[0] || "there";
   const planUsageRows = useMemo(
     () =>
-      billingUsage?.features
-        ? sortPlanUsageFeatures(billingUsage.features)
+      featureUsage?.features
+        ? sortPlanUsageFeatures(featureUsage.features)
         : [],
-    [billingUsage],
+    [featureUsage],
   );
 
   const recentTranscriptsSorted = useMemo(
@@ -554,9 +554,9 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   const showUpgradeCta =
     isAuthenticated &&
-    billingUsage &&
+    featureUsage &&
     !billingLoading &&
-    !isProPlan(billingUsage.plan_type);
+    !isProPlan(featureUsage.plan_type);
 
   return (
     <motion.div
@@ -792,25 +792,25 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         {/* Right: Plan Usage */}
         <motion.section
-          className={`billing-usage-section${billingUsage && isProPlan(billingUsage.plan_type) ? " is-pro-plan" : ""}`}
+          className={`billing-usage-section${featureUsage && isProPlan(featureUsage.plan_type) ? " is-pro-plan" : ""}`}
           variants={itemVariants}
         >
           <div className="section-header">
             <div>
               <h2 className="section-title">Plan Usage</h2>
-              {billingUsage && (
+              {featureUsage && (
                 <div className="billing-usage-meta">
                   <span
-                    className={`billing-plan-badge${isProPlan(billingUsage.plan_type) ? " is-pro" : ""}`}
+                    className={`billing-plan-badge${isProPlan(featureUsage.plan_type) ? " is-pro" : ""}`}
                   >
-                    {isProPlan(billingUsage.plan_type) && (
+                    {isProPlan(featureUsage.plan_type) && (
                       <Zap size={10} fill="#ffffff" color="#ffffff" />
                     )}
-                    {billingUsage.plan_type}
+                    {featureUsage.plan_type}
                   </span>
-                  {!isProPlan(billingUsage.plan_type) && (
+                  {!isProPlan(featureUsage.plan_type) && (
                     <BillingResetCountdown
-                      periodEndIso={billingUsage.period_end}
+                      periodEndIso={featureUsage.period_end}
                     />
                   )}
                 </div>
@@ -845,7 +845,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </div>
               ))}
             </div>
-          ) : billingUsage && planUsageRows.length > 0 ? (
+          ) : featureUsage && planUsageRows.length > 0 ? (
             <ul className="billing-feature-list">
               {planUsageRows.map((feature) => {
                 const limit = feature.limit_value;
