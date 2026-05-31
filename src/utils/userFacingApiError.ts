@@ -6,7 +6,7 @@
 export const USAGE_QUOTA_EXCEEDED_MESSAGE =
   "You've reached your usage limit for this billing period. Upgrade your plan or try again when your quota resets.";
 
-/** Server returns HTTP 403 with `detail: "usage_quota_exceeded"` (see BillingService.enforce_feature). */
+/** Server returns HTTP 403 with `detail: "usage_quota_exceeded"` (see BillingService.enforce_from_token / enforce_from_database). */
 export const USAGE_QUOTA_EXCEEDED_DETAIL = "usage_quota_exceeded";
 
 /** True when the error text includes the server usage-quota token (403 + this detail, not other 403s). */
