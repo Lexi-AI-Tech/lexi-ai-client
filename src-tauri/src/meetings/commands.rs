@@ -78,13 +78,18 @@ pub async fn create_meeting(
 
     utils::log_api_request("POST", &url);
 
-    let response = client
+    let mut request = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
-        .json(&payload)
+        .json(&payload);
+    request = crate::utils::apply_feature_usage_header(&app, request);
+
+    let response = request
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
+
+    crate::utils::capture_feature_usage_header(&app, &response);
 
     if !response.status().is_success() {
         let status = response.status();
