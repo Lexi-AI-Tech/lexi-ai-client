@@ -14,6 +14,7 @@ pub mod hotkey;
 pub mod notes;
 pub mod onboarding;
 pub mod rooms;
+pub mod session_refresh;
 pub mod shortcuts;
 pub mod text;
 pub mod utils;

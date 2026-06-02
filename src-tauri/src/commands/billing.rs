@@ -27,11 +27,16 @@ pub struct FeatureUsageResponse {
     pub feature_usage: Option<String>,
 }
 
-async fn fetch_feature_usage_period(app: &AppHandle) -> Result<FeatureUsageResponse, String> {
+async fn fetch_feature_usage_period(
+    app: &AppHandle,
+    emit_auth_expired_on_failure: bool,
+) -> Result<FeatureUsageResponse, String> {
     let auth_token = match get_auth_token_async(app).await {
         Ok(token) => token,
         Err(_) => {
-            crate::commands::auth::handle_auth_expired(app);
+            if emit_auth_expired_on_failure {
+                crate::commands::auth::handle_auth_expired(app);
+            }
             return Err("Authentication required".to_string());
         }
     };
@@ -77,7 +82,14 @@ fn persist_feature_usage_from_response(app: &AppHandle, usage: &FeatureUsageResp
 
 /// Fetch feature usage from cloud and persist the signed JWT locally.
 pub(crate) async fn hydrate_feature_usage_from_cloud(app: &AppHandle) -> Result<(), String> {
-    let usage = fetch_feature_usage_period(app).await?;
+    hydrate_feature_usage_from_cloud_quiet(app).await
+}
+
+/// Same as [`hydrate_feature_usage_from_cloud`] but does not emit `auth_expired` (background use).
+pub(crate) async fn hydrate_feature_usage_from_cloud_quiet(
+    app: &AppHandle,
+) -> Result<(), String> {
+    let usage = fetch_feature_usage_period(app, false).await?;
     persist_feature_usage_from_response(app, &usage);
     Ok(())
 }
@@ -85,7 +97,7 @@ pub(crate) async fn hydrate_feature_usage_from_cloud(app: &AppHandle) -> Result<
 /// GET /api/v1/billing/usage — current period window and per-feature usage.
 #[tauri::command]
 pub async fn get_feature_usage(app: AppHandle) -> Result<FeatureUsageResponse, String> {
-    let usage = fetch_feature_usage_period(&app).await?;
+    let usage = fetch_feature_usage_period(&app, true).await?;
     persist_feature_usage_from_response(&app, &usage);
     Ok(usage)
 }

@@ -117,8 +117,8 @@ use commands::billing::{
     cancel_billing_subscription, create_billing_checkout, get_current_subscription,
     get_feature_usage,
 };
-use commands::billing::hydrate_feature_usage_from_cloud;
 use commands::cache::user_cache_warmup;
+use commands::session_refresh::{spawn_session_refresh, start_session_refresh_scheduler, SessionRefreshReason};
 use docs::commands::{
     create_doc, create_doc_from_meeting, delete_doc, get_doc, get_docs, start_doc_recording,
     stop_doc_recording, update_doc,
@@ -505,20 +505,13 @@ pub fn main() {
                 show_and_focus_main_window(&app_handle_clone);
             });
 
-            // Refresh auth token on app startup (background task)
-            // This ensures tokens are fresh before the user interacts with the app
-            let app_handle_for_auth = app_handle.clone();
+            // JWT + feature-usage refresh (startup, periodic, foreground) — Rust-side, non-blocking.
+            let app_handle_for_session_refresh = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                use commands::auth::get_auth_token_async;
-                println!("🔑 Checking auth token on startup...");
-                match get_auth_token_async(&app_handle_for_auth).await {
-                    Ok(_) => println!("✅ Auth token valid on startup"),
-                    Err(_) => println!("ℹ️  No valid auth token - user needs to login"),
-                }
+                start_session_refresh_scheduler(app_handle_for_session_refresh).await;
             });
 
-            // Periodic user cache warmup (server-side caches) — runs in Rust so it keeps
-            // working even if the WebView throttles timers while app is backgrounded.
+            // Periodic AI memory cache warmup — runs in Rust while app is backgrounded.
             let app_handle_for_cache_warmup = app_handle.clone();
             tauri::async_runtime::spawn(async move {
                 commands::cache::start_user_cache_warmup_scheduler(app_handle_for_cache_warmup)
@@ -586,15 +579,6 @@ pub fn main() {
                 }
             });
 
-            let app_handle_for_billing = app_handle.clone();
-            tauri::async_runtime::spawn(async move {
-                println!("🔄 Background task: Hydrating feature usage from cloud...");
-                if let Err(e) = hydrate_feature_usage_from_cloud(&app_handle_for_billing).await
-                {
-                    println!("⚠️  Feature usage hydration unavailable on startup: {}", e);
-                }
-            });
-
             // Defer starting the key listener until the frontend calls start_global_key_listener
             // after onboarding is complete so the listener is not started during first-run setup.
             app.manage(KeyListenerStartupState {
@@ -643,6 +627,8 @@ pub fn main() {
                 tauri::WindowEvent::Focused(focused) => {
                     if window.label() == "main" && *focused {
                         println!("🔍 Main window received focus event");
+                        let app = window.app_handle().clone();
+                        spawn_session_refresh(app, SessionRefreshReason::Foreground);
                         let is_visible = window.is_visible().unwrap_or(false);
                         if !is_visible {
                             show_and_focus_main_window(window.app_handle());
@@ -676,18 +662,20 @@ pub fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            #[cfg(target_os = "macos")]
-            if let RunEvent::Reopen { has_visible_windows, .. } = event {
-                println!(
-                    "🍎 RunEvent::Reopen triggered (has_visible_windows: {})",
-                    has_visible_windows
-                );
-                show_and_focus_main_window(app_handle);
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                let _ = app_handle;
-                let _ = event;
+            match event {
+                #[cfg(target_os = "macos")]
+                RunEvent::Reopen { has_visible_windows, .. } => {
+                    println!(
+                        "🍎 RunEvent::Reopen triggered (has_visible_windows: {})",
+                        has_visible_windows
+                    );
+                    spawn_session_refresh(
+                        app_handle.clone(),
+                        SessionRefreshReason::Foreground,
+                    );
+                    show_and_focus_main_window(app_handle);
+                }
+                _ => {}
             }
         });
 }
