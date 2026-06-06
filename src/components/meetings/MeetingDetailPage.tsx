@@ -631,22 +631,42 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     suggestedQuestions.length === 0 &&
     !isLoadingSuggestedQuestions;
 
+  const starterQuestions = useMemo(() => {
+    if (isLoadingSuggestedQuestions || noSuggestedQuestionsFromServer) {
+      return [];
+    }
+    const pool =
+      suggestedQuestions && suggestedQuestions.length > 0
+        ? suggestedQuestions
+        : DEFAULT_SUGGESTED_QUESTIONS;
+    return pool.slice(0, 4);
+  }, [
+    suggestedQuestions,
+    isLoadingSuggestedQuestions,
+    noSuggestedQuestionsFromServer,
+  ]);
+
+  const showChatStarters =
+    chatMessages.length === 0 &&
+    !isSendingChat &&
+    (isLoadingSuggestedQuestions || starterQuestions.length > 0);
+
   const chatInputForm = (
     <form
       onSubmit={handleSendChatMessage}
-      className="meeting-detail-rail__form"
+      className="meeting-detail-chat__form"
     >
       <input
         type="text"
-        className="meeting-detail-rail__input"
+        className="meeting-detail-chat__input"
         value={chatInput}
         onChange={(e) => setChatInput(e.target.value)}
-        placeholder="Ask a question..."
+        placeholder="Ask about this meeting…"
         disabled={isSendingChat || isThisMeetingRecording}
       />
       <button
         type="submit"
-        className="meeting-detail-btn meeting-detail-btn--primary meeting-detail-rail__submit"
+        className="meeting-detail-btn meeting-detail-btn--primary meeting-detail-chat__submit"
         disabled={isSendingChat || !chatInput.trim() || isThisMeetingRecording}
       >
         Send
@@ -655,101 +675,77 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   );
 
   const qaPanelContent = (
-    <div className="meeting-detail-qa-full">
-      <div className="meeting-detail-qa-full__header">
-        <div className="meeting-detail-qa-full__title-block">
-          <h3 className="meeting-detail-qa-full__title">
-            <MessageCircle
-              size={14}
-              className="meeting-detail-qa-full__title-icon"
-              aria-hidden
-            />
-            Q&A
-          </h3>
-          <p className="meeting-detail-qa-full__hint">
-            Ask about this meeting. Use suggested questions or type your own.
-          </p>
-        </div>
-      </div>
-      <div className="meeting-detail-rail meeting-detail-qa-full__body">
-        <div className="meeting-detail-rail__section">
-          <div className="meeting-detail-rail__section-title">
-            Suggested questions
-          </div>
-          {isLoadingSuggestedQuestions ? (
-            <p className="meeting-detail-rail__suggestions-loading">
-              <span
-                className="skeleton-block app-page-subtitle-skeleton"
-                style={{
-                  width: 170,
-                  height: 12,
-                  borderRadius: 10,
-                }}
-              />
-            </p>
-          ) : noSuggestedQuestionsFromServer ? (
-            <p className="meeting-detail-rail__suggestions-empty">
-              Could not suggest questions due to missing transcripts. Add a
-              transcript by recording or capturing this meeting.
-            </p>
-          ) : (
-            (suggestedQuestions && suggestedQuestions.length > 0
-              ? suggestedQuestions
-              : DEFAULT_SUGGESTED_QUESTIONS
-            ).map((q) => (
-              <button
-                key={q}
-                type="button"
-                className="meeting-detail-rail__chip"
-                onClick={() => handleSendChatMessage(undefined, q)}
-                disabled={
-                  !activeSummary || isSendingChat || isThisMeetingRecording
-                }
-              >
-                {q}
-              </button>
-            ))
-          )}
-        </div>
-        <div className="meeting-detail-rail__section meeting-detail-rail__section--conversation">
-          <div className="meeting-detail-rail__section-title">Conversation</div>
-          {chatMessages.length === 0 && !isSendingChat ? (
-            <div className="meeting-detail-rail__empty-with-form">
-              <p className="meeting-detail-rail__empty">
-                Your questions and answers appear here.
-              </p>
-              {chatInputForm}
+    <div className="meeting-detail-chat">
+      <div ref={chatScrollRef} className="meeting-detail-chat__messages">
+        {chatMessages.length === 0 && !isSendingChat ? (
+          <div className="meeting-detail-chat__empty">
+            <div className="meeting-detail-chat__empty-icon" aria-hidden>
+              <MessageCircle size={22} strokeWidth={1.75} />
             </div>
-          ) : (
-            <>
-              <div
-                ref={chatScrollRef}
-                className="meeting-detail-rail__messages"
-              >
-                {chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`meeting-detail-rail__msg meeting-detail-rail__msg--${msg.role}`}
-                  >
-                    <div className="meeting-detail-rail__msg-body">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    </div>
-                  </div>
-                ))}
-                {isSendingChat && (
-                  <div className="meeting-detail-rail__msg meeting-detail-rail__msg--assistant meeting-detail-rail__msg--loading">
-                    <span
-                      className="meeting-detail-rail__loading-spinner"
-                      aria-hidden
-                    />
-                  </div>
-                )}
+            <p className="meeting-detail-chat__empty-title">
+              Ask anything about this meeting
+            </p>
+            <p className="meeting-detail-chat__empty-hint">
+              Answers are based on your summary and transcript.
+            </p>
+            {showChatStarters && (
+              <div className="meeting-detail-chat__starters">
+                <span className="meeting-detail-chat__starters-label">
+                  {isLoadingSuggestedQuestions ? "Loading ideas…" : "Try asking"}
+                </span>
+                <div className="meeting-detail-chat__starters-chips">
+                  {isLoadingSuggestedQuestions
+                    ? [0, 1, 2].map((i) => (
+                        <span
+                          key={i}
+                          className="meeting-detail-chat__starter-skeleton skeleton-block app-page-subtitle-skeleton"
+                          aria-hidden
+                        />
+                      ))
+                    : starterQuestions.map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          className="meeting-detail-chat__starter-chip"
+                          onClick={() => handleSendChatMessage(undefined, q)}
+                          disabled={
+                            !activeSummary ||
+                            isSendingChat ||
+                            isThisMeetingRecording
+                          }
+                          title={q}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                </div>
               </div>
-              {chatInputForm}
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {chatMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`meeting-detail-chat__msg meeting-detail-chat__msg--${msg.role}`}
+              >
+                <div className="meeting-detail-chat__msg-body">
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
+              </div>
+            ))}
+            {isSendingChat && (
+              <div className="meeting-detail-chat__msg meeting-detail-chat__msg--assistant meeting-detail-chat__msg--loading">
+                <span
+                  className="meeting-detail-chat__loading-spinner"
+                  aria-hidden
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
+      <div className="meeting-detail-chat__composer">{chatInputForm}</div>
     </div>
   );
 
