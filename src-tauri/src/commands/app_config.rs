@@ -1,11 +1,7 @@
 //! Application Configuration Module
 //!
-//! This module provides unified commands for managing application configuration.
-//! Configuration is fetched from the server and synced with OS-level settings (autostart).
-//!
-//! ## Unified Commands
-//! - `get_app_config` - Get complete app configuration
-//! - `update_app_config` - Update app configuration (automatically syncs autostart and cloud)
+//! Cloud DB is the durable source of truth; the local Tauri Store is the runtime source.
+//! Settings updates go cloud-first; local store is updated only after a successful response.
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -17,6 +13,8 @@ use crate::commands::shortcuts::Shortcut;
 use crate::state::{ActionHotkeyWatchState, HotkeyWatchState, OnboardingRecordingDryRun};
 use crate::utils;
 use std::sync::atomic::Ordering;
+
+use crate::commands::app_config_store::{load_local_config, save_local_config};
 
 /// Application configuration structure
 ///
@@ -42,13 +40,6 @@ pub struct AppConfig {
     pub shortcuts: Option<Vec<Shortcut>>,
 }
 
-// ============================================================================
-// App Configuration Storage Commands
-//
-// These commands provide access to the configuration.
-// They handle fetching from server and syncing.
-// ============================================================================
-
 /// Server response structure for app config
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ServerAppConfigResponse {
@@ -70,35 +61,56 @@ pub struct DefaultHotkeysResponse {
     pub action_hotkeys: Vec<String>,
 }
 
-/// Get the complete app configuration from server
-///
-/// Always attempts to fetch fresh config from server.
-/// Syncs autostart status from OS-level settings.
+/// Fetches app config from the Tauri store and returns it.
+pub fn load_app_config(app: &AppHandle) -> Result<AppConfig, String> {
+    load_local_config(app).ok_or_else(|| {
+        "App configuration not loaded. Please wait for settings to sync.".to_string()
+    })
+}
+
+/// Primary language from local store (meetings WebSocket, rooms).
+pub fn get_primary_language_from_store(app: &AppHandle) -> String {
+    load_local_config(app)
+        .and_then(|c| c.languages)
+        .and_then(|langs| langs.first().cloned())
+        .unwrap_or_else(|| "auto".to_string())
+}
+
+/// Return config from local store; hydrate from cloud if missing.
 #[tauri::command]
 pub async fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
-    println!("🔄 Fetching app config from server...");
+    if let Some(config) = load_local_config(&app) {
+        return Ok(config);
+    }
 
-    let mut config = fetch_config_from_server(&app).await.map_err(|e| {
-        println!("⚠️  Failed to fetch from server: {}", e);
-        e
-    })?;
+    hydrate_app_config_from_cloud(&app).await
+}
 
-    println!(
-        "✅ Fetched config from server with hotkeys: {:?}",
-        config.hotkeys
-    );
+/// Fetch latest config from cloud, persist locally, and apply OS/hotkey side effects.
+#[tauri::command]
+pub async fn refresh_app_config(app: AppHandle) -> Result<AppConfig, String> {
+    hydrate_app_config_from_cloud(&app).await
+}
 
-    // Sync launch_on_system_startup with actual OS autostart status
-    // This will enable autostart if config has launch_on_system_startup: Some(true) or None (defaults to true)
-    sync_autostart_status(&app, &mut config);
+/// Startup/login hydration: cloud GET → local store → OS sync.
+pub async fn hydrate_app_config_from_cloud(app: &AppHandle) -> Result<AppConfig, String> {
+    println!("🔄 Hydrating app config from cloud...");
 
-    // Sync dock icon status based on config
-    sync_dock_icon_status(&app, &config);
-
-    // Update in-memory state for hotkeys
-    update_hotkey_state(&app, &config);
-
-    Ok(config)
+    match fetch_config_from_server(app).await {
+        Ok(config) => {
+            let config = apply_config_side_effects(app, config, true)?;
+            println!("✅ App config hydrated with hotkeys: {:?}", config.hotkeys);
+            Ok(config)
+        }
+        Err(e) => {
+            println!("⚠️  Failed to fetch from cloud: {}", e);
+            if let Some(local) = load_local_config(app) {
+                println!("📦 Using cached local app config");
+                return Ok(apply_config_side_effects(app, local, false)?);
+            }
+            Err(e)
+        }
+    }
 }
 
 /// Get server-defined default hotkeys (used by "Reset to defaults").
@@ -203,35 +215,42 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
     Ok(config)
 }
 
-/// Update the app configuration and sync with cloud API
-///
-/// Merges the provided config with existing config (partial updates supported).
-/// Pushes to cloud, then re-fetches the updated config and syncs OS/hotkey state from it.
+/// Cloud-first update: merge with local → PUT → persist response locally.
 #[tauri::command]
 pub async fn update_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
-    // Fetch current to merge properly
-    let mut current_config = fetch_config_from_server(&app).await?;
-
-    // Merge provided config with current config
+    let mut current_config = load_local_config(&app).unwrap_or_default();
     merge_config(&mut current_config, config);
 
-    println!("✅ App config updated in memory");
-
-    // Sync to cloud first. If the server rejects it (e.g. invalid hotkeys), this will error and abort the update.
-    sync_config_to_cloud(&app, &current_config).await?;
-
-    // Re-fetch from server to get the updated config (source of truth), then sync status from it
-    let mut updated_config = fetch_config_from_server(&app).await?;
-    sync_autostart_status(&app, &mut updated_config);
-    sync_dock_icon_status(&app, &updated_config);
-    update_hotkey_state(&app, &updated_config);
-
-    Ok(updated_config)
+    let updated_config = sync_config_to_cloud(&app, &current_config).await?;
+    apply_config_side_effects(&app, updated_config, true)
 }
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
+/// Merge shortcuts into the local store after shortcuts CRUD API calls.
+pub fn merge_shortcuts_into_local_store(
+    app: &AppHandle,
+    shortcuts: Vec<Shortcut>,
+) -> Result<(), String> {
+    let mut config = load_local_config(app).unwrap_or_default();
+    config.shortcuts = Some(shortcuts);
+    apply_config_side_effects(app, config, true)?;
+    Ok(())
+}
+
+fn apply_config_side_effects(
+    app: &AppHandle,
+    mut config: AppConfig,
+    persist: bool,
+) -> Result<AppConfig, String> {
+    sync_autostart_status(app, &mut config);
+    sync_dock_icon_status(app, &config);
+    update_hotkey_state(app, &config);
+
+    if persist {
+        save_local_config(app, &config)?;
+    }
+
+    Ok(config)
+}
 
 /// Sync autostart status from OS to config
 /// Sync launch_on_system_startup with actual OS autostart status
@@ -286,7 +305,10 @@ pub(crate) fn sync_dock_icon_status(app: &AppHandle, config: &AppConfig) {
             eprintln!("⚠️ Failed to set_skip_taskbar on main window: {}", e);
         }
     }
-    println!("✅ Synced: taskbar icon (main window) shown = {}", show_icon);
+    println!(
+        "✅ Synced: taskbar icon (main window) shown = {}",
+        show_icon
+    );
 }
 
 #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
@@ -430,15 +452,10 @@ fn build_request_body(config: &AppConfig) -> serde_json::Map<String, serde_json:
     body
 }
 
-/// Sync app configuration to cloud API (best-effort, failures are logged)
-async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
-    let auth_token = match get_auth_token_async(app).await {
-        Ok(token) => token,
-        Err(_) => {
-            println!("⚠️  No auth token available, skipping cloud sync");
-            return Ok(());
-        }
-    };
+async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<AppConfig, String> {
+    let auth_token = get_auth_token_async(app)
+        .await
+        .map_err(|_| "Please sign in to sync your settings".to_string())?;
 
     let client = crate::utils::create_http_client();
     let url = app_config::update_url();
@@ -446,37 +463,30 @@ async fn sync_config_to_cloud(app: &AppHandle, config: &AppConfig) -> Result<(),
 
     utils::log_api_request("PUT", &url);
 
-    match client
+    let response = client
         .put(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
         .header("Content-Type", "application/json")
         .json(&request_body)
         .send()
         .await
-    {
-        Ok(response) => {
-            let status = response.status();
-            if status.is_success() {
-                println!("✅ App config synced to cloud successfully");
-                Ok(())
-            } else {
-                let json_value: serde_json::Value = response
-                    .json()
-                    .await
-                    .unwrap_or_else(|_| serde_json::json!({}));
-                let error_msg = extract_error_message(&json_value, status);
-                eprintln!(
-                    "⚠️  Failed to sync app config to cloud ({}): {}",
-                    status, error_msg
-                );
-                Err(error_msg)
-            }
-        }
-        Err(e) => {
-            eprintln!("⚠️  Failed to sync app config to cloud: {}", e);
-            Err(format!("Network error: {}", e))
-        }
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let json_value: serde_json::Value = response
+            .json()
+            .await
+            .unwrap_or_else(|_| serde_json::json!({}));
+        let error_msg = extract_error_message(&json_value, status);
+        return Err(error_msg);
     }
+
+    let server_response: ServerAppConfigResponse = response.json().await.map_err(|_| {
+        "Received invalid settings format from server. Please try again.".to_string()
+    })?;
+
+    Ok(server_response_to_app_config(server_response))
 }
 
 /// Fallback when server default-hotkeys API is unavailable.
@@ -492,7 +502,7 @@ fn local_onboarding_hotkey_fallback() -> DefaultHotkeysResponse {
     {
         DefaultHotkeysResponse {
             hotkeys: vec!["Control+Windows".to_string()],
-            action_hotkeys: vec!["Control+Alt+Windows".to_string()],
+            action_hotkeys: vec!["Control+Alt".to_string()],
         }
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]

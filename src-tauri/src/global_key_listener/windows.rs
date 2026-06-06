@@ -13,19 +13,19 @@ use tokio::sync::watch;
 use super::{key_to_string, HotkeyCommandResult, Key, KeyStateTracker};
 
 use winapi::shared::minwindef::{LPARAM, LRESULT, WPARAM};
-use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::debugapi::OutputDebugStringW;
+use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::winuser::{
-    CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-    GetAsyncKeyState, KBDLLHOOKSTRUCT, MSG, PeekMessageW, VK_LMENU, VK_LWIN, VK_MENU, VK_RMENU,
-    VK_RWIN, VK_SHIFT, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
-    PM_NOREMOVE,
+    CallNextHookEx, DispatchMessageW, GetAsyncKeyState, GetMessageW, PeekMessageW,
+    SetWindowsHookExW, UnhookWindowsHookEx, KBDLLHOOKSTRUCT, MSG, PM_NOREMOVE, VK_LMENU, VK_LWIN,
+    VK_MENU, VK_RMENU, VK_RWIN, VK_SHIFT, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN,
+    WM_SYSKEYUP,
 };
 
 use lazy_static::lazy_static;
-use std::ptr::null_mut;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
+use std::ptr::null_mut;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -325,12 +325,8 @@ fn process_key_event(vk_code: u32, is_press: bool) {
                 let recording_hotkeys = state.context.config_rx.borrow().clone();
                 let action_hotkeys = state.context.action_hotkey_rx.borrow().clone();
 
-                let cmds = tracker.process_events(
-                    &action_hotkeys,
-                    &recording_hotkeys,
-                    &key_str,
-                    is_press,
-                );
+                let cmds =
+                    tracker.process_events(&action_hotkeys, &recording_hotkeys, &key_str, is_press);
 
                 for cmd in cmds {
                     match cmd {
@@ -398,8 +394,9 @@ fn start_polling_fallback_thread() {
 
             // Modifiers: OR all variants into a single canonical state.
             let control_down = is_vk_down(0x11) || is_vk_down(0xA2) || is_vk_down(0xA3);
-            let option_down =
-                is_vk_down(VK_MENU as i32) || is_vk_down(VK_LMENU as i32) || is_vk_down(VK_RMENU as i32);
+            let option_down = is_vk_down(VK_MENU as i32)
+                || is_vk_down(VK_LMENU as i32)
+                || is_vk_down(VK_RMENU as i32);
             let shift_down = is_vk_down(VK_SHIFT as i32);
             let windows_down = is_vk_down(VK_LWIN as i32) || is_vk_down(VK_RWIN as i32);
 

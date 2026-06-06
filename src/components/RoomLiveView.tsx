@@ -1,444 +1,159 @@
 /**
  * RoomLiveView Component
  *
- * Handles the live meeting experience:
- * - WebSocket connection to server for real-time transcription
- * - Audio capture via Tauri command
- * - Displaying transcripts with speaker labels
+ * Displays a live room transcription stream and basic controls.
  */
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Room, RoomTranscriptSegment } from "../types";
-import { SpeakerNamingModal } from "./SpeakerNamingModal";
+import type { Room } from "../types";
 import { useToast } from "./toast/useToast";
-import { PageLoader } from "./ui/PageLoader";
-import { formatLocaleTimeWithSeconds } from "../lib/dateUtils";
+import { SpeakerNamingModal } from "./SpeakerNamingModal";
 
 interface RoomLiveViewProps {
   roomId: string;
   onBack: () => void;
 }
 
-interface StreamingTranscript {
-  start_time?: string;
-  end_time?: string;
-  text: string;
-  speaker_id?: number;
-}
+type TranscriptMsg = {
+  type: string;
+  text?: string | null;
+  speaker_id?: number | null;
+  message_type?: string | null;
+};
 
-export const RoomLiveView: React.FC<RoomLiveViewProps> = ({
-  roomId,
-  onBack,
-}) => {
+export const RoomLiveView: React.FC<RoomLiveViewProps> = ({ roomId, onBack }) => {
   const toast = useToast();
   const [room, setRoom] = useState<Room | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isRecording, setIsRecording] = useState(false);
-  const [liveTranscript, setLiveTranscript] =
-    useState<StreamingTranscript | null>(null);
-  const [segments, setSegments] = useState<RoomTranscriptSegment[]>([]);
-  const [showSpeakerNaming, setShowSpeakerNaming] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [liveTranscripts, setLiveTranscripts] = useState<TranscriptMsg[]>([]);
+  const [showSpeakerModal, setShowSpeakerModal] = useState(false);
 
-  // Refs for cleanup
-  const transcriptUnlistenRef = useRef<(() => void) | null>(null);
-  const errorUnlistenRef = useRef<(() => void) | null>(null);
+  const speakerMap = useMemo(() => (room?.speaker_map as any) || {}, [room?.speaker_map]);
 
-  // Load initial room data
-  useEffect(() => {
-    fetchRoomDetails();
-    return () => {
-      stopRecording(); // Cleanup on unmount
-    };
-  }, [roomId]);
-
-  // Auto-scroll
-  // Auto-scroll and debug logs
-  const segmentsRef = useRef<RoomTranscriptSegment[]>([]);
-  useEffect(() => {
-    segmentsRef.current = segments;
-    console.log(
-      `🔄 UI Update: ${segments.length} segments, Live: ${liveTranscript ? "Yes" : "No"}`,
-    );
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [segments, liveTranscript]);
-
-  const isRecordingRef = useRef(false);
-
-  // Update ref when state changes
-  useEffect(() => {
-    isRecordingRef.current = isRecording;
-  }, [isRecording]);
-
-  const fetchRoomDetails = async () => {
-    console.log("📡 Fetching room details...");
+  const load = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const data = await invoke<Room>("get_room_details", { roomId });
-      console.log(
-        `📡 Fetched details. Transcripts in DB: ${data.transcripts?.length ?? 0}, Local: ${segmentsRef.current.length}`,
-      );
       setRoom(data);
-      if (data.transcripts) {
-        // Sort by start_time just in case
-        const sorted = [...data.transcripts].sort(
-          (a, b) =>
-            new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
-        );
-
-        // Safety Check 1: Recording Active?
-        if (isRecordingRef.current) {
-          console.log("⚠️ Skipping DB update - Recording active");
-          return;
-        }
-
-        // Safety Check 2: DB Empty but Local Has Data? (Prevent Wipe)
-        if (sorted.length === 0 && segmentsRef.current.length > 0) {
-          console.log(
-            "⚠️ Skipping DB update - DB empty but local has segments (DB lag?)",
-          );
-          return;
-        }
-
-        setSegments(sorted);
-      }
-    } catch (err) {
-      console.error("Failed to load room:", err);
-      toast.error("Failed to load this room. Please try again.");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Failed to load room");
     } finally {
       setLoading(false);
     }
   };
 
-  const stopRecording = async () => {
-    // Stop Rust recording (handles WebSocket cleanup and room finalization)
-    if (isRecording) {
-      try {
-        await invoke("stop_room_recording_and_process", { roomId });
-      } catch (e) {
-        console.error("Error stopping recording:", e);
-        toast.error("Failed to stop recording. Please try again.");
-      }
-    }
+  useEffect(() => {
+    load();
+  }, [roomId]);
 
-    // Unlisten Tauri events
-    if (transcriptUnlistenRef.current) {
-      transcriptUnlistenRef.current();
-      transcriptUnlistenRef.current = null;
-    }
-    if (errorUnlistenRef.current) {
-      errorUnlistenRef.current();
-      errorUnlistenRef.current = null;
-    }
+  useEffect(() => {
+    let unlistenTranscript: (() => void) | null = null;
+    let unlistenError: (() => void) | null = null;
+    let unlistenStarted: (() => void) | null = null;
+    let unlistenStopped: (() => void) | null = null;
 
-    setIsRecording(false);
-    setLiveTranscript(null);
-    console.log("🛑 Stopping recording and preserving local segments...");
+    (async () => {
+      unlistenTranscript = await listen<TranscriptMsg>("room-transcript", (e) => {
+        setLiveTranscripts((prev) => [...prev, e.payload]);
+      });
+      unlistenError = await listen<string>("room-websocket-error", (e) => {
+        toast.error(e.payload || "Room stream error");
+      });
+      unlistenStarted = await listen("room-recording-started", () => setRecording(true));
+      unlistenStopped = await listen("room-recording-stopped", () => setRecording(false));
+    })();
 
-    // Do NOT fetch room details here immediately.
-    // The DB writes are async and likely not ready. Fetching now would overwrite our valid live segments with empty DB data.
-    // relying on local state for immediate feedback.
+    return () => {
+      unlistenTranscript?.();
+      unlistenError?.();
+      unlistenStarted?.();
+      unlistenStopped?.();
+    };
+  }, [toast]);
 
-    // Show speaker naming modal if there are transcripts
-    if (segments.length > 0) {
-      setShowSpeakerNaming(true);
-    }
-  };
-
-  const startRecording = async () => {
-    if (isRecording) return;
-
+  const start = async () => {
     try {
-      // 1. Setup listeners FIRST before triggering the backend action
-      // This prevents race conditions where backend emits events before frontend is listneing
-      console.log("🎧 Setting up 'room-transcript' event listener...");
-
-      // Clear existing listener if any
-      if (transcriptUnlistenRef.current) {
-        transcriptUnlistenRef.current();
-        transcriptUnlistenRef.current = null;
-      }
-
-      transcriptUnlistenRef.current = await listen<any>(
-        "room-transcript",
-        (event) => {
-          console.log("📥 Received transcript event from Tauri:", event);
-          const data = event.payload;
-
-          // Debug payload structure
-          if (!data) {
-            console.error("❌ Received null/undefined payload");
-            return;
-          }
-
-          // Robust validation
-          // Check type match
-          const isTranscript = data.type === "transcript";
-          // Check text exists (allow empty string technically, but usually we want content)
-          const hasText = typeof data.text === "string";
-          // Check speaker exists (handle 0, null, undefined)
-          // Note: We accept null/undefined speaker and default to 0
-
-          if (isTranscript && hasText) {
-            const newSegment: RoomTranscriptSegment = {
-              id: Math.random().toString(), // temp id
-              segment_index: segments.length,
-              start_time: data.start_time ?? new Date().toISOString(),
-              end_time: data.end_time ?? new Date().toISOString(),
-              speaker_label: `speaker_${data.speaker_id ?? 0}`,
-              text: data.text,
-            };
-
-            console.log("✅ Adding segment to UI:", newSegment);
-            setSegments((prev) => {
-              const updated = [...prev, newSegment];
-              console.log(
-                `📊 Segments updated: ${prev.length} -> ${updated.length}`,
-              );
-              return updated;
-            });
-            setLiveTranscript(null); // Clear pending
-          } else {
-            console.warn("⚠️ Invalid transcript data:", {
-              type: data.type,
-              hasText,
-              text: data.text,
-            });
-          }
-        },
-      );
-      console.log("✅ Transcript listener set up successfully");
-
-      // Listen for WebSocket errors
-      if (errorUnlistenRef.current) {
-        errorUnlistenRef.current();
-        errorUnlistenRef.current = null;
-      }
-
-      errorUnlistenRef.current = await listen<string>(
-        "room-websocket-error",
-        (event) => {
-          console.error("WebSocket error:", event.payload);
-          toast.error(`Transcription error: ${event.payload}`);
-          stopRecording();
-        },
-      );
-
-      // 2. Start recording - Rust backend handles WebSocket connection
-      // Language is read from app config
-      console.log("🚀 Invoking start_room_recording...");
+      setLiveTranscripts([]);
       await invoke("start_room_recording", { roomId });
-      setIsRecording(true);
-      console.log("✅ Recording started successfully");
-    } catch (err) {
-      console.error("Failed to start recording:", err);
-      toast.error(`Failed to start recording: ${err}`);
-      stopRecording();
+      setRecording(true);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Failed to start recording");
     }
   };
 
-  const getSpeakerName = (label: string) => {
-    return room?.speaker_map?.[label] || label.replace("speaker_", "Speaker ");
+  const stop = async () => {
+    try {
+      await invoke("stop_room_recording_and_process");
+      setRecording(false);
+      // Refresh details after stopping so persisted segments show up
+      await load();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Failed to stop recording");
+    }
   };
 
-  if (loading && !room) {
-    return (
-      <div
-        style={{
-          padding: 20,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 120,
-        }}
-      >
-        <PageLoader />
-      </div>
-    );
-  }
+  const labelForSpeaker = (speakerId?: number | null) => {
+    const key = `speaker_${speakerId ?? 0}`;
+    const name = speakerMap?.[key];
+    return name ? `${name}` : key;
+  };
 
   return (
-    <div
-      className="room-live-view"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        backgroundColor: "#1e1e1e",
-        color: "white",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 20px",
-          borderBottom: "1px solid rgba(255,255,255,0.1)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            onClick={onBack}
-            className="icon-button"
-            style={{
-              background: "none",
-              border: "none",
-              color: "white",
-              cursor: "pointer",
-            }}
-          >
-            ←
+    <div className="settings">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <button className="settings-button" onClick={onBack}>
+          Back
+        </button>
+        <div style={{ fontWeight: 600 }}>{room?.name || "Room"}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="settings-button" onClick={() => setShowSpeakerModal(true)} disabled={!room}>
+            Name speakers
           </button>
-          <h2 style={{ margin: 0, fontSize: "18px" }}>{room?.name}</h2>
-          {isRecording && (
-            <span
-              style={{
-                fontSize: "12px",
-                padding: "2px 8px",
-                borderRadius: "10px",
-                backgroundColor: "rgba(255, 59, 48, 0.2)",
-                color: "#ff3b30",
-              }}
-            >
-              ● Live
-            </span>
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: "12px" }}>
-          {!isRecording ? (
-            <>
-              {segments.length > 0 && (
-                <>
-                  <button
-                    onClick={() => setShowSpeakerNaming(true)}
-                    className="settings-button"
-                    style={{ fontSize: "12px", padding: "6px 12px" }}
-                  >
-                    Name Speakers
-                  </button>
-                </>
-              )}
-              <button
-                onClick={startRecording}
-                className="settings-button primary"
-                style={{ backgroundColor: "#34c759" }} // Green for start
-              >
-                Start Recording
-              </button>
-            </>
+          {!recording ? (
+            <button className="settings-button primary" onClick={start} disabled={loading}>
+              Start
+            </button>
           ) : (
-            <button
-              onClick={stopRecording}
-              className="settings-button"
-              style={{
-                backgroundColor: "#ff3b30",
-                color: "white",
-                border: "none",
-              }} // Red for stop
-            >
-              Stop Recording
+            <button className="settings-button" onClick={stop}>
+              Stop
             </button>
           )}
         </div>
       </div>
 
-      {/* Transcript Area */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            maxWidth: "800px",
-            margin: "0 auto",
-          }}
-        >
-          {segments.map((seg, idx) => (
-            <div
-              key={seg.id || idx}
-              style={{
-                padding: "12px 0",
-                borderBottom: "1px solid rgba(255,255,255,0.1)",
-              }}
-            >
-              <div style={{ fontSize: "15px", lineHeight: 1.6 }}>
-                <span
-                  style={{
-                    color: "rgba(255,255,255,0.7)",
-                    fontWeight: 500,
-                    marginRight: "8px",
-                  }}
-                >
-                  {getSpeakerName(seg.speaker_label)} →
-                </span>
-                <span style={{ color: "rgba(255,255,255,0.9)" }}>
-                  {seg.text}
-                </span>
+      {loading && <div style={{ opacity: 0.7, marginTop: 12 }}>Loading…</div>}
+
+      <div style={{ marginTop: 16 }}>
+        <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 8 }}>Live</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {liveTranscripts.slice(-50).map((t, idx) => (
+            <div key={idx} style={{ padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)" }}>
+              <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>
+                {labelForSpeaker(t.speaker_id ?? 0)}
               </div>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "rgba(255,255,255,0.4)",
-                  marginTop: "4px",
-                }}
-              >
-                {formatLocaleTimeWithSeconds(seg.start_time)}
-              </div>
+              <div>{t.text || ""}</div>
             </div>
           ))}
-
-          {/* Live Segment */}
-          {liveTranscript && (
-            <div
-              style={{
-                padding: "12px 0",
-                opacity: 0.7,
-                borderBottom: "1px solid rgba(255,255,255,0.1)",
-              }}
-            >
-              <div style={{ fontSize: "15px", lineHeight: 1.6 }}>
-                <span
-                  style={{
-                    color: "rgba(255,255,255,0.7)",
-                    fontWeight: 500,
-                    marginRight: "8px",
-                    fontStyle: "italic",
-                  }}
-                >
-                  {liveTranscript.speaker_id !== undefined
-                    ? `${getSpeakerName(`speaker_${liveTranscript.speaker_id}`)} →`
-                    : "... →"}
-                </span>
-                <span
-                  style={{
-                    color: "rgba(255,255,255,0.9)",
-                    fontStyle: "italic",
-                  }}
-                >
-                  {liveTranscript.text}
-                </span>
-              </div>
-            </div>
+          {liveTranscripts.length === 0 && (
+            <div style={{ opacity: 0.6, fontSize: 12 }}>No live transcript yet.</div>
           )}
-
-          <div ref={chatEndRef} />
         </div>
       </div>
 
-      {showSpeakerNaming && room && (
+      {showSpeakerModal && room && (
         <SpeakerNamingModal
           room={room}
-          onClose={() => setShowSpeakerNaming(false)}
-          onSave={(updatedRoom) => {
-            setRoom(updatedRoom);
-            setShowSpeakerNaming(false);
-          }}
+          onClose={() => setShowSpeakerModal(false)}
+          onUpdated={(r) => setRoom(r)}
         />
       )}
     </div>
   );
 };
+

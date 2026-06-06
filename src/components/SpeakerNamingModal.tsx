@@ -1,135 +1,103 @@
 /**
  * SpeakerNamingModal Component
  *
- * Allows users to assign names to detected speakers after recording.
+ * Lets the user map diarization speaker labels (e.g. speaker_0) to human-friendly names.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Room } from "../types";
+import type { Room } from "../types";
 import { useToast } from "./toast/useToast";
 
 interface SpeakerNamingModalProps {
   room: Room;
   onClose: () => void;
-  onSave: (updatedRoom: Room) => void;
+  onUpdated: (room: Room) => void;
 }
 
 export const SpeakerNamingModal: React.FC<SpeakerNamingModalProps> = ({
   room,
   onClose,
-  onSave,
+  onUpdated,
 }) => {
   const toast = useToast();
-  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  // Extract unique speakers from transcripts
-  const uniqueSpeakers = React.useMemo(() => {
-    const speakers = new Set<string>();
-    room.transcripts?.forEach((seg) => {
-      speakers.add(seg.speaker_label);
-    });
-    return Array.from(speakers).sort();
-  }, [room.transcripts]);
+  const speakerKeys = useMemo(() => {
+    const map = room.speaker_map || {};
+    return Object.keys(map).sort();
+  }, [room.speaker_map]);
 
-  // Initialize with existing speaker_map or default names
-  useEffect(() => {
-    const initial: Record<string, string> = {};
-    uniqueSpeakers.forEach((label) => {
-      initial[label] =
-        room.speaker_map?.[label] || label.replace("speaker_", "Speaker ");
-    });
-    setSpeakerNames(initial);
-  }, [uniqueSpeakers, room.speaker_map]);
+  const [localMap, setLocalMap] = useState<Record<string, string>>(() => {
+    const raw = room.speaker_map || {};
+    const out: Record<string, string> = {};
+    for (const k of Object.keys(raw)) out[k] = String((raw as any)[k] ?? "");
+    return out;
+  });
 
-  const handleNameChange = (speakerLabel: string, newName: string) => {
-    setSpeakerNames((prev) => ({
-      ...prev,
-      [speakerLabel]: newName,
-    }));
-  };
-
-  const handleSave = async () => {
+  const save = async () => {
     setSaving(true);
     try {
-      // Update each speaker name
-      // Update speaker names in bulk
-      await invoke("update_speaker", {
+      const updated = await invoke<Room>("update_speaker", {
         roomId: room.id,
-        speakerMap: speakerNames,
+        speakerMap: localMap,
       });
-
-      // Fetch updated room
-      const updatedRoom = await invoke<Room>("get_room_details", {
-        roomId: room.id,
-      });
-      onSave(updatedRoom);
+      onUpdated(updated);
+      toast.success("Speakers updated");
       onClose();
-      toast.success("Speaker names saved");
-    } catch (err) {
-      console.error("Failed to save speaker names:", err);
-      toast.error("Failed to save speaker names. Please try again.");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Failed to update speakers");
     } finally {
       setSaving(false);
     }
   };
 
-  // Get sample text for each speaker
-  const getSampleText = (speakerLabel: string): string => {
-    const sample = room.transcripts?.find(
-      (seg) => seg.speaker_label === speakerLabel,
-    );
-    return sample?.text || "No transcript available";
-  };
-
   return (
     <div className="modal-overlay">
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h3>Name Speakers</h3>
-        <p className="modal-content__desc">
-          Assign names to the detected speakers. This will update all
-          transcripts.
-        </p>
-
-        <div className="modal-speakers">
-          {uniqueSpeakers.map((speakerLabel) => (
-            <div key={speakerLabel} className="modal-speaker-card">
-              <label>{speakerLabel}</label>
-              <input
-                type="text"
-                className="form-input--dark"
-                value={speakerNames[speakerLabel] || ""}
-                onChange={(e) => handleNameChange(speakerLabel, e.target.value)}
-                placeholder="Enter speaker name"
-              />
-              <div className="modal-speaker-sample">
-                Sample: &quot;{getSampleText(speakerLabel).substring(0, 100)}
-                ...&quot;
-              </div>
-            </div>
-          ))}
+      <div className="modal-content" style={{ width: 520 }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <h4 style={{ marginTop: 0 }}>Name speakers</h4>
+          <button className="settings-button" onClick={onClose}>
+            Close
+          </button>
         </div>
 
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={onClose}
-            disabled={saving}
-          >
+        {speakerKeys.length === 0 ? (
+          <div style={{ opacity: 0.7, fontSize: 12 }}>
+            No speakers detected yet. Start recording to generate speakers.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {speakerKeys.map((k) => (
+              <div
+                key={k}
+                style={{ display: "flex", alignItems: "center", gap: 12 }}
+              >
+                <div style={{ width: 120, opacity: 0.8, fontSize: 12 }}>{k}</div>
+                <input
+                  value={localMap[k] || ""}
+                  onChange={(e) =>
+                    setLocalMap((m) => ({ ...m, [k]: e.target.value }))
+                  }
+                  placeholder="e.g. Alice"
+                  style={{ flex: 1 }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 16 }}>
+          <button className="settings-button" onClick={onClose} disabled={saving}>
             Cancel
           </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? "Saving..." : "Save Names"}
+          <button className="settings-button primary" onClick={save} disabled={saving}>
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
     </div>
   );
 };
+

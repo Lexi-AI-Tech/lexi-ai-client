@@ -10,6 +10,7 @@
 
 use super::service::AssistantService;
 
+use crate::commands::app_config::load_app_config;
 use crate::commands::auth::get_auth_token_async;
 
 use crate::text_injector::TextInjector;
@@ -57,6 +58,27 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
         // offline_transcription is not in app config, keep as hardcoded for now
         let offline_transcription = false;
 
+        let app_config = match load_app_config(&app_handle_for_task) {
+            Ok(config) => config,
+            Err(e) => {
+                let app_handle_emit = app_handle_for_task.clone();
+                let error_msg = e.clone();
+                tauri::async_runtime::spawn(async move {
+                    app_handle_emit.emit("error", error_msg).unwrap_or_default();
+                });
+                return;
+            }
+        };
+
+        let language = app_config
+            .languages
+            .as_ref()
+            .and_then(|langs| langs.first().cloned())
+            .unwrap_or_else(|| "auto".to_string());
+        let vocabulary = app_config.vocabulary.unwrap_or_default();
+        let enhance_transcription = app_config.enhance_transcription.unwrap_or(true);
+        let shortcuts = app_config.shortcuts.unwrap_or_default();
+
         // Initialize the Assistant service client and transcribe the audio (cursor context is fetched inside transcribe_audio)
         let assistant_service = AssistantService::new();
 
@@ -67,6 +89,10 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 auth_token,
                 Some(app_handle_for_task.clone()),
                 offline_transcription,
+                language,
+                vocabulary,
+                enhance_transcription,
+                shortcuts,
             )
             .await;
         let transcription_duration = transcription_start.elapsed();
@@ -132,40 +158,6 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                         .emit("transcription_error", error_msg)
                         .unwrap_or_default();
                 });
-            }
-        }
-    });
-}
-
-/// Processes recorded audio for the Docs feature: transcribes only and emits
-/// `doc_transcription_ready` with the transcript text (no injection).
-pub fn process_audio_for_doc(audio_data: Vec<u8>, app_handle: AppHandle) {
-    let app_handle_for_task = app_handle.clone();
-
-    let _task = tauri::async_runtime::spawn(async move {
-        let auth_token = get_auth_token_async(&app_handle_for_task).await;
-        if auth_token.is_err() {
-            let _ = app_handle_for_task.emit("doc_transcription_error", "Authentication required");
-            return;
-        }
-
-        let assistant_service = AssistantService::new();
-        let offline_transcription = false;
-        let transcription_result = assistant_service
-            .transcribe_audio(
-                audio_data,
-                auth_token,
-                Some(app_handle_for_task.clone()),
-                offline_transcription,
-            )
-            .await;
-
-        match transcription_result {
-            Ok((transcription, _)) => {
-                let _ = app_handle_for_task.emit("doc_transcription_ready", &transcription);
-            }
-            Err(e) => {
-                let _ = app_handle_for_task.emit("doc_transcription_error", e.to_string());
             }
         }
     });

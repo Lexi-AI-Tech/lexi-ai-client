@@ -5,14 +5,16 @@
 
 pub mod analytics;
 pub mod app_config;
+pub mod app_config_store;
 pub mod auth;
 pub mod billing;
+pub mod feature_usage_store;
 pub mod cache;
-pub mod docs;
 pub mod hotkey;
 pub mod notes;
 pub mod onboarding;
 pub mod rooms;
+pub mod session_refresh;
 pub mod shortcuts;
 pub mod text;
 pub mod utils;

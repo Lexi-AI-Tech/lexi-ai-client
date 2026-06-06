@@ -1,9 +1,9 @@
 //! macOS: AVFoundation mic check, AX accessibility check, TCC system audio, Settings deep links,
 //! mic stream probe, Core Audio tap for system audio request.
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
-use crate::audio::recorder::AudioRecorder;
+use crate::{RecordingCommand, RecordingCommandTx};
 use objc::runtime::Class;
 use objc::{msg_send, sel, sel_impl};
 use std::ffi::CString;
@@ -129,21 +129,13 @@ pub fn open_permission_pane(pane: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn request_microphone_permission() -> Result<bool, String> {
-    use std::thread;
-    use std::time::Duration;
-
+pub fn request_microphone_permission(app: AppHandle) -> Result<bool, String> {
     let _ = open_permission_pane_impl("microphone");
 
-    thread::spawn(move || {
-        let _ = std::panic::catch_unwind(|| {
-            let mut recorder = AudioRecorder::new();
-            if recorder.start_recording(None).is_ok() {
-                thread::sleep(Duration::from_millis(600));
-                recorder.release_stream();
-            }
-        });
-    });
+    // Run mic open/close on the recording thread (serialized CoreAudio access).
+    if let Some(rec) = app.try_state::<RecordingCommandTx>() {
+        let _ = rec.0.send(RecordingCommand::WarmupMic);
+    }
 
     Ok(true)
 }

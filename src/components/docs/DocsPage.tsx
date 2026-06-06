@@ -8,7 +8,7 @@ import React, {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ArrowLeft, Loader2, Mic, Square, Trash2 } from "lucide-react";
-import type { Doc } from "../../types";
+import type { Doc, DocContentResponse } from "../../types";
 import { useToast } from "../toast/useToast";
 import { DocsListPage } from "./DocsListPage";
 import { RichTextEditor, type RichTextEditorRef } from "./RichTextEditor";
@@ -21,9 +21,6 @@ import "./docs.css";
 
 const SAVE_DEBOUNCE_MS = 600;
 const SAVE_INDICATOR_MIN_MS = 400;
-
-/** Matches Tauri `CreateDocFromAudioResult` / server `CreateDocFromAudioResponse`. */
-type CreateDocFromAudioResult = { title: string; content: string };
 
 /** Isolated save indicator so parent doesn't re-render on saving state change */
 export interface SaveIndicatorRef {
@@ -183,61 +180,57 @@ export const DocsPage: React.FC<DocsPageProps> = ({
 
         const unlistenRecordingStopped = await listen(
           "doc_recording_stopped",
-          () => setIsDocRecording(false),
+          () => {
+            setIsDocRecording(false);
+            setIsCreatingDocFromAudio(true);
+          },
         );
         if (isMounted) unlistens.push(unlistenRecordingStopped);
         else unlistenRecordingStopped();
 
-        const unlistenTranscriptionReady = await listen<string>(
-          "doc_transcription_ready",
-          async (e) => {
-            const transcript = e.payload;
-            if (!transcript?.trim()) return;
-            setIsCreatingDocFromAudio(true);
-            try {
-              const result = await invoke<CreateDocFromAudioResult>(
-                "create_doc_from_audio",
-                { transcript },
-              );
-              editorRef.current?.insertStructuredContent(result.content);
-              const docId = selectedIdRef.current;
-              const suggested = (result.title ?? "").trim();
-              const currentTitle = latestTitleRef.current.trim();
-              const shouldApplyTitle =
-                Boolean(docId) &&
-                suggested.length > 0 &&
-                suggested.toLowerCase() !== "untitled" &&
-                (!currentTitle || currentTitle.toLowerCase() === "untitled");
-              if (shouldApplyTitle && docId) {
-                latestTitleRef.current = suggested;
-                setEditingTitle(suggested);
-                scheduleSaveRef.current(docId);
-              }
-              toast.success("Content added from voice");
-            } catch (err) {
-              console.error("Create doc from audio failed:", err);
-              const msg = formatUserFacingApiErrorFromUnknown(err);
-              if (isQuotaExceeded(err)) {
-                setShowUpgradeModal(true);
-              }
-              toast.error(msg);
-            } finally {
+        const unlistenFromAudioReady = await listen<DocContentResponse>(
+          "doc_from_audio_ready",
+          (e) => {
+            const result = e.payload;
+            if (!result?.content?.trim()) {
               setIsCreatingDocFromAudio(false);
+              return;
             }
+            editorRef.current?.insertStructuredContent(result.content);
+            const docId = selectedIdRef.current;
+            const suggested = (result.title ?? "").trim();
+            const currentTitle = latestTitleRef.current.trim();
+            const shouldApplyTitle =
+              Boolean(docId) &&
+              suggested.length > 0 &&
+              suggested.toLowerCase() !== "untitled" &&
+              (!currentTitle || currentTitle.toLowerCase() === "untitled");
+            if (shouldApplyTitle && docId) {
+              latestTitleRef.current = suggested;
+              setEditingTitle(suggested);
+              scheduleSaveRef.current(docId);
+            }
+            setIsCreatingDocFromAudio(false);
+            toast.success("Content added from voice");
           },
         );
-        if (isMounted) unlistens.push(unlistenTranscriptionReady);
-        else unlistenTranscriptionReady();
+        if (isMounted) unlistens.push(unlistenFromAudioReady);
+        else unlistenFromAudioReady();
 
-        const unlistenTranscriptionError = await listen<string>(
-          "doc_transcription_error",
+        const unlistenFromAudioError = await listen<string>(
+          "doc_from_audio_error",
           (e) => {
             setIsDocRecording(false);
-            toast.error(e.payload || "Transcription failed");
+            setIsCreatingDocFromAudio(false);
+            const msg = e.payload || "Voice input failed";
+            if (isQuotaExceeded(msg)) {
+              setShowUpgradeModal(true);
+            }
+            toast.error(msg);
           },
         );
-        if (isMounted) unlistens.push(unlistenTranscriptionError);
-        else unlistenTranscriptionError();
+        if (isMounted) unlistens.push(unlistenFromAudioError);
+        else unlistenFromAudioError();
       } catch (err) {
         console.error("Doc event listeners failed:", err);
         toast.error("Docs failed to initialize. Please restart the app.");

@@ -5,7 +5,7 @@
  * This file serves as the single source of truth for type definitions.
  */
 
-import { DeviceType, LanguageCode } from "../lib/constants";
+import { LanguageCode } from "../lib/constants";
 
 // ============================================================================
 // API Types
@@ -86,48 +86,23 @@ export interface AuthState {
 // ============================================================================
 
 /**
- * AppConfig from server API (complete config with all fields)
+ * App config exposed by Rust (`get_app_config`, `update_app_config`, etc.).
+ * React never talks to the server directly; this mirrors the Tauri command payload.
  */
 export interface AppConfig {
-  system_type: string;
-  device_type: DeviceType;
-  hotkeys: string[];
-  languages: LanguageCode[];
-  enhance_transcription: boolean;
-  launch_on_system_startup: boolean;
-  vocabulary: string[];
-  action_hotkeys: string[] | null;
-  show_icon: boolean;
-  shortcuts: Shortcut[];
-}
-
-/**
- * AppConfigUpdateRequest for updating app config (partial updates supported)
- */
-export interface AppConfigUpdateRequest {
-  system_type?: string;
-  device_type?: DeviceType;
-  hotkeys?: string[];
-  languages?: LanguageCode[];
-  enhance_transcription?: boolean;
-  launch_on_system_startup?: boolean;
-  vocabulary?: string[] | null;
-  action_hotkeys?: string[] | null;
-  show_icon?: boolean;
-  shortcuts?: Shortcut[] | null;
-}
-
-/**
- * AppConfig from Tauri Store (local storage, all fields optional)
- */
-export interface TauriAppConfig {
-  languages?: string[] | null;
+  languages?: LanguageCode[] | null;
   hotkeys?: string[] | null;
   action_hotkeys?: string[] | null;
   enhance_transcription?: boolean | null;
   launch_on_system_startup?: boolean | null;
   show_icon?: boolean | null;
   vocabulary?: string[] | null;
+  shortcuts?: Shortcut[] | null;
+}
+
+export interface DocContentResponse {
+  title: string;
+  content: string;
 }
 
 // ============================================================================

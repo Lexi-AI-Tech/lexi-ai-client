@@ -1,6 +1,7 @@
-//! Billing usage (current period) from Lexi server.
+//! Billing API (feature usage period, checkout, subscription).
 
 use crate::commands::auth::get_auth_token_async;
+use crate::commands::feature_usage_store;
 use crate::utils;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
@@ -16,21 +17,26 @@ pub struct FeatureUsageEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct BillingUsageResponse {
+pub struct FeatureUsageResponse {
     pub plan_type: String,
     pub period_start: String,
     pub period_end: String,
     pub limit_reset: String,
     pub features: Vec<FeatureUsageEntry>,
+    #[serde(default)]
+    pub feature_usage: Option<String>,
 }
 
-/// GET /api/v1/billing/usage — current weekly window and per-feature usage.
-#[tauri::command]
-pub async fn get_billing_usage(app: AppHandle) -> Result<BillingUsageResponse, String> {
-    let auth_token = match get_auth_token_async(&app).await {
+async fn fetch_feature_usage_period(
+    app: &AppHandle,
+    emit_auth_expired_on_failure: bool,
+) -> Result<FeatureUsageResponse, String> {
+    let auth_token = match get_auth_token_async(app).await {
         Ok(token) => token,
         Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+            if emit_auth_expired_on_failure {
+                crate::commands::auth::handle_auth_expired(app);
+            }
             return Err("Authentication required".to_string());
         }
     };
@@ -62,6 +68,38 @@ pub async fn get_billing_usage(app: AppHandle) -> Result<BillingUsageResponse, S
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
     serde_json::from_value(data).map_err(|e| format!("Failed to deserialize response: {}", e))
+}
+
+fn persist_feature_usage_from_response(app: &AppHandle, usage: &FeatureUsageResponse) {
+    if let Some(ref jwt) = usage.feature_usage {
+        if !jwt.is_empty() {
+            if let Err(e) = feature_usage_store::save_feature_usage(app, jwt) {
+                eprintln!("⚠️  Failed to save feature usage JWT: {}", e);
+            }
+        }
+    }
+}
+
+/// Fetch feature usage from cloud and persist the signed JWT locally.
+pub(crate) async fn hydrate_feature_usage_from_cloud(app: &AppHandle) -> Result<(), String> {
+    hydrate_feature_usage_from_cloud_quiet(app).await
+}
+
+/// Same as [`hydrate_feature_usage_from_cloud`] but does not emit `auth_expired` (background use).
+pub(crate) async fn hydrate_feature_usage_from_cloud_quiet(
+    app: &AppHandle,
+) -> Result<(), String> {
+    let usage = fetch_feature_usage_period(app, false).await?;
+    persist_feature_usage_from_response(app, &usage);
+    Ok(())
+}
+
+/// GET /api/v1/billing/usage — current period window and per-feature usage.
+#[tauri::command]
+pub async fn get_feature_usage(app: AppHandle) -> Result<FeatureUsageResponse, String> {
+    let usage = fetch_feature_usage_period(&app, true).await?;
+    persist_feature_usage_from_response(&app, &usage);
+    Ok(usage)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

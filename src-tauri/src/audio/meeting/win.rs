@@ -5,12 +5,12 @@ use std::thread;
 use std::time::Duration;
 
 use windows::Win32::Media::Audio::{
+    eConsole, eRender, IAudioCaptureClient, IAudioClient, IMMDeviceEnumerator, MMDeviceEnumerator,
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
-    IAudioCaptureClient, IAudioClient, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
-    WAVEFORMATEXTENSIBLE, eConsole, eRender,
+    WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
 };
 use windows::Win32::System::Com::{
-    CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
+    CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
 
 const KSDATAFORMAT_SUBTYPE_IEEE_FLOAT: windows::core::GUID =
@@ -38,7 +38,8 @@ unsafe fn parse_mix_format(wf: *const WAVEFORMATEX) -> Option<ParsedFormat> {
         is_float = true;
     } else if tag == WAVE_FORMAT_EXTENSIBLE && w.cbSize >= 22 {
         let off = std::mem::offset_of!(WAVEFORMATEXTENSIBLE, SubFormat);
-        let sub = std::ptr::read_unaligned((wf as *const u8).add(off) as *const windows::core::GUID);
+        let sub =
+            std::ptr::read_unaligned((wf as *const u8).add(off) as *const windows::core::GUID);
         if sub == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT {
             is_float = true;
         }
@@ -70,9 +71,7 @@ unsafe fn frames_to_pcm_bytes(
 ) -> Vec<u8> {
     let frames = num_frames as usize;
     let ch = fmt.channels as usize;
-    let byte_len = frames
-        .checked_mul(fmt.block_align as usize)
-        .unwrap_or(0);
+    let byte_len = frames.checked_mul(fmt.block_align as usize).unwrap_or(0);
     if byte_len == 0 {
         return Vec::new();
     }
@@ -156,12 +155,10 @@ unsafe fn run_loopback_inner(
             format!("IAudioClient::Initialize(loopback): {e:?}")
         })?;
 
-    let capture_client: IAudioCaptureClient = audio_client
-        .GetService()
-        .map_err(|e| {
-            CoTaskMemFree(Some(mix_format as *const _));
-            format!("GetService(IAudioCaptureClient): {e:?}")
-        })?;
+    let capture_client: IAudioCaptureClient = audio_client.GetService().map_err(|e| {
+        CoTaskMemFree(Some(mix_format as *const _));
+        format!("GetService(IAudioCaptureClient): {e:?}")
+    })?;
 
     CoTaskMemFree(Some(mix_format as *const _));
 

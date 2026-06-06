@@ -1,6 +1,6 @@
 [package]
 name = "lexi-ai"
-version = "0.1.8"
+version = "0.1.9"
 description = "AI Productivity tool"
 authors = ["anadi45"]
 license = ""
@@ -54,6 +54,7 @@ tauri-plugin-os = "2.3.2"
 tauri-plugin-http = "2.5.7"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+rubato = "0.15"
 windows = { version = "0.48", features = [
     "Win32_Foundation",
     "Win32_Media_Audio",

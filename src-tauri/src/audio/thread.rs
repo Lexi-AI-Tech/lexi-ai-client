@@ -7,7 +7,8 @@
 
 use super::recorder::AudioRecorder;
 use crate::actions::processor::process_action_audio;
-use crate::assistant::processor::{process_audio, process_audio_for_doc};
+use crate::assistant::processor::process_audio;
+use crate::docs::processor::process_audio_for_doc;
 use crate::RecordingCommand;
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -136,6 +137,20 @@ pub fn spawn_recording_thread(
             // Map command to simple start/stop logic and mode
             // We unify Start/ActionStart and Stop/ActionStop logic here
             match (command, ctx.phase) {
+                // ── macOS MIC WARMUP ────────────────────────────────
+                (RecordingCommand::WarmupMic, RecordingPhase::Idle | RecordingPhase::Error(_)) => {
+                    #[cfg(target_os = "macos")]
+                    {
+                        if let Some(mut rec) = ctx.recorder.take() {
+                            rec.release_stream();
+                        }
+                        thread::sleep(CORE_AUDIO_RELEASE_DELAY);
+                        warmup_microphone();
+                    }
+                }
+
+                (RecordingCommand::WarmupMic, _) => {}
+
                 // ── START RECORDING ─────────────────────────────────
                 (RecordingCommand::Start, RecordingPhase::Idle | RecordingPhase::Error(_))
                 | (
@@ -313,7 +328,7 @@ pub fn spawn_recording_thread(
                                     tauri::async_runtime::spawn(async move {
                                         if mode_skip == RecordingMode::Doc {
                                             let _ = app_handle_clone.emit(
-                                                "doc_transcription_error",
+                                                "doc_from_audio_error",
                                                 "Recording too short",
                                             );
                                         } else {
@@ -340,8 +355,13 @@ pub fn spawn_recording_thread(
                                                 let _ = app_handle_done.emit("action_success", "");
                                             }
                                             RecordingMode::Doc => {
-                                                let _ = app_handle_done
-                                                    .emit("doc_transcription_ready", "");
+                                                let _ = app_handle_done.emit(
+                                                    "doc_from_audio_ready",
+                                                    serde_json::json!({
+                                                        "title": "",
+                                                        "content": ""
+                                                    }),
+                                                );
                                             }
                                         }
                                     });
@@ -466,4 +486,22 @@ pub fn spawn_recording_thread(
             }
         }
     });
+}
+
+/// Brief capture to prime CoreAudio after grant or app launch (macOS only).
+#[cfg(target_os = "macos")]
+fn warmup_microphone() {
+    println!("🎙️  Warming up microphone...");
+    let mut recorder = AudioRecorder::new();
+    match recorder.start_recording(None) {
+        Ok(_) => {
+            thread::sleep(Duration::from_millis(200));
+            recorder.release_stream();
+            println!("✅ Microphone warmup complete");
+        }
+        Err(e) => {
+            eprintln!("⚠️  Microphone warmup failed: {}", e);
+            recorder.release_stream();
+        }
+    }
 }

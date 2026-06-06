@@ -125,6 +125,7 @@ async fn docs_request(
         _ => return Err("Unsupported method".to_string()),
     };
     req = req.header("Authorization", format!("Bearer {}", auth_token));
+    req = crate::utils::apply_feature_usage_header(app, req);
     if let Some(b) = body {
         req = req.header("Content-Type", "application/json").json(&b);
     }
@@ -132,6 +133,7 @@ async fn docs_request(
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
+    crate::utils::capture_feature_usage_header(app, &response);
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
@@ -209,7 +211,7 @@ pub async fn delete_doc(app: AppHandle, payload: DeleteDocRequest) -> Result<(),
     Ok(())
 }
 
-/// Start recording for doc (Docs UI mic button). Emits doc_recording_started; when user stops, transcript is emitted as doc_transcription_ready.
+/// Start recording for doc (Docs UI mic button). Emits `doc_recording_started`.
 #[tauri::command]
 pub fn start_doc_recording(app: AppHandle) -> Result<(), String> {
     let tx = app.state::<RecordingCommandTx>();
@@ -217,7 +219,7 @@ pub fn start_doc_recording(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Stop recording for doc. Transcript will be emitted via doc_transcription_ready after processing.
+/// Stop recording for doc. Server processes audio; result is emitted as `doc_from_audio_ready`.
 #[tauri::command]
 pub fn stop_doc_recording(app: AppHandle) -> Result<(), String> {
     let tx = app.state::<RecordingCommandTx>();
@@ -225,56 +227,54 @@ pub fn stop_doc_recording(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Server response for create-doc-from-audio (editor JSON body + suggested title).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateDocFromAudioResult {
-    pub title: String,
-    pub content: String,
-}
-
-/// Call server LLM to create doc content from a voice transcript.
+/// Create a doc from a meeting (server generates content and stores the doc).
 #[tauri::command]
-pub async fn create_doc_from_audio(
+pub async fn create_doc_from_meeting(
     app: AppHandle,
-    transcript: String,
-) -> Result<CreateDocFromAudioResult, String> {
+    meeting_id: String,
+    instructions: String,
+) -> Result<Doc, String> {
     let auth_token = get_auth_token_async(&app)
         .await
         .map_err(|_| "Authentication required")?;
-    let url = crate::api_endpoints::docs::create_doc_from_audio_url();
-    let client = crate::utils::create_http_client();
+
+    let client = crate::utils::create_http_client_long_timeout();
+    let url = crate::api_endpoints::docs::create_doc_from_meeting_url(&meeting_id);
+    let payload = serde_json::json!({
+        "instructions": instructions.trim(),
+    });
+
+    crate::utils::log_api_request("POST", &url);
+
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", auth_token))
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({ "transcript": transcript }))
+        .json(&payload)
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
 
     if !response.status().is_success() {
-        let err_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Unknown error".to_string());
-        return Err(format!("Server error: {}", err_text));
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Server error: {} - {}", status, body));
     }
 
     let data: serde_json::Value = response
         .json()
         .await
-        .map_err(|e| format!("Invalid response: {}", e))?;
-    let content = data
-        .get("content")
-        .or_else(|| data.get("data").and_then(|d| d.get("content")))
-        .and_then(|c| c.as_str())
-        .ok_or_else(|| "Missing content in response")?
-        .to_string();
-    let title = data
-        .get("title")
-        .or_else(|| data.get("data").and_then(|d| d.get("title")))
-        .and_then(|t| t.as_str())
-        .unwrap_or("Untitled")
-        .to_string();
-    Ok(CreateDocFromAudioResult { title, content })
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let doc = parse_doc_from_value(&data).map_err(|e| format!("Invalid doc response: {}", e))?;
+    let _ = app.emit(
+        "docs_changed",
+        serde_json::json!({
+            "kind": "created",
+            "docId": doc.id,
+            "source": "meeting",
+            "meetingId": meeting_id,
+        }),
+    );
+    Ok(doc)
 }
+

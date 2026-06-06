@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use cidre::core_audio as ca;
 
-use super::{AppInfo, SUSTAINED_POLL_SECS, score_app_for_meeting, spawn_polling_thread};
+use super::{score_app_for_meeting, spawn_polling_thread, AppInfo, SUSTAINED_POLL_SECS};
 
 pub(super) fn is_system_app_for_display(app: &AppInfo) -> bool {
     let id = app.id.to_lowercase();

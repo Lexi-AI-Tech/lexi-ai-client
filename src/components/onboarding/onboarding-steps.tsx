@@ -17,7 +17,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
 import { useAuthStore } from "../../store/authStore";
-import type { TauriAppConfig } from "../../types";
+import type { AppConfig } from "../../types";
 import { GoogleLoginButton } from "../auth/GoogleLoginButton";
 
 /** Matches Rust `DefaultHotkeysResponse` / `begin_onboarding_hotkey_dry_run` */
@@ -34,7 +34,7 @@ function getLocalHotkeyFallback(systemType: string): DefaultHotkeysResponse {
       }
     : {
         hotkeys: ["Control+Windows"],
-        action_hotkeys: ["Control+Alt+Windows"],
+        action_hotkeys: ["Control+Alt"],
       };
 }
 
@@ -44,11 +44,13 @@ const HOW_TO_SETUP_URL = "https://speaklexi.com/how-to-setup";
  * Labels for the try-it step: prefer `get_app_config`, fill empty sides with
  * `get_default_hotkeys` (same server defaults as the hotkey dry-run), then local fallback.
  */
-async function resolveHotkeysForTryItStep(systemType: string): Promise<DefaultHotkeysResponse> {
+async function resolveHotkeysForTryItStep(
+  systemType: string,
+): Promise<DefaultHotkeysResponse> {
   let hotkeys: string[] = [];
   let action_hotkeys: string[] = [];
   try {
-    const cfg = await invoke<TauriAppConfig>("get_app_config");
+    const cfg = await invoke<AppConfig>("get_app_config");
     hotkeys = cfg.hotkeys?.filter(Boolean) ?? [];
     action_hotkeys = cfg.action_hotkeys?.filter(Boolean) ?? [];
   } catch {
@@ -66,11 +68,10 @@ async function resolveHotkeysForTryItStep(systemType: string): Promise<DefaultHo
   } catch {
     // Same path as Rust `local_onboarding_hotkey_fallback`
   }
-  
+
   const fallback = getLocalHotkeyFallback(systemType);
   if (!hotkeys.length) hotkeys = [...fallback.hotkeys];
-  if (!action_hotkeys.length)
-    action_hotkeys = [...fallback.action_hotkeys];
+  if (!action_hotkeys.length) action_hotkeys = [...fallback.action_hotkeys];
   return { hotkeys, action_hotkeys };
 }
 
@@ -746,7 +747,8 @@ export function TryItStep({
     let cancelled = false;
     (async () => {
       try {
-        const { hotkeys, action_hotkeys } = await resolveHotkeysForTryItStep(systemType);
+        const { hotkeys, action_hotkeys } =
+          await resolveHotkeysForTryItStep(systemType);
         if (!cancelled) {
           setTranscriptionHotkeys(hotkeys);
           setActionHotkeys(action_hotkeys);

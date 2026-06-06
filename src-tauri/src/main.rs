@@ -59,6 +59,7 @@ mod actions; // Voice actions (triggered by hotkeys)
 mod api_endpoints; // Centralized API endpoint definitions
 mod app_icon; // `app_icon/` — platform app icons (macOS, Windows)
 mod assistant; // Recording thread management
+mod docs; // Docs voice-to-text (transcribe into editor, no injection)
 mod audio;
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
@@ -105,7 +106,7 @@ use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
 use commands::analytics::{get_analytics_chart, get_analytics_stats};
 use commands::app_config::{
     begin_onboarding_hotkey_dry_run, end_onboarding_hotkey_dry_run, get_app_config,
-    get_default_hotkeys, update_app_config,
+    get_default_hotkeys, hydrate_app_config_from_cloud, refresh_app_config, update_app_config,
 };
 use commands::auth::{
     auth_get_state, clear_auth_data, get_api_base_url, get_auth_data, get_auth_token,
@@ -113,12 +114,13 @@ use commands::auth::{
     start_google_login, store_auth_data,
 };
 use commands::billing::{
-    cancel_billing_subscription, create_billing_checkout, get_billing_usage,
-    get_current_subscription,
+    cancel_billing_subscription, create_billing_checkout, get_current_subscription,
+    get_feature_usage,
 };
 use commands::cache::user_cache_warmup;
-use commands::docs::{
-    create_doc, create_doc_from_audio, delete_doc, get_doc, get_docs, start_doc_recording,
+use commands::session_refresh::{spawn_session_refresh, start_session_refresh_scheduler, SessionRefreshReason};
+use docs::commands::{
+    create_doc, create_doc_from_meeting, delete_doc, get_doc, get_docs, start_doc_recording,
     stop_doc_recording, update_doc,
 };
 use commands::hotkey::{
@@ -139,10 +141,10 @@ use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type, open_external_url};
 use commands::window::{open_devtools, show_main_window};
 use meetings::commands::{
-    add_meeting_note, create_doc_from_meeting, create_meeting, delete_meeting,
-    dismiss_meeting_end_check_prompt, end_meeting_session, get_meeting_details,
-    get_meeting_suggested_questions, list_meetings, send_meeting_chat, start_meeting_recording,
-    stop_meeting_recording, stream_meeting_summary, update_meeting,
+    add_meeting_note, create_meeting, delete_meeting, dismiss_meeting_end_check_prompt,
+    end_meeting_session, get_meeting_details, get_meeting_suggested_questions, list_meetings,
+    send_meeting_chat, start_meeting_recording, stop_meeting_recording, stream_meeting_summary,
+    update_meeting,
 };
 use websocket::{start_oauth_websocket, stop_oauth_websocket};
 
@@ -157,6 +159,8 @@ pub enum RecordingCommand {
     DocStop,           // Stop recording for doc and emit transcript
     SwitchToAction,    // Mode dynamically switched to Action
     SwitchToAssistant, // Mode dynamically switched to Assistant
+    /// macOS: open/close an input stream once so CoreAudio is ready before the first hotkey.
+    WarmupMic,
 }
 
 /// Shared sender for recording commands (used by key listener and by doc recording commands).
@@ -195,6 +199,12 @@ fn start_global_key_listener(app: tauri::AppHandle) -> Result<(), String> {
             params.meeting_recording_rx,
         );
         println!("✅ Global key listener started");
+
+        // Prime CoreAudio on macOS so the first Fn press captures audio (avoids needing an app restart).
+        #[cfg(target_os = "macos")]
+        if let Some(rec) = app.try_state::<RecordingCommandTx>() {
+            let _ = rec.0.send(RecordingCommand::WarmupMic);
+        }
 
         // Set up macOS sleep/wake watcher to restart the app after wake.
         // macOS destroys CGEventTap, stales HTTP sockets, and invalidates audio handles
@@ -335,9 +345,7 @@ pub fn main() {
     // Must register before `tauri-plugin-deep-link` so Windows/Linux can forward protocol
     // URLs from a second process to the running instance (see Tauri deep-linking docs).
     builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-        println!(
-            "🔄 Second instance launch detected (argv={argv:?}) — focusing main window"
-        );
+        println!("🔄 Second instance launch detected (argv={argv:?}) — focusing main window");
         show_and_focus_main_window(app.app_handle());
 
         // Minimal backup retry
@@ -395,6 +403,7 @@ pub fn main() {
             get_default_hotkeys,
             begin_onboarding_hotkey_dry_run,
             end_onboarding_hotkey_dry_run,
+            refresh_app_config,
             update_app_config,
             get_system_type,
             copy_to_clipboard,
@@ -404,7 +413,7 @@ pub fn main() {
             delete_transcript,
             get_analytics_stats,
             get_analytics_chart,
-            get_billing_usage,
+            get_feature_usage,
             create_billing_checkout,
             cancel_billing_subscription,
             get_current_subscription,
@@ -433,11 +442,11 @@ pub fn main() {
             get_docs,
             get_doc,
             create_doc,
+            create_doc_from_meeting,
             update_doc,
             delete_doc,
             start_doc_recording,
             stop_doc_recording,
-            create_doc_from_audio,
             create_room,
             list_rooms,
             get_room_details,
@@ -458,7 +467,6 @@ pub fn main() {
             delete_meeting,
             stream_meeting_summary,
             send_meeting_chat,
-            create_doc_from_meeting,
             get_app_icon,
             start_global_key_listener,
         ])
@@ -497,20 +505,13 @@ pub fn main() {
                 show_and_focus_main_window(&app_handle_clone);
             });
 
-            // Refresh auth token on app startup (background task)
-            // This ensures tokens are fresh before the user interacts with the app
-            let app_handle_for_auth = app_handle.clone();
+            // JWT + feature-usage refresh (startup, periodic, foreground) — Rust-side, non-blocking.
+            let app_handle_for_session_refresh = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                use commands::auth::get_auth_token_async;
-                println!("🔑 Checking auth token on startup...");
-                match get_auth_token_async(&app_handle_for_auth).await {
-                    Ok(_) => println!("✅ Auth token valid on startup"),
-                    Err(_) => println!("ℹ️  No valid auth token - user needs to login"),
-                }
+                start_session_refresh_scheduler(app_handle_for_session_refresh).await;
             });
 
-            // Periodic user cache warmup (server-side caches) — runs in Rust so it keeps
-            // working even if the WebView throttles timers while app is backgrounded.
+            // Periodic AI memory cache warmup — runs in Rust while app is backgrounded.
             let app_handle_for_cache_warmup = app_handle.clone();
             tauri::async_runtime::spawn(async move {
                 commands::cache::start_user_cache_warmup_scheduler(app_handle_for_cache_warmup)
@@ -572,9 +573,9 @@ pub fn main() {
             // Fetch config in background after state is managed to ensure channels get updated
             let app_handle_for_config = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                println!("🔄 Background task: Fetching config from server...");
-                if let Err(e) = get_app_config(app_handle_for_config).await {
-                    println!("⚠️  Server config unavailable on startup: {}", e);
+                println!("🔄 Background task: Hydrating app config from cloud...");
+                if let Err(e) = hydrate_app_config_from_cloud(&app_handle_for_config).await {
+                    println!("⚠️  App config hydration unavailable on startup: {}", e);
                 }
             });
 
@@ -626,6 +627,8 @@ pub fn main() {
                 tauri::WindowEvent::Focused(focused) => {
                     if window.label() == "main" && *focused {
                         println!("🔍 Main window received focus event");
+                        let app = window.app_handle().clone();
+                        spawn_session_refresh(app, SessionRefreshReason::Foreground);
                         let is_visible = window.is_visible().unwrap_or(false);
                         if !is_visible {
                             show_and_focus_main_window(window.app_handle());
@@ -659,18 +662,20 @@ pub fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            #[cfg(target_os = "macos")]
-            if let RunEvent::Reopen { has_visible_windows, .. } = event {
-                println!(
-                    "🍎 RunEvent::Reopen triggered (has_visible_windows: {})",
-                    has_visible_windows
-                );
-                show_and_focus_main_window(app_handle);
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                let _ = app_handle;
-                let _ = event;
+            match event {
+                #[cfg(target_os = "macos")]
+                RunEvent::Reopen { has_visible_windows, .. } => {
+                    println!(
+                        "🍎 RunEvent::Reopen triggered (has_visible_windows: {})",
+                        has_visible_windows
+                    );
+                    spawn_session_refresh(
+                        app_handle.clone(),
+                        SessionRefreshReason::Foreground,
+                    );
+                    show_and_focus_main_window(app_handle);
+                }
+                _ => {}
             }
         });
 }

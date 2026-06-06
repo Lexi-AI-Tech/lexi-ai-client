@@ -2,6 +2,7 @@
 //!
 //! Tauri commands for managing shortcuts.
 
+use crate::commands::app_config;
 use crate::commands::auth::get_auth_token_async;
 use crate::utils;
 use serde::{Deserialize, Serialize};
@@ -76,6 +77,12 @@ pub async fn get_shortcuts(app: AppHandle) -> Result<Vec<Shortcut>, String> {
         .map_err(|e| format!("Failed to deserialize response: {}", e))
 }
 
+async fn sync_local_shortcuts(app: &AppHandle) {
+    if let Ok(shortcuts) = get_shortcuts(app.clone()).await {
+        let _ = app_config::merge_shortcuts_into_local_store(app, shortcuts);
+    }
+}
+
 /// Create a new shortcut
 #[tauri::command]
 pub async fn create_shortcut(
@@ -126,8 +133,11 @@ pub async fn create_shortcut(
         &data
     };
 
-    serde_json::from_value(shortcut_data.clone())
-        .map_err(|e| format!("Failed to deserialize response: {}", e))
+    let shortcut: Shortcut = serde_json::from_value(shortcut_data.clone())
+        .map_err(|e| format!("Failed to deserialize response: {}", e))?;
+
+    sync_local_shortcuts(&app).await;
+    Ok(shortcut)
 }
 
 /// Update a shortcut
@@ -182,8 +192,11 @@ pub async fn update_shortcut(
         &data
     };
 
-    serde_json::from_value(shortcut_data.clone())
-        .map_err(|e| format!("Failed to deserialize response: {}", e))
+    let shortcut: Shortcut = serde_json::from_value(shortcut_data.clone())
+        .map_err(|e| format!("Failed to deserialize response: {}", e))?;
+
+    sync_local_shortcuts(&app).await;
+    Ok(shortcut)
 }
 
 /// Delete a shortcut
@@ -221,5 +234,6 @@ pub async fn delete_shortcut(app: AppHandle, shortcut_id: String) -> Result<(), 
         return Err(format!("Server error ({}): {}", status, error_text));
     }
 
+    sync_local_shortcuts(&app).await;
     Ok(())
 }

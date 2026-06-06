@@ -12,12 +12,36 @@ use tokio_tungstenite::{
     tungstenite::{client::IntoClientRequest, Message},
 };
 
-use crate::room_websocket::{ServerMessage, TranscriptMessage};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TranscriptMessage {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub text: Option<String>,
+    #[serde(rename = "start_time")]
+    pub start_time: Option<String>,
+    #[serde(rename = "end_time")]
+    pub end_time: Option<String>,
+    #[serde(rename = "speaker_id")]
+    pub speaker_id: Option<u32>,
+    /// message_type: "user_audio" (mic, right), "system_audio" (system, left), "user_note" (typed note).
+    #[serde(rename = "message_type")]
+    pub message_type: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServerMessage {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub message: Option<String>,
+}
 
 pub struct MeetingWebSocket {
     app: AppHandle,
     meeting_id: String,
     jwt_token: String,
+    language: String,
     /// Sends (source, chunk) where source is "user" or "system"; server tags transcripts with message_type.
     pub audio_tx: Arc<Mutex<Option<mpsc::Sender<(String, Vec<u8>)>>>>,
     pub text_tx: Arc<Mutex<Option<mpsc::Sender<String>>>>, // For sending text messages (like end_recording)
@@ -28,11 +52,12 @@ pub struct MeetingWebSocket {
 }
 
 impl MeetingWebSocket {
-    pub fn new(app: AppHandle, meeting_id: String, jwt_token: String) -> Self {
+    pub fn new(app: AppHandle, meeting_id: String, jwt_token: String, language: String) -> Self {
         Self {
             app,
             meeting_id,
             jwt_token,
+            language,
             audio_tx: Arc::new(Mutex::new(None)),
             text_tx: Arc::new(Mutex::new(None)),
             close_tx: Arc::new(Mutex::new(None)),
@@ -46,7 +71,12 @@ impl MeetingWebSocket {
         let ws_base_url = api_base_url
             .replace("http://", "ws://")
             .replace("https://", "wss://");
-        let ws_url = format!("{}/api/v1/meetings/{}/stream", ws_base_url, self.meeting_id);
+        let ws_url = format!(
+            "{}/api/v1/meetings/{}/stream?language={}",
+            ws_base_url,
+            self.meeting_id,
+            urlencoding::encode(&self.language)
+        );
 
         let mut request = ws_url
             .into_client_request()

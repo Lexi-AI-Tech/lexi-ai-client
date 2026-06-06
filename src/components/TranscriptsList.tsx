@@ -13,7 +13,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useKeycapLayout } from "../hooks/useKeycapLayout";
 import { lookupKeycap, type KeycapLayout } from "../lib/keySymbols";
 import { HotkeyKeycapSymbol } from "./HotkeyKeycapSymbol";
-import type { Transcript, TauriAppConfig } from "../types";
+import type { Transcript } from "../types";
+import { useAppConfigStore } from "../store/appConfigStore";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
@@ -171,22 +172,12 @@ export const TranscriptsList: React.FC<TranscriptsListProps> = ({
     }
   }, [authStore.isAuthenticated, authStore.isInitialized, toast]);
 
+  const { config: appConfig } = useAppConfigStore();
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const cfg = await invoke<TauriAppConfig>("get_app_config");
-        if (cancelled) return;
-        const list = (cfg.hotkeys ?? []).filter(Boolean).slice(0, 3);
-        setTranscriptionHotkeys(list);
-      } catch (e) {
-        console.warn("Failed to load transcription hotkeys:", e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const list = (appConfig?.hotkeys ?? []).filter(Boolean).slice(0, 3);
+    setTranscriptionHotkeys(list);
+  }, [appConfig?.hotkeys]);
 
   // Infinite scrolling observer
   const observer = useRef<IntersectionObserver | null>(null);

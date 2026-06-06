@@ -6,11 +6,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useKeycapLayout } from "../hooks/useKeycapLayout";
 import { lookupKeycap, type KeycapLayout } from "../lib/keySymbols";
 import { HotkeyKeycapSymbol } from "./HotkeyKeycapSymbol";
-import type {
-  ActionHistory,
-  PaginatedActionHistoryResponse,
-  TauriAppConfig,
-} from "../types";
+import type { ActionHistory, PaginatedActionHistoryResponse } from "../types";
+import { useAppConfigStore } from "../store/appConfigStore";
 import { formatDateRelative } from "../lib/dateUtils";
 import { useAuthStore } from "../store/authStore";
 import { GoogleLoginButton } from "./auth/GoogleLoginButton";
@@ -172,22 +169,12 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     }
   }, [authStore.isAuthenticated, authStore.isInitialized, loadActionsPage]);
 
+  const { config: appConfig } = useAppConfigStore();
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const cfg = await invoke<TauriAppConfig>("get_app_config");
-        if (cancelled) return;
-        const list = (cfg.action_hotkeys ?? []).filter(Boolean).slice(0, 3);
-        setActionHotkeys(list);
-      } catch (e) {
-        console.warn("Failed to load action hotkeys:", e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const list = (appConfig?.action_hotkeys ?? []).filter(Boolean).slice(0, 3);
+    setActionHotkeys(list);
+  }, [appConfig?.action_hotkeys]);
 
   const lastElementRef = useCallback(
     (node: HTMLDivElement | null) => {

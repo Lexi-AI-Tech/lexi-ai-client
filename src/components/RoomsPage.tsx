@@ -1,12 +1,12 @@
 /**
  * RoomsPage Component
  *
- * Displays a list of rooms and allows creating new ones.
+ * Lists rooms and allows creating/opening a room.
  */
 
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Room } from "../types";
+import type { Room } from "../types";
 import { RoomLiveView } from "./RoomLiveView";
 import { useToast } from "./toast/useToast";
 import { PageLoader } from "./ui/PageLoader";
@@ -27,7 +27,7 @@ export const RoomsPage: React.FC = () => {
       setRooms(result);
     } catch (err: any) {
       console.error("Failed to fetch rooms:", err);
-      toast.error(err.message || "Failed to fetch rooms");
+      toast.error(err?.message || "Failed to fetch rooms");
     } finally {
       setLoading(false);
     }
@@ -40,18 +40,16 @@ export const RoomsPage: React.FC = () => {
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoomName.trim()) return;
-
     try {
       const room = await invoke<Room>("create_room", { name: newRoomName });
       setNewRoomName("");
       setShowCreateModal(false);
-      // Immediately open the new room
       setSelectedRoomId(room.id);
       fetchRooms();
       toast.success("Room created");
     } catch (err: any) {
       console.error("Failed to create room:", err);
-      toast.error(err.message || "Failed to create room");
+      toast.error(err?.message || "Failed to create room");
     }
   };
 
@@ -61,7 +59,7 @@ export const RoomsPage: React.FC = () => {
         roomId={selectedRoomId}
         onBack={() => {
           setSelectedRoomId(null);
-          fetchRooms(); // Refresh list on return
+          fetchRooms();
         }}
       />
     );
@@ -88,31 +86,8 @@ export const RoomsPage: React.FC = () => {
       </div>
 
       {showCreateModal && (
-        <div
-          className="modal-overlay"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-            zIndex: 1000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <div
-            className="modal-content"
-            style={{
-              backgroundColor: "#1e1e1e",
-              padding: "24px",
-              borderRadius: "12px",
-              width: "400px",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-            }}
-          >
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ width: 420 }}>
             <h4 style={{ marginTop: 0 }}>Create New Room</h4>
             <form onSubmit={handleCreateRoom}>
               <div className="form-group">
@@ -123,25 +98,10 @@ export const RoomsPage: React.FC = () => {
                   onChange={(e) => setNewRoomName(e.target.value)}
                   placeholder="e.g. Weekly Sync"
                   autoFocus
-                  style={{
-                    width: "100%",
-                    padding: "8px",
-                    marginTop: "8px",
-                    backgroundColor: "#333",
-                    border: "1px solid #444",
-                    color: "white",
-                    borderRadius: "4px",
-                  }}
+                  style={{ width: "100%", marginTop: 8 }}
                 />
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "12px",
-                  marginTop: "24px",
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 16 }}>
                 <button
                   type="button"
                   className="settings-button"
@@ -164,7 +124,7 @@ export const RoomsPage: React.FC = () => {
         <div style={{ padding: "40px", textAlign: "center", opacity: 0.6 }}>
           <p>No rooms found.</p>
           <p style={{ fontSize: "12px" }}>
-            Create a room to start recording meetings.
+            Create a room to start recording.
           </p>
         </div>
       ) : (
@@ -188,31 +148,12 @@ export const RoomsPage: React.FC = () => {
                 borderRadius: "8px",
                 cursor: "pointer",
                 border: "1px solid rgba(255, 255, 255, 0.05)",
-                transition: "background 0.2s",
               }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.1)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.05)")
-              }
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: "16px" }}>
-                    {room.name}
-                  </div>
-                  <div
-                    style={{ fontSize: "12px", opacity: 0.6, marginTop: "4px" }}
-                  >
+                  <div style={{ fontWeight: 600, fontSize: "16px" }}>{room.name}</div>
+                  <div style={{ fontSize: "12px", opacity: 0.6, marginTop: 4 }}>
                     {formatAppDateTime(room.created_at)}
                   </div>
                 </div>
@@ -224,3 +165,4 @@ export const RoomsPage: React.FC = () => {
     </div>
   );
 };
+

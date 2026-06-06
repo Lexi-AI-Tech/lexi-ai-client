@@ -22,6 +22,7 @@
 //! - **Debug Logging**: Detailed logging of request/response for troubleshooting
 
 use crate::api_endpoints::assistant;
+use crate::commands::shortcuts::Shortcut;
 use crate::cursor_context::{get_cursor_context, CursorContext};
 use crate::utils;
 // use crate::whisper; // COMMENTED OUT: Model execution functionality
@@ -58,10 +59,11 @@ impl AssistantService {
     /// * `audio_data` - WAV file data as bytes (typically from AudioRecorder)
     /// * `auth_token` - Optional authentication token (Bearer token) for authenticated requests
     /// * `language` - Language code for transcription (e.g., "en", "es", "auto")
+    /// * `vocabulary` - Vocabulary terms sent to the server
     /// * `enhance_transcription` - Whether to enhance the transcription with AI
+    /// * `shortcuts` - Shortcut items for post-STT expansion
     /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
     /// * `offline_transcription` - Whether to use local Whisper model instead of server API
-    /// * `vocabulary` - Optional vocabulary array to use as initial prompt for offline transcription
     ///
     /// Cursor context (focused app, selected text) is fetched inside this function just before
     /// calling the Assistant API and is returned with the transcription for use by the caller.
@@ -75,6 +77,10 @@ impl AssistantService {
         auth_token: Result<String, String>,
         app_handle: Option<AppHandle>,
         offline_transcription: bool,
+        language: String,
+        vocabulary: Vec<String>,
+        enhance_transcription: bool,
+        shortcuts: Vec<Shortcut>,
     ) -> Result<(String, Option<CursorContext>), Box<dyn Error + Send + Sync>> {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
@@ -135,15 +141,26 @@ impl AssistantService {
             // Continue with server API transcription
 
             let build_form = |audio_data: &[u8],
-                              focused_app: &str|
+                              focused_app: &str,
+                              language: &str,
+                              vocabulary: &[String],
+                              enhance_transcription: bool,
+                              shortcuts: &[Shortcut]|
              -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
                 let part = multipart::Part::bytes(audio_data.to_vec())
                     .file_name("audio.wav")
                     .mime_str("audio/wav")?;
 
+                let vocabulary_json = serde_json::to_string(vocabulary)?;
+                let shortcuts_json = serde_json::to_string(shortcuts)?;
+
                 let form = multipart::Form::new()
                     .part("audio_file", part)
-                    .text("focused_app", focused_app.to_string());
+                    .text("focused_app", focused_app.to_string())
+                    .text("language", language.to_string())
+                    .text("vocabulary", vocabulary_json)
+                    .text("enhance_transcription", enhance_transcription.to_string())
+                    .text("shortcuts", shortcuts_json);
 
                 Ok(form)
             };
@@ -175,23 +192,29 @@ impl AssistantService {
                 .unwrap_or_else(|| "Unknown".to_string());
 
             // Build the form and make the request
-            let form = build_form(&audio_data, &focused_app)?;
+            let form = build_form(
+                &audio_data,
+                &focused_app,
+                &language,
+                &vocabulary,
+                enhance_transcription,
+                &shortcuts,
+            )?;
 
-            // Build the request URL
-            let system_type = utils::get_system_type();
-            let device_type = utils::get_device_type();
-            let url = format!(
-                "{}?system_type={}&device_type={}",
-                assistant::transcribe_url(),
-                urlencoding::encode(system_type),
-                urlencoding::encode(device_type)
-            );
+            // Build the request URL (auth + billing only; config is in the form body)
+            let url = assistant::transcribe_url();
             utils::log_api_request("POST", &url);
             let mut request = self.client.post(&url).multipart(form);
             request = request.header("Authorization", format!("Bearer {}", current_token));
+            if let Some(handle) = &app_handle {
+                request = utils::apply_feature_usage_header(handle, request);
+            }
 
             // Send the initial request
             let res = request.send().await?;
+            if let Some(handle) = &app_handle {
+                utils::capture_feature_usage_header(handle, &res);
+            }
 
             let status = res.status();
             println!("🔍 DEBUG: Response status: {}", status);

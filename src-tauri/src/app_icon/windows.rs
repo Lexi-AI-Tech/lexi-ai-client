@@ -12,7 +12,7 @@ use winapi::shared::minwindef::{FALSE, UINT};
 use winapi::shared::windef::{HBITMAP, HICON};
 use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
 use winapi::um::processthreadsapi::OpenProcess;
-use winapi::um::shellapi::{SHFILEINFOW, SHGetFileInfoW, SHGFI_ICON, SHGFI_LARGEICON};
+use winapi::um::shellapi::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
 use winapi::um::tlhelp32::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
 };
@@ -36,10 +36,7 @@ struct LangCodePage {
 }
 
 fn to_wide_path(path: &Path) -> Vec<u16> {
-    path.as_os_str()
-        .encode_wide()
-        .chain(Some(0))
-        .collect()
+    path.as_os_str().encode_wide().chain(Some(0)).collect()
 }
 
 fn file_description(path: &Path) -> Option<String> {
@@ -51,14 +48,8 @@ fn file_description(path: &Path) -> Option<String> {
         return None;
     }
     let mut buf = vec![0u8; info_size as usize];
-    if unsafe {
-        GetFileVersionInfoW(
-            path_ptr as LPCWSTR,
-            0,
-            info_size,
-            buf.as_mut_ptr().cast(),
-        )
-    } == FALSE
+    if unsafe { GetFileVersionInfoW(path_ptr as LPCWSTR, 0, info_size, buf.as_mut_ptr().cast()) }
+        == FALSE
     {
         return None;
     }

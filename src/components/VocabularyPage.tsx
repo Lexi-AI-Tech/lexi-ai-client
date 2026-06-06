@@ -1,7 +1,8 @@
-import React, { useEffect, useId, useState } from "react";
+import React, { useId, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, Plus, Trash2, Edit, Info, Languages } from "lucide-react";
-import type { TauriAppConfig } from "../types";
+import type { AppConfig } from "../types";
+import { useAppConfigStore } from "../store/appConfigStore";
 import { useToast } from "./toast/useToast";
 import { ScreenSkeleton } from "./ui/ScreenSkeleton";
 import { motion } from "framer-motion";
@@ -44,8 +45,8 @@ function VocabularyPageHeading() {
 
 export const VocabularyPage: React.FC = () => {
   const toast = useToast();
-  const [config, setConfig] = useState<TauriAppConfig | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { config, isLoading, isInitialized, refreshFromCloud } =
+    useAppConfigStore();
   const [isUpdating, setIsUpdating] = useState(false);
   const [newVocabularyValue, setNewVocabularyValue] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -58,34 +59,12 @@ export const VocabularyPage: React.FC = () => {
 
   const vocabulary = config?.vocabulary || [];
 
-  // Load app config on mount
-  useEffect(() => {
-    const loadConfig = async () => {
-      setIsLoading(true);
-
-      try {
-        const loadedConfig = await invoke<TauriAppConfig>("get_app_config");
-        setConfig(loadedConfig);
-      } catch (err: any) {
-        console.error("Failed to load app config:", err);
-        toast.error(err?.message || "Failed to load vocabulary");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadConfig();
-  }, []);
-
-  // Update config function
-  const updateConfig = async (updates: Partial<TauriAppConfig>) => {
+  const updateConfig = async (updates: Partial<AppConfig>) => {
     setIsUpdating(true);
     try {
-      const updatedConfig = await invoke<TauriAppConfig>("update_app_config", {
+      await invoke<AppConfig>("update_app_config", {
         config: updates,
       });
-      setConfig(updatedConfig);
-      return updatedConfig;
     } catch (err: any) {
       console.error("Failed to update config:", err);
       toast.error(err?.message || "Failed to update vocabulary");
@@ -179,7 +158,7 @@ export const VocabularyPage: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !isInitialized) {
     return (
       <div className="page">
         <VocabularyPageHeading />
@@ -251,19 +230,7 @@ export const VocabularyPage: React.FC = () => {
           <div className="vocab-actions">
             <button
               type="button"
-              onClick={async () => {
-                setIsLoading(true);
-                try {
-                  const loadedConfig =
-                    await invoke<TauriAppConfig>("get_app_config");
-                  setConfig(loadedConfig);
-                } catch (err: any) {
-                  console.error("Failed to load app config:", err);
-                  toast.error(err?.message || "Failed to load vocabulary");
-                } finally {
-                  setIsLoading(false);
-                }
-              }}
+              onClick={() => void refreshFromCloud()}
               className="btn btn--icon"
               aria-label="Refresh"
             >

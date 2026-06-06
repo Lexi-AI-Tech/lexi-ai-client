@@ -12,6 +12,8 @@
 //! - Token exchange and management
 
 use crate::commands::app_config;
+use crate::commands::billing;
+use crate::commands::feature_usage_store;
 use crate::google_oauth;
 use crate::secure_storage::{self, AuthData, UserData};
 use crate::utils;
@@ -50,6 +52,8 @@ pub struct AuthDataRequest {
     pub expires_at: Option<u64>,
     pub expires_in: Option<u64>,
     pub user: Option<UserDataRequest>,
+    #[serde(default)]
+    pub feature_usage: Option<String>,
 }
 
 /// User data structure for authentication (frontend interface)
@@ -155,6 +159,7 @@ impl From<AuthData> for AuthDataRequest {
             expires_at: data.expires_at,
             expires_in: data.expires_in,
             user: data.user.map(Into::into),
+            feature_usage: None,
         }
     }
 }
@@ -198,21 +203,30 @@ impl From<UserData> for UserDataRequest {
 /// * `data` - Authentication data including tokens and user information
 #[tauri::command]
 pub async fn store_auth_data(app: AppHandle, data: AuthDataRequest) -> Result<(), String> {
+    let feature_usage = data.feature_usage.clone();
     let auth_data: AuthData = data.into();
     secure_storage::store_auth_data(&app, &auth_data)?;
 
     // After login, force fetch config from server and save it to Tauri Store
     // This ensures we get default settings from server and override any first launch config
-    match app_config::fetch_config_from_server(&app).await {
-        Ok(mut config) => {
-            println!("✅ App config fetched and saved after login");
-            // Sync autostart status with OS based on server config
-            app_config::sync_autostart_status(&app, &mut config);
+    if let Some(ref feature_usage) = feature_usage {
+        if !feature_usage.is_empty() {
+            let _ = feature_usage_store::save_feature_usage(&app, feature_usage);
+        }
+    }
+
+    match app_config::hydrate_app_config_from_cloud(&app).await {
+        Ok(_) => {
+            println!("✅ App config hydrated after login");
         }
         Err(e) => {
-            eprintln!("⚠️  Failed to fetch app config after login: {}", e);
-            // Don't fail the login if config fetch fails, but log it
+            eprintln!("⚠️  Failed to hydrate app config after login: {}", e);
         }
+    }
+
+    match billing::hydrate_feature_usage_from_cloud(&app).await {
+        Ok(_) => println!("✅ Feature usage hydrated after login"),
+        Err(e) => eprintln!("⚠️  Failed to hydrate feature usage after login: {}", e),
     }
 
     emit_auth_state_changed(&app);
@@ -246,6 +260,8 @@ pub async fn auth_get_state(app: AppHandle) -> Result<AuthUiStateResponse, Strin
 #[tauri::command]
 pub async fn clear_auth_data(app: AppHandle) -> Result<(), String> {
     secure_storage::clear_auth_data(&app)?;
+    let _ = crate::commands::app_config_store::clear_local_config(&app);
+    let _ = feature_usage_store::clear_feature_usage_store(&app);
     emit_auth_state_changed(&app);
     Ok(())
 }
@@ -254,6 +270,8 @@ pub async fn clear_auth_data(app: AppHandle) -> Result<(), String> {
 /// resets onboarding so the user is sent back to re-authenticate, then emits auth_expired.
 pub fn handle_auth_expired(app: &AppHandle) {
     let _ = secure_storage::clear_auth_data(app);
+    let _ = crate::commands::app_config_store::clear_local_config(app);
+    let _ = feature_usage_store::clear_feature_usage_store(app);
     if let Err(e) = crate::commands::onboarding::reset_onboarding(app.clone()) {
         eprintln!("Failed to reset onboarding on auth expiry: {}", e);
     }
@@ -367,6 +385,17 @@ async fn refresh_access_token(
                             };
 
                             secure_storage::store_auth_data(app, &new_auth_data)?;
+
+                            if let Some(feature_usage) =
+                                token_data.get("feature_usage").and_then(|v| v.as_str())
+                            {
+                                if !feature_usage.is_empty() {
+                                    let _ = feature_usage_store::save_feature_usage(
+                                        app,
+                                        feature_usage,
+                                    );
+                                }
+                            }
                             emit_auth_state_changed(app);
                             println!("✅ Access token refreshed successfully");
                             Ok(Some(access_token.to_string()))
@@ -729,6 +758,7 @@ pub async fn logout(app: AppHandle) -> Result<(), String> {
 
     // Clear local auth data and reset onboarding so user sees onboarding on next launch
     secure_storage::clear_auth_data(&app)?;
+    let _ = crate::commands::app_config_store::clear_local_config(&app);
     if let Err(e) = crate::commands::onboarding::reset_onboarding(app.clone()) {
         eprintln!("Failed to reset onboarding on logout: {}", e);
     }

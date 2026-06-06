@@ -17,7 +17,7 @@ interface FeatureUsageEntry {
   metered: boolean;
 }
 
-interface BillingUsageResponse {
+interface FeatureUsageResponse {
   plan_type: string;
   period_start: string;
   period_end: string;
@@ -99,7 +99,7 @@ interface UpgradeModalProps {
 
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
   const toast = useToast();
-  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(
+  const [featureUsage, setFeatureUsage] = useState<FeatureUsageResponse | null>(
     null,
   );
   const [isUpgrading, setIsUpgrading] = useState(false);
@@ -109,23 +109,23 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
 
   useEffect(() => {
     let cancelled = false;
-    invoke<BillingUsageResponse>("get_billing_usage")
+    invoke<FeatureUsageResponse>("get_feature_usage")
       .then((data) => {
-        if (!cancelled) setBillingUsage(data);
+        if (!cancelled) setFeatureUsage(data);
       })
       .catch((err) => {
-        console.error("Failed to fetch billing usage:", err);
+        console.error("Failed to fetch feature usage:", err);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const refreshBillingUsage =
-    useCallback(async (): Promise<BillingUsageResponse | null> => {
+  const refreshFeatureUsage =
+    useCallback(async (): Promise<FeatureUsageResponse | null> => {
       try {
-        const data = await invoke<BillingUsageResponse>("get_billing_usage");
-        setBillingUsage(data);
+        const data = await invoke<FeatureUsageResponse>("get_feature_usage");
+        setFeatureUsage(data);
         return data;
       } catch (e) {
         return null;
@@ -140,7 +140,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
     pollInFlightRef.current = true;
     try {
       setUpgradePollAttempts((n) => n + 1);
-      const latest = await refreshBillingUsage();
+      const latest = await refreshFeatureUsage();
       if (latest && isPro(latest.plan_type)) {
         // Pull a fresh access token so any plan/entitlement claims update immediately.
         try {
@@ -148,7 +148,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
         } catch (e) {
           // Even if refresh fails, plan is upgraded server-side; user can still retry actions.
         }
-        await refreshBillingUsage();
+        await refreshFeatureUsage();
         try {
           // Bring focus back to the app via Rust (more reliable on macOS).
           await invoke("show_main_window");
@@ -168,7 +168,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
     } finally {
       pollInFlightRef.current = false;
     }
-  }, [onClose, refreshBillingUsage, toast]);
+  }, [onClose, refreshFeatureUsage, toast]);
 
   const handleUpgrade = useCallback(async () => {
     try {
@@ -212,7 +212,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
   }, [isAwaitingUpgrade, pollForUpgrade]);
 
   const usageMap = new Map<string, FeatureUsageEntry>(
-    (billingUsage?.features ?? []).map((f) => [f.feature_key, f]),
+    (featureUsage?.features ?? []).map((f) => [f.feature_key, f]),
   );
 
   return (
@@ -295,7 +295,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ onClose }) => {
                       </div>
                     </div>
 
-                    {billingUsage && limit != null && (
+                    {featureUsage && limit != null && (
                       <div className="upgrade-plan-usage-bar-wrap">
                         <div className="upgrade-plan-usage-bar">
                           <div
