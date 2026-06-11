@@ -45,8 +45,8 @@ pub async fn get_notes(
 ) -> Result<PaginatedNotesResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };
@@ -109,8 +109,8 @@ pub async fn get_notes(
 pub async fn get_note(app: AppHandle, note_id: String) -> Result<Note, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };
@@ -155,8 +155,8 @@ pub async fn get_note(app: AppHandle, note_id: String) -> Result<Note, String> {
 pub async fn create_note(app: AppHandle, content: String) -> Result<Note, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };
@@ -209,8 +209,8 @@ pub async fn update_note(
 ) -> Result<Note, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };
@@ -259,8 +259,8 @@ pub async fn update_note(
 pub async fn delete_note(app: AppHandle, note_id: String) -> Result<(), String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };

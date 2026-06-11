@@ -20,8 +20,8 @@ pub struct CacheWarmupResponse {
 pub async fn user_cache_warmup(app: AppHandle) -> Result<CacheWarmupResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };

@@ -124,8 +124,8 @@ pub async fn get_default_hotkeys(app: AppHandle) -> Result<DefaultHotkeysRespons
                     .to_string(),
             );
         }
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Please sign in to sync your settings".to_string());
         }
     };
@@ -175,8 +175,8 @@ pub(crate) async fn fetch_config_from_server(app: &AppHandle) -> Result<AppConfi
                     .to_string(),
             );
         }
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(app, &e);
             return Err("Please sign in to sync your settings".to_string());
         }
     };

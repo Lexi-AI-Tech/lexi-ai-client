@@ -33,9 +33,9 @@ async fn fetch_feature_usage_period(
 ) -> Result<FeatureUsageResponse, String> {
     let auth_token = match get_auth_token_async(app).await {
         Ok(token) => token,
-        Err(_) => {
+        Err(e) => {
             if emit_auth_expired_on_failure {
-                crate::commands::auth::handle_auth_expired(app);
+                crate::commands::auth::handle_auth_error(app, &e);
             }
             return Err("Authentication required".to_string());
         }
@@ -129,8 +129,8 @@ pub async fn create_billing_checkout(
 ) -> Result<CheckoutResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };
@@ -176,8 +176,8 @@ pub async fn cancel_billing_subscription(
 ) -> Result<CancelSubscriptionResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };
@@ -221,8 +221,8 @@ pub async fn get_current_subscription(
 ) -> Result<CurrentSubscriptionResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };

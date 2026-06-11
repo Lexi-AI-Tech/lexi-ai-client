@@ -86,6 +86,10 @@ async fn run_session_refresh(app: &AppHandle, reason: SessionRefreshReason) {
 /// Spawn a one-shot refresh (does not block the UI).
 pub fn spawn_session_refresh(app: AppHandle, reason: SessionRefreshReason) {
     tauri::async_runtime::spawn(async move {
+        // Defer foreground refresh so focus-triggered API calls acquire the refresh lock first.
+        if matches!(reason, SessionRefreshReason::Foreground) {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
         run_session_refresh(&app, reason).await;
     });
 }

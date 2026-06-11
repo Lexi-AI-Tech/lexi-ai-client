@@ -26,15 +26,181 @@ use tauri::{AppHandle, Emitter};
 // Background Refresh Synchronization
 // ============================================================================
 
-/// Static flag to track if a background token refresh is currently in progress.
-/// This prevents multiple concurrent refresh attempts when multiple API calls
-/// happen simultaneously.
+const PROACTIVE_REFRESH_BUFFER_SECS: u64 = 15 * 60;
+const REFRESH_LOCK_WAIT_SECS: u64 = 5;
+const REFRESH_LOCK_POLL_MS: u64 = 100;
+
+/// Static flag to track if a token refresh HTTP call is currently in progress.
+/// All refresh paths must acquire this lock — the server revokes the old refresh
+/// token on each successful rotation.
 static REFRESH_IN_PROGRESS: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
 
 fn get_refresh_flag() -> Arc<Mutex<bool>> {
     REFRESH_IN_PROGRESS
         .get_or_init(|| Arc::new(Mutex::new(false)))
         .clone()
+}
+
+struct RefreshLockGuard {
+    flag: Arc<Mutex<bool>>,
+}
+
+impl RefreshLockGuard {
+    fn try_acquire(flag: Arc<Mutex<bool>>) -> Option<Self> {
+        let mut guard = flag.lock().ok()?;
+        if *guard {
+            return None;
+        }
+        *guard = true;
+        drop(guard);
+        Some(Self { flag })
+    }
+}
+
+impl Drop for RefreshLockGuard {
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.flag.lock() {
+            *guard = false;
+        }
+    }
+}
+
+fn unix_now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+/// Returns a stored access token when it is still within its expiry window.
+fn try_get_valid_access_token(app: &AppHandle) -> Option<String> {
+    let data = secure_storage::get_auth_data(app).ok()??;
+    let now = unix_now_secs();
+    let still_valid = data
+        .expires_at
+        .map(|expires_at| expires_at > now)
+        .unwrap_or(false);
+    if still_valid {
+        Some(data.access_token)
+    } else {
+        None
+    }
+}
+
+/// When a refresh should run, given the current stored auth snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RefreshMode {
+    /// Refresh only when the access token is already expired.
+    IfExpired,
+    /// Refresh when expired or within the proactive buffer window.
+    IfExpiringSoon,
+    /// Always call the refresh endpoint when a refresh token exists (session scheduler).
+    Always,
+}
+
+fn should_refresh_auth(auth: &AuthData, mode: RefreshMode) -> bool {
+    let now = unix_now_secs();
+    match mode {
+        RefreshMode::Always => true,
+        RefreshMode::IfExpired => auth.expires_at.map(|e| e <= now).unwrap_or(true),
+        RefreshMode::IfExpiringSoon => auth
+            .expires_at
+            .map(|e| e <= now + PROACTIVE_REFRESH_BUFFER_SECS)
+            .unwrap_or(true),
+    }
+}
+
+/// Outcome of a serialized refresh attempt.
+#[derive(Debug, PartialEq, Eq)]
+enum LockedRefreshResult {
+    Success,
+    AlreadyValid,
+    Rejected,
+    NoSession,
+    NetworkError(String),
+}
+
+/// Returns true when the user must sign in again (not transient failures).
+pub fn requires_reauth(error: &str) -> bool {
+    matches!(error, "expired" | "no_auth_data")
+}
+
+/// Clears the session only when re-authentication is required.
+pub fn handle_auth_error(app: &AppHandle, error: &str) {
+    if requires_reauth(error) {
+        handle_auth_expired(app);
+    }
+}
+
+async fn acquire_refresh_lock() -> Option<RefreshLockGuard> {
+    let flag = get_refresh_flag();
+    let deadline =
+        std::time::Instant::now() + std::time::Duration::from_secs(REFRESH_LOCK_WAIT_SECS);
+
+    loop {
+        if let Some(guard) = RefreshLockGuard::try_acquire(flag.clone()) {
+            return Some(guard);
+        }
+
+        if std::time::Instant::now() >= deadline {
+            eprintln!("⚠️  Timeout waiting for concurrent token refresh lock");
+            return None;
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(REFRESH_LOCK_POLL_MS)).await;
+    }
+}
+
+async fn refresh_tokens_serialized(
+    app: &AppHandle,
+    mode: RefreshMode,
+) -> LockedRefreshResult {
+    let _lock = match acquire_refresh_lock().await {
+        Some(guard) => guard,
+        None => {
+            if try_get_valid_access_token(app).is_some() {
+                return LockedRefreshResult::AlreadyValid;
+            }
+            return LockedRefreshResult::NetworkError("refresh lock timeout".to_string());
+        }
+    };
+
+    let auth_data = match secure_storage::get_auth_data(app) {
+        Ok(Some(data)) => data,
+        Ok(None) => return LockedRefreshResult::NoSession,
+        Err(e) => {
+            eprintln!("⚠️  Failed to read auth data during refresh: {}", e);
+            return LockedRefreshResult::NetworkError("storage_error".to_string());
+        }
+    };
+
+    if !should_refresh_auth(&auth_data, mode) {
+        return LockedRefreshResult::AlreadyValid;
+    }
+
+    let Some(refresh_token) = auth_data.refresh_token.clone() else {
+        return LockedRefreshResult::Rejected;
+    };
+
+    match refresh_access_token(app, &refresh_token).await {
+        Ok(Some(_)) => LockedRefreshResult::Success,
+        Ok(None) => {
+            if try_get_valid_access_token(app).is_some() {
+                println!("ℹ️  Refresh rejected but another caller left a valid token");
+                LockedRefreshResult::Success
+            } else {
+                LockedRefreshResult::Rejected
+            }
+        }
+        Err(e) => {
+            if try_get_valid_access_token(app).is_some() {
+                println!("ℹ️  Refresh network error but stored token is still valid");
+                LockedRefreshResult::Success
+            } else {
+                LockedRefreshResult::NetworkError(e)
+            }
+        }
+    }
 }
 
 // ============================================================================
@@ -429,19 +595,13 @@ async fn refresh_access_token(
 /// Get the current authentication token (helper for internal Rust code)
 ///
 /// Refresh strategy:
-/// - If token is EXPIRED: Block and refresh first, then return new token
-/// - If token expires within 5 minutes: Return current token, spawn background refresh
-/// - If token is valid (>5 min): Return token as-is
-///
-/// This ensures API calls never block for refresh unless absolutely necessary.
-///
-/// # Arguments
-/// * `app` - The Tauri AppHandle to access secure storage
+/// - If token is EXPIRED: block on serialized refresh, then return new token
+/// - If token expires within 15 minutes: return current token, spawn background refresh
+/// - If token is valid (>15 min): return token as-is
 ///
 /// # Returns
-/// * `Result<String, String>` - The current access token if available, or an error string ("expired", "network_error", etc).
+/// Error codes: `no_auth_data`, `expired`, `network_error`, `storage_error`
 pub async fn get_auth_token_async(app: &AppHandle) -> Result<String, String> {
-    // Read auth data from secure storage
     let auth_data = match secure_storage::get_auth_data(app) {
         Ok(Some(data)) => data,
         Ok(None) => return Err("no_auth_data".to_string()),
@@ -451,167 +611,64 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Result<String, String> {
         }
     };
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = unix_now_secs();
 
-    let buffer_time = 15 * 60; // 15 minutes in seconds
-
-    // Determine token state
     let (is_expired, needs_background_refresh) = if let Some(expires_at) = auth_data.expires_at {
         let is_expired = expires_at <= now;
-        let expires_soon = expires_at <= now + buffer_time;
+        let expires_soon = expires_at <= now + PROACTIVE_REFRESH_BUFFER_SECS;
         (is_expired, expires_soon && !is_expired)
     } else {
-        // No expires_at set - assume expired to be safe
         (true, false)
     };
 
-    // Case 1: Token is EXPIRED - must refresh before returning
     if is_expired {
-        let refresh_flag = get_refresh_flag();
-
-        // Try to acquire the refresh lock atomically
-        let is_first = {
-            let mut in_progress = refresh_flag.lock().unwrap();
-            if *in_progress {
-                // Another thread is already refreshing
-                false
-            } else {
-                // We're the first - claim the lock
-                *in_progress = true;
-                true
+        println!("🔴 Token expired, refreshing before API call...");
+        return match refresh_tokens_serialized(app, RefreshMode::IfExpired).await {
+            LockedRefreshResult::Success | LockedRefreshResult::AlreadyValid => {
+                try_get_valid_access_token(app).ok_or_else(|| "expired".to_string())
+            }
+            LockedRefreshResult::Rejected | LockedRefreshResult::NoSession => {
+                eprintln!("⚠️  Token refresh rejected, user needs to re-authenticate");
+                Err("expired".to_string())
+            }
+            LockedRefreshResult::NetworkError(e) => {
+                eprintln!("⚠️  Token refresh failed due to network error: {}", e);
+                Err("network_error".to_string())
             }
         };
-
-        if !is_first {
-            // Another thread is refreshing - wait for it to complete
-            println!("🔴 Token expired, but refresh already in progress, waiting...");
-
-            // Poll the flag until refresh completes (with timeout)
-            let start = std::time::Instant::now();
-            loop {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                let in_progress = {
-                    let guard = refresh_flag.lock().unwrap();
-                    *guard
-                };
-
-                if !in_progress {
-                    // Refresh completed, get the new token
-                    if let Ok(Some(data)) = secure_storage::get_auth_data(app) {
-                        if let Some(expires_at) = data.expires_at {
-                            let now = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs();
-                            if expires_at > now {
-                                println!("✅ Got refreshed token from concurrent refresh");
-                                return Ok(data.access_token);
-                            }
-                        }
-                    }
-                    break;
-                }
-
-                // Timeout after 5 seconds
-                if start.elapsed().as_secs() >= 5 {
-                    eprintln!("⚠️  Timeout waiting for concurrent token refresh");
-                    break;
-                }
-            }
-
-            // After waiting, try to get the token again
-            if let Ok(Some(data)) = secure_storage::get_auth_data(app) {
-                return Ok(data.access_token);
-            }
-            return Err("expired".to_string());
-        }
-
-        // We're the first to see expired token - do the refresh
-        println!("🔴 Token expired, refreshing before API call...");
-        if let Some(refresh_token) = &auth_data.refresh_token {
-            let refresh_flag_clone = refresh_flag.clone();
-            match refresh_access_token(app, refresh_token).await {
-                Ok(Some(new_token)) => {
-                    println!("✅ Token refreshed (was expired)");
-                    // Reset flag
-                    if let Ok(mut flag) = refresh_flag_clone.lock() {
-                        *flag = false;
-                    }
-                    return Ok(new_token);
-                }
-                Ok(None) => {
-                    eprintln!(
-                        "⚠️  Token refresh rejected by auth server, user needs to re-authenticate"
-                    );
-                    // Reset flag
-                    if let Ok(mut flag) = refresh_flag_clone.lock() {
-                        *flag = false;
-                    }
-                    return Err("expired".to_string()); // Force re-auth
-                }
-                Err(e) => {
-                    eprintln!("⚠️  Token refresh failed due to network error: {}", e);
-                    // Reset flag
-                    if let Ok(mut flag) = refresh_flag_clone.lock() {
-                        *flag = false;
-                    }
-                    return Err("network_error".to_string());
-                }
-            }
-        } else {
-            eprintln!("⚠️  Token expired but no refresh token available");
-            // Reset flag
-            if let Ok(mut flag) = refresh_flag.lock() {
-                *flag = false;
-            }
-            return Err("expired".to_string());
-        }
     }
 
-    // Case 2: Token expires soon (<15 min) - return current token, refresh in background
     if needs_background_refresh {
         let refresh_flag = get_refresh_flag();
-        let mut in_progress = refresh_flag.lock().unwrap();
+        let already_refreshing = refresh_flag.lock().map(|g| *g).unwrap_or(false);
 
-        // Only spawn a new refresh task if one isn't already in progress
-        if !*in_progress {
-            *in_progress = true;
-            drop(in_progress); // Release lock before spawning async task
-
+        if !already_refreshing {
             println!("🟡 Token expires soon, spawning background refresh...");
-            if let Some(refresh_token) = auth_data.refresh_token.clone() {
-                let app_clone = app.clone();
-                let refresh_flag_clone = refresh_flag.clone();
-
-                // Spawn background task - don't block API call
-                tokio::spawn(async move {
-                    match refresh_access_token(&app_clone, &refresh_token).await {
-                        Ok(Some(_)) => println!("✅ Background token refresh completed"),
-                        Ok(None) => println!("⚠️  Background token refresh returned None"),
-                        Err(e) => eprintln!("⚠️  Background token refresh failed: {}", e),
+            let app_clone = app.clone();
+            tokio::spawn(async move {
+                match refresh_tokens_serialized(&app_clone, RefreshMode::IfExpiringSoon).await {
+                    LockedRefreshResult::Success => {
+                        println!("✅ Background token refresh completed")
                     }
-                    // Reset the flag when refresh completes (success or failure)
-                    if let Ok(mut flag) = refresh_flag_clone.lock() {
-                        *flag = false;
+                    LockedRefreshResult::AlreadyValid => {
+                        println!("ℹ️  Background refresh skipped (token already fresh)")
                     }
-                });
-            } else {
-                // No refresh token, reset flag immediately
-                if let Ok(mut flag) = refresh_flag.lock() {
-                    *flag = false;
+                    LockedRefreshResult::Rejected => {
+                        println!("⚠️  Background token refresh rejected by server")
+                    }
+                    LockedRefreshResult::NoSession => {}
+                    LockedRefreshResult::NetworkError(e) => {
+                        eprintln!("⚠️  Background token refresh failed: {}", e)
+                    }
                 }
-            }
+            });
         } else {
             println!("🟡 Token expires soon, but refresh already in progress (skipping duplicate)");
         }
-        // Return current token immediately (still valid)
+
         return Ok(auth_data.access_token);
     }
 
-    // Case 3: Token is valid (>15 min to expiry) - return as-is
     Ok(auth_data.access_token)
 }
 
@@ -630,28 +687,20 @@ pub async fn get_auth_token_async(app: &AppHandle) -> Result<String, String> {
 /// * `Err(String)` - Error occurred during refresh
 #[tauri::command]
 pub async fn refresh_auth_token(app: AppHandle) -> Result<bool, String> {
-    let auth_data = match secure_storage::get_auth_data(&app)? {
-        Some(data) => data,
-        None => return Ok(false), // No auth data, nothing to refresh
-    };
-
-    if let Some(refresh_token) = &auth_data.refresh_token {
-        match refresh_access_token(&app, refresh_token).await {
-            Ok(Some(_)) => {
-                println!("✅ Token refreshed via frontend command");
-                Ok(true)
-            }
-            Ok(None) => {
-                println!("⚠️  Token refresh returned None");
-                Ok(false)
-            }
-            Err(e) => {
-                eprintln!("⚠️  Token refresh failed: {}", e);
-                Err(e)
-            }
+    match refresh_tokens_serialized(&app, RefreshMode::Always).await {
+        LockedRefreshResult::Success => {
+            println!("✅ Token refreshed via refresh command");
+            Ok(true)
         }
-    } else {
-        Ok(false) // No refresh token available
+        LockedRefreshResult::AlreadyValid => Ok(false),
+        LockedRefreshResult::Rejected | LockedRefreshResult::NoSession => {
+            println!("⚠️  Token refresh returned no session or was rejected");
+            Ok(false)
+        }
+        LockedRefreshResult::NetworkError(e) => {
+            eprintln!("⚠️  Token refresh failed: {}", e);
+            Err(e)
+        }
     }
 }
 
