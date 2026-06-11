@@ -26,8 +26,8 @@ pub struct ChartDataResponse {
 pub async fn get_analytics_stats(app: AppHandle) -> Result<StatsResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };
@@ -71,8 +71,8 @@ pub async fn get_analytics_chart(
 ) -> Result<ChartDataResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
-        Err(_) => {
-            crate::commands::auth::handle_auth_expired(&app);
+        Err(e) => {
+            crate::commands::auth::handle_auth_error(&app, &e);
             return Err("Authentication required".to_string());
         }
     };
