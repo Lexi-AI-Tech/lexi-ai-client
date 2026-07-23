@@ -37,6 +37,6 @@ pub fn google_oauth_client_id() -> String {
     #[cfg(not(feature = "custom-protocol"))]
     {
         // Development OAuth client id
-        "576813768140-ktsr4n57jfllih23g6pc1g68ufkqk2cq.apps.googleusercontent.com".to_string()
+        "453771286752-paa5rfeb61a72r1r18ttdl0p23vvmqtv.apps.googleusercontent.com".to_string()
     }
 }
