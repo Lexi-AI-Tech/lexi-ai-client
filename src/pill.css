@@ -1,4 +1,11 @@
-/* Critical: Ensure complete transparency for pill overlay window */
+/* Tailwind — scoped to the pill window only (tailwind.config.js content
+   only scans pill.html/pill.tsx); the main app's CSS never imports this file. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Critical: Ensure complete transparency for pill overlay window —
+   must come AFTER Tailwind so these overrides win over preflight's reset. */
 *,
 *::before,
 *::after {
