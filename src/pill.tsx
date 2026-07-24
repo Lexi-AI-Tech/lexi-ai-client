@@ -26,9 +26,6 @@ const RECORDING_SIZE = { width: 158, height: 46 };
 const MEETING_DETECTED_SIZE = { width: 248, height: 138 }; // Larger card for meeting prompt
 const PROCESSING_SIZE = { width: 148, height: 46 };
 const SPEAKING_SIZE = { width: 138, height: 46 }; // Speaking/TTS state
-// Idle grows into this size on hover — a real window resize (not just a CSS
-// transform) since the OS window clips anything drawn outside its own bounds.
-const HOVER_IDLE_SIZE = { width: 68, height: 16 };
 const MEETING_COUNTDOWN_SECONDS = 8;
 // Height difference for position adjustment (to make pill grow upward)
 const HEIGHT_DIFF = RECORDING_SIZE.height - IDLE_SIZE.height;
@@ -69,10 +66,6 @@ export const Pill: React.FC = () => {
   // Single source of truth for idle position - prevents position drift from accumulated rounding errors
   const idlePositionRef = useRef<{ x: number; y: number } | null>(null);
   const startingMeetingRef = useRef(false);
-  // Bumped on every grow/shrink request so an in-flight rAF loop from a
-  // superseded call (e.g. hover in/out fired rapidly) stops on its own
-  // instead of fighting the newer animation for control of the window.
-  const idleAnimTokenRef = useRef(0);
 
   // Smooth audio levels for better visual experience
   useEffect(() => {
@@ -780,93 +773,12 @@ export const Pill: React.FC = () => {
   const handleMouseDown = async () => {
     // Start dragging the window when clicking on the pill
     setIsPressed(true);
-    // Guarantee the "grown" look on click even without a prior hover (e.g. a
-    // fast click) — persists until the mouse actually leaves the pill.
-    growIdleOnHover();
     try {
       const window = getCurrentWindow();
       await window.startDragging();
     } catch (error) {
       console.error("Failed to start dragging:", error);
     }
-  };
-
-  // Tauri can't animate a native window resize itself, so a plain setSize()
-  // call is an instant jump — that's why the earlier version didn't read as
-  // "animated" even though it worked. This tweens size + position over a
-  // handful of rAF frames (small pixel deltas here, so it stays smooth even
-  // with the IPC round-trip per frame) to get a genuine hover "pop".
-  const animateIdleWindow = async (
-    targetSize: { width: number; height: number },
-    targetPos: { x: number; y: number },
-    durationMs = 160,
-  ) => {
-    const myToken = ++idleAnimTokenRef.current;
-    const window = getCurrentWindow();
-    let startSize: { width: number; height: number };
-    let startPos: { x: number; y: number };
-    try {
-      const [physSize, physPos, scaleFactor] = await Promise.all([
-        window.innerSize(),
-        window.outerPosition(),
-        window.scaleFactor(),
-      ]);
-      startSize = {
-        width: physSize.width / scaleFactor,
-        height: physSize.height / scaleFactor,
-      };
-      startPos = { x: physPos.x / scaleFactor, y: physPos.y / scaleFactor };
-    } catch (e) {
-      console.error("Failed to read current pill window bounds:", e);
-      return;
-    }
-
-    const startTime = performance.now();
-    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
-    await new Promise<void>((resolve) => {
-      const step = async (now: number) => {
-        if (idleAnimTokenRef.current !== myToken) return resolve(); // superseded
-        const t = Math.min(1, (now - startTime) / durationMs);
-        const eased = easeOutCubic(t);
-        const w = startSize.width + (targetSize.width - startSize.width) * eased;
-        const h = startSize.height + (targetSize.height - startSize.height) * eased;
-        const x = startPos.x + (targetPos.x - startPos.x) * eased;
-        const y = startPos.y + (targetPos.y - startPos.y) * eased;
-        try {
-          await window.setSize(new LogicalSize(w, h));
-          await window.setPosition(new LogicalPosition(x, y));
-        } catch {
-          // window may have been resized/replaced by a state transition mid-animation
-        }
-        if (idleAnimTokenRef.current !== myToken) return resolve();
-        if (t < 1) {
-          requestAnimationFrame(step);
-        } else {
-          resolve();
-        }
-      };
-      requestAnimationFrame(step);
-    });
-  };
-
-  // Idle-only hover "pop" — genuinely resizes the tiny idle window so the
-  // pill can visibly grow without being clipped by its own bounds, then
-  // shrinks back on mouse-leave. No-ops if a state change beat the hover
-  // (e.g. user starts recording mid-hover) since those effects already own
-  // the window size/position from that point on.
-  const growIdleOnHover = async () => {
-    if (statusRef.current !== "idle" || !idlePositionRef.current) return;
-    const idleX = idlePositionRef.current.x;
-    const idleY = idlePositionRef.current.y;
-    const hoverX = idleX - (HOVER_IDLE_SIZE.width - IDLE_SIZE.width) / 2;
-    const hoverY = idleY - (HOVER_IDLE_SIZE.height - IDLE_SIZE.height);
-    await animateIdleWindow(HOVER_IDLE_SIZE, { x: hoverX, y: hoverY });
-  };
-
-  const shrinkIdleFromHover = async () => {
-    if (statusRef.current !== "idle" || !idlePositionRef.current) return;
-    await animateIdleWindow(IDLE_SIZE, idlePositionRef.current);
   };
 
   // Shared easing — same curve shadcn/Radix-style components use for hover/press
@@ -927,14 +839,10 @@ export const Pill: React.FC = () => {
     <div
       onMouseDown={handleMouseDown}
       onMouseUp={() => setIsPressed(false)}
-      onMouseEnter={() => {
-        setIsHovered(true);
-        growIdleOnHover();
-      }}
+      onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
         setIsHovered(false);
         setIsPressed(false);
-        shrinkIdleFromHover();
       }}
       className={`relative w-full h-full flex items-center justify-center transition-all duration-300 ease-out ${cardClass}`}
       style={{
@@ -942,7 +850,7 @@ export const Pill: React.FC = () => {
         userSelect: "none",
         transform: isPressed
           ? "translateY(1px) scale(0.99)"
-          : isHovered && status !== "idle"
+          : isHovered
             ? "scale(1.02)"
             : "scale(1)",
         transformOrigin: "center bottom",
