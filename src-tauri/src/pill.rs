@@ -28,7 +28,7 @@
 //! - **NonactivatingPanel**: Doesn't activate when shown
 
 use tauri::{
-    AppHandle, LogicalPosition, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
 // Define NSPanel type for overlay on macOS
@@ -119,16 +119,6 @@ fn create_pill_window(app: &AppHandle) -> Result<(), String> {
         .focusable(false)
         .build()
         .map_err(|e| format!("Failed to create pill window: {}", e))?;
-
-    // Position it near the bottom center
-    if let Ok(Some(monitor)) = pill_window.primary_monitor() {
-        let screen_size = monitor.size();
-        let screen_width = screen_size.width as f64;
-        let x = (screen_width - pill_width) / 2.0;
-        pill_window
-            .set_position(PhysicalPosition::new(x as i32, 40))
-            .ok();
-    }
 
     // On macOS, convert to NSPanel for better fullscreen app behavior
     #[cfg(target_os = "macos")]
