@@ -23,6 +23,9 @@ import "./pill.css";
 // Sized to fit the "Glass Frosted" design's text labels + larger meeting card.
 const IDLE_SIZE = { width: 50, height: 6.6 };
 const RECORDING_SIZE = { width: 158, height: 46 };
+// Action hotkey mode shows longer copy ("Listening for command") than plain
+// dictation ("Transcribing"), so it needs a wider card at the same height.
+const ACTION_SIZE = { width: 248, height: 46 };
 const MEETING_DETECTED_SIZE = { width: 248, height: 138 }; // Larger card for meeting prompt
 const PROCESSING_SIZE = { width: 148, height: 46 };
 const SPEAKING_SIZE = { width: 138, height: 46 }; // Speaking/TTS state
@@ -186,11 +189,26 @@ export const Pill: React.FC = () => {
     };
   }, [status, resetPillToIdle]);
 
-  // Initialize idle position reference on mount
+  // Initialize idle position reference on mount.
+  //
+  // The pill window starts hidden and Rust positions it in two steps
+  // (create_pill_window sets a throwaway spot, then init_pill_window moves it
+  // to the real bottom-center position and calls .show()). If we snapshot
+  // outerPosition() before that second step lands, we cache the wrong
+  // "idle" anchor forever — every later transition (recording, and
+  // especially the much bigger meeting card) then grows from that wrong
+  // spot. Poll until the window reports visible (set right after the real
+  // position is applied) before trusting the read.
   useEffect(() => {
+    let cancelled = false;
     const initializePosition = async () => {
+      const window = getCurrentWindow();
       try {
-        const window = getCurrentWindow();
+        for (let attempt = 0; attempt < 40; attempt++) {
+          if (cancelled) return;
+          if (await window.isVisible()) break;
+          await new Promise((r) => setTimeout(r, 50)); // up to ~2s worst case
+        }
         const physicalPos = await window.outerPosition();
         const scaleFactor = await window.scaleFactor();
         const logicalX = physicalPos.x / scaleFactor;
@@ -205,6 +223,9 @@ export const Pill: React.FC = () => {
       }
     };
     initializePosition();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Keep idlePositionRef in sync while the user drags the pill around.
@@ -289,11 +310,11 @@ export const Pill: React.FC = () => {
               const idleX = idlePositionRef.current.x;
               const idleY = idlePositionRef.current.y;
 
-              const recX = idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
+              const recX = idleX - (ACTION_SIZE.width - IDLE_SIZE.width) / 2;
               const recY = idleY - HEIGHT_DIFF;
 
               await window.setSize(
-                new LogicalSize(RECORDING_SIZE.width, RECORDING_SIZE.height),
+                new LogicalSize(ACTION_SIZE.width, ACTION_SIZE.height),
               );
               await window.setPosition(new LogicalPosition(recX, recY));
             } catch (e) {
@@ -799,10 +820,18 @@ export const Pill: React.FC = () => {
   // verbatim in this file to generate their CSS — it can't resolve classes
   // built from an interpolated variable at runtime. So sage/gold variants
   // are spelled out in full below rather than templated from accentHex.
+  // Solid dark base (not just a light accent tint) so text/icons stay legible
+  // no matter what's behind the window — a translucent-only card reads fine
+  // over a dark demo background but washes out over a bright desktop/app.
+  // The accent color still shows through as a gradient overlay + border/glow.
   const shapeClass =
     status === "meeting_detected" ? "rounded-3xl px-4 py-3" : "rounded-2xl px-4 py-3";
-  const sageCardClass = `bg-gradient-to-br from-[#6b8f6e]/10 to-[#587a5b]/10 backdrop-blur-xl border-2 border-[#6b8f6e]/55 ${shapeClass}`;
-  const goldCardClass = `bg-gradient-to-br from-[#c9a45c]/10 to-[#a9863f]/10 backdrop-blur-xl border-2 border-[#c9a45c]/55 ${shapeClass}`;
+  // NOTE: Tailwind v3.4's gradient from-*/to-* utilities silently produce no
+  // CSS when an arbitrary color value is combined with a separate opacity
+  // modifier (from-[#000]/78) — a reproducible bug in this version. Embedding
+  // the opacity directly in the arbitrary rgba() value sidesteps it.
+  const sageCardClass = `bg-gradient-to-br from-[rgba(0,0,0,0.78)] to-[rgba(0,0,0,0.68)] backdrop-blur-xl border-2 border-[#6b8f6e]/70 ${shapeClass}`;
+  const goldCardClass = `bg-gradient-to-br from-[rgba(0,0,0,0.78)] to-[rgba(0,0,0,0.68)] backdrop-blur-xl border-2 border-[#c9a45c]/70 ${shapeClass}`;
   const cardClass =
     status === "idle"
       ? isHovered
@@ -879,11 +908,8 @@ export const Pill: React.FC = () => {
               />
             ))}
           </div>
-          <span
-            className="text-xs font-bold ml-1"
-            style={{ color: accentHex }}
-          >
-            {isGold ? "Action" : "Recording"}
+          <span className="text-xs font-bold ml-1 text-white whitespace-nowrap">
+            {isGold ? "Listening for command" : "Transcribing"}
           </span>
         </div>
       )}
@@ -915,9 +941,7 @@ export const Pill: React.FC = () => {
               </defs>
             </svg>
           </div>
-          <span className="text-xs font-bold text-[#6b8f6e]">
-            Processing
-          </span>
+          <span className="text-xs font-bold text-white">Processing</span>
         </div>
       )}
 
@@ -935,19 +959,21 @@ export const Pill: React.FC = () => {
               />
             ))}
           </div>
-          <span className="text-xs font-bold text-[#6b8f6e]">Speaking</span>
+          <span className="text-xs font-bold text-white">Speaking</span>
         </div>
       )}
 
       {status === "meeting_detected" && (
         <div className="flex flex-col gap-2 w-full">
           <div className="flex items-center gap-2">
-            <AlertCircle size={16} className="text-[#6b8f6e] animate-pulse shrink-0" />
-            <span className="text-sm font-bold text-[#6b8f6e] truncate">
-              {meetingContext?.platform || "Meeting"} detected
+            <AlertCircle size={16} className="text-[#8ab98a] animate-pulse shrink-0" />
+            <span className="text-sm font-bold text-white truncate">
+              {meetingContext?.platform
+                ? `Meeting detected in ${meetingContext.platform}`
+                : "Meeting detected"}
             </span>
           </div>
-          <div className="text-xs text-[#587a5b] font-medium">
+          <div className="text-xs text-white/75 font-medium">
             Record this meeting?
           </div>
           <div className="flex gap-2 items-center">
@@ -977,12 +1003,12 @@ export const Pill: React.FC = () => {
                 evt.stopPropagation();
                 await resetPillToIdle();
               }}
-              className="flex-1 px-3 py-1.5 text-xs font-semibold bg-white/40 hover:bg-white/55 text-[#587a5b] rounded-lg transition-colors duration-200"
+              className="flex-1 px-3 py-1.5 text-xs font-semibold bg-white/85 hover:bg-white text-[#2e3b2f] rounded-lg transition-colors duration-200"
             >
               Skip
             </button>
           </div>
-          <div className="text-[10px] text-[#587a5b]/70 text-center font-medium">
+          <div className="text-[10px] text-white/60 text-center font-medium">
             Auto-recording in {meetingCountdown}s
           </div>
         </div>
