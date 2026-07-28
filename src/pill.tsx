@@ -102,6 +102,21 @@ export const Pill: React.FC = () => {
         );
         setTimeout(() => relaunch(), 1500); // 1.5s visual delay before jarring restart so animations have time to settle
       }
+
+      // Rare glitch: after a rapid native resize+reposition (shrinking back
+      // from an active card) combined with backdrop-filter, the compositor
+      // can occasionally get stuck painting solid black instead of the
+      // transparent/tinted idle pill. Same nudge used for the post-sleep
+      // repaint bug below — force a repaint by toggling opacity a hair.
+      requestAnimationFrame(() => {
+        const root = document.getElementById("root");
+        if (!root) return;
+        const prev = root.style.opacity;
+        root.style.opacity = "0.999";
+        requestAnimationFrame(() => {
+          root.style.opacity = prev;
+        });
+      });
     }
 
     if (status !== "recording") {
@@ -832,11 +847,18 @@ export const Pill: React.FC = () => {
   // the opacity directly in the arbitrary rgba() value sidesteps it.
   const sageCardClass = `bg-gradient-to-br from-[rgba(0,0,0,0.78)] to-[rgba(0,0,0,0.68)] backdrop-blur-xl border-2 border-[#6b8f6e]/70 ${shapeClass}`;
   const goldCardClass = `bg-gradient-to-br from-[rgba(0,0,0,0.78)] to-[rgba(0,0,0,0.68)] backdrop-blur-xl border-2 border-[#c9a45c]/70 ${shapeClass}`;
+  // NOTE: idle uses an explicit rounded-[3.3px] (== IDLE_SIZE.height / 2,
+  // same visual "fully rounded" look as rounded-full at this tiny size)
+  // instead of Tailwind's rounded-full (border-radius: 9999px). The window
+  // itself resizes instantly on every state change (native resize can't be
+  // animated), but border-radius genuinely does tween over the 300ms
+  // transition — interpolating from 9999px down to 16/24px on an
+  // already-full-size box is what made every grow/shrink look "shaky".
   const cardClass =
     status === "idle"
       ? isHovered
-        ? "bg-[#6b8f6e]/16 backdrop-blur-md border-2 border-[#6b8f6e]/50 rounded-full"
-        : "bg-[#6b8f6e]/5 backdrop-blur-md border-2 border-[#6b8f6e]/25 rounded-full"
+        ? "bg-[#6b8f6e]/16 backdrop-blur-md border-2 border-[#6b8f6e]/50 rounded-[3.3px]"
+        : "bg-[#6b8f6e]/5 backdrop-blur-md border-2 border-[#6b8f6e]/25 rounded-[3.3px]"
       : isGold
         ? goldCardClass
         : sageCardClass;
