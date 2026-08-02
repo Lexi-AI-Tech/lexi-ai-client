@@ -71,7 +71,6 @@ mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortc
 mod meetings;
 mod os_permissions; // macOS permission requests and checks (microphone, accessibility, system audio)
 mod pill; // Pill overlay window creation, positioning, and visibility management
-mod room_websocket; // WebSocket connections for room streaming
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
 mod sleep_watcher; // macOS: CGEventTap wake; Windows: pill WebView refresh after resume
 mod state; // Application state management (auth tokens, transcription tasks, hotkey config) // Meetings module
@@ -90,7 +89,7 @@ use google_oauth::OAuthState;
 
 use state::{
     ActionHotkeyWatchState, HotkeyRecordingState, HotkeyWatchState, MeetingState,
-    OnboardingRecordingDryRun, RoomState,
+    OnboardingRecordingDryRun,
 };
 use window::show_and_focus_main_window;
 
@@ -131,10 +130,6 @@ use commands::onboarding::{
     complete_onboarding, complete_server_onboarding, get_onboarding_state,
     get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
     set_onboarding_step,
-};
-use commands::rooms::{
-    create_room, get_room_details, list_rooms, start_room_recording,
-    stop_room_recording_and_process, update_room, update_speaker,
 };
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
@@ -447,13 +442,6 @@ pub fn main() {
             delete_doc,
             start_doc_recording,
             stop_doc_recording,
-            create_room,
-            list_rooms,
-            get_room_details,
-            start_room_recording,
-            stop_room_recording_and_process,
-            update_room,
-            update_speaker,
             add_meeting_note,
             create_meeting,
             list_meetings,
@@ -551,11 +539,6 @@ pub fn main() {
             app.manage(OnboardingRecordingDryRun(
                 onboarding_recording_dry_run.clone(),
             ));
-
-            app.manage(RoomState {
-                is_recording: Mutex::new(false),
-                command_tx: Mutex::new(None),
-            });
 
             app.manage(MeetingState {
                 is_recording: Mutex::new(false),

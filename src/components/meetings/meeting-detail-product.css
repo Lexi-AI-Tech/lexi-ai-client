@@ -1272,77 +1272,13 @@
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.meeting-detail-transcript__segment {
-  margin-bottom: 0.65rem;
-  display: flex;
-  flex-direction: column;
-}
-
-.meeting-detail-transcript__segment:last-child {
-  margin-bottom: 0;
-}
-
-.meeting-detail-transcript__segment--user {
-  align-items: flex-end;
-}
-
-.meeting-detail-transcript__segment--system {
-  align-items: flex-start;
-}
-
-.meeting-detail-transcript__segment--unknown {
-  align-items: flex-start;
-}
-
-/* Sizes to the bubble; subtitle padding matches bubble horizontal padding so time aligns with text */
-.meeting-detail-transcript__block {
-  display: flex;
-  flex-direction: column;
-  max-width: 82%;
-  width: fit-content;
-}
-
-.meeting-detail-transcript__bubble {
-  max-width: 100%;
-  padding: 0.5625rem 1rem;
-  border-radius: 12px;
+/* Single flowing transcript — no per-speaker bubble/alignment distinction (merged +
+   deduped across mic/system-audio sources, see src/utils/transcriptMerge.ts). */
+.meeting-detail-transcript__flow {
   font-size: 0.875rem;
-  line-height: 1.45;
-}
-
-.meeting-detail-transcript__bubble--user {
-  background: var(--lexi-primary);
-  color: white;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-}
-
-.meeting-detail-transcript__bubble--system {
-  background: #ffffff;
+  line-height: 1.6;
   color: #374151;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.meeting-detail-transcript__time-subtitle {
-  font-size: 0.625rem;
-  line-height: 1.2;
-  font-weight: 500;
-  color: #9ca3af;
-  margin-top: 0.0625rem;
-  padding: 0 1rem;
-  letter-spacing: 0.02em;
-}
-
-.meeting-detail-transcript__segment--user
-  .meeting-detail-transcript__time-subtitle {
-  text-align: right;
-}
-
-.meeting-detail-transcript__segment--system
-  .meeting-detail-transcript__time-subtitle,
-.meeting-detail-transcript__segment--unknown
-  .meeting-detail-transcript__time-subtitle {
-  text-align: left;
+  white-space: pre-wrap;
 }
 
 .meeting-detail-transcript__empty {

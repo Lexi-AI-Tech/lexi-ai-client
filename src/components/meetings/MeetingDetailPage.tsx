@@ -30,8 +30,8 @@ import {
 import "../meetings.css";
 import "./meetings-list.css";
 import "./meeting-detail-product.css";
-import { formatLocaleTimeWithSeconds } from "../../lib/dateUtils";
 import { useToast } from "../toast/useToast";
+import { parseServerDate } from "../../lib/dateUtils";
 
 function summarySeedFromMeeting(m: Meeting | null): string | null {
   if (!m?.summary || typeof m.summary !== "string") return null;
@@ -158,6 +158,20 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
   const segments = isThisMeetingRecording
     ? [...fetchedSegments, ...liveSegments]
     : fetchedSegments;
+
+  // Duplicate user_audio/system_audio content (mic picking up speaker output) is now
+  // deduplicated server-side, before it's ever saved — so `segments` arrives already
+  // clean. Just render one flowing transcript in chronological order (fetchedSegments +
+  // liveSegments are simple concatenations, not guaranteed sorted).
+  const mergedLines = useMemo(
+    () =>
+      [...segments].sort(
+        (a, b) =>
+          (parseServerDate(a.start_time)?.getTime() ?? 0) -
+          (parseServerDate(b.start_time)?.getTime() ?? 0),
+      ),
+    [segments],
+  );
 
   const summaryLines = useMemo(() => {
     if (streamingLines.length > 0) return streamingLines;
@@ -872,49 +886,17 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                       Getting ready…
                     </p>
                   </div>
-                ) : segments.length === 0 ? (
+                ) : mergedLines.length === 0 ? (
                   <p className="meeting-detail-transcript__empty">
                     {isThisMeetingRecording
                       ? "Listening for speech..."
                       : "Click Resume to start capturing."}
                   </p>
-                ) : null}
-                {segments.map((seg, idx) => {
-                  const timeString = seg.start_time
-                    ? formatLocaleTimeWithSeconds(seg.start_time)
-                    : "00:00:00";
-                  const msgType = seg.message_type;
-                  const isUser =
-                    msgType === "user_audio" || msgType === "user_note";
-                  const isSystem = msgType === "system_audio";
-                  const segmentAlign = isUser
-                    ? "user"
-                    : isSystem
-                      ? "system"
-                      : "unknown";
-                  const bubbleVariant = isUser
-                    ? "user"
-                    : isSystem
-                      ? "system"
-                      : "unknown";
-                  return (
-                    <div
-                      key={seg.id ?? idx}
-                      className={`meeting-detail-transcript__segment meeting-detail-transcript__segment--${segmentAlign}`}
-                    >
-                      <div className="meeting-detail-transcript__block">
-                        <div
-                          className={`meeting-detail-transcript__bubble meeting-detail-transcript__bubble--${bubbleVariant}`}
-                        >
-                          <span>{seg.text}</span>
-                        </div>
-                        <span className="meeting-detail-transcript__time-subtitle">
-                          {timeString}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                ) : (
+                  <p className="meeting-detail-transcript__flow">
+                    {mergedLines.map((line) => line.text).join(" ")}
+                  </p>
+                )}
               </div>
               <form
                 onSubmit={handleAddNote}
