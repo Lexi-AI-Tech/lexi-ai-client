@@ -9,6 +9,7 @@ import {
   BookText,
   ArrowLeftRight,
   LayoutDashboard,
+  BarChart3,
 } from "lucide-react";
 
 import type { SidebarProps } from "../types";
@@ -65,6 +66,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <LayoutDashboard size={18} strokeWidth={2} />
           <span>Home</span>
+        </button>
+
+        {/* Analytics */}
+        <button
+          className={`sidebar-item ${currentPage === "analytics" ? "active" : ""}`}
+          onClick={() => onNavigate("analytics")}
+        >
+          <BarChart3 size={18} strokeWidth={2} />
+          <span>Analytics</span>
         </button>
 
         {/* Transcripts */}

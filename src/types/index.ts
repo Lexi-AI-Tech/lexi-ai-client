@@ -229,6 +229,7 @@ export interface GoogleLoginButtonProps {
 export interface SidebarProps {
   currentPage:
     | "home"
+    | "analytics"
     | "transcripts"
     | "settings"
     | "vocabulary"
@@ -240,6 +241,7 @@ export interface SidebarProps {
   onNavigate: (
     page:
       | "home"
+      | "analytics"
       | "transcripts"
       | "settings"
       | "vocabulary"
