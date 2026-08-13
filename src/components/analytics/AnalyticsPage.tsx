@@ -2,28 +2,20 @@
  * AnalyticsPage Component
  *
  * Deep-dive on usage: activity breakdown over time (transcripts/meetings/actions),
- * meeting-platform and action-type/app splits, an inferred "what Lexi helped you
- * with" insight, and tabbed recent activity. Plan/billing usage lives on the
- * dedicated Usage page instead.
+ * meeting-platform and action-type/app splits, and an inferred "what Lexi helped
+ * you with" insight. Recent activity lives on the Home page (compact merged feed);
+ * plan/billing usage lives on the dedicated Usage page.
  */
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Atom, AudioLines, Sparkles, Video } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
-import type {
-  ActionHistory,
-  PaginatedActionHistoryResponse,
-  PaginatedTranscriptsResponse,
-  Transcript,
-} from "../../types";
-import type { Meeting } from "../meetings/MeetingsListPage";
-import { formatDateRelative } from "../../lib/dateUtils";
-// Reuses the recent-activity/billing/skeleton/empty-state card styles already
-// established in home.css (kept there since HomePage still shares the same
-// --lexi-* design tokens and card conventions) — analytics.css only adds the
-// new sections (insights, breakdown chart/lists, period toggle).
+// Reuses the billing/skeleton/empty-state card styles already established in
+// home.css (kept there since HomePage still shares the same --lexi-* design
+// tokens and card conventions) — analytics.css only adds the new sections
+// (insights, breakdown chart/lists, period toggle).
 import "../home/home.css";
 import "./analytics.css";
 
@@ -36,6 +28,8 @@ interface BreakdownResponse {
   transcripts: number[];
   meetings: number[];
   actions: number[];
+  docs: number[];
+  notes: number[];
   meetings_by_platform: Record<string, number>;
   actions_by_type: Record<string, number>;
   actions_by_app: Record<string, number>;
@@ -47,18 +41,7 @@ interface InsightsResponse {
   generated_at: string;
 }
 
-type RecentActivityTabId = "transcripts" | "meetings" | "actions";
 type BreakdownPeriod = "7d" | "30d";
-
-// ---------------------------------------------------------------------------
-// Constants & helpers
-// ---------------------------------------------------------------------------
-
-function byCreatedAtDesc<T extends { created_at: string }>(a: T, b: T): number {
-  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-}
-
-const RECENT_ACTIVITY_LIMIT = 5;
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -88,42 +71,6 @@ const SkBlock: React.FC<{
   <div className={`skeleton-block ${className ?? ""}`.trim()} style={style} />
 );
 
-const RecentActivityRow: React.FC<{
-  badgeClass: string;
-  icon: React.ElementType;
-  title: string;
-  subtitle: string;
-  typeLabel: string;
-  timestamp: string;
-  onRowClick: () => void;
-}> = ({
-  badgeClass,
-  icon: Icon,
-  title,
-  subtitle,
-  typeLabel,
-  timestamp,
-  onRowClick,
-}) => (
-  <li className="recent-activity-row" onClick={onRowClick}>
-    <div className={`recent-activity-badge ${badgeClass}`}>
-      <Icon size={14} />
-    </div>
-    <div className="recent-activity-info">
-      <span className="recent-activity-text">{title}</span>
-      <div className="recent-activity-meta">
-        <span className="recent-activity-type">{typeLabel}</span>
-        <span className="recent-activity-dot" />
-        <span className="recent-activity-subtitle">{subtitle}</span>
-        <span className="recent-activity-dot" />
-        <span className="recent-activity-time">
-          {formatDateRelative(timestamp)}
-        </span>
-      </div>
-    </div>
-  </li>
-);
-
 /** Grouped-bar mini chart: one column per label, one bar per series. */
 const ActivityChart: React.FC<{ breakdown: BreakdownResponse }> = ({
   breakdown,
@@ -133,6 +80,8 @@ const ActivityChart: React.FC<{ breakdown: BreakdownResponse }> = ({
     ...breakdown.transcripts,
     ...breakdown.meetings,
     ...breakdown.actions,
+    ...breakdown.docs,
+    ...breakdown.notes,
   );
   return (
     <div className="activity-chart">
@@ -153,6 +102,16 @@ const ActivityChart: React.FC<{ breakdown: BreakdownResponse }> = ({
               className="activity-chart__bar activity-chart__bar--actions"
               style={{ height: `${(breakdown.actions[i] / max) * 100}%` }}
               title={`${breakdown.actions[i]} actions`}
+            />
+            <div
+              className="activity-chart__bar activity-chart__bar--docs"
+              style={{ height: `${(breakdown.docs[i] / max) * 100}%` }}
+              title={`${breakdown.docs[i]} docs`}
+            />
+            <div
+              className="activity-chart__bar activity-chart__bar--notes"
+              style={{ height: `${(breakdown.notes[i] / max) * 100}%` }}
+              title={`${breakdown.notes[i]} notes`}
             />
           </div>
           <span className="activity-chart__label">{label}</span>
@@ -194,93 +153,17 @@ const BreakdownList: React.FC<{
 // Main Component
 // ---------------------------------------------------------------------------
 
-interface AnalyticsPageProps {
-  onNavigate?: (page: string) => void;
-}
-
-export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
+export const AnalyticsPage: React.FC = () => {
   const { isAuthenticated } = useAuthStore();
 
-  const [recentActivityTab, setRecentActivityTab] =
-    useState<RecentActivityTabId>("transcripts");
   const [period, setPeriod] = useState<BreakdownPeriod>("7d");
-
-  const [recentLoading, setRecentLoading] = useState(false);
-  const [meetingsLoading, setMeetingsLoading] = useState(false);
-  const [actionsLoading, setActionsLoading] = useState(false);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
-  const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [recentActions, setRecentActions] = useState<ActionHistory[]>([]);
   const [breakdown, setBreakdown] = useState<BreakdownResponse | null>(null);
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
 
   // Data fetching
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let cancelled = false;
-    (async () => {
-      setRecentLoading(true);
-      try {
-        const data = await invoke<PaginatedTranscriptsResponse>(
-          "get_transcripts",
-          { page: 1, pageSize: RECENT_ACTIVITY_LIMIT },
-        );
-        if (!cancelled) setRecentTranscripts(data.transcripts);
-      } catch (err) {
-        console.error("Failed to fetch recent transcripts:", err);
-      } finally {
-        if (!cancelled) setRecentLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let cancelled = false;
-    (async () => {
-      setMeetingsLoading(true);
-      try {
-        const data = await invoke<Meeting[]>("list_meetings");
-        if (!cancelled) setMeetings(data);
-      } catch (err) {
-        console.error("Failed to fetch meetings:", err);
-      } finally {
-        if (!cancelled) setMeetingsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let cancelled = false;
-    (async () => {
-      setActionsLoading(true);
-      try {
-        const data = await invoke<PaginatedActionHistoryResponse>(
-          "get_action_history",
-          { page: 1, pageSize: RECENT_ACTIVITY_LIMIT },
-        );
-        if (!cancelled) setRecentActions(data.actions);
-      } catch (err) {
-        console.error("Failed to fetch recent actions:", err);
-      } finally {
-        if (!cancelled) setActionsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated]);
-
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
@@ -322,35 +205,6 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
       cancelled = true;
     };
   }, [isAuthenticated]);
-
-  // Derived
-  const recentTranscriptsSorted = useMemo(
-    () => [...recentTranscripts].sort(byCreatedAtDesc),
-    [recentTranscripts],
-  );
-  const recentTranscriptsDisplayed = useMemo(
-    () => recentTranscriptsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
-    [recentTranscriptsSorted],
-  );
-  const recentMeetingsSorted = useMemo(
-    () => [...meetings].sort(byCreatedAtDesc),
-    [meetings],
-  );
-  const recentMeetingsDisplayed = useMemo(
-    () => recentMeetingsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
-    [recentMeetingsSorted],
-  );
-  const recentActionsSorted = useMemo(
-    () => [...recentActions].sort(byCreatedAtDesc),
-    [recentActions],
-  );
-  const recentActionsDisplayed = useMemo(
-    () => recentActionsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
-    [recentActionsSorted],
-  );
-
-  const recentActivityLoading =
-    recentLoading || meetingsLoading || actionsLoading;
 
   return (
     <motion.div
@@ -445,6 +299,14 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
                 <span className="legend-dot legend-dot--actions" />
                 Actions
               </span>
+              <span className="legend-item">
+                <span className="legend-dot legend-dot--docs" />
+                Docs
+              </span>
+              <span className="legend-item">
+                <span className="legend-dot legend-dot--notes" />
+                Notes
+              </span>
             </div>
             <ActivityChart breakdown={breakdown} />
 
@@ -474,211 +336,6 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
           </>
         )}
       </motion.section>
-
-      {/* ── Recent Activity ── */}
-      <motion.section
-        className="recent-activity-section"
-        variants={itemVariants}
-      >
-          <div className="section-header section-header--recent-activity">
-            <h2 className="section-title">Recent Activity</h2>
-          </div>
-
-          <div className="recent-activity-content">
-            {isAuthenticated && recentActivityLoading ? (
-              <div className="home-recent-skeleton" aria-hidden>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="home-recent-skeleton__row">
-                    <SkBlock
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div
-                      style={{
-                        flex: 1,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 5,
-                      }}
-                    >
-                      <SkBlock
-                        style={{ height: 13, width: "70%", borderRadius: 5 }}
-                      />
-                      <SkBlock
-                        style={{ height: 10, width: "45%", borderRadius: 4 }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : !isAuthenticated ? (
-              <div className="empty-state">
-                <div className="empty-icon">
-                  <AudioLines size={24} />
-                </div>
-                <p className="empty-title">No activity yet</p>
-                <p className="empty-sub">
-                  Sign in to see transcriptions, meetings, and actions.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div
-                  className="recent-activity-tabs"
-                  role="tablist"
-                  aria-label="Recent activity by category"
-                >
-                  {(
-                    [
-                      { id: "transcripts" as const, label: "Transcripts" },
-                      { id: "meetings" as const, label: "Meetings" },
-                      { id: "actions" as const, label: "Actions" },
-                    ] as const
-                  ).map(({ id, label }) => {
-                    const isActive = recentActivityTab === id;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        role="tab"
-                        id={`recent-activity-tab-${id}`}
-                        aria-selected={isActive}
-                        aria-controls={`recent-activity-panel-${id}`}
-                        tabIndex={isActive ? 0 : -1}
-                        className={`recent-activity-tab${isActive ? " is-active" : ""}`}
-                        onClick={() => setRecentActivityTab(id)}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div
-                  id="recent-activity-panel-transcripts"
-                  role="tabpanel"
-                  aria-labelledby="recent-activity-tab-transcripts"
-                  hidden={recentActivityTab !== "transcripts"}
-                  className="recent-activity-panel"
-                >
-                  {recentTranscriptsSorted.length === 0 ? (
-                    <div className="empty-state empty-state--tab">
-                      <div className="empty-icon">
-                        <AudioLines size={24} />
-                      </div>
-                      <p className="empty-title">No transcriptions yet</p>
-                      <p className="empty-sub">
-                        Your speech-to-text history will show up here.
-                      </p>
-                    </div>
-                  ) : (
-                    <ul className="recent-activity-list">
-                      {recentTranscriptsDisplayed.map((t) => {
-                        const title =
-                          t.original_text.length > 70
-                            ? t.original_text.slice(0, 70) + "…"
-                            : t.original_text;
-                        return (
-                          <RecentActivityRow
-                            key={t.id}
-                            badgeClass="transcription"
-                            icon={AudioLines}
-                            title={title}
-                            subtitle={`${t.original_text_word_count} words`}
-                            typeLabel="Transcription"
-                            timestamp={t.created_at}
-                            onRowClick={() => onNavigate?.("transcripts")}
-                          />
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-
-                <div
-                  id="recent-activity-panel-meetings"
-                  role="tabpanel"
-                  aria-labelledby="recent-activity-tab-meetings"
-                  hidden={recentActivityTab !== "meetings"}
-                  className="recent-activity-panel"
-                >
-                  {recentMeetingsSorted.length === 0 ? (
-                    <div className="empty-state empty-state--tab">
-                      <div className="empty-icon">
-                        <Video size={24} />
-                      </div>
-                      <p className="empty-title">No meetings yet</p>
-                      <p className="empty-sub">
-                        Recorded meetings will appear here.
-                      </p>
-                    </div>
-                  ) : (
-                    <ul className="recent-activity-list">
-                      {recentMeetingsDisplayed.map((m) => (
-                        <RecentActivityRow
-                          key={m.id}
-                          badgeClass="meeting"
-                          icon={Video}
-                          title={m.name || "Untitled Meeting"}
-                          subtitle={m.platform ?? "Meeting"}
-                          typeLabel="Meeting"
-                          timestamp={m.created_at}
-                          onRowClick={() => onNavigate?.("meetings")}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div
-                  id="recent-activity-panel-actions"
-                  role="tabpanel"
-                  aria-labelledby="recent-activity-tab-actions"
-                  hidden={recentActivityTab !== "actions"}
-                  className="recent-activity-panel"
-                >
-                  {recentActionsSorted.length === 0 ? (
-                    <div className="empty-state empty-state--tab">
-                      <div className="empty-icon">
-                        <Atom size={24} />
-                      </div>
-                      <p className="empty-title">No actions yet</p>
-                      <p className="empty-sub">
-                        Action hotkey runs will show up here.
-                      </p>
-                    </div>
-                  ) : (
-                    <ul className="recent-activity-list">
-                      {recentActionsDisplayed.map((a) => {
-                        const cmd = a.action_command?.trim() || "Action";
-                        const title =
-                          cmd.length > 70 ? cmd.slice(0, 70) + "…" : cmd;
-                        const sub =
-                          a.app_name?.trim() || a.action_type || "Action";
-                        return (
-                          <RecentActivityRow
-                            key={a.id}
-                            badgeClass="action"
-                            icon={Atom}
-                            title={title}
-                            subtitle={sub}
-                            typeLabel="Action"
-                            timestamp={a.created_at}
-                            onRowClick={() => onNavigate?.("actions")}
-                          />
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </motion.section>
     </motion.div>
   );
 };

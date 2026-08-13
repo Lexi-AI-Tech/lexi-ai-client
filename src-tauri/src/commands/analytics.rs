@@ -27,6 +27,8 @@ pub struct BreakdownResponse {
     pub transcripts: Vec<i32>,
     pub meetings: Vec<i32>,
     pub actions: Vec<i32>,
+    pub docs: Vec<i32>,
+    pub notes: Vec<i32>,
     pub meetings_by_platform: std::collections::HashMap<String, i32>,
     pub actions_by_type: std::collections::HashMap<String, i32>,
     pub actions_by_app: std::collections::HashMap<String, i32>,
@@ -128,7 +130,7 @@ pub async fn get_analytics_chart(
     serde_json::from_value(data).map_err(|e| format!("Failed to deserialize response: {}", e))
 }
 
-/// Get activity breakdown (transcripts/meetings/actions) for a specific period
+/// Get activity breakdown (transcripts/meetings/actions/docs/notes) for a specific period
 #[tauri::command]
 pub async fn get_analytics_breakdown(
     app: AppHandle,
