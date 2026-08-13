@@ -230,6 +230,7 @@ export interface SidebarProps {
   currentPage:
     | "home"
     | "analytics"
+    | "usage"
     | "transcripts"
     | "settings"
     | "vocabulary"
@@ -242,6 +243,7 @@ export interface SidebarProps {
     page:
       | "home"
       | "analytics"
+      | "usage"
       | "transcripts"
       | "settings"
       | "vocabulary"

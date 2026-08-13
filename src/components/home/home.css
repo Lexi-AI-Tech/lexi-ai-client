@@ -19,7 +19,41 @@
    ============================================ */
 
 .home-greeting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+.home-usage-cta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.375rem;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--lexi-text);
+  background: var(--lexi-surface);
+  border: 1px solid var(--lexi-border-subtle);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.home-usage-cta:hover {
+  background: var(--lexi-primary-muted);
+  border-color: var(--lexi-primary);
+}
+
+.home-usage-cta:active {
+  transform: scale(0.98);
 }
 
 .home-greeting-card {

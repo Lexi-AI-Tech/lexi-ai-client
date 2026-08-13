@@ -16,6 +16,7 @@ import { AppLoader } from "./components/AppLoader";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { HomePage } from "./components/home/HomePage";
 import { AnalyticsPage } from "./components/analytics/AnalyticsPage";
+import { UsagePage } from "./components/usage/UsagePage";
 import {
   SettingsPage,
   type SettingsPageInitialSection,
@@ -42,6 +43,7 @@ const ONBOARDING_VERSION = 1;
 type Page =
   | "home"
   | "analytics"
+  | "usage"
   | "transcripts"
   | "settings"
   | "vocabulary"
@@ -621,6 +623,11 @@ function App() {
                 <AnalyticsPage
                   onNavigate={(page: string) => setCurrentPage(page as Page)}
                 />
+              </div>
+            )}
+            {currentPage === "usage" && (
+              <div className="container">
+                <UsagePage />
               </div>
             )}
             {currentPage === "transcripts" && (

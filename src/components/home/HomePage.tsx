@@ -4,7 +4,8 @@
  * Onboarding + feature-spotlight surface: greeting, a "getting started" checklist
  * built from real usage signals (first transcription/meeting/action/shortcut), and
  * cards teaching each core feature — the pain point it solves and how to use it.
- * Deep usage breakdowns and plan usage live on the Analytics page instead.
+ * Deep usage breakdowns live on the Analytics page; plan/billing usage lives
+ * on the dedicated Usage page.
  */
 
 import React, { useEffect, useState } from "react";
@@ -14,6 +15,7 @@ import {
   BookText,
   Check,
   FileText,
+  Gauge,
   Mic,
   NotebookPen,
   Sparkles,
@@ -273,6 +275,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             Voice-first Work OS for thinking, meetings, and writing
           </p>
         </div>
+        {isAuthenticated && (
+          <button
+            type="button"
+            className="home-usage-cta"
+            onClick={() => onNavigate?.("usage")}
+          >
+            <Gauge size={16} />
+            <span>View plan usage</span>
+          </button>
+        )}
       </motion.header>
 
       {/* ── Getting Started ── */}
@@ -330,6 +342,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               onClick={() => onNavigate?.("analytics")}
             >
               Analytics
+            </button>{" "}
+            or check your{" "}
+            <button
+              type="button"
+              className="getting-started-done__link"
+              onClick={() => onNavigate?.("usage")}
+            >
+              Usage
             </button>
             .
           </span>
