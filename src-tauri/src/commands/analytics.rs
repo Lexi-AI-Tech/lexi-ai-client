@@ -30,7 +30,6 @@ pub struct BreakdownResponse {
     pub docs: Vec<i32>,
     pub notes: Vec<i32>,
     pub meetings_by_platform: std::collections::HashMap<String, i32>,
-    pub actions_by_type: std::collections::HashMap<String, i32>,
     pub actions_by_app: std::collections::HashMap<String, i32>,
 }
 
@@ -177,9 +176,12 @@ pub async fn get_analytics_breakdown(
     serde_json::from_value(data).map_err(|e| format!("Failed to deserialize response: {}", e))
 }
 
-/// Get an inferred summary of problems/tasks Lexi has helped with recently
+/// Get an inferred summary of problems/tasks Lexi has helped with, scoped to the period
 #[tauri::command]
-pub async fn get_analytics_insights(app: AppHandle) -> Result<InsightsResponse, String> {
+pub async fn get_analytics_insights(
+    app: AppHandle,
+    period: String,
+) -> Result<InsightsResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
         Err(e) => {
@@ -188,7 +190,11 @@ pub async fn get_analytics_insights(app: AppHandle) -> Result<InsightsResponse, 
         }
     };
 
-    let url = format!("{}/api/v1/analytics/insights", crate::config::api_base_url());
+    let url = format!(
+        "{}/api/v1/analytics/insights?period={}",
+        crate::config::api_base_url(),
+        period
+    );
 
     utils::log_api_request("GET", &url);
 

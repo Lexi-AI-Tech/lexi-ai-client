@@ -31,7 +31,6 @@ interface BreakdownResponse {
   docs: number[];
   notes: number[];
   meetings_by_platform: Record<string, number>;
-  actions_by_type: Record<string, number>;
   actions_by_app: Record<string, number>;
 }
 
@@ -192,7 +191,9 @@ export const AnalyticsPage: React.FC = () => {
     (async () => {
       setInsightsLoading(true);
       try {
-        const data = await invoke<InsightsResponse>("get_analytics_insights");
+        const data = await invoke<InsightsResponse>("get_analytics_insights", {
+          period,
+        });
         if (!cancelled) setInsights(data);
       } catch (err) {
         console.error("Failed to fetch analytics insights:", err);
@@ -204,7 +205,7 @@ export const AnalyticsPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, period]);
 
   return (
     <motion.div
@@ -322,13 +323,6 @@ export const AnalyticsPage: React.FC = () => {
                 <h3 className="breakdown-panel__title">Actions by app</h3>
                 <BreakdownList
                   data={breakdown.actions_by_app}
-                  emptyLabel="No actions run in this period."
-                />
-              </div>
-              <div className="breakdown-panel">
-                <h3 className="breakdown-panel__title">Actions by type</h3>
-                <BreakdownList
-                  data={breakdown.actions_by_type}
                   emptyLabel="No actions run in this period."
                 />
               </div>

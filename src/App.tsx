@@ -292,6 +292,37 @@ function App() {
     };
   }, []);
 
+  // Listen for "View Analytics" / "View Usage" from system tray
+  useEffect(() => {
+    let cancelled = false;
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlistenAnalytics = await listen("view-analytics-from-tray", () => {
+        if (!cancelled) setCurrentPage("analytics");
+      });
+      const unlistenUsage = await listen("view-usage-from-tray", () => {
+        if (!cancelled) setCurrentPage("usage");
+      });
+      if (cancelled) {
+        unlistenAnalytics();
+        unlistenUsage();
+      } else {
+        return () => {
+          unlistenAnalytics();
+          unlistenUsage();
+        };
+      }
+    };
+    let unlistenFn: (() => void) | undefined;
+    setup().then((fn) => {
+      unlistenFn = fn;
+    });
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
+
   // Listen for "Check for Updates" from system tray
   useEffect(() => {
     let cancelled = false;

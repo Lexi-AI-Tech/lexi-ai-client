@@ -6,6 +6,7 @@
 //! ## Tray Features
 //!
 //! - **Show App**: Click to show/hide the main window
+//! - **View Analytics** / **View Usage**: Show the app and jump straight to that page
 //! - **Quit**: Exit the application
 //! - **Left-click**: Toggle main window visibility
 //!
@@ -79,6 +80,10 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
     let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
     let start_meeting_item =
         MenuItem::with_id(app, "start_meeting", "Start Meeting", true, None::<&str>)?;
+    let view_analytics_item =
+        MenuItem::with_id(app, "view_analytics", "View Analytics", true, None::<&str>)?;
+    let view_usage_item =
+        MenuItem::with_id(app, "view_usage", "View Usage", true, None::<&str>)?;
 
     #[cfg(target_os = "windows")]
     let transcript_item = MenuItem::with_id(
@@ -128,6 +133,8 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
             &show_item,
             &start_meeting_item,
             &transcript_item,
+            &view_analytics_item,
+            &view_usage_item,
             &check_updates_item,
             &simulate_meeting_item,
             &version_item,
@@ -141,6 +148,8 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
             &show_item,
             &start_meeting_item,
             &transcript_item,
+            &view_analytics_item,
+            &view_usage_item,
             &check_updates_item,
             &version_item,
             &quit_item,
@@ -233,6 +242,24 @@ fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                     if let Err(e) = injector.inject_text(&text) {
                         eprintln!("Failed to paste last transcript: {}", e);
                     }
+                }
+            });
+        }
+        "view_analytics" => {
+            show_and_focus_main_window(app);
+            let app_clone = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = app_clone.emit("view-analytics-from-tray", ()) {
+                    eprintln!("Failed to emit view-analytics-from-tray event: {}", e);
+                }
+            });
+        }
+        "view_usage" => {
+            show_and_focus_main_window(app);
+            let app_clone = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = app_clone.emit("view-usage-from-tray", ()) {
+                    eprintln!("Failed to emit view-usage-from-tray event: {}", e);
                 }
             });
         }
