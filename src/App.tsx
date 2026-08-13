@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppLoader } from "./components/AppLoader";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { HomePage } from "./components/home/HomePage";
+import { AnalyticsPage } from "./components/analytics/AnalyticsPage";
 import {
   SettingsPage,
   type SettingsPageInitialSection,
@@ -40,6 +41,7 @@ const ONBOARDING_VERSION = 1;
 
 type Page =
   | "home"
+  | "analytics"
   | "transcripts"
   | "settings"
   | "vocabulary"
@@ -613,6 +615,13 @@ function App() {
                 onViewAllTranscripts={() => setCurrentPage("transcripts")}
                 onNavigate={(page: string) => setCurrentPage(page as Page)}
               />
+            )}
+            {currentPage === "analytics" && (
+              <div className="container">
+                <AnalyticsPage
+                  onNavigate={(page: string) => setCurrentPage(page as Page)}
+                />
+              </div>
             )}
             {currentPage === "transcripts" && (
               <div className="container container--transcripts">

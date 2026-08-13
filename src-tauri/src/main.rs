@@ -102,7 +102,9 @@ use os_permissions::{
 use actions::commands::{delete_action_history, get_action_history};
 use app_icon::get_app_icon;
 use assistant::commands::{delete_transcript, get_transcript, get_transcripts};
-use commands::analytics::{get_analytics_chart, get_analytics_stats};
+use commands::analytics::{
+    get_analytics_breakdown, get_analytics_chart, get_analytics_insights, get_analytics_stats,
+};
 use commands::app_config::{
     begin_onboarding_hotkey_dry_run, end_onboarding_hotkey_dry_run, get_app_config,
     get_default_hotkeys, hydrate_app_config_from_cloud, refresh_app_config, update_app_config,
@@ -408,6 +410,8 @@ pub fn main() {
             delete_transcript,
             get_analytics_stats,
             get_analytics_chart,
+            get_analytics_breakdown,
+            get_analytics_insights,
             get_feature_usage,
             create_billing_checkout,
             cancel_billing_subscription,
