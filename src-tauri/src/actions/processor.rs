@@ -126,10 +126,9 @@ pub async fn process_action_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                         Err(e) => {
                             eprintln!("❌ Text injection failed: {}", e);
                             let app_handle_clone = app_handle.clone();
-                            let error_msg = e.to_string();
                             tauri::async_runtime::spawn(async move {
                                 app_handle_clone
-                                    .emit("injection_error", error_msg)
+                                    .emit("injection_error", "Failed to insert text")
                                     .unwrap_or_default();
                             });
                         }

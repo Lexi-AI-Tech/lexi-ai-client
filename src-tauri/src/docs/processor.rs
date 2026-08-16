@@ -38,8 +38,12 @@ pub fn process_audio_for_doc(audio_data: Vec<u8>, app_handle: AppHandle) {
                 let _ = app_handle_for_task.emit("doc_from_audio_ready", result);
             }
             Err(e) => {
-                let _ = app_handle_for_task
-                    .emit("doc_from_audio_error", e.to_string());
+                eprintln!("❌ Doc from audio failed: {}", e);
+                let error_msg = crate::utils::user_facing_error(
+                    &e.to_string(),
+                    "Voice input failed. Please try again.",
+                );
+                let _ = app_handle_for_task.emit("doc_from_audio_error", error_msg);
             }
         }
     });

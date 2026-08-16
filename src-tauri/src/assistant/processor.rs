@@ -134,10 +134,9 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                             eprintln!("Failed to inject text: {}", e);
                             // Notify frontend of injection failure
                             let app_handle_emit = app_handle_for_task.clone();
-                            let error_msg = e.to_string();
                             tauri::async_runtime::spawn(async move {
                                 app_handle_emit
-                                    .emit("injection_error", error_msg)
+                                    .emit("injection_error", "Failed to insert text")
                                     .unwrap_or_default();
                             });
                         }
@@ -145,11 +144,14 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 }
             }
             Err(e) => {
-                let error_msg = e.to_string();
                 eprintln!(
                     "❌ Transcription failed after {:.2}s: {}",
                     transcription_duration.as_secs_f64(),
                     e
+                );
+                let error_msg = crate::utils::user_facing_error(
+                    &e.to_string(),
+                    "Transcription failed. Please try again.",
                 );
                 // Notify frontend of transcription failure
                 let app_handle_emit = app_handle_for_task.clone();

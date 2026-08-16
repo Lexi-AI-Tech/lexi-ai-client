@@ -245,10 +245,9 @@ pub async fn start_oauth_websocket(app: AppHandle, state: String) -> Result<(), 
                                 Some(Err(e)) => {
                                     eprintln!("⚠️  WebSocket error: {}", e);
                                     let app_clone_emit = app_clone.clone();
-                                    let error_msg = format!("WebSocket error: {}", e);
                                     tauri::async_runtime::spawn(async move {
                                         app_clone_emit
-                                            .emit("oauth-error", &error_msg)
+                                            .emit("oauth-error", "Authentication failed. Please try again.")
                                             .unwrap_or_default();
                                     });
                                     timeout_task.abort();
@@ -270,10 +269,9 @@ pub async fn start_oauth_websocket(app: AppHandle, state: String) -> Result<(), 
             Err(e) => {
                 eprintln!("❌ Failed to connect to WebSocket: {}", e);
                 let app_clone_emit = app_clone.clone();
-                let error_msg = format!("Failed to connect to WebSocket: {}", e);
                 tauri::async_runtime::spawn(async move {
                     app_clone_emit
-                        .emit("oauth-error", &error_msg)
+                        .emit("oauth-error", "Couldn't reach the server. Check your connection and try again.")
                         .unwrap_or_default();
                 });
             }
