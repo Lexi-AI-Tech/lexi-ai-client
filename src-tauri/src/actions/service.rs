@@ -47,7 +47,7 @@ impl ActionService {
     /// Initializes the HTTP client.
     pub fn new() -> Self {
         Self {
-            client: crate::utils::create_http_client(),
+            client: crate::utils::create_http_client_long_timeout(),
         }
     }
 
@@ -129,15 +129,19 @@ impl ActionService {
             }
             Err(e) => {
                 let action_duration = action_start.elapsed();
-                let error_msg = format!("Action failed: {}", e);
                 eprintln!(
                     "❌ Action failed after {:.2}s: {}",
                     action_duration.as_secs_f64(),
                     e
                 );
+                let user_msg = if e.to_string().to_lowercase().contains("timed out") {
+                    "Action timed out. Please try again."
+                } else {
+                    "Action failed. Please try again."
+                };
                 // Notify frontend that action processing has completed (with error)
                 app_handle
-                    .emit("action_error", error_msg.as_str())
+                    .emit("action_error", user_msg)
                     .unwrap_or_default();
                 // Return None to indicate failure
                 None
