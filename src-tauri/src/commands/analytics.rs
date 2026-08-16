@@ -38,6 +38,12 @@ pub struct InsightsResponse {
     pub headline: String,
     pub highlights: Vec<String>,
     pub generated_at: String,
+    #[serde(default)]
+    pub nudge: Option<String>,
+    #[serde(default)]
+    pub nudge_cta: Option<String>,
+    #[serde(default)]
+    pub nudge_page: Option<String>,
 }
 
 /// Get user statistics
@@ -176,12 +182,10 @@ pub async fn get_analytics_breakdown(
     serde_json::from_value(data).map_err(|e| format!("Failed to deserialize response: {}", e))
 }
 
-/// Get an inferred summary of problems/tasks Lexi has helped with, scoped to the period
+/// Get an inferred summary of problems/tasks Lexi has recently helped with, based on the
+/// most recent activity (not scoped to a fixed period)
 #[tauri::command]
-pub async fn get_analytics_insights(
-    app: AppHandle,
-    period: String,
-) -> Result<InsightsResponse, String> {
+pub async fn get_analytics_insights(app: AppHandle) -> Result<InsightsResponse, String> {
     let auth_token = match get_auth_token_async(&app).await {
         Ok(token) => token,
         Err(e) => {
@@ -191,9 +195,8 @@ pub async fn get_analytics_insights(
     };
 
     let url = format!(
-        "{}/api/v1/analytics/insights?period={}",
-        crate::config::api_base_url(),
-        period
+        "{}/api/v1/analytics/insights",
+        crate::config::api_base_url()
     );
 
     utils::log_api_request("GET", &url);

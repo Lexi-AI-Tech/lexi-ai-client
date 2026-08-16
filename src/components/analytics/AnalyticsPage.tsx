@@ -2,20 +2,20 @@
  * AnalyticsPage Component
  *
  * Deep-dive on usage: activity breakdown over time (transcripts/meetings/actions),
- * meeting-platform and action-type/app splits, and an inferred "what Lexi helped
- * you with" insight. Recent activity lives on the Home page (compact merged feed);
- * plan/billing usage lives on the dedicated Usage page.
+ * an interactive chart with exact counts, and an inferred "what Lexi helped you
+ * with" insight (with a feature nudge). Recent activity lives on the Home page
+ * (compact merged feed); plan/billing usage lives on the dedicated Usage page.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../../store/authStore";
 // Reuses the billing/skeleton/empty-state card styles already established in
 // home.css (kept there since HomePage still shares the same --lexi-* design
 // tokens and card conventions) — analytics.css only adds the new sections
-// (insights, breakdown chart/lists, period toggle).
+// (insights, breakdown chart, period toggle).
 import "../home/home.css";
 import "./analytics.css";
 
@@ -30,17 +30,49 @@ interface BreakdownResponse {
   actions: number[];
   docs: number[];
   notes: number[];
-  meetings_by_platform: Record<string, number>;
-  actions_by_app: Record<string, number>;
 }
 
 interface InsightsResponse {
   headline: string;
   highlights: string[];
   generated_at: string;
+  nudge?: string | null;
+  nudge_cta?: string | null;
+  nudge_page?: string | null;
 }
 
 type BreakdownPeriod = "7d" | "30d";
+type NavigablePage =
+  | "home"
+  | "meetings"
+  | "actions"
+  | "docs"
+  | "notes"
+  | "transcripts"
+  | "shortcuts"
+  | "analytics";
+
+const NUDGE_PAGES: readonly string[] = [
+  "home",
+  "meetings",
+  "actions",
+  "docs",
+  "notes",
+  "transcripts",
+  "shortcuts",
+];
+
+interface AnalyticsPageProps {
+  onNavigate?: (page: NavigablePage) => void;
+}
+
+const SERIES = [
+  { key: "transcripts", label: "Transcripts", className: "transcripts" },
+  { key: "meetings", label: "Meetings", className: "meetings" },
+  { key: "actions", label: "Actions", className: "actions" },
+  { key: "docs", label: "Docs", className: "docs" },
+  { key: "notes", label: "Notes", className: "notes" },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -70,10 +102,13 @@ const SkBlock: React.FC<{
   <div className={`skeleton-block ${className ?? ""}`.trim()} style={style} />
 );
 
-/** Grouped-bar mini chart: one column per label, one bar per series. */
+/** Grouped-bar chart: one column per label, one bar per series, with an
+ * exact-number tooltip on hover/focus and a totals row underneath. */
 const ActivityChart: React.FC<{ breakdown: BreakdownResponse }> = ({
   breakdown,
 }) => {
+  const [hovered, setHovered] = useState<number | null>(null);
+
   const max = Math.max(
     1,
     ...breakdown.transcripts,
@@ -82,69 +117,116 @@ const ActivityChart: React.FC<{ breakdown: BreakdownResponse }> = ({
     ...breakdown.docs,
     ...breakdown.notes,
   );
-  return (
-    <div className="activity-chart">
-      {breakdown.labels.map((label, i) => (
-        <div className="activity-chart__col" key={`${label}-${i}`}>
-          <div className="activity-chart__bars">
-            <div
-              className="activity-chart__bar activity-chart__bar--transcripts"
-              style={{ height: `${(breakdown.transcripts[i] / max) * 100}%` }}
-              title={`${breakdown.transcripts[i]} transcriptions`}
-            />
-            <div
-              className="activity-chart__bar activity-chart__bar--meetings"
-              style={{ height: `${(breakdown.meetings[i] / max) * 100}%` }}
-              title={`${breakdown.meetings[i]} meetings`}
-            />
-            <div
-              className="activity-chart__bar activity-chart__bar--actions"
-              style={{ height: `${(breakdown.actions[i] / max) * 100}%` }}
-              title={`${breakdown.actions[i]} actions`}
-            />
-            <div
-              className="activity-chart__bar activity-chart__bar--docs"
-              style={{ height: `${(breakdown.docs[i] / max) * 100}%` }}
-              title={`${breakdown.docs[i]} docs`}
-            />
-            <div
-              className="activity-chart__bar activity-chart__bar--notes"
-              style={{ height: `${(breakdown.notes[i] / max) * 100}%` }}
-              title={`${breakdown.notes[i]} notes`}
-            />
-          </div>
-          <span className="activity-chart__label">{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
 
-/** Horizontal ranked bar list for a Record<string, number> breakdown. */
-const BreakdownList: React.FC<{
-  data: Record<string, number>;
-  emptyLabel: string;
-}> = ({ data, emptyLabel }) => {
-  const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
-  const max = Math.max(1, ...entries.map(([, v]) => v));
-  if (entries.length === 0) {
-    return <p className="empty-sub">{emptyLabel}</p>;
-  }
+  const totals = useMemo(
+    () =>
+      SERIES.reduce<Record<string, number>>((acc, s) => {
+        acc[s.key] = breakdown[s.key].reduce((sum, v) => sum + v, 0);
+        return acc;
+      }, {}),
+    [breakdown],
+  );
+
+  const activeIndex = hovered ?? breakdown.labels.length - 1;
+  const activeTotal = SERIES.reduce(
+    (sum, s) => sum + breakdown[s.key][activeIndex],
+    0,
+  );
+
   return (
-    <ul className="breakdown-list">
-      {entries.map(([key, value]) => (
-        <li className="breakdown-list__row" key={key}>
-          <span className="breakdown-list__label">{key}</span>
-          <div className="breakdown-list__bar-track">
-            <div
-              className="breakdown-list__bar-fill"
-              style={{ width: `${(value / max) * 100}%` }}
-            />
+    <div className="activity-chart-wrap">
+      <div className="activity-chart">
+        {breakdown.labels.map((label, i) => (
+          <div
+            className={`activity-chart__col${hovered === i ? " is-hovered" : ""}`}
+            key={`${label}-${i}`}
+            tabIndex={0}
+            role="button"
+            aria-label={`${label}: ${SERIES.map((s) => `${breakdown[s.key][i]} ${s.label.toLowerCase()}`).join(", ")}`}
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+            onFocus={() => setHovered(i)}
+            onBlur={() => setHovered(null)}
+          >
+            <div className="activity-chart__bars">
+              {SERIES.map((s) => (
+                <div
+                  key={s.key}
+                  className={`activity-chart__bar activity-chart__bar--${s.className}`}
+                  style={{ height: `${(breakdown[s.key][i] / max) * 100}%` }}
+                />
+              ))}
+            </div>
+            <span className="activity-chart__label">{label}</span>
           </div>
-          <span className="breakdown-list__value">{value}</span>
-        </li>
-      ))}
-    </ul>
+        ))}
+      </div>
+
+      <div className="activity-chart__tooltip">
+        <span className="activity-chart__tooltip-label">
+          {breakdown.labels[activeIndex]}
+        </span>
+        <span className="activity-chart__tooltip-total">
+          {activeTotal} {activeTotal === 1 ? "item" : "items"}
+        </span>
+        <div className="activity-chart__tooltip-rows">
+          {SERIES.map((s) => (
+            <span className="activity-chart__tooltip-row" key={s.key}>
+              <span
+                className={`legend-dot legend-dot--${s.className}`}
+                aria-hidden
+              />
+              {s.label}
+              <strong>{breakdown[s.key][activeIndex]}</strong>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="activity-table-scroll">
+        <table className="activity-table">
+          <thead>
+            <tr>
+              <th scope="col">Category</th>
+              {breakdown.labels.map((label, i) => (
+                <th
+                  scope="col"
+                  key={`${label}-${i}`}
+                  className={hovered === i ? "is-hovered" : undefined}
+                >
+                  {label}
+                </th>
+              ))}
+              <th scope="col">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SERIES.map((s) => (
+              <tr key={s.key}>
+                <th scope="row">
+                  <span
+                    className={`legend-dot legend-dot--${s.className}`}
+                    aria-hidden
+                  />
+                  {s.label}
+                </th>
+                {breakdown[s.key].map((v, i) => (
+                  <td
+                    key={i}
+                    className={hovered === i ? "is-hovered" : undefined}
+                    onMouseEnter={() => setHovered(i)}
+                    onMouseLeave={() => setHovered(null)}
+                  >
+                    {v}
+                  </td>
+                ))}
+                <td className="activity-table__total">{totals[s.key]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 };
 
@@ -152,7 +234,9 @@ const BreakdownList: React.FC<{
 // Main Component
 // ---------------------------------------------------------------------------
 
-export const AnalyticsPage: React.FC = () => {
+export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
+  onNavigate,
+}) => {
   const { isAuthenticated } = useAuthStore();
 
   const [period, setPeriod] = useState<BreakdownPeriod>("7d");
@@ -185,15 +269,15 @@ export const AnalyticsPage: React.FC = () => {
     };
   }, [isAuthenticated, period]);
 
+  // Insights are a single recency-biased snapshot across all activity — independent
+  // of the breakdown period toggle below, so this only ever fetches once.
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
       setInsightsLoading(true);
       try {
-        const data = await invoke<InsightsResponse>("get_analytics_insights", {
-          period,
-        });
+        const data = await invoke<InsightsResponse>("get_analytics_insights");
         if (!cancelled) setInsights(data);
       } catch (err) {
         console.error("Failed to fetch analytics insights:", err);
@@ -205,7 +289,12 @@ export const AnalyticsPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, period]);
+  }, [isAuthenticated]);
+
+  const nudgePage =
+    insights?.nudge_page && NUDGE_PAGES.includes(insights.nudge_page)
+      ? (insights.nudge_page as NavigablePage)
+      : null;
 
   return (
     <motion.div
@@ -246,7 +335,7 @@ export const AnalyticsPage: React.FC = () => {
               <>
                 <p className="insights-card__headline">
                   {insights?.headline ??
-                    "Start recording meetings or running actions to see insights here."}
+                    "Record a meeting, run an action, dictate, jot a note, draft a doc, or set up a shortcut — your personal insights will show up here."}
                 </p>
                 {insights?.highlights && insights.highlights.length > 0 && (
                   <ul className="insights-card__highlights">
@@ -254,6 +343,23 @@ export const AnalyticsPage: React.FC = () => {
                       <li key={i}>{h}</li>
                     ))}
                   </ul>
+                )}
+                {insights?.nudge && (
+                  <div className="insights-card__nudge">
+                    <span className="insights-card__nudge-text">
+                      {insights.nudge}
+                    </span>
+                    {insights.nudge_cta && nudgePage && (
+                      <button
+                        type="button"
+                        className="insights-card__nudge-cta"
+                        onClick={() => onNavigate?.(nudgePage)}
+                      >
+                        {insights.nudge_cta}
+                        <ArrowRight size={13} aria-hidden />
+                      </button>
+                    )}
+                  </div>
                 )}
               </>
             )}
@@ -288,45 +394,14 @@ export const AnalyticsPage: React.FC = () => {
         ) : (
           <>
             <div className="activity-chart-legend">
-              <span className="legend-item">
-                <span className="legend-dot legend-dot--transcripts" />
-                Transcripts
-              </span>
-              <span className="legend-item">
-                <span className="legend-dot legend-dot--meetings" />
-                Meetings
-              </span>
-              <span className="legend-item">
-                <span className="legend-dot legend-dot--actions" />
-                Actions
-              </span>
-              <span className="legend-item">
-                <span className="legend-dot legend-dot--docs" />
-                Docs
-              </span>
-              <span className="legend-item">
-                <span className="legend-dot legend-dot--notes" />
-                Notes
-              </span>
+              {SERIES.map((s) => (
+                <span className="legend-item" key={s.key}>
+                  <span className={`legend-dot legend-dot--${s.className}`} />
+                  {s.label}
+                </span>
+              ))}
             </div>
             <ActivityChart breakdown={breakdown} />
-
-            <div className="breakdown-grid">
-              <div className="breakdown-panel">
-                <h3 className="breakdown-panel__title">Meetings by platform</h3>
-                <BreakdownList
-                  data={breakdown.meetings_by_platform}
-                  emptyLabel="No meetings recorded in this period."
-                />
-              </div>
-              <div className="breakdown-panel">
-                <h3 className="breakdown-panel__title">Actions by app</h3>
-                <BreakdownList
-                  data={breakdown.actions_by_app}
-                  emptyLabel="No actions run in this period."
-                />
-              </div>
-            </div>
           </>
         )}
       </motion.section>

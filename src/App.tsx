@@ -651,7 +651,9 @@ function App() {
             )}
             {currentPage === "analytics" && (
               <div className="container">
-                <AnalyticsPage />
+                <AnalyticsPage
+                  onNavigate={(page: string) => setCurrentPage(page as Page)}
+                />
               </div>
             )}
             {currentPage === "usage" && (

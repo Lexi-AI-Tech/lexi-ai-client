@@ -1,19 +1,19 @@
 /**
  * HomePage Component
  *
- * Onboarding + feature-spotlight surface: greeting, a "getting started" checklist
- * built from real usage signals (first transcription/meeting/action/shortcut), and
- * cards teaching each core feature — the pain point it solves and how to use it.
- * Deep usage breakdowns live on the Analytics page; plan/billing usage lives
- * on the dedicated Usage page.
+ * Onboarding + feature-spotlight surface: greeting, a use-case-grounded nudge
+ * pulled from the same LLM insights that power Analytics, and cards teaching
+ * each core feature — the pain point it solves and how to use it. Deep usage
+ * breakdowns live on the Analytics page; plan/billing usage lives on the
+ * dedicated Usage page.
  */
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
+  ArrowRight,
   Atom,
   BookText,
-  Check,
   FileText,
   Gauge,
   Mic,
@@ -29,22 +29,13 @@ import "./home.css";
 // Types
 // ---------------------------------------------------------------------------
 
-interface PaginatedTotal {
-  total: number;
-}
-
-interface ChecklistState {
-  hasTranscript: boolean;
-  hasMeeting: boolean;
-  hasAction: boolean;
-  hasShortcut: boolean;
-}
-
-interface ChecklistStep {
-  id: keyof ChecklistState;
-  label: string;
-  description: string;
-  page: string;
+interface InsightsResponse {
+  headline: string;
+  highlights: string[];
+  generated_at: string;
+  nudge?: string | null;
+  nudge_cta?: string | null;
+  nudge_page?: string | null;
 }
 
 interface FeatureSpotlight {
@@ -56,36 +47,19 @@ interface FeatureSpotlight {
   cta: string;
 }
 
+const NUDGE_PAGES: readonly string[] = [
+  "home",
+  "meetings",
+  "actions",
+  "docs",
+  "notes",
+  "transcripts",
+  "shortcuts",
+];
+
 // ---------------------------------------------------------------------------
 // Content
 // ---------------------------------------------------------------------------
-
-const CHECKLIST_STEPS: ChecklistStep[] = [
-  {
-    id: "hasTranscript",
-    label: "Try your first transcription",
-    description: "Hold your hotkey and speak — text appears wherever your cursor is.",
-    page: "transcripts",
-  },
-  {
-    id: "hasMeeting",
-    label: "Record a meeting",
-    description: "Lexi joins silently and transcribes everyone, live.",
-    page: "meetings",
-  },
-  {
-    id: "hasAction",
-    label: "Run your first Action",
-    description: "Speak an instruction, get AI output right at your cursor.",
-    page: "actions",
-  },
-  {
-    id: "hasShortcut",
-    label: "Set up a shortcut",
-    description: "Bind hotkeys so every feature is one keypress away.",
-    page: "shortcuts",
-  },
-];
 
 const FEATURE_SPOTLIGHTS: FeatureSpotlight[] = [
   {
@@ -214,36 +188,19 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const { user, isAuthenticated } = useAuthStore();
 
-  const [checklist, setChecklist] = useState<ChecklistState | null>(null);
+  const [insights, setInsights] = useState<InsightsResponse | null>(null);
 
-  // One-time, lightweight existence checks (page_size=1 / small lists) — no
-  // polling, no live-refresh listeners. This is onboarding guidance, not a
-  // live dashboard; Analytics owns the detailed, continuously-refreshed data.
+  // Same recency-biased LLM insights that power Analytics — reused here just
+  // for the nudge, not the headline/highlights.
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
       try {
-        const [transcripts, actions, meetings, shortcuts] = await Promise.all([
-          invoke<PaginatedTotal>("get_transcripts", { page: 1, pageSize: 1 }).catch(
-            () => ({ total: 0 }),
-          ),
-          invoke<PaginatedTotal>("get_action_history", {
-            page: 1,
-            pageSize: 1,
-          }).catch(() => ({ total: 0 })),
-          invoke<unknown[]>("list_meetings").catch(() => []),
-          invoke<unknown[]>("get_shortcuts").catch(() => []),
-        ]);
-        if (cancelled) return;
-        setChecklist({
-          hasTranscript: transcripts.total > 0,
-          hasAction: actions.total > 0,
-          hasMeeting: meetings.length > 0,
-          hasShortcut: shortcuts.length > 0,
-        });
+        const data = await invoke<InsightsResponse>("get_analytics_insights");
+        if (!cancelled) setInsights(data);
       } catch (err) {
-        console.error("Failed to load getting-started checklist:", err);
+        console.error("Failed to load home nudge:", err);
       }
     })();
     return () => {
@@ -251,11 +208,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     };
   }, [isAuthenticated]);
 
+  const nudgePage =
+    insights?.nudge_page && NUDGE_PAGES.includes(insights.nudge_page)
+      ? insights.nudge_page
+      : null;
+
   const userName = user?.name?.split(" ")[0] || "there";
-  const completedCount = checklist
-    ? CHECKLIST_STEPS.filter((s) => checklist[s.id]).length
-    : 0;
-  const allComplete = checklist != null && completedCount === CHECKLIST_STEPS.length;
 
   return (
     <motion.div
@@ -287,72 +245,25 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         )}
       </motion.header>
 
-      {/* ── Getting Started ── */}
-      {isAuthenticated && checklist && !allComplete && (
-        <motion.section className="getting-started-section" variants={itemVariants}>
-          <div className="getting-started-header">
-            <h2 className="section-title">Get started with Lexi</h2>
-            <span className="getting-started-progress">
-              {completedCount}/{CHECKLIST_STEPS.length}
-            </span>
+      {/* ── Nudge ── */}
+      {isAuthenticated && insights?.nudge && (
+        <motion.section className="home-nudge-card" variants={itemVariants}>
+          <div className="home-nudge-card__icon">
+            <Sparkles size={18} />
           </div>
-          <div className="getting-started-track">
-            <div
-              className="getting-started-track__fill"
-              style={{
-                width: `${(completedCount / CHECKLIST_STEPS.length) * 100}%`,
-              }}
-            />
+          <div className="home-nudge-card__body">
+            <p className="home-nudge-card__text">{insights.nudge}</p>
+            {insights.nudge_cta && nudgePage && (
+              <button
+                type="button"
+                className="home-nudge-card__cta"
+                onClick={() => onNavigate?.(nudgePage)}
+              >
+                {insights.nudge_cta}
+                <ArrowRight size={13} aria-hidden />
+              </button>
+            )}
           </div>
-          <ul className="getting-started-list">
-            {CHECKLIST_STEPS.map((step) => {
-              const done = checklist[step.id];
-              return (
-                <li
-                  key={step.id}
-                  className={`getting-started-item${done ? " is-done" : ""}`}
-                  onClick={() => !done && onNavigate?.(step.page)}
-                >
-                  <span className="getting-started-item__check">
-                    {done && <Check size={12} strokeWidth={3} />}
-                  </span>
-                  <div className="getting-started-item__text">
-                    <span className="getting-started-item__label">
-                      {step.label}
-                    </span>
-                    <span className="getting-started-item__desc">
-                      {step.description}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </motion.section>
-      )}
-
-      {isAuthenticated && allComplete && (
-        <motion.section className="getting-started-done" variants={itemVariants}>
-          <Sparkles size={16} />
-          <span>
-            You've explored every core feature — see how it's paid off on{" "}
-            <button
-              type="button"
-              className="getting-started-done__link"
-              onClick={() => onNavigate?.("analytics")}
-            >
-              Analytics
-            </button>{" "}
-            or check your{" "}
-            <button
-              type="button"
-              className="getting-started-done__link"
-              onClick={() => onNavigate?.("usage")}
-            >
-              Usage
-            </button>
-            .
-          </span>
         </motion.section>
       )}
 
