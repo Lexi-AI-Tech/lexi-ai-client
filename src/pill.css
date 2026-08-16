@@ -4,6 +4,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Pill window is a separate bundle that intentionally does not import
+   index.css (see pill.tsx), so design-token CSS vars like --lexi-font-body
+   aren't available here. Redefine the body font stack locally — without
+   this, text silently falls back to the webview's default font, which
+   renders wider/bolder than Satoshi and can overflow the pill's tightly
+   sized cards (e.g. the action-mode "Listening for command" label). */
+:root {
+  --lexi-font-body:
+    "Satoshi", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 /* Critical: Ensure complete transparency for pill overlay window —
    must come AFTER Tailwind so these overrides win over preflight's reset. */
 *,

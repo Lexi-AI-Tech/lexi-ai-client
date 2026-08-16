@@ -25,7 +25,7 @@ const IDLE_SIZE = { width: 50, height: 6.6 };
 const RECORDING_SIZE = { width: 158, height: 46 };
 // Action hotkey mode shows longer copy ("Listening for command") than plain
 // dictation ("Transcribing"), so it needs a wider card at the same height.
-const ACTION_SIZE = { width: 248, height: 46 };
+const ACTION_SIZE = { width: 320, height: 46 };
 const MEETING_DETECTED_SIZE = { width: 248, height: 138 }; // Larger card for meeting prompt
 const PROCESSING_SIZE = { width: 148, height: 46 };
 const SPEAKING_SIZE = { width: 138, height: 46 }; // Speaking/TTS state
@@ -840,7 +840,7 @@ export const Pill: React.FC = () => {
   // over a dark demo background but washes out over a bright desktop/app.
   // The accent color still shows through as a gradient overlay + border/glow.
   const shapeClass =
-    status === "meeting_detected" ? "rounded-3xl px-4 py-3" : "rounded-2xl px-4 py-3";
+    status === "meeting_detected" ? "rounded-3xl px-4 py-3.5" : "rounded-2xl px-4 py-3";
   // NOTE: Tailwind v3.4's gradient from-*/to-* utilities silently produce no
   // CSS when an arbitrary color value is combined with a separate opacity
   // modifier (from-[#000]/78) — a reproducible bug in this version. Embedding
@@ -969,11 +969,11 @@ export const Pill: React.FC = () => {
 
       {status === "speaking" && (
         <div className="flex items-center gap-2">
-          <div className="flex gap-1 items-end h-4">
+          <div className="flex gap-1.5 items-end h-4">
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="w-1 rounded-full"
+                className="w-1.5 rounded-full"
                 style={{
                   background: "linear-gradient(to top, #6b8f6e, #8ab98a)",
                   animation: `pillSpeakBounce ${0.5 + i * 0.1}s ease-in-out infinite`,
@@ -1010,7 +1010,7 @@ export const Pill: React.FC = () => {
                 evt.stopPropagation();
                 await startMeetingFromPill();
               }}
-              className="flex-1 px-3 py-1.5 text-xs font-semibold bg-[#6b8f6e] hover:bg-[#587a5b] text-white rounded-lg transition-colors duration-200"
+              className="flex-1 px-3 py-1.5 text-xs font-semibold bg-[#6b8f6e] hover:bg-[#587a5b] text-white rounded-xl border border-white/10 transition-colors duration-200"
             >
               Record
             </button>
@@ -1025,7 +1025,7 @@ export const Pill: React.FC = () => {
                 evt.stopPropagation();
                 await resetPillToIdle();
               }}
-              className="flex-1 px-3 py-1.5 text-xs font-semibold bg-white/85 hover:bg-white text-[#2e3b2f] rounded-lg transition-colors duration-200"
+              className="flex-1 px-3 py-1.5 text-xs font-semibold bg-white/85 hover:bg-white text-[#2e3b2f] rounded-xl border border-black/5 transition-colors duration-200"
             >
               Skip
             </button>
