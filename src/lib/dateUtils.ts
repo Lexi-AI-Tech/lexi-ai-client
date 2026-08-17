@@ -7,7 +7,7 @@
  * the server host’s local zone). Pydantic `datetime` fields serialize similarly;
  * the Tauri layer forwards JSON strings without rewriting times.
  *
- * **Inbound-only server logic** (e.g. meeting/room segment `parse_dt`) normalizes
+ * **Inbound-only server logic** (e.g. meeting segment `parse_dt`) normalizes
  * client-submitted strings to UTC for storage; that is not applied again when
  * reading rows for API responses.
  *

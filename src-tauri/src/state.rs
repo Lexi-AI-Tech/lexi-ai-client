@@ -30,15 +30,6 @@ pub struct HotkeyRecordingState {
     pub is_recording: Arc<Mutex<bool>>,
 }
 
-/// Room recording state
-///
-/// Note: AudioRecorder and RoomWebSocket are managed in a dedicated thread because
-/// macOS audio streams are not always Send+Sync across runtime boundaries.
-pub struct RoomState {
-    pub is_recording: Mutex<bool>,
-    pub command_tx: Mutex<Option<std::sync::mpsc::Sender<()>>>,
-}
-
 /// Meeting recording state
 ///
 /// Note: AudioRecorder and MeetingWebSocket cannot be stored here because they contain

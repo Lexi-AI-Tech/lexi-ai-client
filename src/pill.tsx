@@ -14,17 +14,21 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 import { useUpdaterStore } from "./store/updaterStore";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { Play, X } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 // import { playSound } from "./lib/soundUtils";
 // Note: Do NOT import index.css here - it adds opaque backgrounds that break transparency
 import "./pill.css";
 
 // Window size constants — window matches pill exactly in each state (no extra space)
+// Sized to fit the "Glass Frosted" design's text labels + larger meeting card.
 const IDLE_SIZE = { width: 50, height: 6.6 };
-const RECORDING_SIZE = { width: 80, height: 36 };
-const MEETING_DETECTED_SIZE = { width: 130, height: 52 }; // Larger pill for meeting prompt
-const PROCESSING_SIZE = { width: 100, height: 36 };
-const SPEAKING_SIZE = { width: 90, height: 36 }; // Speaking/TTS state
+const RECORDING_SIZE = { width: 158, height: 46 };
+// Action hotkey mode shows longer copy ("Listening for command") than plain
+// dictation ("Transcribing"), so it needs a wider card at the same height.
+const ACTION_SIZE = { width: 320, height: 46 };
+const MEETING_DETECTED_SIZE = { width: 248, height: 138 }; // Larger card for meeting prompt
+const PROCESSING_SIZE = { width: 148, height: 46 };
+const SPEAKING_SIZE = { width: 138, height: 46 }; // Speaking/TTS state
 const MEETING_COUNTDOWN_SECONDS = 8;
 // Height difference for position adjustment (to make pill grow upward)
 const HEIGHT_DIFF = RECORDING_SIZE.height - IDLE_SIZE.height;
@@ -46,18 +50,36 @@ interface MeetingDetectedPayload {
   platform: string;
 }
 
+type PillStatus =
+  | "idle"
+  | "recording"
+  | "processing"
+  | "speaking"
+  | "meeting_detected";
+
 export const Pill: React.FC = () => {
-  const [status, setStatus] = useState<
-    "idle" | "recording" | "processing" | "speaking" | "meeting_detected"
-  >("idle");
+  const [status, setStatusState] = useState<PillStatus>("idle");
   const [isActionMode, setIsActionMode] = useState(false); // Track if action hotkey is active
   const [isHovered, setIsHovered] = useState(false);
+  const [isPressed, setIsPressed] = useState(false); // Subtle press-down feedback on click
   const [audioLevels, setAudioLevels] = useState<number[]>([]);
   const [smoothedLevels, setSmoothedLevels] = useState<number[]>([]);
   const [meetingContext, setMeetingContext] =
     useState<MeetingDetectedPayload | null>(null);
   const [meetingCountdown, setMeetingCountdown] = useState(0); // 0 = not in countdown, 1–5 = seconds left
   const isRecordingRef = useRef(false);
+  // Live status snapshot for listeners set up once on mount. Updated
+  // synchronously in `setStatus` below (not via a `useEffect` on `status`) —
+  // an effect only commits on the *next* render, so a resize/reposition that
+  // runs synchronously right after a `setStatus("meeting_detected")` call
+  // could otherwise still see a stale "idle" here, letting the onMoved guard
+  // below mistake our own programmatic move for a user drag and corrupt
+  // idlePositionRef with the intermediate (shifted) position.
+  const statusRef = useRef<PillStatus>(status);
+  const setStatus = React.useCallback((next: PillStatus) => {
+    statusRef.current = next;
+    setStatusState(next);
+  }, []);
   const hasRealAudioRef = useRef(false); // Track if we're receiving real volume data
   const lastVolumeTimeRef = useRef(0); // Track when we last received volume data
   // Single source of truth for idle position - prevents position drift from accumulated rounding errors
@@ -80,7 +102,8 @@ export const Pill: React.FC = () => {
     });
   }, [audioLevels]);
 
-  // Reset audio levels when not recording, and sync idle status to the global updater
+  // Reset audio levels when not recording, and sync idle status to the global updater.
+  // (statusRef itself is kept in sync synchronously by `setStatus` above, not here.)
   useEffect(() => {
     isRecordingRef.current = status === "recording";
 
@@ -95,6 +118,21 @@ export const Pill: React.FC = () => {
         );
         setTimeout(() => relaunch(), 1500); // 1.5s visual delay before jarring restart so animations have time to settle
       }
+
+      // Rare glitch: after a rapid native resize+reposition (shrinking back
+      // from an active card) combined with backdrop-filter, the compositor
+      // can occasionally get stuck painting solid black instead of the
+      // transparent/tinted idle pill. Same nudge used for the post-sleep
+      // repaint bug below — force a repaint by toggling opacity a hair.
+      requestAnimationFrame(() => {
+        const root = document.getElementById("root");
+        if (!root) return;
+        const prev = root.style.opacity;
+        root.style.opacity = "0.999";
+        requestAnimationFrame(() => {
+          root.style.opacity = prev;
+        });
+      });
     }
 
     if (status !== "recording") {
@@ -182,11 +220,26 @@ export const Pill: React.FC = () => {
     };
   }, [status, resetPillToIdle]);
 
-  // Initialize idle position reference on mount
+  // Initialize idle position reference on mount.
+  //
+  // The pill window starts hidden and Rust positions it in two steps
+  // (create_pill_window sets a throwaway spot, then init_pill_window moves it
+  // to the real bottom-center position and calls .show()). If we snapshot
+  // outerPosition() before that second step lands, we cache the wrong
+  // "idle" anchor forever — every later transition (recording, and
+  // especially the much bigger meeting card) then grows from that wrong
+  // spot. Poll until the window reports visible (set right after the real
+  // position is applied) before trusting the read.
   useEffect(() => {
+    let cancelled = false;
     const initializePosition = async () => {
+      const window = getCurrentWindow();
       try {
-        const window = getCurrentWindow();
+        for (let attempt = 0; attempt < 40; attempt++) {
+          if (cancelled) return;
+          if (await window.isVisible()) break;
+          await new Promise((r) => setTimeout(r, 50)); // up to ~2s worst case
+        }
         const physicalPos = await window.outerPosition();
         const scaleFactor = await window.scaleFactor();
         const logicalX = physicalPos.x / scaleFactor;
@@ -201,6 +254,38 @@ export const Pill: React.FC = () => {
       }
     };
     initializePosition();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Keep idlePositionRef in sync while the user drags the pill around.
+  // Without this, dragging the idle pill to a new spot and then starting a
+  // recording would snap it back to the position captured at mount time —
+  // our own programmatic setPosition calls also fire onMoved, but those only
+  // happen while status is already non-idle (or moving back to the same idle
+  // spot), so gating on statusRef.current === "idle" only picks up real drags.
+  useEffect(() => {
+    let unlistenMoved: (() => void) | undefined;
+    const setupMoveTracking = async () => {
+      try {
+        const window = getCurrentWindow();
+        const scaleFactor = await window.scaleFactor();
+        unlistenMoved = await window.onMoved(({ payload: position }) => {
+          if (statusRef.current !== "idle") return;
+          idlePositionRef.current = {
+            x: position.x / scaleFactor,
+            y: position.y / scaleFactor,
+          };
+        });
+      } catch (e) {
+        console.error("Failed to set up move tracking:", e);
+      }
+    };
+    setupMoveTracking();
+    return () => {
+      if (unlistenMoved) unlistenMoved();
+    };
   }, []);
 
   useEffect(() => {
@@ -256,11 +341,11 @@ export const Pill: React.FC = () => {
               const idleX = idlePositionRef.current.x;
               const idleY = idlePositionRef.current.y;
 
-              const recX = idleX - (RECORDING_SIZE.width - IDLE_SIZE.width) / 2;
+              const recX = idleX - (ACTION_SIZE.width - IDLE_SIZE.width) / 2;
               const recY = idleY - HEIGHT_DIFF;
 
               await window.setSize(
-                new LogicalSize(RECORDING_SIZE.width, RECORDING_SIZE.height),
+                new LogicalSize(ACTION_SIZE.width, ACTION_SIZE.height),
               );
               await window.setPosition(new LogicalPosition(recX, recY));
             } catch (e) {
@@ -739,6 +824,7 @@ export const Pill: React.FC = () => {
 
   const handleMouseDown = async () => {
     // Start dragging the window when clicking on the pill
+    setIsPressed(true);
     try {
       const window = getCurrentWindow();
       await window.startDragging();
@@ -747,569 +833,222 @@ export const Pill: React.FC = () => {
     }
   };
 
-  // Pill accents — dictation primary; processing blue; action gold; speaking teal
-  // (pill.html does not load index.css; optional --lexi-* overrides, hex fallbacks)
-  /** Dictation (voice → text) — brand sage */
-  const PILL_DICTATION = "var(--lexi-primary, #6b8f6e)";
-  /** Processing — dusty blue, similar mid-value to --lexi-primary (not electric blue) */
-  const PILL_PROCESSING = "var(--lexi-pill-processing-accent, #7aa3c4)";
-  /** Action hotkey — warm gold, clearly not green/teal */
-  const PILL_ACTION = "var(--lexi-pill-action-accent, #c9a45c)";
-  /** Assistant TTS (speaking) — cool teal, distinct from dictation + action */
-  const PILL_ASSISTANT = "var(--lexi-pill-assistant-accent, #4a9e96)";
-  const BAR_FILL_DICTATION = `color-mix(in srgb, ${PILL_DICTATION} 36%, rgba(255,255,255,0.94) 64%)`;
-  const BAR_FILL_ACTION = `color-mix(in srgb, ${PILL_ACTION} 44%, rgba(255,255,255,0.91) 56%)`;
+  // Shared easing — same curve shadcn/Radix-style components use for hover/press
+  // (size/position changes keep their own springier curve further down)
+  const EASE = "cubic-bezier(0.4, 0, 0.2, 1)";
 
-  // Waveform icon SVG - individual bars that respond to audio levels
-  // Uses separate width/height so bars fill the pill properly
-  const WaveformIcon = ({
-    width: svgWidth = 48,
-    height: svgHeight = 24,
-    audioLevels = [],
-    barFill = "rgba(255, 255, 255, 0.9)",
-  }: {
-    width?: number;
-    height?: number;
-    audioLevels?: number[];
-    /** Dictation / action / assistant each pass a theme barFill */
-    barFill?: string;
-  }) => {
-    const numBars = 7;
-    const barWidth = 3;
-    const barSpacing = 2.5;
-    const maxBarHeight = svgHeight * 0.9;
-    const minBarHeight = svgHeight * 0.18;
+  // "Glass Frosted" design — ported 1:1 from the v0 pill-variations.tsx
+  // export (PillGlass), now using real Tailwind utility classes (matches the
+  // shared code's transition-all/backdrop-blur-xl/rounded-2xl exactly) so the
+  // CSS-keyframe animations run on the GPU compositor instead of being
+  // re-triggered by React state — that's what made the earlier inline-style
+  // version feel less smooth than the source.
+  const isGold = isActionMode && status === "recording";
+  const accentHex = isGold ? "#c9a45c" : "#6b8f6e";
+  const accentLightHex = isGold ? "#e0c088" : "#8ab98a";
 
-    const hasAudio =
-      audioLevels.length > 0 && audioLevels.some((level) => level > 0.25);
+  // NOTE: Tailwind's JIT scanner needs full static class strings present
+  // verbatim in this file to generate their CSS — it can't resolve classes
+  // built from an interpolated variable at runtime. So sage/gold variants
+  // are spelled out in full below rather than templated from accentHex.
+  // Solid dark base (not just a light accent tint) so text/icons stay legible
+  // no matter what's behind the window — a translucent-only card reads fine
+  // over a dark demo background but washes out over a bright desktop/app.
+  // The accent color still shows through as a gradient overlay + border/glow.
+  const shapeClass =
+    status === "meeting_detected" ? "rounded-3xl px-4 py-3.5" : "rounded-2xl px-4 py-3";
+  // NOTE: Tailwind v3.4's gradient from-*/to-* utilities silently produce no
+  // CSS when an arbitrary color value is combined with a separate opacity
+  // modifier (from-[#000]/78) — a reproducible bug in this version. Embedding
+  // the opacity directly in the arbitrary rgba() value sidesteps it.
+  const sageCardClass = `bg-gradient-to-br from-[rgba(0,0,0,0.78)] to-[rgba(0,0,0,0.68)] backdrop-blur-xl border-2 border-[#6b8f6e]/70 ${shapeClass}`;
+  const goldCardClass = `bg-gradient-to-br from-[rgba(0,0,0,0.78)] to-[rgba(0,0,0,0.68)] backdrop-blur-xl border-2 border-[#c9a45c]/70 ${shapeClass}`;
+  // NOTE: idle uses an explicit rounded-[3.3px] (== IDLE_SIZE.height / 2,
+  // same visual "fully rounded" look as rounded-full at this tiny size)
+  // instead of Tailwind's rounded-full (border-radius: 9999px). The window
+  // itself resizes instantly on every state change (native resize can't be
+  // animated), but border-radius genuinely does tween over the 300ms
+  // transition — interpolating from 9999px down to 16/24px on an
+  // already-full-size box is what made every grow/shrink look "shaky".
+  const cardClass =
+    status === "idle"
+      ? isHovered
+        ? "bg-[#6b8f6e]/16 backdrop-blur-md border-2 border-[#6b8f6e]/50 rounded-[3.3px]"
+        : "bg-[#6b8f6e]/5 backdrop-blur-md border-2 border-[#6b8f6e]/25 rounded-[3.3px]"
+      : isGold
+        ? goldCardClass
+        : sageCardClass;
 
-    const resampledLevels =
-      audioLevels.length > 0
-        ? Array(numBars)
-            .fill(0)
-            .map((_, i) => {
-              const sourceIndex = Math.floor(
-                (i / numBars) * audioLevels.length,
-              );
-              return audioLevels[sourceIndex] || 0.3;
-            })
-        : Array(numBars).fill(0.35);
-
-    const barHeights = resampledLevels.map((level, i) => {
-      // Natural curve — middle bars taller
-      const curveFactor = Math.sin((i / (numBars - 1)) * Math.PI);
-      const curvedLevel = level * (0.65 + curveFactor * 0.35);
-      return (
-        minBarHeight +
-        (maxBarHeight - minBarHeight) * Math.max(0.12, curvedLevel)
-      );
-    });
-
-    const totalBarsWidth = numBars * barWidth + (numBars - 1) * barSpacing;
-    const barsStartX = (svgWidth - totalBarsWidth) / 2;
-
-    return (
-      <svg
-        width={svgWidth}
-        height={svgHeight}
-        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        fill="none"
-      >
-        {barHeights.map((height, index) => {
-          const x = barsStartX + index * (barWidth + barSpacing);
-          const y = (svgHeight - height) / 2;
-
-          return (
-            <rect
-              key={index}
-              x={x}
-              y={y}
-              width={barWidth}
-              height={height}
-              fill={barFill}
-              rx={barWidth / 2}
-              style={{
-                transition: hasAudio
-                  ? "height 0.08s cubic-bezier(0.4, 0, 0.2, 1), y 0.08s cubic-bezier(0.4, 0, 0.2, 1)"
-                  : "none",
-              }}
-            />
-          );
-        })}
-      </svg>
-    );
-  };
-
-  // Loader icon SVG (spinning)
-  const LoaderIcon = ({
-    size = 20,
-    color = "white",
-  }: {
-    size?: number;
-    color?: string;
-  }) => (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{
-        animation: "spin 1s linear infinite",
-      }}
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  );
-
-  // Grey used for the pill border in recording (and ring stroke) — use as idle background
-  const PILL_IDLE_GREY = "rgba(0, 0, 0, 0.45)";
-  const PILL_IDLE_GREY_HOVER = "rgba(0, 0, 0, 0.35)";
-
-  // Idle: grey background (same grey as recording border). Other states: black.
-  const getBackgroundColor = () => {
-    if (status === "idle") {
-      return isHovered ? PILL_IDLE_GREY_HOVER : PILL_IDLE_GREY;
+  // Continuous GPU-driven bounce (matches v0's pillarBounce keyframes exactly)
+  // gives the bars constant buttery motion; real mic level modulates a
+  // transform: scaleY() on top via CSS transition, so audio reactivity never
+  // fights the keyframe animation or causes layout thrash.
+  const barKeyframeStyle = `
+    @keyframes pillarBounce {
+      0%, 100% { height: 6px; }
+      50% { height: 20px; }
     }
-    if (isHovered) {
-      return "rgba(0, 0, 0, 0.95)";
+    @keyframes pillSpeakBounce {
+      0%, 100% { height: 8px; }
+      50% { height: 16px; }
     }
-    return "rgba(0, 0, 0, 0.9)";
-  };
+  `;
 
-  // Build base style object
-  const baseStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "move",
-    // Separate transitions for smooth size + shadow changes
-    transition: [
-      "width 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
-      "height 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
-      "border-radius 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
-      "box-shadow 0.3s ease-out",
-      "border 0.3s ease-out",
-      "background-color 0.3s ease-out",
-      "transform 0.2s ease-out",
-      "opacity 0.3s ease-out",
-    ].join(", "),
-    transform: isHovered ? "scale(1.02)" : "scale(1)",
-    transformOrigin: "center bottom",
-    userSelect: "none",
-    backgroundColor: getBackgroundColor(),
-    pointerEvents: "auto",
-    position: "relative",
-    overflow: "visible",
-    boxSizing: "border-box",
-    flexShrink: 0,
-  };
-
-  // Apply state-specific styles — pill fills 100% of window (window = pill)
-  if (status === "idle") {
-    baseStyle.width = "50px";
-    baseStyle.height = "6.6px";
-    baseStyle.borderRadius = "3.3px";
-    baseStyle.border = "1.5px solid rgba(255, 255, 255, 0.25)";
-    baseStyle.boxShadow = "none";
-  } else if (status === "recording") {
-    baseStyle.width = "100%";
-    baseStyle.height = "100%";
-    baseStyle.borderRadius = "18px";
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
-    baseStyle.boxShadow = "none";
-  } else if (status === "processing") {
-    baseStyle.width = "100%";
-    baseStyle.height = "100%";
-    baseStyle.borderRadius = "18px";
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
-    baseStyle.boxShadow = "none";
-  } else if (status === "speaking") {
-    baseStyle.width = "100%";
-    baseStyle.height = "100%";
-    baseStyle.borderRadius = "18px";
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
-    baseStyle.boxShadow = "none";
-  } else if (status === "meeting_detected") {
-    baseStyle.width = "100%";
-    baseStyle.height = "100%";
-    baseStyle.borderRadius = "26px";
-    baseStyle.border = "1px solid rgba(255, 255, 255, 0.1)";
-    baseStyle.boxShadow = "none";
-    baseStyle.cursor = "move";
-  }
+  const resampleLevels = (levels: number[], count: number) =>
+    levels.length > 0
+      ? Array.from({ length: count }, (_, i) => {
+          const src = Math.floor((i / count) * levels.length);
+          return levels[src] ?? 0.35;
+        })
+      : Array(count).fill(0.35);
 
   return (
     <div
       onMouseDown={handleMouseDown}
+      onMouseUp={() => setIsPressed(false)}
       onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={baseStyle}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setIsPressed(false);
+      }}
+      className={`relative w-full h-full flex items-center justify-center transition-all duration-300 ease-out ${cardClass}`}
+      style={{
+        cursor: "move",
+        userSelect: "none",
+        transform: isPressed
+          ? "translateY(1px) scale(0.99)"
+          : isHovered
+            ? "scale(1.02)"
+            : "scale(1)",
+        transformOrigin: "center bottom",
+        pointerEvents: "auto",
+        boxSizing: "border-box",
+        flexShrink: 0,
+        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.22)",
+      }}
     >
-      {/* Chasing border — high-contrast stroke that works on light backgrounds */}
-      {status !== "idle" &&
-        (() => {
-          let accent: string;
-          let speed: string;
-          if (status === "meeting_detected") {
-            accent = PILL_DICTATION;
-            speed = "2s";
-          } else if (status === "speaking") {
-            accent = PILL_ASSISTANT;
-            speed = "1.8s";
-          } else if (status === "processing") {
-            accent = PILL_PROCESSING;
-            speed = "1.5s";
-          } else if (isActionMode) {
-            accent = PILL_ACTION;
-            speed = "2s";
-          } else {
-            accent = PILL_DICTATION;
-            speed = "2s";
-          }
+      <style>{barKeyframeStyle}</style>
 
-          // Match meeting viewbox to meeting window size so corners stay crisp.
-          const VIEW_W = status === "meeting_detected" ? 130 : 100;
-          const VIEW_H = status === "meeting_detected" ? 52 : 36;
-          const RADIUS = VIEW_H / 2;
-
-          const stroke = 3;
-          const x = stroke / 2;
-          const y = stroke / 2;
-          const rw = VIEW_W - stroke;
-          const rh = VIEW_H - stroke;
-
-          return (
-            <>
-              <style>
-                {`
-                @keyframes dashFlow {
-                  to { stroke-dashoffset: -100; }
-                }
-              `}
-              </style>
-
-              {/* Dual-outline base ring (dark + light) + animated comet segment */}
-              <svg
-                width="100%"
-                height="100%"
-                viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-                preserveAspectRatio="none"
-                fill="none"
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  pointerEvents: "none",
-                }}
-              >
-                <rect
-                  x={x}
-                  y={y}
-                  width={rw}
-                  height={rh}
-                  rx={RADIUS}
-                  ry={RADIUS}
-                  pathLength={100}
-                  stroke="rgba(0, 0, 0, 0.45)"
-                  strokeWidth={stroke + 1}
-                />
-                <rect
-                  x={x}
-                  y={y}
-                  width={rw}
-                  height={rh}
-                  rx={RADIUS}
-                  ry={RADIUS}
-                  pathLength={100}
-                  stroke="rgba(255, 255, 255, 0.18)"
-                  strokeWidth={stroke}
-                />
-                <rect
-                  x={x}
-                  y={y}
-                  width={rw}
-                  height={rh}
-                  rx={RADIUS}
-                  ry={RADIUS}
-                  pathLength={100}
-                  stroke={accent}
-                  strokeWidth={stroke}
-                  strokeLinecap="round"
-                  strokeDasharray={
-                    status === "meeting_detected" ? "100" : "12 88"
-                  }
-                  strokeDashoffset={
-                    status === "meeting_detected"
-                      ? 100 *
-                        (1 -
-                          Math.max(
-                            0,
-                            Math.min(
-                              1,
-                              meetingCountdown / MEETING_COUNTDOWN_SECONDS,
-                            ),
-                          ))
-                      : undefined
-                  }
-                  style={{
-                    animation:
-                      status === "meeting_detected"
-                        ? undefined
-                        : `dashFlow ${speed} linear infinite`,
-                    transition:
-                      status === "meeting_detected"
-                        ? "stroke-dashoffset 0.35s ease-out"
-                        : undefined,
-                    filter:
-                      status === "meeting_detected"
-                        ? `drop-shadow(0 0 3px ${accent}) drop-shadow(0 0 9px ${accent})`
-                        : `drop-shadow(0 0 2px ${accent}) drop-shadow(0 0 6px ${accent})`,
-                  }}
-                />
-              </svg>
-
-              {/* Inner fill to create a clear ring */}
+      {status === "recording" && (
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5 items-end h-5">
+            {resampleLevels(smoothedLevels, 4).map((level, i) => (
               <div
+                key={i}
+                className="w-1.5 rounded-full"
                 style={{
-                  position: "absolute",
-                  inset: "4px",
-                  borderRadius: `${Math.max(10, RADIUS - 4)}px`,
-                  backgroundColor: getBackgroundColor(),
-                  pointerEvents: "none",
+                  background: `linear-gradient(to top, ${accentHex}, ${accentLightHex})`,
+                  animation: `pillarBounce 0.6s ease-in-out ${i % 2 === 1 ? "0.1s" : "0s"} infinite`,
+                  transform: `scaleY(${0.7 + Math.max(0.15, level) * 0.6})`,
+                  transformOrigin: "bottom",
+                  transition: `transform 0.09s ${EASE}`,
                 }}
               />
-            </>
-          );
-        })()}
+            ))}
+          </div>
+          <span className="text-xs font-bold ml-1 text-white whitespace-nowrap">
+            {isGold ? "Listening for command" : "Transcribing"}
+          </span>
+        </div>
+      )}
 
-      {/* Icon container - only show for active states */}
-      {status !== "idle" && (
-        <div
-          style={{
-            position: "relative",
-            zIndex: 10,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "white",
-            width: "100%",
-            height: "100%",
-            gap: "6px",
-            padding: "0 4px",
-          }}
-        >
-          {status === "meeting_detected" ? (
-            /* Meeting detected: start + dismiss icon buttons */
-            (() => {
-              const baseButtonStyle: React.CSSProperties = {
-                appearance: "none",
-                border: "1px solid rgba(255, 255, 255, 0.14)",
-                background: "rgba(255, 255, 255, 0.06)",
-                color: "rgba(255, 255, 255, 0.95)",
-                width: 34,
-                height: 34,
-                borderRadius: 999,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                outline: "none",
-                boxShadow:
-                  "0 10px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)",
-                transition:
-                  "transform 0.12s ease, background 0.18s ease, border-color 0.18s ease",
-              };
+      {status === "processing" && (
+        <div className="flex items-center gap-2">
+          <div className="animate-spin">
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="12"
+                cy="12"
+                r="8"
+                stroke="url(#pillLoaderGradient)"
+                strokeWidth="5.5"
+                strokeLinecap="round"
+                strokeDasharray="12 38"
+              />
+              <defs>
+                <linearGradient
+                  id="pillLoaderGradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stopColor="#6b8f6e" />
+                  <stop offset="100%" stopColor="#8ab98a" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <span className="text-xs font-bold text-white">Processing</span>
+        </div>
+      )}
 
-              const handleButtonMouseDown = (evt: React.MouseEvent) => {
-                // Prevent window dragging when interacting with buttons
+      {status === "speaking" && (
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5 items-end h-4">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-1.5 rounded-full"
+                style={{
+                  background: "linear-gradient(to top, #6b8f6e, #8ab98a)",
+                  animation: `pillSpeakBounce ${0.5 + i * 0.1}s ease-in-out infinite`,
+                }}
+              />
+            ))}
+          </div>
+          <span className="text-xs font-bold text-white">Speaking</span>
+        </div>
+      )}
+
+      {status === "meeting_detected" && (
+        <div className="flex flex-col gap-2 w-full">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="text-[#8ab98a] animate-pulse shrink-0" />
+            <span className="text-sm font-bold text-white truncate">
+              {meetingContext?.platform
+                ? `Meeting detected in ${meetingContext.platform}`
+                : "Meeting detected"}
+            </span>
+          </div>
+          <div className="text-xs text-white/75 font-medium">
+            Record this meeting?
+          </div>
+          <div className="flex gap-2 items-center">
+            <button
+              type="button"
+              onMouseDown={(evt) => {
                 evt.preventDefault();
                 evt.stopPropagation();
-              };
-
-              return (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    width: "100%",
-                    height: "100%",
-                    padding: "0 10px",
-                  }}
-                >
-                  <button
-                    type="button"
-                    aria-label="Start meeting recording"
-                    onMouseDown={handleButtonMouseDown}
-                    onClick={async (evt) => {
-                      evt.preventDefault();
-                      evt.stopPropagation();
-                      await startMeetingFromPill();
-                    }}
-                    style={{
-                      ...baseButtonStyle,
-                      background:
-                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 24%, rgba(255,255,255,0.03))",
-                      border:
-                        "1px solid color-mix(in srgb, var(--lexi-primary, #6b8f6e) 42%, rgba(255,255,255,0.18))",
-                    }}
-                    onMouseEnter={(evt) => {
-                      (
-                        evt.currentTarget as HTMLButtonElement
-                      ).style.background =
-                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 34%, rgba(255,255,255,0.04))";
-                      (
-                        evt.currentTarget as HTMLButtonElement
-                      ).style.borderColor =
-                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 58%, rgba(255,255,255,0.22))";
-                      (evt.currentTarget as HTMLButtonElement).style.transform =
-                        "scale(1.04)";
-                    }}
-                    onMouseLeave={(evt) => {
-                      (
-                        evt.currentTarget as HTMLButtonElement
-                      ).style.background =
-                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 24%, rgba(255,255,255,0.03))";
-                      (
-                        evt.currentTarget as HTMLButtonElement
-                      ).style.borderColor =
-                        "color-mix(in srgb, var(--lexi-primary, #6b8f6e) 42%, rgba(255,255,255,0.18))";
-                      (evt.currentTarget as HTMLButtonElement).style.transform =
-                        "scale(1)";
-                    }}
-                  >
-                    <Play size={18} strokeWidth={2.2} />
-                  </button>
-
-                  <button
-                    type="button"
-                    aria-label="Dismiss"
-                    onMouseDown={handleButtonMouseDown}
-                    onClick={async (evt) => {
-                      evt.preventDefault();
-                      evt.stopPropagation();
-                      await resetPillToIdle();
-                    }}
-                    style={baseButtonStyle}
-                    onMouseEnter={(evt) => {
-                      (
-                        evt.currentTarget as HTMLButtonElement
-                      ).style.background = "rgba(255, 255, 255, 0.10)";
-                      (evt.currentTarget as HTMLButtonElement).style.transform =
-                        "scale(1.04)";
-                    }}
-                    onMouseLeave={(evt) => {
-                      (
-                        evt.currentTarget as HTMLButtonElement
-                      ).style.background = "rgba(255, 255, 255, 0.06)";
-                      (evt.currentTarget as HTMLButtonElement).style.transform =
-                        "scale(1)";
-                    }}
-                  >
-                    <X size={18} strokeWidth={2.2} />
-                  </button>
-                </div>
-              );
-            })()
-          ) : status === "speaking" ? (
-            /* Speaking: Lexi is talking — speaker icon with animated sound arcs */
-            <>
-              <style>
-                {`
-                  @keyframes speakPulse1 {
-                    0%, 100% { opacity: 0.3; transform: scale(0.95); }
-                    50% { opacity: 1; transform: scale(1.05); }
-                  }
-                  @keyframes speakPulse2 {
-                    0%, 100% { opacity: 0.2; transform: scale(0.9); }
-                    50% { opacity: 0.8; transform: scale(1.1); }
-                  }
-                `}
-              </style>
-              <svg width={50} height={26} viewBox="0 0 50 26" fill="none">
-                {/* Speaker icon */}
-                <path d="M12 8L8 11H5v4h3l4 3V8z" fill="white" opacity={0.9} />
-                {/* Sound arc 1 — close */}
-                <path
-                  d="M18 9.5c1.5 1.2 2.5 3 2.5 5s-1 3.8-2.5 5"
-                  stroke={PILL_ASSISTANT}
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  fill="none"
-                  opacity={0.85}
-                  style={{
-                    animation: "speakPulse1 1.2s ease-in-out infinite",
-                    transformOrigin: "16px 13px",
-                  }}
-                />
-                {/* Sound arc 2 — far */}
-                <path
-                  d="M22 6.5c2.5 2 4 5 4 7.5s-1.5 5.5-4 7.5"
-                  stroke={PILL_ASSISTANT}
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  fill="none"
-                  opacity={0.55}
-                  style={{
-                    animation: "speakPulse2 1.2s ease-in-out 0.3s infinite",
-                    transformOrigin: "20px 13px",
-                  }}
-                />
-                {/* Dots that pulse — representing speech */}
-                <circle
-                  cx="33"
-                  cy="10"
-                  r="1.5"
-                  fill={PILL_ASSISTANT}
-                  opacity={0.65}
-                  style={{ animation: "speakPulse1 0.8s ease-in-out infinite" }}
-                />
-                <circle
-                  cx="37"
-                  cy="13"
-                  r="1.5"
-                  fill={PILL_ASSISTANT}
-                  opacity={0.85}
-                  style={{
-                    animation: "speakPulse1 0.8s ease-in-out 0.15s infinite",
-                  }}
-                />
-                <circle
-                  cx="41"
-                  cy="10"
-                  r="1.5"
-                  fill={PILL_ASSISTANT}
-                  opacity={0.65}
-                  style={{
-                    animation: "speakPulse1 0.8s ease-in-out 0.3s infinite",
-                  }}
-                />
-              </svg>
-            </>
-          ) : status === "processing" ? (
-            <>
-              {/* Processing: bars + loader — blue */}
-              <WaveformIcon
-                width={52}
-                height={22}
-                audioLevels={[]}
-                barFill={PILL_PROCESSING}
-              />
-              <LoaderIcon size={14} color={PILL_PROCESSING} />
-            </>
-          ) : (
-            /* Dictation vs action: same layout, different bar tint */
-            <WaveformIcon
-              width={56}
-              height={26}
-              audioLevels={smoothedLevels}
-              barFill={isActionMode ? BAR_FILL_ACTION : BAR_FILL_DICTATION}
-            />
-          )}
+              }}
+              onClick={async (evt) => {
+                evt.preventDefault();
+                evt.stopPropagation();
+                await startMeetingFromPill();
+              }}
+              className="flex-1 px-3 py-1.5 text-xs font-semibold bg-[#6b8f6e] hover:bg-[#587a5b] text-white rounded-xl border border-white/10 transition-colors duration-200"
+            >
+              Record
+            </button>
+            <button
+              type="button"
+              onMouseDown={(evt) => {
+                evt.preventDefault();
+                evt.stopPropagation();
+              }}
+              onClick={async (evt) => {
+                evt.preventDefault();
+                evt.stopPropagation();
+                await resetPillToIdle();
+              }}
+              className="flex-1 px-3 py-1.5 text-xs font-semibold bg-white/85 hover:bg-white text-[#2e3b2f] rounded-xl border border-black/5 transition-colors duration-200"
+            >
+              Skip
+            </button>
+          </div>
+          <div className="text-[10px] text-white/60 text-center font-medium">
+            Auto-recording in {meetingCountdown}s
+          </div>
         </div>
       )}
     </div>

@@ -68,7 +68,7 @@ pub fn load_app_config(app: &AppHandle) -> Result<AppConfig, String> {
     })
 }
 
-/// Primary language from local store (meetings WebSocket, rooms).
+/// Primary language from local store (meetings WebSocket).
 pub fn get_primary_language_from_store(app: &AppHandle) -> String {
     load_local_config(app)
         .and_then(|c| c.languages)

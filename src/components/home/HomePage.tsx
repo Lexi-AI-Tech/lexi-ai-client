@@ -1,127 +1,120 @@
 /**
  * HomePage Component
  *
- * Compact dashboard: greeting, quick actions with descriptions,
- * tabbed recent activity (transcripts, meetings, actions), and plan usage.
+ * Onboarding + feature-spotlight surface: greeting, a use-case-grounded nudge
+ * pulled from the same LLM insights that power Analytics, and cards teaching
+ * each core feature — the pain point it solves and how to use it. Deep usage
+ * breakdowns live on the Analytics page; plan/billing usage lives on the
+ * dedicated Usage page.
  */
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Atom, FileText, Mic, Video, AudioLines, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  Atom,
+  BookText,
+  FileText,
+  Gauge,
+  Mic,
+  NotebookPen,
+  Sparkles,
+  Video,
+} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { useAuthStore } from "../../store/authStore";
-import { UpgradeModal } from "../UpgradeModal";
-import type {
-  ActionHistory,
-  PaginatedActionHistoryResponse,
-  PaginatedTranscriptsResponse,
-  Transcript,
-} from "../../types";
-import type { Meeting } from "../meetings/MeetingsListPage";
-import { formatDateRelative } from "../../lib/dateUtils";
 import "./home.css";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface FeatureUsageEntry {
-  feature_key: string;
-  enabled: boolean;
-  used: number;
-  limit_value: number | null;
-  limit_reset: string | null;
-  metered: boolean;
+interface InsightsResponse {
+  headline: string;
+  highlights: string[];
+  generated_at: string;
+  nudge?: string | null;
+  nudge_cta?: string | null;
+  nudge_page?: string | null;
 }
 
-interface FeatureUsageResponse {
-  plan_type: string;
-  period_start: string;
-  period_end: string;
-  limit_reset: string;
-  features: FeatureUsageEntry[];
+interface FeatureSpotlight {
+  icon: React.ElementType;
+  title: string;
+  painPoint: string;
+  howTo: string;
+  page: string;
+  cta: string;
 }
 
-type RecentActivityTabId = "transcripts" | "meetings" | "actions";
+const NUDGE_PAGES: readonly string[] = [
+  "home",
+  "meetings",
+  "actions",
+  "docs",
+  "notes",
+  "transcripts",
+  "shortcuts",
+];
 
 // ---------------------------------------------------------------------------
-// Constants & Helpers
+// Content
 // ---------------------------------------------------------------------------
 
-function byCreatedAtDesc<T extends { created_at: string }>(a: T, b: T): number {
-  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-}
+const FEATURE_SPOTLIGHTS: FeatureSpotlight[] = [
+  {
+    icon: Mic,
+    title: "Transcribe",
+    painPoint: "Typing slows you down and breaks your train of thought.",
+    howTo: "Hold your hotkey anywhere and speak — Lexi types it for you.",
+    page: "transcripts",
+    cta: "Start transcribing",
+  },
+  {
+    icon: Video,
+    title: "Meetings",
+    painPoint: "Taking notes in a call means you can't fully listen.",
+    howTo: "Start a meeting and Lexi transcribes and summarizes it for you.",
+    page: "meetings",
+    cta: "Record a meeting",
+  },
+  {
+    icon: Atom,
+    title: "Actions",
+    painPoint: "Switching to a chat app to ask AI for help breaks your flow.",
+    howTo: "Hold the Action hotkey, speak what you need — output lands at your cursor.",
+    page: "actions",
+    cta: "Run an action",
+  },
+  {
+    icon: FileText,
+    title: "Docs",
+    painPoint: "Drafting long documents by hand is slow.",
+    howTo: "Dictate and let Lexi structure it into a clean document.",
+    page: "docs",
+    cta: "Create a doc",
+  },
+  {
+    icon: NotebookPen,
+    title: "Notes",
+    painPoint: "Fleeting ideas get lost if you can't capture them fast.",
+    howTo: "Jot voice or text notes in seconds, searchable later.",
+    page: "notes",
+    cta: "Add a note",
+  },
+  {
+    icon: BookText,
+    title: "Vocabulary",
+    painPoint: "Names, acronyms, and jargon often get mistranscribed.",
+    howTo: "Teach Lexi your custom terms so it recognizes them every time.",
+    page: "vocabulary",
+    cta: "Add vocabulary",
+  },
+];
 
-/** Max items per category in Recent Activity (tabs + API page size). */
-const RECENT_ACTIVITY_LIMIT = 5;
-
-const FEATURE_LABELS: Record<string, string> = {
-  "assistant.speech_to_text": "Transcriptions",
-  "meetings.create": "Meeting",
-  "actions.perform": "Actions",
-  "docs.create": "Docs",
-};
-
-const FEATURE_USAGE_SUFFIX: Record<string, string> = {
-  "assistant.speech_to_text": "words",
-  "meetings.create": "sessions",
-  "actions.perform": "actions",
-  "docs.create": "docs",
-};
-
-const PLAN_USAGE_FEATURE_ORDER = [
-  "assistant.speech_to_text",
-  "meetings.create",
-  "docs.create",
-  "actions.perform",
-] as const;
-
-function featureLabel(key: string): string {
-  return FEATURE_LABELS[key] ?? key;
-}
-
-function featureUsageSuffix(key: string): string {
-  return FEATURE_USAGE_SUFFIX[key] ?? "used";
-}
-
-function isProPlan(planType: string): boolean {
-  return planType.trim().toLowerCase() === "pro";
-}
-
-function clamp01(n: number): number {
-  if (Number.isNaN(n)) return 0;
-  return Math.max(0, Math.min(1, n));
-}
-
-function sortPlanUsageFeatures<T extends { feature_key: string }>(
-  features: T[],
-): T[] {
-  const orderMap = new Map<string, number>(
-    PLAN_USAGE_FEATURE_ORDER.map((k, i) => [k, i]),
-  );
-  return [...features].sort((a, b) => {
-    const ia = orderMap.get(a.feature_key);
-    const ib = orderMap.get(b.feature_key);
-    if (ia !== undefined && ib !== undefined) return ia - ib;
-    if (ia !== undefined) return -1;
-    if (ib !== undefined) return 1;
-    return a.feature_key.localeCompare(b.feature_key);
-  });
-}
-
-function formatResetsInCountdown(periodEndMs: number, nowMs: number): string {
-  const ms = periodEndMs - nowMs;
-  if (Number.isNaN(ms) || periodEndMs <= 0 || ms <= 0) return "Resets soon";
-  const totalSec = Math.floor(ms / 1000);
-  const days = Math.floor(totalSec / 86400);
-  const h = Math.floor((totalSec % 86400) / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const p2 = (n: number) => String(n).padStart(2, "0");
-  const dPart = days < 100 ? p2(days) : String(days);
-  return `Resets in ${dPart}d ${p2(h)}h ${p2(m)}m ${p2(s)}s`;
-}
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function formatCurrentDate(): string {
   return new Date().toLocaleDateString("en-US", {
@@ -137,24 +130,6 @@ const getGreeting = (): string => {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 };
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function BillingResetCountdown({ periodEndIso }: { periodEndIso: string }) {
-  const endMs = useMemo(() => new Date(periodEndIso).getTime(), [periodEndIso]);
-  const [label, setLabel] = useState(() =>
-    formatResetsInCountdown(endMs, Date.now()),
-  );
-  useEffect(() => {
-    const tick = () => setLabel(formatResetsInCountdown(endMs, Date.now()));
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, [endMs]);
-  return <span className="billing-period">{label}</span>;
-}
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -173,91 +148,33 @@ const itemVariants = {
   },
 };
 
-// Quick action with description
-const QuickAction: React.FC<{
-  icon: React.ElementType;
-  label: string;
-  description: string;
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+const FeatureCard: React.FC<{
+  spotlight: FeatureSpotlight;
   onClick: () => void;
-}> = ({ icon: Icon, label, description, onClick }) => (
-  <motion.button
-    className="quick-action-card"
-    onClick={onClick}
-    whileHover={{ y: -2 }}
-    whileTap={{ scale: 0.98 }}
-    transition={{ duration: 0.2 }}
-  >
-    <div className="quick-action-icon">
-      <Icon size={18} />
-    </div>
-    <div className="quick-action-text">
-      <span className="quick-action-label">{label}</span>
-      <span className="quick-action-desc">{description}</span>
-    </div>
-  </motion.button>
-);
-
-// Skeleton helpers
-const SkBlock: React.FC<{
-  className?: string;
-  style?: React.CSSProperties;
-}> = ({ className, style }) => (
-  <div className={`skeleton-block ${className ?? ""}`.trim()} style={style} />
-);
-
-const HomeRecentSkeleton: React.FC = () => (
-  <div className="home-recent-skeleton" aria-hidden>
-    {Array.from({ length: 5 }).map((_, i) => (
-      <div key={i} className="home-recent-skeleton__row">
-        <SkBlock
-          style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }}
-        />
-        <div
-          style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}
-        >
-          <SkBlock style={{ height: 13, width: "70%", borderRadius: 5 }} />
-          <SkBlock style={{ height: 10, width: "45%", borderRadius: 4 }} />
-        </div>
+}> = ({ spotlight, onClick }) => {
+  const Icon = spotlight.icon;
+  return (
+    <motion.button
+      className="feature-spotlight-card"
+      onClick={onClick}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="feature-spotlight-card__icon">
+        <Icon size={18} />
       </div>
-    ))}
-  </div>
-);
-
-const RecentActivityRow: React.FC<{
-  badgeClass: string;
-  icon: React.ElementType;
-  title: string;
-  subtitle: string;
-  typeLabel: string;
-  timestamp: string;
-  onRowClick: () => void;
-}> = ({
-  badgeClass,
-  icon: Icon,
-  title,
-  subtitle,
-  typeLabel,
-  timestamp,
-  onRowClick,
-}) => (
-  <li className="recent-activity-row" onClick={onRowClick}>
-    <div className={`recent-activity-badge ${badgeClass}`}>
-      <Icon size={14} />
-    </div>
-    <div className="recent-activity-info">
-      <span className="recent-activity-text">{title}</span>
-      <div className="recent-activity-meta">
-        <span className="recent-activity-type">{typeLabel}</span>
-        <span className="recent-activity-dot" />
-        <span className="recent-activity-subtitle">{subtitle}</span>
-        <span className="recent-activity-dot" />
-        <span className="recent-activity-time">
-          {formatDateRelative(timestamp)}
-        </span>
-      </div>
-    </div>
-  </li>
-);
+      <h3 className="feature-spotlight-card__title">{spotlight.title}</h3>
+      <p className="feature-spotlight-card__pain">{spotlight.painPoint}</p>
+      <p className="feature-spotlight-card__howto">{spotlight.howTo}</p>
+      <span className="feature-spotlight-card__cta">{spotlight.cta} →</span>
+    </motion.button>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Main Component
@@ -268,295 +185,35 @@ interface HomePageProps {
   onNavigate?: (page: string) => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({
-  onViewAllTranscripts: _onViewAllTranscripts,
-  onNavigate,
-}) => {
+export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const { user, isAuthenticated } = useAuthStore();
 
-  const [recentActivityTab, setRecentActivityTab] =
-    useState<RecentActivityTabId>("transcripts");
+  const [insights, setInsights] = useState<InsightsResponse | null>(null);
 
-  const [billingLoading, setBillingLoading] = useState(false);
-  const [recentLoading, setRecentLoading] = useState(false);
-  const [meetingsLoading, setMeetingsLoading] = useState(false);
-  const [actionsLoading, setActionsLoading] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-
-  const [featureUsage, setFeatureUsage] = useState<FeatureUsageResponse | null>(
-    null,
-  );
-  const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [recentActions, setRecentActions] = useState<ActionHistory[]>([]);
-
-  // Data fetching
-  const fetchFeatureUsage = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      setFeatureUsage(await invoke<FeatureUsageResponse>("get_feature_usage"));
-    } catch (err) {
-      console.error("Failed to fetch feature usage:", err);
-      setFeatureUsage(null);
-    }
-  }, [isAuthenticated]);
-
-  // Refresh plan/usage when upgrade completes elsewhere (e.g. checkout).
+  // Same recency-biased LLM insights that power Analytics — reused here just
+  // for the nudge, not the headline/highlights.
   useEffect(() => {
     if (!isAuthenticated) return;
-    const onPlanUpdated = () => {
-      void fetchFeatureUsage();
-    };
-    window.addEventListener("lexi:plan-updated", onPlanUpdated);
-    return () => {
-      window.removeEventListener("lexi:plan-updated", onPlanUpdated);
-    };
-  }, [fetchFeatureUsage, isAuthenticated]);
-
-  const fetchRecentTranscripts = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const data = await invoke<PaginatedTranscriptsResponse>(
-        "get_transcripts",
-        {
-          page: 1,
-          pageSize: RECENT_ACTIVITY_LIMIT,
-        },
-      );
-      setRecentTranscripts(data.transcripts);
-    } catch (err) {
-      console.error("Failed to fetch recent transcripts:", err);
-    }
-  }, [isAuthenticated]);
-
-  const fetchRecentActions = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const data = await invoke<PaginatedActionHistoryResponse>(
-        "get_action_history",
-        {
-          page: 1,
-          pageSize: RECENT_ACTIVITY_LIMIT,
-        },
-      );
-      setRecentActions(data.actions);
-    } catch (err) {
-      console.error("Failed to fetch recent actions:", err);
-    }
-  }, [isAuthenticated]);
-
-  const fetchMeetings = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      setMeetings(await invoke<Meeting[]>("list_meetings"));
-    } catch (err) {
-      console.error("Failed to fetch meetings:", err);
-    }
-  }, [isAuthenticated]);
-
-  // ---------------------------------------------------------------------------
-  // Live refresh: keep Home in sync with background work.
-  // - action_success: Action finished (history + usage change)
-  // - transcription_success: Transcription finished (history + usage change)
-  // - meeting-recording-stopped / meeting-detected: meetings list changes
-  // Also refresh on window focus as a safety net.
-  // ---------------------------------------------------------------------------
-
-  const refreshTimeoutRef = React.useRef<number | null>(null);
-  const scheduleHomeRefresh = useCallback(
-    (kinds: Array<"billing" | "transcripts" | "actions" | "meetings">) => {
-      if (!isAuthenticated) return;
-      if (refreshTimeoutRef.current != null) {
-        window.clearTimeout(refreshTimeoutRef.current);
-      }
-      refreshTimeoutRef.current = window.setTimeout(() => {
-        refreshTimeoutRef.current = null;
-        if (kinds.includes("billing")) void fetchFeatureUsage();
-        if (kinds.includes("transcripts")) void fetchRecentTranscripts();
-        if (kinds.includes("actions")) void fetchRecentActions();
-        if (kinds.includes("meetings")) void fetchMeetings();
-      }, 200);
-    },
-    [
-      fetchFeatureUsage,
-      fetchMeetings,
-      fetchRecentActions,
-      fetchRecentTranscripts,
-      isAuthenticated,
-    ],
-  );
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let disposed = false;
-    const unsubs: Array<() => void> = [];
-    const add = (u: () => void) => {
-      if (disposed) u();
-      else unsubs.push(u);
-    };
-
-    // Action completion → actions + billing
-    listen("action_success", () => {
-      if (!disposed) scheduleHomeRefresh(["actions", "billing"]);
-    }).then((u) => add(u));
-
-    // Transcription completion → transcripts + billing
-    listen("transcription_success", () => {
-      if (!disposed) scheduleHomeRefresh(["transcripts", "billing"]);
-    }).then((u) => add(u));
-
-    // Meeting lifecycle → meetings list
-    listen("meeting-recording-stopped", () => {
-      if (!disposed) scheduleHomeRefresh(["meetings", "billing"]);
-    }).then((u) => add(u));
-    listen("meeting-detected", () => {
-      if (!disposed) scheduleHomeRefresh(["meetings", "billing"]);
-    }).then((u) => add(u));
-
-    // Docs are created/updated via Tauri commands which emit docs_changed.
-    listen("docs_changed", () => {
-      if (!disposed) scheduleHomeRefresh(["billing"]);
-    }).then((u) => add(u));
-
-    const onFocus = () =>
-      scheduleHomeRefresh(["billing", "transcripts", "actions", "meetings"]);
-    window.addEventListener("focus", onFocus);
-
-    return () => {
-      disposed = true;
-      unsubs.forEach((u) => u());
-      window.removeEventListener("focus", onFocus);
-      if (refreshTimeoutRef.current != null) {
-        window.clearTimeout(refreshTimeoutRef.current);
-        refreshTimeoutRef.current = null;
-      }
-    };
-  }, [isAuthenticated, scheduleHomeRefresh]);
-
-  // Effects
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setBillingLoading(false);
-      return;
-    }
-    let c = false;
-    setBillingLoading(true);
+    let cancelled = false;
     (async () => {
       try {
-        await fetchFeatureUsage();
-      } finally {
-        if (!c) setBillingLoading(false);
+        const data = await invoke<InsightsResponse>("get_analytics_insights");
+        if (!cancelled) setInsights(data);
+      } catch (err) {
+        console.error("Failed to load home nudge:", err);
       }
     })();
     return () => {
-      c = true;
+      cancelled = true;
     };
-  }, [isAuthenticated, fetchFeatureUsage]);
+  }, [isAuthenticated]);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setRecentLoading(false);
-      return;
-    }
-    let c = false;
-    setRecentLoading(true);
-    (async () => {
-      try {
-        await fetchRecentTranscripts();
-      } finally {
-        if (!c) setRecentLoading(false);
-      }
-    })();
-    return () => {
-      c = true;
-    };
-  }, [isAuthenticated, fetchRecentTranscripts]);
+  const nudgePage =
+    insights?.nudge_page && NUDGE_PAGES.includes(insights.nudge_page)
+      ? insights.nudge_page
+      : null;
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setMeetingsLoading(false);
-      return;
-    }
-    let c = false;
-    setMeetingsLoading(true);
-    (async () => {
-      try {
-        await fetchMeetings();
-      } finally {
-        if (!c) setMeetingsLoading(false);
-      }
-    })();
-    return () => {
-      c = true;
-    };
-  }, [isAuthenticated, fetchMeetings]);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setActionsLoading(false);
-      return;
-    }
-    let c = false;
-    setActionsLoading(true);
-    (async () => {
-      try {
-        await fetchRecentActions();
-      } finally {
-        if (!c) setActionsLoading(false);
-      }
-    })();
-    return () => {
-      c = true;
-    };
-  }, [isAuthenticated, fetchRecentActions]);
-
-  // Derived
   const userName = user?.name?.split(" ")[0] || "there";
-  const planUsageRows = useMemo(
-    () =>
-      featureUsage?.features
-        ? sortPlanUsageFeatures(featureUsage.features)
-        : [],
-    [featureUsage],
-  );
-
-  const recentTranscriptsSorted = useMemo(
-    () => [...recentTranscripts].sort(byCreatedAtDesc),
-    [recentTranscripts],
-  );
-  const recentTranscriptsDisplayed = useMemo(
-    () => recentTranscriptsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
-    [recentTranscriptsSorted],
-  );
-  const recentMeetingsSorted = useMemo(
-    () => [...meetings].sort(byCreatedAtDesc),
-    [meetings],
-  );
-  const recentMeetingsDisplayed = useMemo(
-    () => recentMeetingsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
-    [recentMeetingsSorted],
-  );
-  const recentActionsSorted = useMemo(
-    () => [...recentActions].sort(byCreatedAtDesc),
-    [recentActions],
-  );
-  const recentActionsDisplayed = useMemo(
-    () => recentActionsSorted.slice(0, RECENT_ACTIVITY_LIMIT),
-    [recentActionsSorted],
-  );
-
-  const recentActivityLoading =
-    recentLoading || meetingsLoading || actionsLoading;
-
-  const handleUpgradeClick = useCallback(() => {
-    setShowUpgradeModal(true);
-  }, []);
-
-  const showUpgradeCta =
-    isAuthenticated &&
-    featureUsage &&
-    !billingLoading &&
-    !isProPlan(featureUsage.plan_type);
 
   return (
     <motion.div
@@ -565,9 +222,6 @@ export const HomePage: React.FC<HomePageProps> = ({
       initial="hidden"
       animate="visible"
     >
-      {showUpgradeModal && (
-        <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
-      )}
       {/* ── Greeting ── */}
       <motion.header className="home-greeting" variants={itemVariants}>
         <div className="greeting-section">
@@ -579,335 +233,53 @@ export const HomePage: React.FC<HomePageProps> = ({
             Voice-first Work OS for thinking, meetings, and writing
           </p>
         </div>
+        {isAuthenticated && (
+          <button
+            type="button"
+            className="home-usage-cta"
+            onClick={() => onNavigate?.("usage")}
+          >
+            <Gauge size={16} />
+            <span>View plan usage</span>
+          </button>
+        )}
       </motion.header>
 
-      {/* ── Quick Actions with descriptions ── */}
-      <motion.section className="quick-actions-section" variants={itemVariants}>
-        <div className="quick-actions-grid">
-          <QuickAction
-            icon={Mic}
-            label="Transcribe"
-            description="Convert speech to text instantly"
-            onClick={() => onNavigate?.("transcripts")}
-          />
-          <QuickAction
-            icon={Video}
-            label="New Meeting"
-            description="Record and transcribe live meetings"
-            onClick={() => onNavigate?.("meetings")}
-          />
-          <QuickAction
-            icon={FileText}
-            label="Create Doc"
-            description="Draft documents with voice input"
-            onClick={() => onNavigate?.("docs")}
-          />
-          <QuickAction
-            icon={Atom}
-            label="Actions"
-            description="Hold Action and speak—AI output at your cursor"
-            onClick={() => onNavigate?.("actions")}
-          />
-        </div>
-      </motion.section>
-
-      {/* ── Main Grid: Recent Activity | Plan Usage ── */}
-      <div className="home-grid">
-        {/* Left: Recent Activity (tabbed) */}
-        <motion.section
-          className="recent-activity-section"
-          variants={itemVariants}
-        >
-          <div className="section-header section-header--recent-activity">
-            <h2 className="section-title">Recent Activity</h2>
+      {/* ── Nudge ── */}
+      {isAuthenticated && insights?.nudge && (
+        <motion.section className="home-nudge-card" variants={itemVariants}>
+          <div className="home-nudge-card__icon">
+            <Sparkles size={18} />
           </div>
-
-          <div className="recent-activity-content">
-            {isAuthenticated && recentActivityLoading ? (
-              <HomeRecentSkeleton />
-            ) : !isAuthenticated ? (
-              <div className="empty-state">
-                <div className="empty-icon">
-                  <AudioLines size={24} />
-                </div>
-                <p className="empty-title">No activity yet</p>
-                <p className="empty-sub">
-                  Sign in to see transcriptions, meetings, and actions.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div
-                  className="recent-activity-tabs"
-                  role="tablist"
-                  aria-label="Recent activity by category"
-                >
-                  {(
-                    [
-                      { id: "transcripts" as const, label: "Transcripts" },
-                      { id: "meetings" as const, label: "Meetings" },
-                      { id: "actions" as const, label: "Actions" },
-                    ] as const
-                  ).map(({ id, label }) => {
-                    const isActive = recentActivityTab === id;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        role="tab"
-                        id={`recent-activity-tab-${id}`}
-                        aria-selected={isActive}
-                        aria-controls={`recent-activity-panel-${id}`}
-                        tabIndex={isActive ? 0 : -1}
-                        className={`recent-activity-tab${isActive ? " is-active" : ""}`}
-                        onClick={() => setRecentActivityTab(id)}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div
-                  id="recent-activity-panel-transcripts"
-                  role="tabpanel"
-                  aria-labelledby="recent-activity-tab-transcripts"
-                  hidden={recentActivityTab !== "transcripts"}
-                  className="recent-activity-panel"
-                >
-                  {recentTranscriptsSorted.length === 0 ? (
-                    <div className="empty-state empty-state--tab">
-                      <div className="empty-icon">
-                        <AudioLines size={24} />
-                      </div>
-                      <p className="empty-title">No transcriptions yet</p>
-                      <p className="empty-sub">
-                        Your speech-to-text history will show up here.
-                      </p>
-                    </div>
-                  ) : (
-                    <ul className="recent-activity-list">
-                      {recentTranscriptsDisplayed.map((t) => {
-                        const title =
-                          t.original_text.length > 70
-                            ? t.original_text.slice(0, 70) + "…"
-                            : t.original_text;
-                        return (
-                          <RecentActivityRow
-                            key={t.id}
-                            badgeClass="transcription"
-                            icon={AudioLines}
-                            title={title}
-                            subtitle={`${t.original_text_word_count} words`}
-                            typeLabel="Transcription"
-                            timestamp={t.created_at}
-                            onRowClick={() => onNavigate?.("transcripts")}
-                          />
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-
-                <div
-                  id="recent-activity-panel-meetings"
-                  role="tabpanel"
-                  aria-labelledby="recent-activity-tab-meetings"
-                  hidden={recentActivityTab !== "meetings"}
-                  className="recent-activity-panel"
-                >
-                  {recentMeetingsSorted.length === 0 ? (
-                    <div className="empty-state empty-state--tab">
-                      <div className="empty-icon">
-                        <Video size={24} />
-                      </div>
-                      <p className="empty-title">No meetings yet</p>
-                      <p className="empty-sub">
-                        Recorded meetings will appear here.
-                      </p>
-                    </div>
-                  ) : (
-                    <ul className="recent-activity-list">
-                      {recentMeetingsDisplayed.map((m) => (
-                        <RecentActivityRow
-                          key={m.id}
-                          badgeClass="meeting"
-                          icon={Video}
-                          title={m.name || "Untitled Meeting"}
-                          subtitle={m.platform ?? "Meeting"}
-                          typeLabel="Meeting"
-                          timestamp={m.created_at}
-                          onRowClick={() => onNavigate?.("meetings")}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div
-                  id="recent-activity-panel-actions"
-                  role="tabpanel"
-                  aria-labelledby="recent-activity-tab-actions"
-                  hidden={recentActivityTab !== "actions"}
-                  className="recent-activity-panel"
-                >
-                  {recentActionsSorted.length === 0 ? (
-                    <div className="empty-state empty-state--tab">
-                      <div className="empty-icon">
-                        <Atom size={24} />
-                      </div>
-                      <p className="empty-title">No actions yet</p>
-                      <p className="empty-sub">
-                        Action hotkey runs will show up here.
-                      </p>
-                    </div>
-                  ) : (
-                    <ul className="recent-activity-list">
-                      {recentActionsDisplayed.map((a) => {
-                        const cmd = a.action_command?.trim() || "Action";
-                        const title =
-                          cmd.length > 70 ? cmd.slice(0, 70) + "…" : cmd;
-                        const sub =
-                          a.app_name?.trim() || a.action_type || "Action";
-                        return (
-                          <RecentActivityRow
-                            key={a.id}
-                            badgeClass="action"
-                            icon={Atom}
-                            title={title}
-                            subtitle={sub}
-                            typeLabel="Action"
-                            timestamp={a.created_at}
-                            onRowClick={() => onNavigate?.("actions")}
-                          />
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </motion.section>
-
-        {/* Right: Plan Usage */}
-        <motion.section
-          className={`billing-usage-section${featureUsage && isProPlan(featureUsage.plan_type) ? " is-pro-plan" : ""}`}
-          variants={itemVariants}
-        >
-          <div className="section-header">
-            <div>
-              <h2 className="section-title">Plan Usage</h2>
-              {featureUsage && (
-                <div className="billing-usage-meta">
-                  <span
-                    className={`billing-plan-badge${isProPlan(featureUsage.plan_type) ? " is-pro" : ""}`}
-                  >
-                    {isProPlan(featureUsage.plan_type) && (
-                      <Zap size={10} fill="#ffffff" color="#ffffff" />
-                    )}
-                    {featureUsage.plan_type}
-                  </span>
-                  {!isProPlan(featureUsage.plan_type) && (
-                    <BillingResetCountdown
-                      periodEndIso={featureUsage.period_end}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-            {showUpgradeCta && (
+          <div className="home-nudge-card__body">
+            <p className="home-nudge-card__text">{insights.nudge}</p>
+            {insights.nudge_cta && nudgePage && (
               <button
                 type="button"
-                className="home-upgrade-btn"
-                onClick={handleUpgradeClick}
+                className="home-nudge-card__cta"
+                onClick={() => onNavigate?.(nudgePage)}
               >
-                Upgrade
+                {insights.nudge_cta}
+                <ArrowRight size={13} aria-hidden />
               </button>
             )}
           </div>
-
-          {billingLoading ? (
-            <div className="home-billing-skeleton">
-              {[80, 55, 70].map((w, i) => (
-                <div key={i} className="home-billing-skeleton__row">
-                  <SkBlock
-                    style={{
-                      height: 12,
-                      width: `${w}%`,
-                      borderRadius: 4,
-                      marginBottom: 6,
-                    }}
-                  />
-                  <SkBlock
-                    style={{ height: 6, width: "100%", borderRadius: 3 }}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : featureUsage && planUsageRows.length > 0 ? (
-            <ul className="billing-feature-list">
-              {planUsageRows.map((feature) => {
-                const limit = feature.limit_value;
-                const isUnlimited = limit === null;
-                const used = feature.used ?? 0;
-                const pct = isUnlimited
-                  ? 0
-                  : clamp01(limit > 0 ? used / limit : used > 0 ? 1 : 0);
-                return (
-                  <li
-                    key={feature.feature_key}
-                    className={`billing-feature-row${!feature.enabled ? " is-disabled" : ""}`}
-                  >
-                    <div className="billing-feature-info">
-                      <div className="billing-feature-name-wrap">
-                        <span className="billing-feature-name">
-                          {featureLabel(feature.feature_key)}
-                        </span>
-                        {!feature.enabled && (
-                          <span className="billing-feature-disabled">
-                            Not included
-                          </span>
-                        )}
-                      </div>
-                      <div className="billing-feature-metrics">
-                        <span className="billing-feature-usage">
-                          {isUnlimited ? (
-                            <span className="billing-usage-unlimited">
-                              ∞ Unlimited
-                            </span>
-                          ) : (
-                            <>
-                              <span className="billing-usage-numbers">
-                                {used} / {limit}
-                              </span>{" "}
-                              <span className="billing-feature-usage-suffix">
-                                {featureUsageSuffix(feature.feature_key)}
-                              </span>
-                            </>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                    {!isUnlimited && feature.metered && (
-                      <div className="billing-usage-bar">
-                        <div
-                          className="billing-usage-bar-fill"
-                          style={{ width: `${Math.round(pct * 100)}%` }}
-                        />
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="empty-state">
-              <p className="empty-sub">No plan data available.</p>
-            </div>
-          )}
         </motion.section>
-      </div>
+      )}
+
+      {/* ── Feature Spotlights ── */}
+      <motion.section className="feature-spotlight-section" variants={itemVariants}>
+        <h2 className="section-title">What Lexi can do for you</h2>
+        <div className="feature-spotlight-grid">
+          {FEATURE_SPOTLIGHTS.map((spotlight) => (
+            <FeatureCard
+              key={spotlight.title}
+              spotlight={spotlight}
+              onClick={() => onNavigate?.(spotlight.page)}
+            />
+          ))}
+        </div>
+      </motion.section>
     </motion.div>
   );
 };

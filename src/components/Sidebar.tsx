@@ -9,6 +9,8 @@ import {
   BookText,
   ArrowLeftRight,
   LayoutDashboard,
+  BarChart3,
+  Gauge,
 } from "lucide-react";
 
 import type { SidebarProps } from "../types";
@@ -146,6 +148,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Languages size={18} strokeWidth={2} />
           <span>Vocabulary</span>
+        </button>
+
+        {/* Analytics */}
+        <button
+          className={`sidebar-item ${currentPage === "analytics" ? "active" : ""}`}
+          onClick={() => onNavigate("analytics")}
+        >
+          <BarChart3 size={18} strokeWidth={2} />
+          <span>Analytics</span>
+        </button>
+
+        {/* Usage */}
+        <button
+          className={`sidebar-item ${currentPage === "usage" ? "active" : ""}`}
+          onClick={() => onNavigate("usage")}
+        >
+          <Gauge size={18} strokeWidth={2} />
+          <span>Usage</span>
         </button>
 
         {/* Settings */}

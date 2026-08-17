@@ -30,8 +30,11 @@ import {
 import "../meetings.css";
 import "./meetings-list.css";
 import "./meeting-detail-product.css";
-import { formatLocaleTimeWithSeconds } from "../../lib/dateUtils";
 import { useToast } from "../toast/useToast";
+import {
+  parseServerDate,
+  formatLocaleTimeWithSeconds,
+} from "../../lib/dateUtils";
 
 function summarySeedFromMeeting(m: Meeting | null): string | null {
   if (!m?.summary || typeof m.summary !== "string") return null;
@@ -155,9 +158,31 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
     "Any risks or blockers mentioned?",
   ];
 
+  // `fetchMeetingDetails` can be re-called while still recording (e.g. on resume),
+  // re-fetching segments that are already present in `liveSegments` — dedupe by id
+  // so a segment saved on the server doesn't render twice.
   const segments = isThisMeetingRecording
-    ? [...fetchedSegments, ...liveSegments]
+    ? [
+        ...fetchedSegments,
+        ...liveSegments.filter(
+          (live) => !fetchedSegments.some((f) => f.id === live.id),
+        ),
+      ]
     : fetchedSegments;
+
+  // Duplicate user_audio/system_audio content (mic picking up speaker output) is now
+  // deduplicated server-side, before it's ever saved — so `segments` arrives already
+  // clean. Just render one flowing transcript in chronological order (fetchedSegments +
+  // liveSegments are simple concatenations, not guaranteed sorted).
+  const mergedLines = useMemo(
+    () =>
+      [...segments].sort(
+        (a, b) =>
+          (parseServerDate(a.start_time)?.getTime() ?? 0) -
+          (parseServerDate(b.start_time)?.getTime() ?? 0),
+      ),
+    [segments],
+  );
 
   const summaryLines = useMemo(() => {
     if (streamingLines.length > 0) return streamingLines;
@@ -253,6 +278,18 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
   }, [chatMessages, isSendingChat]);
+
+  // Follow new live transcript text as it streams in — but only when the reader is
+  // already near the bottom, so scrolling up to re-read earlier text during an active
+  // meeting doesn't get yanked back down by the next incoming segment.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 150) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+  }, [mergedLines.length]);
 
   useEffect(() => {
     if (!triggerEndMeetingFromTray) return;
@@ -872,49 +909,63 @@ export const MeetingDetailPage: React.FC<MeetingDetailPageProps> = ({
                       Getting ready…
                     </p>
                   </div>
-                ) : segments.length === 0 ? (
+                ) : mergedLines.length === 0 ? (
                   <p className="meeting-detail-transcript__empty">
                     {isThisMeetingRecording
                       ? "Listening for speech..."
                       : "Click Resume to start capturing."}
                   </p>
-                ) : null}
-                {segments.map((seg, idx) => {
-                  const timeString = seg.start_time
-                    ? formatLocaleTimeWithSeconds(seg.start_time)
-                    : "00:00:00";
-                  const msgType = seg.message_type;
-                  const isUser =
-                    msgType === "user_audio" || msgType === "user_note";
-                  const isSystem = msgType === "system_audio";
-                  const segmentAlign = isUser
-                    ? "user"
-                    : isSystem
-                      ? "system"
-                      : "unknown";
-                  const bubbleVariant = isUser
-                    ? "user"
-                    : isSystem
-                      ? "system"
-                      : "unknown";
-                  return (
-                    <div
-                      key={seg.id ?? idx}
-                      className={`meeting-detail-transcript__segment meeting-detail-transcript__segment--${segmentAlign}`}
-                    >
-                      <div className="meeting-detail-transcript__block">
-                        <div
-                          className={`meeting-detail-transcript__bubble meeting-detail-transcript__bubble--${bubbleVariant}`}
-                        >
-                          <span>{seg.text}</span>
+                ) : (
+                  mergedLines.map((line) => {
+                    const badgeVariant =
+                      line.message_type === "user_audio"
+                        ? "you"
+                        : line.message_type === "system_audio"
+                          ? "system"
+                          : line.message_type === "user_note"
+                            ? "note"
+                            : "unknown";
+                    const badgeLabel =
+                      badgeVariant === "you"
+                        ? "You"
+                        : badgeVariant === "system"
+                          ? "System"
+                          : badgeVariant === "note"
+                            ? "Note"
+                            : "?";
+                    const segmentAlign =
+                      badgeVariant === "you" || badgeVariant === "note"
+                        ? "user"
+                        : badgeVariant === "system"
+                          ? "system"
+                          : "unknown";
+                    const timeString = line.start_time
+                      ? formatLocaleTimeWithSeconds(line.start_time)
+                      : "00:00:00";
+                    return (
+                      <div
+                        key={line.id}
+                        className={`meeting-detail-transcript__segment meeting-detail-transcript__segment--${segmentAlign} meeting-detail-transcript__word-in`}
+                      >
+                        <div className="meeting-detail-transcript__block">
+                          <div
+                            className={`meeting-detail-transcript__bubble meeting-detail-transcript__bubble--${segmentAlign}`}
+                          >
+                            <span
+                              className={`meeting-detail-transcript__badge meeting-detail-transcript__badge--${badgeVariant}`}
+                            >
+                              {badgeLabel}
+                            </span>
+                            <span>{line.text}</span>
+                          </div>
+                          <span className="meeting-detail-transcript__time-subtitle">
+                            {timeString}
+                          </span>
                         </div>
-                        <span className="meeting-detail-transcript__time-subtitle">
-                          {timeString}
-                        </span>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
               <form
                 onSubmit={handleAddNote}

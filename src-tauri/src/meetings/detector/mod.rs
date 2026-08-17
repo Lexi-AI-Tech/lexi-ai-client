@@ -11,7 +11,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::state::{MeetingState, RoomState};
+use crate::state::MeetingState;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use crate::window::show_and_focus_main_window;
 
@@ -209,19 +209,10 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
             }
 
             let mut skip = false;
-            if let Some(room_state) = app_detect.try_state::<RoomState>() {
-                if let Ok(guard) = room_state.is_recording.try_lock() {
+            if let Some(meeting_state) = app_detect.try_state::<MeetingState>() {
+                if let Ok(guard) = meeting_state.is_recording.try_lock() {
                     if *guard {
                         skip = true;
-                    }
-                }
-            }
-            if !skip {
-                if let Some(meeting_state) = app_detect.try_state::<MeetingState>() {
-                    if let Ok(guard) = meeting_state.is_recording.try_lock() {
-                        if *guard {
-                            skip = true;
-                        }
                     }
                 }
             }
@@ -291,16 +282,6 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
 
             loop {
                 tick.tick().await;
-
-                let skip_room = app_handle
-                    .try_state::<RoomState>()
-                    .map(|rs| *rs.is_recording.lock().unwrap())
-                    .unwrap_or(false);
-                if skip_room {
-                    saw_non_lexi_mic = false;
-                    consecutive_only_lexi = 0;
-                    continue;
-                }
 
                 let (recording, meeting_id) = match app_handle.try_state::<MeetingState>() {
                     Some(ms) => {

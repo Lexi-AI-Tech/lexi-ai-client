@@ -43,6 +43,28 @@ pub fn create_http_client() -> reqwest::Client {
         .unwrap_or_else(|_| reqwest::Client::new())
 }
 
+/// Turns a raw error's Display text into a short, user-facing message.
+/// Structured "Server Error (status): body" text is passed through as-is —
+/// the frontend's formatUserFacingApiError parses that shape. Everything
+/// else (transport/timeout/OS-level errors) is replaced with generic copy.
+pub fn user_facing_error(raw: &str, fallback: &str) -> String {
+    if raw.starts_with("Server Error (") {
+        return raw.to_string();
+    }
+    let lower = raw.to_lowercase();
+    if lower.contains("timed out") {
+        return "Request timed out. Please try again.".to_string();
+    }
+    if lower.contains("error sending request")
+        || lower.contains("connection")
+        || lower.contains("dns")
+        || lower.contains("tls")
+    {
+        return "Couldn't reach the server. Check your connection and try again.".to_string();
+    }
+    fallback.to_string()
+}
+
 /// Creates a reqwest client with a long timeout for endpoints that call the LLM
 /// (e.g. meeting Q&A), which can take 30–120+ seconds.
 pub fn create_http_client_long_timeout() -> reqwest::Client {

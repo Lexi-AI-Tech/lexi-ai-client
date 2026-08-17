@@ -1272,6 +1272,9 @@
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+/* Chat-style bubbles per segment (dedup happens server-side before save, see
+   lexi-ai-server modules/meeting/service.py — segments arriving here are already
+   clean), with a small source badge (U / System / Note) inside each bubble. */
 .meeting-detail-transcript__segment {
   margin-bottom: 0.65rem;
   display: flex;
@@ -1303,6 +1306,7 @@
 }
 
 .meeting-detail-transcript__bubble {
+  position: relative;
   max-width: 100%;
   padding: 0.5625rem 1rem;
   border-radius: 12px;
@@ -1310,17 +1314,51 @@
   line-height: 1.45;
 }
 
-.meeting-detail-transcript__bubble--user {
-  background: var(--lexi-primary);
-  color: white;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-}
-
-.meeting-detail-transcript__bubble--system {
+/* All bubbles share the same neutral white styling — the badge alone carries the
+   source color-coding (see .meeting-detail-transcript__badge--*), not the bubble. */
+.meeting-detail-transcript__bubble--user,
+.meeting-detail-transcript__bubble--system,
+.meeting-detail-transcript__bubble--unknown {
   background: #ffffff;
   color: #374151;
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.meeting-detail-transcript__badge {
+  position: absolute;
+  /* Straddles the bubble's top-right corner (half in, half out) rather than sitting
+     inside the padding, so it doesn't push/reserve any space from the bubble's text. */
+  top: -0.5rem;
+  right: -0.375rem;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.meeting-detail-transcript__badge--you {
+  background: var(--lexi-primary);
+  color: white;
+}
+
+.meeting-detail-transcript__badge--system {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.meeting-detail-transcript__badge--note {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.meeting-detail-transcript__badge--unknown {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .meeting-detail-transcript__time-subtitle {
@@ -1343,6 +1381,24 @@
 .meeting-detail-transcript__segment--unknown
   .meeting-detail-transcript__time-subtitle {
   text-align: left;
+}
+
+/* Each newly-appended segment of live transcript fades/slides in as it arrives. Only
+   the newly-mounted segment plays this — React keeps already-rendered ones as-is, so
+   older segments don't replay the animation on every re-render. */
+@keyframes transcript-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.meeting-detail-transcript__word-in {
+  animation: transcript-word-in 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
 .meeting-detail-transcript__empty {

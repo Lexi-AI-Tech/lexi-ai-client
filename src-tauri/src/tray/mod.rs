@@ -6,6 +6,7 @@
 //! ## Tray Features
 //!
 //! - **Show App**: Click to show/hide the main window
+//! - **View Analytics** / **View Usage**: Show the app and jump straight to that page
 //! - **Quit**: Exit the application
 //! - **Left-click**: Toggle main window visibility
 //!
@@ -79,6 +80,10 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
     let show_item = MenuItem::with_id(app, "show", "Show App", true, None::<&str>)?;
     let start_meeting_item =
         MenuItem::with_id(app, "start_meeting", "Start Meeting", true, None::<&str>)?;
+    let view_analytics_item =
+        MenuItem::with_id(app, "view_analytics", "View Analytics", true, None::<&str>)?;
+    let view_usage_item =
+        MenuItem::with_id(app, "view_usage", "View Usage", true, None::<&str>)?;
 
     #[cfg(target_os = "windows")]
     let transcript_item = MenuItem::with_id(
@@ -107,12 +112,44 @@ pub fn init_system_tray(app: &mut App) -> Result<MenuItem<tauri::Wry>, tauri::Er
     let version_label = format!("Version {}", app.package_info().version);
     let version_item = MenuItem::with_id(app, "version", version_label, false, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+
+    // Debug-only: lets us pop the meeting-detected pill on demand instead of
+    // needing to actually join a call. Stripped from release builds since
+    // it's gated on debug_assertions (false whenever built with --release,
+    // which `tauri build` always does).
+    #[cfg(debug_assertions)]
+    let simulate_meeting_item = MenuItem::with_id(
+        app,
+        "debug_simulate_meeting_detected",
+        "🐛 [DEV] Simulate Meeting Detected",
+        true,
+        None::<&str>,
+    )?;
+
+    #[cfg(debug_assertions)]
     let tray_menu = Menu::with_items(
         app,
         &[
             &show_item,
             &start_meeting_item,
             &transcript_item,
+            &view_analytics_item,
+            &view_usage_item,
+            &check_updates_item,
+            &simulate_meeting_item,
+            &version_item,
+            &quit_item,
+        ],
+    )?;
+    #[cfg(not(debug_assertions))]
+    let tray_menu = Menu::with_items(
+        app,
+        &[
+            &show_item,
+            &start_meeting_item,
+            &transcript_item,
+            &view_analytics_item,
+            &view_usage_item,
             &check_updates_item,
             &version_item,
             &quit_item,
@@ -208,6 +245,24 @@ fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                 }
             });
         }
+        "view_analytics" => {
+            show_and_focus_main_window(app);
+            let app_clone = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = app_clone.emit("view-analytics-from-tray", ()) {
+                    eprintln!("Failed to emit view-analytics-from-tray event: {}", e);
+                }
+            });
+        }
+        "view_usage" => {
+            show_and_focus_main_window(app);
+            let app_clone = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = app_clone.emit("view-usage-from-tray", ()) {
+                    eprintln!("Failed to emit view-usage-from-tray event: {}", e);
+                }
+            });
+        }
         "check_updates" => {
             show_and_focus_main_window(app);
             let app_clone = app.clone();
@@ -216,6 +271,16 @@ fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                     eprintln!("Failed to emit check-updates-from-tray event: {}", e);
                 }
             });
+        }
+        #[cfg(debug_assertions)]
+        "debug_simulate_meeting_detected" => {
+            println!("🐛 [DEV] Simulating meeting-detected event");
+            let context = crate::meetings::detector::MeetingContext {
+                platform: "Zoom".to_string(),
+            };
+            if let Err(e) = app.emit("meeting-detected", context) {
+                eprintln!("Failed to emit simulated meeting-detected event: {}", e);
+            }
         }
         "quit" => {
             println!("👋 Quitting application");

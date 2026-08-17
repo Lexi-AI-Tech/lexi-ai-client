@@ -1073,7 +1073,7 @@ textarea.form-input {
   position: relative;
 }
 
-/* Modal overlay (e.g. SpeakerNamingModal) */
+/* Modal overlay (e.g. UpdateModal) */
 .modal-overlay {
   position: fixed;
   top: 0;

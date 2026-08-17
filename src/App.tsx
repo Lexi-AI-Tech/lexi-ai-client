@@ -15,6 +15,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppLoader } from "./components/AppLoader";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { HomePage } from "./components/home/HomePage";
+import { AnalyticsPage } from "./components/analytics/AnalyticsPage";
+import { UsagePage } from "./components/usage/UsagePage";
 import {
   SettingsPage,
   type SettingsPageInitialSection,
@@ -40,6 +42,8 @@ const ONBOARDING_VERSION = 1;
 
 type Page =
   | "home"
+  | "analytics"
+  | "usage"
   | "transcripts"
   | "settings"
   | "vocabulary"
@@ -275,6 +279,37 @@ function App() {
         return () => {
           unlistenStart();
           unlistenEnd();
+        };
+      }
+    };
+    let unlistenFn: (() => void) | undefined;
+    setup().then((fn) => {
+      unlistenFn = fn;
+    });
+    return () => {
+      cancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, []);
+
+  // Listen for "View Analytics" / "View Usage" from system tray
+  useEffect(() => {
+    let cancelled = false;
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlistenAnalytics = await listen("view-analytics-from-tray", () => {
+        if (!cancelled) setCurrentPage("analytics");
+      });
+      const unlistenUsage = await listen("view-usage-from-tray", () => {
+        if (!cancelled) setCurrentPage("usage");
+      });
+      if (cancelled) {
+        unlistenAnalytics();
+        unlistenUsage();
+      } else {
+        return () => {
+          unlistenAnalytics();
+          unlistenUsage();
         };
       }
     };
@@ -613,6 +648,18 @@ function App() {
                 onViewAllTranscripts={() => setCurrentPage("transcripts")}
                 onNavigate={(page: string) => setCurrentPage(page as Page)}
               />
+            )}
+            {currentPage === "analytics" && (
+              <div className="container">
+                <AnalyticsPage
+                  onNavigate={(page: string) => setCurrentPage(page as Page)}
+                />
+              </div>
+            )}
+            {currentPage === "usage" && (
+              <div className="container">
+                <UsagePage />
+              </div>
             )}
             {currentPage === "transcripts" && (
               <div className="container container--transcripts">

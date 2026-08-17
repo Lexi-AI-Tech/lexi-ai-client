@@ -19,7 +19,41 @@
    ============================================ */
 
 .home-greeting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+.home-usage-cta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.375rem;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--lexi-text);
+  background: var(--lexi-surface);
+  border: 1px solid var(--lexi-border-subtle);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.home-usage-cta:hover {
+  background: var(--lexi-primary-muted);
+  border-color: var(--lexi-primary);
+}
+
+.home-usage-cta:active {
+  transform: scale(0.98);
 }
 
 .home-greeting-card {
@@ -998,4 +1032,151 @@
   .quick-actions-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* ============================================
+   NUDGE CARD
+   ============================================ */
+
+.home-nudge-card {
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+  margin-bottom: 1.75rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(
+    135deg,
+    var(--lexi-surface) 0%,
+    var(--lexi-primary-muted) 100%
+  );
+  border: 1px solid var(--lexi-border-subtle);
+  border-radius: 1rem;
+}
+
+.home-nudge-card__icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
+}
+
+.home-nudge-card__body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.home-nudge-card__text {
+  font-size: 0.875rem;
+  color: var(--lexi-text);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.home-nudge-card__cta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: var(--lexi-primary);
+  color: var(--lexi-primary-foreground);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.home-nudge-card__cta:hover {
+  opacity: 0.9;
+  transform: translateX(1px);
+}
+
+/* ============================================
+   FEATURE SPOTLIGHT CARDS
+   ============================================ */
+
+.feature-spotlight-section {
+  margin-bottom: 1.5rem;
+}
+
+.feature-spotlight-section .section-title {
+  margin-bottom: 0.875rem;
+  display: block;
+}
+
+.feature-spotlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.feature-spotlight-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 0.5rem;
+  padding: 1.125rem 1.25rem 1.25rem;
+  background: var(--lexi-surface);
+  border: 1px solid var(--lexi-border-subtle);
+  border-radius: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.feature-spotlight-card:hover {
+  border-color: var(--lexi-primary);
+  box-shadow: var(--lexi-shadow-sm);
+}
+
+.feature-spotlight-card__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lexi-primary-muted);
+  color: var(--lexi-primary);
+  margin-bottom: 0.25rem;
+}
+
+.feature-spotlight-card__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--lexi-text);
+  margin: 0;
+}
+
+.feature-spotlight-card__pain {
+  font-size: 0.8rem;
+  color: var(--lexi-text-muted);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.feature-spotlight-card__howto {
+  font-size: 0.8rem;
+  color: var(--lexi-text-faint);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.feature-spotlight-card__cta {
+  margin-top: 0.375rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--lexi-primary);
 }

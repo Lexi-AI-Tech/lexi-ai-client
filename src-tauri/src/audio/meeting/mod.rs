@@ -12,7 +12,15 @@ mod win;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter};
+
+/// Mic ("user") sends are staggered behind system-audio sends by this much so that, for
+/// the same real-world utterance, the system_audio copy reliably reaches the server (and
+/// is saved) before the user_audio echo of it arrives — letting the server's duplicate
+/// check compare against an already-saved segment instead of racing it. See the
+/// deduplication note in `lexi-ai-server`'s `modules/meeting/service.py`.
+const USER_AUDIO_SEND_DELAY: Duration = Duration::from_millis(500);
 
 /// Handles to stop meeting audio (recorder + optional system-audio capture).
 pub struct MeetingAudioHandles {
@@ -22,12 +30,19 @@ pub struct MeetingAudioHandles {
 }
 
 /// Sends (source, chunk) to output; used for mic (source "user") and system (source "system").
+/// `initial_delay`, if set, is slept once before the first chunk is sent — a fixed
+/// time-shift applied to the whole stream (not a per-chunk sleep, which would keep
+/// compounding since chunks arrive faster than the delay).
 fn send_tagged_chunks(
     rx: mpsc::Receiver<Vec<u8>>,
     source: &'static str,
     output_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<(String, Vec<u8>)>>>>,
     rt_handle: tokio::runtime::Handle,
+    initial_delay: Option<Duration>,
 ) {
+    if let Some(delay) = initial_delay {
+        thread::sleep(delay);
+    }
     while let Ok(chunk) = rx.recv() {
         let guard = output_tx.lock().unwrap();
         if let Some(ref tx) = *guard {
@@ -84,13 +99,15 @@ pub fn start_meeting_audio(
 
     let output_mic = output_tx.clone();
     let rt_mic = rt_handle.clone();
-    thread::spawn(move || send_tagged_chunks(mic_rx, "user", output_mic, rt_mic));
+    thread::spawn(move || {
+        send_tagged_chunks(mic_rx, "user", output_mic, rt_mic, Some(USER_AUDIO_SEND_DELAY))
+    });
 
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         let output_sys = output_tx.clone();
         let rt_sys = rt_handle.clone();
-        thread::spawn(move || send_tagged_chunks(system_rx, "system", output_sys, rt_sys));
+        thread::spawn(move || send_tagged_chunks(system_rx, "system", output_sys, rt_sys, None));
     }
 
     let (recorder_stop_tx, recorder_stop_rx) = mpsc::channel::<()>();

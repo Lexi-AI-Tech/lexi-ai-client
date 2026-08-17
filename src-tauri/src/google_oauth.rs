@@ -142,7 +142,10 @@ fn open_browser(url: &str, app: AppHandle) {
 
         if let Err(e) = result {
             eprintln!("Failed to open browser: {}", e);
-            let _ = app.emit("oauth-error", format!("Failed to open browser: {}", e));
+            let _ = app.emit(
+                "oauth-error",
+                "Couldn't open the browser to sign in. Please try again.",
+            );
         }
     });
 }
