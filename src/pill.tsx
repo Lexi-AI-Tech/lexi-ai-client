@@ -50,10 +50,15 @@ interface MeetingDetectedPayload {
   platform: string;
 }
 
+type PillStatus =
+  | "idle"
+  | "recording"
+  | "processing"
+  | "speaking"
+  | "meeting_detected";
+
 export const Pill: React.FC = () => {
-  const [status, setStatus] = useState<
-    "idle" | "recording" | "processing" | "speaking" | "meeting_detected"
-  >("idle");
+  const [status, setStatusState] = useState<PillStatus>("idle");
   const [isActionMode, setIsActionMode] = useState(false); // Track if action hotkey is active
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false); // Subtle press-down feedback on click
@@ -63,7 +68,18 @@ export const Pill: React.FC = () => {
     useState<MeetingDetectedPayload | null>(null);
   const [meetingCountdown, setMeetingCountdown] = useState(0); // 0 = not in countdown, 1–5 = seconds left
   const isRecordingRef = useRef(false);
-  const statusRef = useRef(status); // Live status snapshot for listeners set up once on mount
+  // Live status snapshot for listeners set up once on mount. Updated
+  // synchronously in `setStatus` below (not via a `useEffect` on `status`) —
+  // an effect only commits on the *next* render, so a resize/reposition that
+  // runs synchronously right after a `setStatus("meeting_detected")` call
+  // could otherwise still see a stale "idle" here, letting the onMoved guard
+  // below mistake our own programmatic move for a user drag and corrupt
+  // idlePositionRef with the intermediate (shifted) position.
+  const statusRef = useRef<PillStatus>(status);
+  const setStatus = React.useCallback((next: PillStatus) => {
+    statusRef.current = next;
+    setStatusState(next);
+  }, []);
   const hasRealAudioRef = useRef(false); // Track if we're receiving real volume data
   const lastVolumeTimeRef = useRef(0); // Track when we last received volume data
   // Single source of truth for idle position - prevents position drift from accumulated rounding errors
@@ -86,9 +102,9 @@ export const Pill: React.FC = () => {
     });
   }, [audioLevels]);
 
-  // Reset audio levels when not recording, and sync idle status to the global updater
+  // Reset audio levels when not recording, and sync idle status to the global updater.
+  // (statusRef itself is kept in sync synchronously by `setStatus` above, not here.)
   useEffect(() => {
-    statusRef.current = status;
     isRecordingRef.current = status === "recording";
 
     // Tell the global updater whether the app is currently in use (so it doesn't forcefully restart)
