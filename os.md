@@ -7,13 +7,13 @@
   - [ ] Rotate anything found (especially the old Google OAuth client secret — see commit "remove google client secret")
   - [ ] Decide: publish with squashed/fresh history, or rewrite with `git filter-repo`
 - [ ] **Add a license**
-  - [ ] Choose one: MIT / Apache-2.0 (max adoption) or AGPL / GPL (prevent closed-source forks)
-  - [ ] Add `LICENSE` file
-  - [ ] Set `license` in `package.json` and `src-tauri/Cargo.toml` (currently `license = ""`)
+  - [x] Choose one: MIT (chosen)
+  - [x] Add `LICENSE` file
+  - [x] Set `license` in `package.json` and `src-tauri/Cargo.toml`
 - [ ] **Dependency license audit**
-  - [ ] Rust: `cargo deny` / `cargo license`
-  - [ ] npm: `license-checker`
-  - [ ] Confirm compatibility with the chosen license
+  - [x] Rust: no GPL-only crates; 5 MPL-2.0 crates (cssparser, selectors, etc.) are fine as unmodified deps
+  - [x] npm: all MIT/ISC/Apache/BSD; 5 entries lack a lockfile license field (framer-motion, lucide-react, motion-dom, motion-utils, tslib) but are MIT/ISC/0BSD upstream
+  - [x] Confirm compatibility with the chosen license
 
 ## Decisions
 

@@ -3,6 +3,7 @@
   "version": "0.1.11",
   "description": "AI Productivity tool",
   "author": "anadi45",
+  "license": "MIT",
   "main": "src-tauri/src/main.rs",
   "scripts": {
     "tauri": "tauri",
