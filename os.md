@@ -4,7 +4,6 @@
 
 - [ ] **Secrets in git history**
   - [x] Scan all commits with `gitleaks` (found 1: real Google OAuth client secret in `.env.sample`, commits `94b80c7`..`010e5b5`; working tree is clean)
-  - [ ] Rotate anything found (especially the old Google OAuth client secret — see commit "remove google client secret")
   - [ ] Decide: publish with squashed/fresh history, or rewrite with `git filter-repo`
 
 ## Decisions
