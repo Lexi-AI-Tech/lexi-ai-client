@@ -15,8 +15,8 @@
 
 ## Legal and privacy
 
-- [ ] Document what data leaves the device (audio/meeting recording) and where it goes
-- [ ] Review Terms and Privacy pages
+- [x] Document what data leaves the device (audio/meeting recording) and where it goes (`docs/DATA-FLOW.md`)
+- [ ] Review Terms and Privacy pages (code-vs-policy discrepancies listed in `docs/DATA-FLOW.md`; the page edits are still open)
 - [ ] Choose DCO sign-off or CLA (if relicensing later is possible)
 - [ ] Get sign-off from company/co-founders
 - [ ] Confirm no employer or client owns code in the repo
