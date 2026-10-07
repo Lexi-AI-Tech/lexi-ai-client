@@ -3,7 +3,6 @@
 ## Decisions
 
 - [ ] **Updater and signing**
-  - [ ] Ensure the private signing key and Apple signing/notarization secrets live only in CI secrets
   - [ ] Review or remove `.github/APPLE_SIGNING_SETUP.md`
   - [ ] Make sure forks' CI cannot publish via the release workflows (dev workflow disabled; still set a production environment with required reviewers, and branch protection on `main`)
   - [ ] Replace the personal Apple `signingIdentity` in `tauri.conf.json` and `.github/APPLE_SIGNING_SETUP.md` with a placeholder or env value
