@@ -13,7 +13,7 @@
 //! 2. **Audio Recording**: Captures audio from the default microphone using `cpal`
 //!    (Cross-Platform Audio Library) and converts it to WAV format
 //! 3. **Speech-to-Text Transcription**: Sends audio to Lexi AI Server API endpoint
-//!    (server handles Groq's Whisper API integration internally)
+//!    (handled by the server)
 //! 4. **Text Injection**: Injects transcribed text into the currently active application
 //!    using clipboard + paste keystroke via keyboard_simulator module (Cmd+V on macOS, Ctrl+V elsewhere)
 //! 5. **Pill Overlay Window**: Manages a small transparent overlay window that displays
@@ -27,7 +27,7 @@
 //!
 //! - **Frontend**: React + TypeScript UI for settings and status display
 //! - **Backend**: Rust + Tauri for system-level operations (audio, hotkeys, text injection)
-//! - **Server**: Lexi AI Server (separate service) handles transcription via Groq API
+//! - **Server**: Lexi AI Server (separate service) handles transcription
 //!
 //! ## Permissions Required (macOS)
 //!

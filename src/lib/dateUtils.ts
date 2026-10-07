@@ -10,7 +10,7 @@
  * client-submitted strings to UTC for storage; that is not applied again when
  * reading rows for API responses.
  *
- * **Parsing here:** `parseServerDate` accepts ISO strings plus PostgreSQL-style
+ * **Parsing here:** `parseServerDate` accepts ISO strings plus SQL-style
  * literals (e.g. space between date and time, long fractional seconds) so the
  * same instant is recovered; `formatAppDateTime` / `toLocaleString` then display
  * in the **user’s** locale and timezone.
@@ -26,7 +26,7 @@ export function parseServerDate(input: string | null | undefined): Date | null {
   let s = String(input).trim();
   if (!s) return null;
 
-  // SQL / Postgres: space between date and time — use `T` for reliable ISO parsing.
+  // SQL-style: space between date and time — use `T` for reliable ISO parsing.
   if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(s)) {
     s = s.replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})/, "$1T$2");
   }

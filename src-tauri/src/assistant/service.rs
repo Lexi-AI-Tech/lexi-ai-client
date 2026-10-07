@@ -5,9 +5,9 @@
 //!
 //! ## Architecture
 //!
-//! The client sends audio to the Lexi AI Server, which handles the Groq Whisper API integration
-//! internally. This means:
-//! - No Groq API key is needed in the client
+//! The client sends audio to the Lexi AI Server, which handles speech-to-text
+//! processing. This means:
+//! - No third-party provider API key is needed in the client
 //! - Authentication is handled via Bearer token (JWT) in the Authorization header
 //! - The server manages API rate limiting, retries, and error handling
 //!
@@ -33,7 +33,7 @@ use tauri::{AppHandle, Emitter};
 /// Assistant Service client for transcribing audio using Lexi AI Server
 ///
 /// This struct manages HTTP requests to the Lexi AI Server endpoint for speech-to-text conversion.
-/// The server handles the Groq API integration internally.
+/// The server handles the speech-to-text provider integration.
 pub struct AssistantService {
     client: reqwest::Client, // HTTP client for making API requests
 }
