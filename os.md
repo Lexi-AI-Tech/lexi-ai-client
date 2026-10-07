@@ -2,9 +2,6 @@
 
 ## Decisions
 
-- [ ] **Server (`lexi-ai-server`)**
-  - [ ] Decide: open-source it too, document the API contract, or support self-hosting
-  - [ ] Make the server URL configurable in the client
 - [ ] **Branding**
   - [ ] Keep Lexi name/logo/`speaklexi.com` links as yours
   - [ ] Add a trademark note: forks must rename
