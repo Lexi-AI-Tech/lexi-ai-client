@@ -136,17 +136,16 @@ All debug output appears in the terminal, which helps with issues in production 
 
 ### Building a distributable release (notarized DMG)
 
-Without notarization and stapling, users installing from the DMG will see **"Lexi AI can't be opened"**. The DMG must contain the **stapled** app, so use the release script or CI. Do not distribute the raw DMG from `npm run build`.
+Without notarization, users installing from the DMG will see **"Lexi AI can't be opened"**. Do not distribute the raw DMG from `npm run build`.
 
-From the project root, set your Apple Developer credentials and run the release script. It builds, notarizes, and staples the app, recreates the DMG, notarizes and staples the DMG, and copies the result into `release/` (gitignored).
+Maintainers build a signed universal macOS release with:
 
 ```bash
-export APPLE_ID="your-apple-id@example.com"
-export APPLE_PASSWORD="your-app-specific-password"
-export APPLE_TEAM_ID="YOUR_TEAM_ID"
-
-./build-release.sh
+cp .env.sample .env   # then fill in the APPLE_* and TAURI_SIGNING_* values
+npm run build:mac
 ```
+
+The script (`scripts/build-mac.js`) loads `.env` and builds for `universal-apple-darwin`. Official releases are produced by CI (`.github/workflows/release-production.yml`).
 
 ## Contributing
 
