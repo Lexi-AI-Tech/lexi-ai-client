@@ -11,6 +11,7 @@ Speech-to-text overlay app for macOS and Windows built with Tauri and React.
 - [Development](#development)
 - [Building](#building)
 - [Troubleshooting](#troubleshooting)
+- [License and Trademarks](#license-and-trademarks)
 
 ## Setup
 
@@ -125,3 +126,9 @@ export APPLE_TEAM_ID="YOUR_TEAM_ID"
 
 ./build-release.sh
 ```
+
+## License and Trademarks
+
+The code is released under the [MIT License](LICENSE). The Lexi name, logo, and
+other branding are not covered by that license; see [TRADEMARKS.md](TRADEMARKS.md).
+If you fork this project, please rename it and replace the logo and app icons.
