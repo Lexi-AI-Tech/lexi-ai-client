@@ -1,11 +1,5 @@
 # Open-Source Readiness Checklist
 
-## Decisions
-
-- [ ] **Third-party code and assets**
-  - [ ] Self-host Satoshi (check its Fontshare license) or switch to a system font stack; remove the `fonts.cdnfonts.com` link from `index.html`
-  - [ ] Remove the unused `fonts.googleapis.com` / `fonts.gstatic.com` preconnects from `index.html`
-
 ## Cleanup
 
 - [ ] Review `CLAUDE.md`, `changelog`, and code comments for internal servers, customer data, or credentials
