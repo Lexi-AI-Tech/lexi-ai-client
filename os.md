@@ -6,7 +6,6 @@
   - [ ] Keep Lexi name/logo/`speaklexi.com` links as yours
   - [ ] Add a trademark note: forks must rename
 - [ ] **Updater and signing**
-  - [ ] Updater endpoint and public key are fine to publish
   - [ ] Ensure the private signing key and Apple signing/notarization secrets live only in CI secrets
   - [ ] Review or remove `.github/APPLE_SIGNING_SETUP.md`
   - [ ] Make sure forks' CI cannot publish via the release workflows (dev workflow disabled; still set a production environment with required reviewers, and branch protection on `main`)
