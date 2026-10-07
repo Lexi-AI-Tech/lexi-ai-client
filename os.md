@@ -3,7 +3,6 @@
 ## Cleanup
 
 - [ ] Review `CLAUDE.md`, `changelog`, and code comments for internal servers, customer data, or credentials
-- [ ] Review the "Inspired by the shared dashboard reference" comment in `src/index.css`
 - [ ] Set a Content Security Policy (`"csp": null` in `tauri.conf.json`)
 - [ ] Fix or remove `checkUpdateDetails` (reads undefined `VITE_API_BASE_URL`; update size/notes never load)
 - [ ] Resolve the 28 Dependabot alerts (12 high, 13 moderate, 3 low)
