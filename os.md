@@ -10,11 +10,6 @@
 
 ## Files to add
 
-- [ ] `README.md` (screenshots, Tauri/Rust/Node prerequisites, build and run steps)
-- [ ] `CONTRIBUTING.md`
-- [ ] `CODE_OF_CONDUCT.md`
-- [ ] `SECURITY.md` (private vulnerability reporting)
-- [ ] Issue and PR templates
 - [ ] CI workflow for lint, build, and tests on PRs
 - [ ] GitHub settings: branch protection, Dependabot, secret scanning + push protection, disable workflows on forks if needed
 
