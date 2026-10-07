@@ -2,9 +2,6 @@
 
 ## Decisions
 
-- [ ] **Branding**
-  - [ ] Keep Lexi name/logo/`speaklexi.com` links as yours
-  - [ ] Add a trademark note: forks must rename
 - [ ] **Updater and signing**
   - [ ] Ensure the private signing key and Apple signing/notarization secrets live only in CI secrets
   - [ ] Review or remove `.github/APPLE_SIGNING_SETUP.md`
