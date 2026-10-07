@@ -10,6 +10,8 @@ Use GitHub's private vulnerability reporting instead:
 2. Click **Report a vulnerability**.
 3. Describe the issue and, if possible, include steps to reproduce.
 
+If you cannot use that form, email support@speaklexi.com with the subject "Security report" and **no technical details**; we will reply with a private channel.
+
 ### What to include
 
 - A description of the vulnerability and its potential impact
