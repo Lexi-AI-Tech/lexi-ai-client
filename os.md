@@ -3,8 +3,6 @@
 ## Cleanup
 
 - [ ] Review `CLAUDE.md`, `changelog`, and code comments for internal servers, customer data, or credentials
-- [ ] Generalize comments referencing `lexi-ai-server/modules/...` internals
-- [ ] Search for hardcoded internal URLs, analytics keys, Sentry DSNs, test accounts, personal emails
 - [ ] Review the "Inspired by the shared dashboard reference" comment in `src/index.css`
 - [ ] Set a Content Security Policy (`"csp": null` in `tauri.conf.json`)
 - [ ] Fix or remove `checkUpdateDetails` (reads undefined `VITE_API_BASE_URL`; update size/notes never load)

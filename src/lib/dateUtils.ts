@@ -2,12 +2,11 @@
  * Date formatting utilities for use across the app.
  * Replaces Tauri format_date_relative / format_date_time to avoid N invokes.
  *
- * **API contract (lexi-ai-server):** Responses use ISO-8601 instants. Manual
- * string fields use `datetime_to_api_iso` (UTC `Z` on the wire — no conversion to
- * the server host’s local zone). Pydantic `datetime` fields serialize similarly;
- * the Tauri layer forwards JSON strings without rewriting times.
+ * **API contract:** Responses use ISO-8601 instants in UTC (`Z` on the wire), with
+ * no conversion to the server host's local zone. The Tauri layer forwards JSON
+ * strings without rewriting times.
  *
- * **Inbound-only server logic** (e.g. meeting segment `parse_dt`) normalizes
+ * **Inbound-only server logic** (e.g. parsing meeting segment times) normalizes
  * client-submitted strings to UTC for storage; that is not applied again when
  * reading rows for API responses.
  *

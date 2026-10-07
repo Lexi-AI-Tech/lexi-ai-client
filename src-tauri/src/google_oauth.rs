@@ -155,7 +155,7 @@ fn open_browser(url: &str, app: AppHandle) {
 /// This command:
 /// 1. Generates PKCE challenge/verifier pair
 /// 2. Generates a random state for CSRF protection (includes system_type and device_type)
-/// 3. Stores the verifier in Redis via backend API
+/// 3. Stores the verifier on the server via the backend API
 /// 4. Builds Google OAuth authorization URL
 /// 5. Opens the browser with the auth URL
 /// 6. Returns the PKCE challenge and auth URL to the frontend
@@ -186,7 +186,7 @@ pub async fn start_google_login(
         verifiers.insert(oauth_state.clone(), verifier.clone());
     }
 
-    // Store verifier in Redis via backend API (so backend can retrieve it during callback)
+    // Store verifier on the server via the backend API (so the backend can retrieve it during callback)
     let api_base_url = config::api_base_url();
     let store_verifier_url = format!("{}/api/v1/auth/oauth/verifier", api_base_url);
 
@@ -207,11 +207,11 @@ pub async fn start_google_login(
                     .text()
                     .await
                     .unwrap_or_else(|_| "Unknown error".to_string());
-                eprintln!("Failed to store verifier in Redis: {}", error_text);
+                eprintln!("Failed to store verifier on server: {}", error_text);
                 return Err(format!("Failed to store verifier: {}", error_text));
             }
             println!(
-                "✅ Stored PKCE verifier in Redis for state: {}...",
+                "✅ Stored PKCE verifier on server for state: {}...",
                 &oauth_state[..20]
             );
         }
@@ -231,7 +231,7 @@ pub async fn start_google_login(
     open_browser(&auth_url, app.clone());
 
     // Note: OAuth callback is now handled by the UI route (/auth/google/callback)
-    // The verifier is stored in both local state and Redis
+    // The verifier is stored in both local state and on the server
     // No need to start a separate callback server
 
     Ok(PkceChallenge {
