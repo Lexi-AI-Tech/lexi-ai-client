@@ -1,3 +1,6 @@
+# DISABLED: not under .github/workflows/, so GitHub does not run it.
+# The "deploy dev" comment trigger ran PR code with signing secrets, which is unsafe in a public repo.
+# Do not move it back without restricting it to maintainers (github.event.comment.author_association).
 # Dev release: comment "deploy dev" on a PR → build + upload to dev server (no formal GitHub release).
 name: Release Lexi AI Client (dev)
 
