@@ -29,7 +29,7 @@ No test suite exists in this repo (no `test`/`lint` script in `package.json`).
 
 `tauri build` alone is not distributable — macOS shows "can't be opened" without notarization+stapling. Use `./build-release.sh` (needs `APPLE_ID`, `APPLE_PASSWORD` app-specific password, `APPLE_TEAM_ID` env vars) or CI (`.github/workflows/release-production.yml`), which notarizes+staples both the `.app` and the `.dmg` and drops the result in `release/` (gitignored). Never distribute the raw `dist`/`target` DMG.
 
-CI: `release-dev.yml` and `release-production.yml` under `.github/workflows/` handle signed builds; see `.github/APPLE_SIGNING_SETUP.md` for the certificate export/secrets flow.
+CI: `release-production.yml` under `.github/workflows/` handles signed builds. The certificate export and secrets setup guide lives in the separate `lexi-ai-documentation` repo (`docs/client/apple-signing-setup.md`).
 
 ### Resetting local app state
 

@@ -3,9 +3,8 @@
 ## Decisions
 
 - [ ] **Updater and signing**
-  - [ ] Review or remove `.github/APPLE_SIGNING_SETUP.md`
   - [ ] Make sure forks' CI cannot publish via the release workflows (dev workflow disabled; still set a production environment with required reviewers, and branch protection on `main`)
-  - [ ] Replace the personal Apple `signingIdentity` in `tauri.conf.json` and `.github/APPLE_SIGNING_SETUP.md` with a placeholder or env value
+  - [ ] Replace the personal Apple `signingIdentity` in `tauri.conf.json` with a placeholder or env value
   - [ ] Delete or sanitize `.github/disabled/release-dev.yml.disabled` (contains `dev-server.speaklexi.com`)
 - [ ] **Third-party code and assets**
   - [ ] Confirm rights to fonts, icons, sounds, models, bundled binaries
