@@ -2,8 +2,6 @@
 
 ## Decisions
 
-- [ ] **Updater and signing**
-  - [ ] Delete or sanitize `.github/disabled/release-dev.yml.disabled` (contains `dev-server.speaklexi.com`)
 - [ ] **Third-party code and assets**
   - [ ] Confirm rights to fonts, icons, sounds, models, bundled binaries
 
