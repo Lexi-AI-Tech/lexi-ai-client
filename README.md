@@ -10,15 +10,6 @@ Voice-first productivity overlay for macOS and Windows, built with [Tauri 2](htt
 
 The client talks to the separate `lexi-ai-server` backend for transcription, LLM calls, auth, and billing. This repo contains only the desktop app.
 
-## Screenshots
-
-<!-- Add images to docs/screenshots/ and reference them here, e.g.
-![Dashboard](docs/screenshots/dashboard.png)
-![Pill overlay](docs/screenshots/pill.png)
--->
-
-_Screenshots coming soon._
-
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
