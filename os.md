@@ -3,7 +3,6 @@
 ## Decisions
 
 - [ ] **Updater and signing**
-  - [ ] Replace the personal Apple `signingIdentity` in `tauri.conf.json` with a placeholder or env value
   - [ ] Delete or sanitize `.github/disabled/release-dev.yml.disabled` (contains `dev-server.speaklexi.com`)
 - [ ] **Third-party code and assets**
   - [ ] Confirm rights to fonts, icons, sounds, models, bundled binaries

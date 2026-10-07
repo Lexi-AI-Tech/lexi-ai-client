@@ -27,7 +27,6 @@
       "exceptionDomain": "",
       "frameworks": [],
       "providerShortName": null,
-      "signingIdentity": "Developer ID Application: Satyasai Vallampati (FWLCJN85BF)",
       "infoPlist": "Info.plist",
       "hardenedRuntime": true,
       "dmg": {
