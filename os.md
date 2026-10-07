@@ -3,7 +3,8 @@
 ## Decisions
 
 - [ ] **Third-party code and assets**
-  - [ ] Confirm rights to fonts, icons, sounds, models, bundled binaries
+  - [ ] Self-host Satoshi (check its Fontshare license) or switch to a system font stack; remove the `fonts.cdnfonts.com` link from `index.html`
+  - [ ] Remove the unused `fonts.googleapis.com` / `fonts.gstatic.com` preconnects from `index.html`
 
 ## Cleanup
 
