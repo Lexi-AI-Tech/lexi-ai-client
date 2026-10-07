@@ -41,9 +41,7 @@ function main() {
         "Runs `tauri build` for the default Windows target (x86_64-pc-windows-msvc)",
         "with the `custom-protocol` feature (same as production CI).",
         "",
-        "Env loading order (does not override already-set env):",
-        "  1) .env.build.windows (preferred)",
-        "  2) .env",
+        "Env is loaded from .env (does not override already-set env).",
         "",
         "Required for signed updater artifacts (same as CI):",
         "  TAURI_SIGNING_PRIVATE_KEY",
@@ -56,7 +54,6 @@ function main() {
   const root = path.resolve(__dirname, "..");
 
   const envFromFile = {
-    ...loadEnvFile(path.join(root, ".env.build.windows")),
     ...loadEnvFile(path.join(root, ".env")),
   };
 
@@ -83,7 +80,7 @@ function main() {
         "Missing required env vars for Windows build:",
         ...missing.map((k) => `- ${k}`),
         "",
-        "Set them in your shell or add them to `.env.build.windows` (preferred) or `.env`.",
+        "Set them in your shell or add them to `.env`.",
       ].join("\n"),
     );
     process.exit(1);
