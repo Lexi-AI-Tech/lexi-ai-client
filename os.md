@@ -17,8 +17,6 @@
 
 - [ ] Review `CLAUDE.md`, `changelog`, and code comments for internal servers, customer data, or credentials
 - [ ] Generalize comments referencing `lexi-ai-server/modules/...` internals
-- [ ] Add `.env.production` to `.gitignore` (it is currently tracked)
-- [ ] Keep `.env.sample` with placeholders only
 - [ ] Search for hardcoded internal URLs, analytics keys, Sentry DSNs, test accounts, personal emails
 
 ## Files to add
