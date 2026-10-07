@@ -9,7 +9,9 @@
   - [ ] Updater endpoint and public key are fine to publish
   - [ ] Ensure the private signing key and Apple signing/notarization secrets live only in CI secrets
   - [ ] Review or remove `.github/APPLE_SIGNING_SETUP.md`
-  - [ ] Make sure forks' CI cannot publish via the release workflows
+  - [ ] Make sure forks' CI cannot publish via the release workflows (dev workflow disabled; still set a production environment with required reviewers, and branch protection on `main`)
+  - [ ] Replace the personal Apple `signingIdentity` in `tauri.conf.json` and `.github/APPLE_SIGNING_SETUP.md` with a placeholder or env value
+  - [ ] Delete or sanitize `.github/disabled/release-dev.yml.disabled` (contains `dev-server.speaklexi.com`)
 - [ ] **Third-party code and assets**
   - [ ] Confirm rights to fonts, icons, sounds, models, bundled binaries
 
@@ -18,6 +20,11 @@
 - [ ] Review `CLAUDE.md`, `changelog`, and code comments for internal servers, customer data, or credentials
 - [ ] Generalize comments referencing `lexi-ai-server/modules/...` internals
 - [ ] Search for hardcoded internal URLs, analytics keys, Sentry DSNs, test accounts, personal emails
+- [ ] Review the "Inspired by the shared dashboard reference" comment in `src/index.css`
+- [ ] Set a Content Security Policy (`"csp": null` in `tauri.conf.json`)
+- [ ] Fix or remove `checkUpdateDetails` (reads undefined `VITE_API_BASE_URL`; update size/notes never load)
+- [ ] Resolve the 28 Dependabot alerts (12 high, 13 moderate, 3 low)
+- [ ] Fix `build-release.sh` references in `CLAUDE.md`/`README.md` (the script does not exist)
 
 ## Files to add
 
