@@ -45,9 +45,7 @@ function main() {
         "",
         "Always produces a Universal Binary (aarch64 + x86_64).",
         "",
-        "Env loading order (does not override already-set env):",
-        "  1) .env.build.mac (preferred)",
-        "  2) .env",
+        "Env is loaded from .env (does not override already-set env).",
       ].join("\n"),
     );
     process.exit(0);
@@ -55,9 +53,8 @@ function main() {
 
   const root = path.resolve(__dirname, "..");
 
-  // Prefer a mac-specific env file if present; fall back to .env.
+  // Load secrets from .env (shell/CI variables take precedence).
   const envFromFile = {
-    ...loadEnvFile(path.join(root, ".env.build.mac")),
     ...loadEnvFile(path.join(root, ".env")),
   };
 
@@ -89,7 +86,7 @@ function main() {
         "Missing required env vars for mac build:",
         ...missing.map((k) => `- ${redactKey(k)}`),
         "",
-        "Set them in your shell or add them to `.env.build.mac` (preferred) or `.env`.",
+        "Set them in your shell or add them to `.env`.",
       ].join("\n"),
     );
     process.exit(1);

@@ -54,7 +54,7 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             return;
         }
 
-        // TODO: Implement this as on demand download feature on paid plans
+        // TODO: Implement this
         // offline_transcription is not in app config, keep as hardcoded for now
         let offline_transcription = false;
 

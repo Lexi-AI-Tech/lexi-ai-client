@@ -1272,9 +1272,9 @@
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-/* Chat-style bubbles per segment (dedup happens server-side before save, see
-   lexi-ai-server modules/meeting/service.py — segments arriving here are already
-   clean), with a small source badge (U / System / Note) inside each bubble. */
+/* Chat-style bubbles per segment (dedup happens server-side before save, so
+   segments arriving here are already clean), with a small source badge
+   (U / System / Note) inside each bubble. */
 .meeting-detail-transcript__segment {
   margin-bottom: 0.65rem;
   display: flex;

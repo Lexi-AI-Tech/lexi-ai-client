@@ -19,7 +19,7 @@ use tauri::{AppHandle, Emitter};
 /// the same real-world utterance, the system_audio copy reliably reaches the server (and
 /// is saved) before the user_audio echo of it arrives — letting the server's duplicate
 /// check compare against an already-saved segment instead of racing it. See the
-/// deduplication note in `lexi-ai-server`'s `modules/meeting/service.py`.
+/// deduplication note in the server's meeting service.
 const USER_AUDIO_SEND_DELAY: Duration = Duration::from_millis(500);
 
 /// Handles to stop meeting audio (recorder + optional system-audio capture).

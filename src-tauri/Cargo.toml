@@ -3,7 +3,7 @@ name = "lexi-ai"
 version = "0.1.11"
 description = "AI Productivity tool"
 authors = ["anadi45"]
-license = ""
+license = "MIT"
 repository = ""
 edition = "2021"
 

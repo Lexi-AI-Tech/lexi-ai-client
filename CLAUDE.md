@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**Lexi AI Client** — a Tauri 2 (Rust) + React 18/TypeScript desktop app for macOS and Windows. Global-hotkey voice dictation, AI "actions" (voice command → AI output injected at cursor), meeting recording/transcription, docs/notes with voice input, and a small always-on-top "pill" overlay showing recording status. Talks to the separate `lexi-ai-server` FastAPI backend (`server.speaklexi.com` in prod) for transcription, LLM calls, auth, and billing — this repo has no backend logic of its own beyond thin Rust command wrappers around that API.
+**Lexi AI Client** — a Tauri 2 (Rust) + React 18/TypeScript desktop app for macOS and Windows. Global-hotkey voice dictation, AI "actions" (voice command → AI output injected at cursor), meeting recording/transcription, docs/notes with voice input, and a small always-on-top "pill" overlay showing recording status. Talks to the separate, closed-source Lexi AI server (`server.speaklexi.com` in prod) for transcription, LLM calls, auth, and billing — this repo has no backend logic of its own beyond thin Rust command wrappers around that API.
 
 ## Commands
 
@@ -23,17 +23,17 @@ npm run format                 # cargo fmt (in src-tauri) + prettier --write . (
 
 No test suite exists in this repo (no `test`/`lint` script in `package.json`).
 
-**The `custom-protocol` feature flag is what switches prod vs dev config** — see `src-tauri/src/config.rs`: without it, `api_base_url()` returns `http://localhost:3000` and dev Google OAuth client id; with it (release builds / `npm run build`), it returns `https://server.speaklexi.com` and the prod OAuth client id. `npm run dev` does **not** pass this feature, so `tauri dev` always talks to a local `lexi-ai-server` on port 3000 — run that server locally, or edit `config.rs` temporarily to point at a remote one.
+**The `custom-protocol` feature flag is what switches prod vs dev config** — see `src-tauri/src/config.rs`: without it, `api_base_url()` returns `http://localhost:3000` and dev Google OAuth client id; with it (release builds / `npm run build`), it returns `https://server.speaklexi.com` and the prod OAuth client id. `npm run dev` does **not** pass this feature, so `tauri dev` always talks to a local Lexi AI server on port 3000 — run that server locally, or edit `config.rs` temporarily to point at a remote one.
 
 ### Distributable (notarized) macOS build
 
-`tauri build` alone is not distributable — macOS shows "can't be opened" without notarization+stapling. Use `./build-release.sh` (needs `APPLE_ID`, `APPLE_PASSWORD` app-specific password, `APPLE_TEAM_ID` env vars) or CI (`.github/workflows/release-production.yml`), which notarizes+staples both the `.app` and the `.dmg` and drops the result in `release/` (gitignored). Never distribute the raw `dist`/`target` DMG.
+`tauri build` alone is not distributable — macOS shows "can't be opened" without notarization+stapling. Use `npm run build:mac` (needs the `APPLE_*` and `TAURI_SIGNING_*` variables from `.env`, see `.env.sample`) or CI (`.github/workflows/release-production.yml`), which notarizes+staples both the `.app` and the `.dmg` and drops the result in `release/` (gitignored). Never distribute the raw `dist`/`target` DMG.
 
-CI: `release-dev.yml` and `release-production.yml` under `.github/workflows/` handle signed builds; see `.github/APPLE_SIGNING_SETUP.md` for the certificate export/secrets flow.
+CI: `release-production.yml` under `.github/workflows/` handles signed builds. The certificate export and secrets setup guide lives in the separate `lexi-ai-documentation` repo (`docs/client/apple-signing-setup.md`).
 
 ### Resetting local app state
 
-Tauri Store file at `~/Library/Application Support/com.lexi.ai/.app-config.dat` (macOS) holds app config; delete it to force a fresh config fetch from the server. Auth tokens live separately in secure storage (see below).
+Tauri Store file at `~/Library/Application Support/com.lexiai.client/.app-config.dat` (macOS) holds app config; delete it to force a fresh config fetch from the server. Auth tokens live separately in secure storage (see below).
 
 ## Architecture
 
@@ -42,7 +42,7 @@ Tauri Store file at `~/Library/Application Support/com.lexi.ai/.app-config.dat` 
 - **`src/`** — React/TypeScript UI. Talks to Rust exclusively via `@tauri-apps/api/core`'s `invoke()` calling `#[tauri::command]` functions, and via `@tauri-apps/api/event`'s `listen()` for events Rust emits (tray actions, meeting lifecycle, update checks — see `src/App.tsx` for the canonical listener-setup pattern: dynamic-imported `listen`, cancellation flag, cleanup function returned from an async setup fn).
 - **`src-tauri/src/`** — Rust. Owns everything OS-level: audio capture/recording, global hotkeys, text injection, window/pill management, OS keychain, meeting detection, system tray. `main.rs`'s module-doc header is the best single overview of what the Rust side does — read it first when touching Rust code.
 
-Almost all HTTP calls to `lexi-ai-server` happen from **Rust**, not the frontend — commands under `src-tauri/src/commands/*.rs` (and feature-specific `src-tauri/src/<feature>/commands.rs` e.g. `actions/`, `assistant/`, `docs/`, `meetings/`) build the request, attach the bearer token via `get_auth_token_async`, and return a typed `Result<T, String>` to the frontend. **When adding a new server endpoint, add a matching Rust struct + `#[tauri::command]` here, not a raw `fetch`/`invoke` from React** — this keeps auth/error handling centralized. New commands must also be registered in `main.rs`'s `tauri::generate_handler![...]` list (`invoke_handler`) and imported near the top of `main.rs`, or the frontend's `invoke()` call will fail silently at runtime with no compile-time check.
+Almost all HTTP calls to the Lexi AI server happen from **Rust**, not the frontend — commands under `src-tauri/src/commands/*.rs` (and feature-specific `src-tauri/src/<feature>/commands.rs` e.g. `actions/`, `assistant/`, `docs/`, `meetings/`) build the request, attach the bearer token via `get_auth_token_async`, and return a typed `Result<T, String>` to the frontend. **When adding a new server endpoint, add a matching Rust struct + `#[tauri::command]` here, not a raw `fetch`/`invoke` from React** — this keeps auth/error handling centralized. New commands must also be registered in `main.rs`'s `tauri::generate_handler![...]` list (`invoke_handler`) and imported near the top of `main.rs`, or the frontend's `invoke()` call will fail silently at runtime with no compile-time check.
 
 **Gotcha**: Rust structs deserializing server JSON responses (`serde`) silently **drop unknown fields** and error on **missing** ones — if the server DTO gains a new field, the Rust struct in `commands/*.rs` needs the matching field added or it's just discarded (not a compile error, not a runtime error, just silently absent in the frontend).
 
@@ -56,7 +56,7 @@ A small (200×50), transparent, always-on-top, non-focusable window (`pill.rs`, 
 
 ### Auth & token storage
 
-Google OAuth 2.0 + PKCE, orchestrated by `google_oauth.rs`; browser flow completion is delivered back over a WebSocket (`websocket.rs`, mirrors `lexi-ai-server`'s Redis-pub/sub OAuth WebSocket). Tokens are stored via `secure_storage.rs`: **debug builds** use a Tauri Store file (`.auth.dat`, avoids repeated keychain prompts during dev); **release builds** use the OS keychain (macOS Keychain / Windows Credential Manager / Linux Secret Service via the `keyring` crate). `commands/session_refresh.rs` runs a background scheduler to proactively refresh the access token before expiry.
+Google OAuth 2.0 + PKCE, orchestrated by `google_oauth.rs`; browser flow completion is delivered back over a WebSocket (`websocket.rs`, which receives the OAuth completion from the server). Tokens are stored via `secure_storage.rs`: **debug builds** use a Tauri Store file (`.auth.dat`, avoids repeated keychain prompts during dev); **release builds** use the OS keychain (macOS Keychain / Windows Credential Manager / Linux Secret Service via the `keyring` crate). `commands/session_refresh.rs` runs a background scheduler to proactively refresh the access token before expiry.
 
 ### Meeting detection & live transcription
 
@@ -72,4 +72,4 @@ Zustand stores in `src/store/`: `authStore`, `appConfigStore`, `onboardingStore`
 
 ### Server-mirrored types
 
-Several frontend TS interfaces (feature usage, analytics breakdown, transcripts, etc.) and their Rust `#[derive(Serialize, Deserialize)]` struct counterparts intentionally mirror `lexi-ai-server`'s Pydantic DTOs field-for-field. There's no shared schema/codegen — when a server DTO changes shape, update the Rust struct (`src-tauri/src/commands/*.rs`) **and** the TS interface (co-located in the relevant page/component file, not centralized) by hand.
+Several frontend TS interfaces (feature usage, analytics breakdown, transcripts, etc.) and their Rust `#[derive(Serialize, Deserialize)]` struct counterparts intentionally mirror the server's response DTOs field-for-field. There's no shared schema/codegen — when a server DTO changes shape, update the Rust struct (`src-tauri/src/commands/*.rs`) **and** the TS interface (co-located in the relevant page/component file, not centralized) by hand.
