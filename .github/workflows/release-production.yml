@@ -13,6 +13,8 @@ permissions:
 jobs:
   preflight:
     runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.tag_check.outputs.should_release }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -22,18 +24,22 @@ jobs:
         with:
           node-version: 20
 
-      - name: Check if tag already exists (fail fast, once per release)
+      - name: Check if tag already exists (skip release if so)
+        id: tag_check
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "Checking if tag v$VERSION already exists on remote..."
           if [ -n "$(git ls-remote --tags origin "refs/tags/v$VERSION")" ]; then
-            echo "❌ Error: Tag v$VERSION already exists! Please bump the version to trigger a new release."
-            exit 1
+            echo "⏭️ Tag v$VERSION already exists. Skipping release (bump the version to trigger a new one)."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "✅ Version v$VERSION is new. Proceeding..."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
-          echo "✅ Version v$VERSION is new. Proceeding..."
 
   build-and-release-prod:
     needs: preflight
+    if: needs.preflight.outputs.should_release == 'true'
     strategy:
       fail-fast: false
       matrix:
