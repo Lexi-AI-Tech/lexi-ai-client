@@ -175,6 +175,28 @@ pub(super) fn spawn_polling_thread(tx: mpsc::Sender<Vec<AppInfo>>) {
     });
 }
 
+/// Debug-only: emits `meeting-detected` when `$TMPDIR/lexi-simulate-meeting`
+/// appears (its contents name the platform, default "Zoom"), then deletes it.
+/// Lets scripts (e.g. marketing captures) pop the meeting pill without the dev
+/// tray item or a real call. Compiled out of release builds.
+#[cfg(debug_assertions)]
+fn spawn_simulation_trigger(app_handle: AppHandle) {
+    let trigger = std::env::temp_dir().join("lexi-simulate-meeting");
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_millis(500));
+        let Ok(contents) = std::fs::read_to_string(&trigger) else {
+            continue;
+        };
+        let _ = std::fs::remove_file(&trigger);
+        let platform = match contents.trim() {
+            "" => "Zoom".to_string(),
+            p => p.to_string(),
+        };
+        println!("[detector] simulated meeting-detected: app={}", platform);
+        let _ = app_handle.emit("meeting-detected", MeetingContext { platform });
+    });
+}
+
 pub fn start_meeting_detector(app_handle: AppHandle) {
     println!("[detector] start_meeting_detector called");
     let (tx_std, rx_std) = mpsc::channel::<Vec<AppInfo>>();
@@ -196,6 +218,9 @@ pub fn start_meeting_detector(app_handle: AppHandle) {
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let _ = tx_std;
+
+    #[cfg(debug_assertions)]
+    spawn_simulation_trigger(app_handle.clone());
 
     let app_detect = app_handle.clone();
     tauri::async_runtime::spawn(async move {
