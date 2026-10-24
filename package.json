@@ -7,7 +7,7 @@
   "main": "src-tauri/src/main.rs",
   "scripts": {
     "tauri": "tauri",
-    "dev": "tauri dev",
+    "dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "build": "tauri build -- --features custom-protocol",
     "build:tauri": "tauri build -- --features custom-protocol",
     "build:mac": "node scripts/build-mac.js",

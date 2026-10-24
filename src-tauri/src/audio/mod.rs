@@ -5,14 +5,12 @@
 //! | [`recorder`] | Microphone capture (`cpal`) |
 //! | [`thread`] | Hotkey recording loop (assistant / action / doc) |
 //! | [`meeting`] | Live meeting mic + system audio |
-//! | `pipeline`, `resampler` | Windows-only STT preprocessing before upload |
+//! | `pipeline`, `resampler` | STT preprocessing (mono 16 kHz) before upload (Windows) or local inference |
 
 pub mod meeting;
 pub mod recorder;
 pub mod thread;
 
-// Windows: mono 16 kHz pipeline before cloud STT (see `recorder::windows`).
-#[cfg(target_os = "windows")]
+// Mono 16 kHz pipeline: Windows cloud STT (see `recorder::windows`) and offline STT.
 pub mod pipeline;
-#[cfg(target_os = "windows")]
 pub mod resampler;

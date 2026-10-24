@@ -12,6 +12,7 @@ use super::service::AssistantService;
 
 use crate::commands::app_config::load_app_config;
 use crate::commands::auth::get_auth_token_async;
+use crate::commands::shortcuts::Shortcut;
 
 use crate::text_injector::TextInjector;
 use std::time::Instant;
@@ -41,6 +42,12 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 .unwrap_or_default();
         });
 
+        // Offline mode: local STT, no auth or network. Decided before the auth check.
+        if crate::offline::is_offline(&app_handle_for_task) {
+            process_audio_offline(audio_data, app_handle_for_task).await;
+            return;
+        }
+
         // Get authentication token from secure storage (with automatic refresh if needed)
         let auth_token = get_auth_token_async(&app_handle_for_task).await;
 
@@ -53,10 +60,6 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             });
             return;
         }
-
-        // TODO: Implement this
-        // offline_transcription is not in app config, keep as hardcoded for now
-        let offline_transcription = false;
 
         let app_config = match load_app_config(&app_handle_for_task) {
             Ok(config) => config,
@@ -88,7 +91,6 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
                 audio_data,
                 auth_token,
                 Some(app_handle_for_task.clone()),
-                offline_transcription,
                 language,
                 vocabulary,
                 enhance_transcription,
@@ -163,4 +165,111 @@ pub fn process_audio(audio_data: Vec<u8>, app_handle: AppHandle) {
             }
         }
     });
+}
+
+/// Local STT path: whisper on-device, then client-side shortcut expansion and injection.
+/// There is no LLM cleanup offline, so the text is whisper's raw output.
+async fn process_audio_offline(audio_data: Vec<u8>, app_handle: AppHandle) {
+    let (language, vocabulary, shortcuts) = match load_app_config(&app_handle) {
+        Ok(config) => (
+            config
+                .languages
+                .as_ref()
+                .and_then(|langs| langs.first().cloned())
+                .unwrap_or_else(|| "auto".to_string()),
+            config.vocabulary.unwrap_or_default(),
+            config.shortcuts.unwrap_or_default(),
+        ),
+        // Config is cached locally; if it's unreadable, still dictate with defaults.
+        Err(_) => ("auto".to_string(), Vec::new(), Vec::new()),
+    };
+
+    let start = Instant::now();
+    match crate::engine::stt::transcribe(&app_handle, audio_data, language, vocabulary).await {
+        Ok(text) => {
+            let text = expand_shortcuts(&text, &shortcuts);
+            println!(
+                "✅ Offline transcription completed in {:.2}s: {}",
+                start.elapsed().as_secs_f64(),
+                text
+            );
+            let _ = app_handle.emit("transcription_success", &text);
+            if !text.trim().is_empty() {
+                match TextInjector::new().inject_text(&text) {
+                    Ok(_) => {
+                        let _ = app_handle.emit("injection_success", ());
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to inject text: {}", e);
+                        let _ = app_handle.emit("injection_error", "Failed to insert text");
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Offline transcription failed: {}", e);
+            let _ = app_handle.emit("transcription_error", e);
+        }
+    }
+}
+
+/// Replaces shortcut phrases (case-insensitive, whole-word) with their values.
+fn expand_shortcuts(text: &str, shortcuts: &[Shortcut]) -> String {
+    let mut out = text.to_string();
+    for shortcut in shortcuts {
+        let phrase = shortcut.phrase.trim().to_ascii_lowercase();
+        if phrase.is_empty() {
+            continue;
+        }
+        let mut result = String::with_capacity(out.len());
+        let lower = out.to_ascii_lowercase(); // ASCII-only lowercase keeps byte offsets aligned
+        let mut cursor = 0;
+        while let Some(found) = lower[cursor..].find(&phrase) {
+            let start = cursor + found;
+            let end = start + phrase.len();
+            let boundary_before = out[..start]
+                .chars()
+                .next_back()
+                .map_or(true, |c| !c.is_alphanumeric());
+            let boundary_after = out[end..]
+                .chars()
+                .next()
+                .map_or(true, |c| !c.is_alphanumeric());
+            result.push_str(&out[cursor..start]);
+            if boundary_before && boundary_after {
+                result.push_str(&shortcut.value);
+            } else {
+                result.push_str(&out[start..end]);
+            }
+            cursor = end;
+        }
+        result.push_str(&out[cursor..]);
+        out = result;
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sc(phrase: &str, value: &str) -> Shortcut {
+        Shortcut {
+            id: "1".into(),
+            phrase: phrase.into(),
+            value: value.into(),
+        }
+    }
+
+    #[test]
+    fn expands_whole_words_case_insensitively() {
+        let out = expand_shortcuts("My Email is here", &[sc("my email", "a@b.com")]);
+        assert_eq!(out, "a@b.com is here");
+    }
+
+    #[test]
+    fn ignores_partial_word_matches() {
+        let out = expand_shortcuts("grid", &[sc("rid", "X")]);
+        assert_eq!(out, "grid");
+    }
 }

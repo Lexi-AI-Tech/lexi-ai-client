@@ -59,16 +59,18 @@ mod actions; // Voice actions (triggered by hotkeys)
 mod api_endpoints; // Centralized API endpoint definitions
 mod app_icon; // `app_icon/` — platform app icons (macOS, Windows)
 mod assistant; // Recording thread management
-mod docs; // Docs voice-to-text (transcribe into editor, no injection)
 mod audio;
 mod commands;
 mod config; // Application configuration (API base URL, OAuth redirect URI)
 mod cursor_context; // Cursor context retrieval using macOS Accessibility API (AXUIElement)
+mod docs; // Docs voice-to-text (transcribe into editor, no injection)
+mod engine; // Local inference engines (offline mode)
 mod global_key_listener; // Unified hotkey management
 mod google_oauth; // Google OAuth 2.0 authentication flow with PKCE (Proof Key for Code Exchange)
 mod keyboard_simulator; // Cross-platform keyboard simulation (copy/paste shortcuts)
 
 mod meetings;
+mod offline; // Offline mode settings and model locations
 mod os_permissions; // macOS permission requests and checks (microphone, accessibility, system audio)
 mod pill; // Pill overlay window creation, positioning, and visibility management
 mod secure_storage; // Secure storage using OS keychain for JWT tokens
@@ -119,11 +121,6 @@ use commands::billing::{
     get_feature_usage,
 };
 use commands::cache::user_cache_warmup;
-use commands::session_refresh::{spawn_session_refresh, start_session_refresh_scheduler, SessionRefreshReason};
-use docs::commands::{
-    create_doc, create_doc_from_meeting, delete_doc, get_doc, get_docs, start_doc_recording,
-    stop_doc_recording, update_doc,
-};
 use commands::hotkey::{
     get_current_hotkey, start_hotkey_recording, stop_hotkey_recording, update_hotkey,
 };
@@ -133,10 +130,17 @@ use commands::onboarding::{
     get_server_onboarding_status, next_onboarding_step, previous_onboarding_step, reset_onboarding,
     set_onboarding_step,
 };
+use commands::session_refresh::{
+    spawn_session_refresh, start_session_refresh_scheduler, SessionRefreshReason,
+};
 use commands::shortcuts::{create_shortcut, delete_shortcut, get_shortcuts, update_shortcut};
 use commands::text::inject_text;
 use commands::utils::{copy_to_clipboard, get_system_type, open_external_url};
 use commands::window::{open_devtools, show_main_window};
+use docs::commands::{
+    create_doc, create_doc_from_meeting, delete_doc, get_doc, get_docs, start_doc_recording,
+    stop_doc_recording, update_doc,
+};
 use meetings::commands::{
     add_meeting_note, create_meeting, delete_meeting, dismiss_meeting_end_check_prompt,
     end_meeting_session, get_meeting_details, get_meeting_suggested_questions, list_meetings,
@@ -370,6 +374,12 @@ pub fn main() {
     builder
         .manage(OAuthState::default())
         .invoke_handler(tauri::generate_handler![
+            offline::get_offline_status,
+            offline::set_inference_mode,
+            offline::list_offline_models,
+            offline::download_offline_model,
+            offline::select_offline_model,
+            offline::delete_offline_model,
             request_microphone_permission,
             request_accessibility_permission,
             open_permission_pane,
