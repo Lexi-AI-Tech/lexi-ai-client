@@ -174,6 +174,12 @@ pub fn spawn_recording_thread(
                     thread::sleep(CORE_AUDIO_RELEASE_DELAY);
 
                     let onboarding_dry_run = onboarding_skip_backend.load(Ordering::Acquire);
+                    if !onboarding_dry_run
+                        && ctx.mode == RecordingMode::Assistant
+                        && crate::offline::is_offline(&app_handle)
+                    {
+                        crate::engine::stt::preload(&app_handle);
+                    }
                     if !onboarding_dry_run {
                         let app_handle_clone = app_handle.clone();
                         tauri::async_runtime::spawn(async move {

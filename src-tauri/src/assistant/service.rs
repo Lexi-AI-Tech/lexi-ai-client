@@ -25,7 +25,6 @@ use crate::api_endpoints::assistant;
 use crate::commands::shortcuts::Shortcut;
 use crate::cursor_context::{get_cursor_context, CursorContext};
 use crate::utils;
-// use crate::whisper; // COMMENTED OUT: Model execution functionality
 use reqwest::multipart;
 use std::error::Error;
 use tauri::{AppHandle, Emitter};
@@ -63,7 +62,6 @@ impl AssistantService {
     /// * `enhance_transcription` - Whether to enhance the transcription with AI
     /// * `shortcuts` - Shortcut items for post-STT expansion
     /// * `app_handle` - Optional Tauri AppHandle for emitting events (e.g., login_required)
-    /// * `offline_transcription` - Whether to use local Whisper model instead of server API
     ///
     /// Cursor context (focused app, selected text) is fetched inside this function just before
     /// calling the Assistant API and is returned with the transcription for use by the caller.
@@ -76,7 +74,6 @@ impl AssistantService {
         audio_data: Vec<u8>,
         auth_token: Result<String, String>,
         app_handle: Option<AppHandle>,
-        offline_transcription: bool,
         language: String,
         vocabulary: Vec<String>,
         enhance_transcription: bool,
@@ -85,160 +82,109 @@ impl AssistantService {
         // Debug logging
         println!("🔍 DEBUG: Audio data size: {} bytes", audio_data.len());
 
-        // COMMENTED OUT: Model execution functionality
-        // Check if offline transcription is enabled
-        if offline_transcription {
-            // COMMENTED OUT: Offline transcription using local Whisper model
-            Err("Offline transcription is currently disabled. Please use server-based transcription.".into())
+        // Continue with server API transcription
 
-            // println!("📦 Using offline transcription (local Whisper model)");
+        let build_form = |audio_data: &[u8],
+                          focused_app: &str,
+                          language: &str,
+                          vocabulary: &[String],
+                          enhance_transcription: bool,
+                          shortcuts: &[Shortcut]|
+         -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
+            let part = multipart::Part::bytes(audio_data.to_vec())
+                .file_name("audio.wav")
+                .mime_str("audio/wav")?;
 
-            // // Prepare vocabulary option
-            // let vocabulary_option = if !vocabulary.is_empty() {
-            //     Some(vocabulary.clone())
-            // } else {
-            //     None
-            // };
+            let vocabulary_json = serde_json::to_string(vocabulary)?;
+            let shortcuts_json = serde_json::to_string(shortcuts)?;
 
-            // // Run the synchronous whisper function in a blocking task
-            // let audio_data_clone = audio_data.clone();
-            // let language_clone = language.clone();
-            // let vocabulary_clone = vocabulary_option;
+            let form = multipart::Form::new()
+                .part("audio_file", part)
+                .text("focused_app", focused_app.to_string())
+                .text("language", language.to_string())
+                .text("vocabulary", vocabulary_json)
+                .text("enhance_transcription", enhance_transcription.to_string())
+                .text("shortcuts", shortcuts_json);
 
-            // // Check for cancellation before starting
-            // if let Some(cancel_rx) = cancel_rx {
-            //     // Use tokio::select to race between transcription and cancellation
-            //     tokio::select! {
-            //         result = tokio::task::spawn_blocking(move || {
-            //             whisper::transcribe_audio_data(audio_data_clone, language_clone, vocabulary_clone)
-            //         }) => {
-            //             match result {
-            //                 Ok(Ok(text)) => Ok(text),
-            //                 Ok(Err(e)) => Err(e.into()),
-            //                 Err(e) => Err(format!("Transcription task failed: {}", e).into()),
-            //             }
-            //         }
-            //         _ = cancel_rx => {
-            //             println!("🛑 Offline transcription cancelled");
-            //             Err("Request cancelled".into())
-            //         }
-            //     }
-            // } else {
-            //     // No cancellation support, just run the blocking task
-            //     let vocabulary_for_blocking = if !vocabulary.is_empty() {
-            //         Some(vocabulary)
-            //     } else {
-            //         None
-            //     };
-            //     tokio::task::spawn_blocking(move || {
-            //         whisper::transcribe_audio_data(audio_data, language, vocabulary_for_blocking)
-            //     })
-            //     .await
-            //     .map_err(|e| format!("Transcription task failed: {}", e))?
-            //     .map_err(|e| e.into())
-            // }
-        } else {
-            // Continue with server API transcription
+            Ok(form)
+        };
 
-            let build_form = |audio_data: &[u8],
-                              focused_app: &str,
-                              language: &str,
-                              vocabulary: &[String],
-                              enhance_transcription: bool,
-                              shortcuts: &[Shortcut]|
-             -> Result<multipart::Form, Box<dyn Error + Send + Sync>> {
-                let part = multipart::Part::bytes(audio_data.to_vec())
-                    .file_name("audio.wav")
-                    .mime_str("audio/wav")?;
-
-                let vocabulary_json = serde_json::to_string(vocabulary)?;
-                let shortcuts_json = serde_json::to_string(shortcuts)?;
-
-                let form = multipart::Form::new()
-                    .part("audio_file", part)
-                    .text("focused_app", focused_app.to_string())
-                    .text("language", language.to_string())
-                    .text("vocabulary", vocabulary_json)
-                    .text("enhance_transcription", enhance_transcription.to_string())
-                    .text("shortcuts", shortcuts_json);
-
-                Ok(form)
-            };
-
-            // Check if we have a token
-            let current_token = match auth_token {
-                Ok(token) => token,
-                Err(e) => {
-                    println!("🔍 DEBUG: No auth token provided (Error: {}) - emitting login_required event", e);
-                    if let Some(handle) = app_handle {
-                        handle.emit("login_required", ()).unwrap_or_else(|e| {
-                            eprintln!("Failed to emit login_required event: {}", e)
-                        });
-                    }
-                    return Err(format!("Authentication required: {}", e).into());
+        // Check if we have a token
+        let current_token = match auth_token {
+            Ok(token) => token,
+            Err(e) => {
+                println!(
+                    "🔍 DEBUG: No auth token provided (Error: {}) - emitting login_required event",
+                    e
+                );
+                if let Some(handle) = app_handle {
+                    handle.emit("login_required", ()).unwrap_or_else(|e| {
+                        eprintln!("Failed to emit login_required event: {}", e)
+                    });
                 }
-            };
-
-            println!(
-                "🔍 DEBUG: Added Authorization header (token length: {})",
-                current_token.len()
-            );
-
-            // Get cursor context just before making the API call
-            let cursor_context = get_cursor_context();
-            let focused_app = cursor_context
-                .as_ref()
-                .and_then(|ctx| ctx.app_name.clone())
-                .unwrap_or_else(|| "Unknown".to_string());
-
-            // Build the form and make the request
-            let form = build_form(
-                &audio_data,
-                &focused_app,
-                &language,
-                &vocabulary,
-                enhance_transcription,
-                &shortcuts,
-            )?;
-
-            // Build the request URL (auth + billing only; config is in the form body)
-            let url = assistant::transcribe_url();
-            utils::log_api_request("POST", &url);
-            let mut request = self.client.post(&url).multipart(form);
-            request = request.header("Authorization", format!("Bearer {}", current_token));
-            if let Some(handle) = &app_handle {
-                request = utils::apply_feature_usage_header(handle, request);
+                return Err(format!("Authentication required: {}", e).into());
             }
+        };
 
-            // Send the initial request
-            let res = request.send().await?;
-            if let Some(handle) = &app_handle {
-                utils::capture_feature_usage_header(handle, &res);
-            }
+        println!(
+            "🔍 DEBUG: Added Authorization header (token length: {})",
+            current_token.len()
+        );
 
-            let status = res.status();
-            println!("🔍 DEBUG: Response status: {}", status);
+        // Get cursor context just before making the API call
+        let cursor_context = get_cursor_context();
+        let focused_app = cursor_context
+            .as_ref()
+            .and_then(|ctx| ctx.app_name.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
 
-            // Check if the request was successful (status code 200-299)
-            if !status.is_success() {
-                let error_text = res.text().await?;
-                println!("🔍 DEBUG: Server Error response: {}", error_text);
-                if status == reqwest::StatusCode::UNAUTHORIZED {
-                    if let Some(handle) = app_handle {
-                        handle.emit("login_required", ()).unwrap_or_else(|e| {
-                            eprintln!("Failed to emit login_required event: {}", e)
-                        });
-                    }
-                }
-                return Err(format!("Server Error ({}): {}", status, error_text).into());
-            }
+        // Build the form and make the request
+        let form = build_form(
+            &audio_data,
+            &focused_app,
+            &language,
+            &vocabulary,
+            enhance_transcription,
+            &shortcuts,
+        )?;
 
-            // Parse the plain text response
-            // The server returns plain text containing the transcribed text
-            let text = res.text().await?;
-            println!("🔍 DEBUG: Server response text: {}", text);
-
-            Ok((text, cursor_context))
+        // Build the request URL (auth + billing only; config is in the form body)
+        let url = assistant::transcribe_url();
+        utils::log_api_request("POST", &url);
+        let mut request = self.client.post(&url).multipart(form);
+        request = request.header("Authorization", format!("Bearer {}", current_token));
+        if let Some(handle) = &app_handle {
+            request = utils::apply_feature_usage_header(handle, request);
         }
+
+        // Send the initial request
+        let res = request.send().await?;
+        if let Some(handle) = &app_handle {
+            utils::capture_feature_usage_header(handle, &res);
+        }
+
+        let status = res.status();
+        println!("🔍 DEBUG: Response status: {}", status);
+
+        // Check if the request was successful (status code 200-299)
+        if !status.is_success() {
+            let error_text = res.text().await?;
+            println!("🔍 DEBUG: Server Error response: {}", error_text);
+            if status == reqwest::StatusCode::UNAUTHORIZED {
+                if let Some(handle) = app_handle {
+                    handle.emit("login_required", ()).unwrap_or_else(|e| {
+                        eprintln!("Failed to emit login_required event: {}", e)
+                    });
+                }
+            }
+            return Err(format!("Server Error ({}): {}", status, error_text).into());
+        }
+
+        // Parse the plain text response
+        // The server returns plain text containing the transcribed text
+        let text = res.text().await?;
+        println!("🔍 DEBUG: Server response text: {}", text);
+
+        Ok((text, cursor_context))
     }
 }

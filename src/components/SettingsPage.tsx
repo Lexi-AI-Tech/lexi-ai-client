@@ -7,6 +7,7 @@ import {
   Power,
   Keyboard,
   Atom,
+  Cpu,
   Sparkles,
   ChevronDown,
   Check,
@@ -31,6 +32,7 @@ import { check } from "@tauri-apps/plugin-updater";
 import { checkUpdateDetails } from "../hooks/useAutoUpdater";
 import { UpgradeModal } from "./UpgradeModal";
 import { LanguageFlagIcon } from "./LanguageFlagIcon";
+import { ModelsSection } from "./ModelsSection";
 
 type CurrentSubscriptionResponse = {
   plan_type: string;
@@ -112,7 +114,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       hotkeys: [],
     });
   const [activeSection, setActiveSection] = useState<
-    "general" | "account" | "transcription" | "hotkeys"
+    "general" | "account" | "transcription" | "offline" | "hotkeys"
   >("general");
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
@@ -666,6 +668,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           { id: "general" as const, label: "General", icon: Power },
           { id: "account" as const, label: "Account", icon: Monitor },
           { id: "transcription" as const, label: "Transcription", icon: Mic },
+          {
+            id: "offline" as const,
+            label: "Offline Models",
+            icon: Cpu,
+          },
           { id: "hotkeys" as const, label: "Hotkeys", icon: Keyboard },
         ].map(({ id, label, icon: Icon }) => (
           <button
@@ -1038,6 +1045,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeSection === "offline" && (
+          <div className="panel panel--lg mb-24">
+            <ModelsSection />
           </div>
         )}
 

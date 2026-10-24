@@ -52,9 +52,9 @@ tauri-plugin-updater = "2.10.0"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-os = "2.3.2"
 tauri-plugin-http = "2.5.7"
+rubato = "0.15"  # 16 kHz resampling for STT preprocessing
 
 [target.'cfg(target_os = "windows")'.dependencies]
-rubato = "0.15"
 windows = { version = "0.48", features = [
     "Win32_Foundation",
     "Win32_Media_Audio",
@@ -80,6 +80,9 @@ winapi = { version = "0.3", features = [
     "winver",
 ] }
 png = "0.17"
+
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
+whisper-rs = { version = "0.16", features = ["metal"] }  # offline STT (whisper.cpp)
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.24"
